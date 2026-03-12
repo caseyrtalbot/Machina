@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerFilesystemIpc } from './ipc/filesystem'
 import { registerWatcherIpc } from './ipc/watcher'
+import { registerShellIpc, getShellService } from './ipc/shell'
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -60,12 +61,17 @@ app.whenReady().then(() => {
 
   const mainWindow = createWindow()
   registerWatcherIpc(mainWindow)
+  registerShellIpc(mainWindow)
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('before-quit', () => {
+  getShellService().killAll()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common
