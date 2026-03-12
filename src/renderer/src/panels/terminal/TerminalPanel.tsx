@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -21,13 +21,24 @@ export function TerminalPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const instancesRef = useRef<Map<string, TerminalInstance>>(new Map())
   const activeContainerRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const { sessions, activeSessionId, addSession, removeSession } = useTerminalStore()
   const { vaultPath } = useVaultStore()
 
   const createTerminalInstance = useCallback(async () => {
-    const cwd = vaultPath || process.cwd?.() || '/'
-    const sessionId: string = await ipcRenderer.invoke('terminal:create', { cwd })
+    const cwd = vaultPath || '/'
+    let sessionId: string
+    try {
+      sessionId = await ipcRenderer.invoke('terminal:create', { cwd })
+    } catch (err) {
+      setError(
+        `Failed to create terminal: ${err instanceof Error ? err.message : String(err)}. ` +
+          'Try restarting the app or running: npx electron-rebuild'
+      )
+      return null
+    }
+    setError(null)
     const title = `Shell ${sessions.length + 1}`
 
     addSession({ id: sessionId, title })
@@ -39,10 +50,10 @@ export function TerminalPanel() {
         background: colors.bg.base,
         foreground: colors.text.primary,
         cursor: colors.accent.default,
-        selectionBackground: colors.accent.muted,
+        selectionBackground: colors.accent.muted
       },
       scrollback: 10000,
-      cursorBlink: true,
+      cursorBlink: true
     })
 
     const fitAddon = new FitAddon()
@@ -82,21 +93,27 @@ export function TerminalPanel() {
 
   // Listen for data and exit events from main process
   useEffect(() => {
-    const unsubData = ipcRenderer.on('terminal:data', (_event, payload: { sessionId: string; data: string }) => {
-      const instance = instancesRef.current.get(payload.sessionId)
-      if (instance) {
-        instance.terminal.write(payload.data)
+    const unsubData = ipcRenderer.on(
+      'terminal:data',
+      (_event, payload: { sessionId: string; data: string }) => {
+        const instance = instancesRef.current.get(payload.sessionId)
+        if (instance) {
+          instance.terminal.write(payload.data)
+        }
       }
-    })
+    )
 
-    const unsubExit = ipcRenderer.on('terminal:exit', (_event, payload: { sessionId: string; code: number }) => {
-      const instance = instancesRef.current.get(payload.sessionId)
-      if (instance) {
-        instance.terminal.writeln(`\r\n[Process exited with code ${payload.code}]`)
-        instancesRef.current.delete(payload.sessionId)
+    const unsubExit = ipcRenderer.on(
+      'terminal:exit',
+      (_event, payload: { sessionId: string; code: number }) => {
+        const instance = instancesRef.current.get(payload.sessionId)
+        if (instance) {
+          instance.terminal.writeln(`\r\n[Process exited with code ${payload.code}]`)
+          instancesRef.current.delete(payload.sessionId)
+        }
+        removeSession(payload.sessionId)
       }
-      removeSession(payload.sessionId)
-    })
+    )
 
     return () => {
       unsubData()
@@ -148,11 +165,33 @@ export function TerminalPanel() {
       style={{ backgroundColor: colors.bg.base }}
     >
       <TerminalTabs onNewTab={handleNewTab} />
-      <div
-        ref={activeContainerRef}
-        className="flex-1 overflow-hidden"
-        style={{ padding: '4px 0 0 4px' }}
-      />
+      {error ? (
+        <div
+          className="flex-1 flex items-center justify-center p-4"
+          style={{ color: colors.text.muted }}
+        >
+          <div className="text-center max-w-xs">
+            <p className="text-sm mb-2">Terminal unavailable</p>
+            <p className="text-xs">{error}</p>
+            <button
+              onClick={() => {
+                setError(null)
+                createTerminalInstance()
+              }}
+              className="mt-3 text-xs px-3 py-1 rounded border"
+              style={{ borderColor: colors.border.default, color: colors.text.secondary }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={activeContainerRef}
+          className="flex-1 overflow-hidden"
+          style={{ padding: '4px 0 0 4px' }}
+        />
+      )}
     </div>
   )
 }

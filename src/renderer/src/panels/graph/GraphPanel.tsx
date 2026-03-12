@@ -3,7 +3,13 @@ import { zoom, type D3ZoomEvent } from 'd3-zoom'
 import { select } from 'd3-selection'
 import { useVaultStore } from '../../store/vault-store'
 import { useGraphStore } from '../../store/graph-store'
-import { createSimulation, renderGraph, findNodeAt, type SimNode, type SimEdge } from './GraphRenderer'
+import {
+  createSimulation,
+  renderGraph,
+  findNodeAt,
+  type SimNode,
+  type SimEdge
+} from './GraphRenderer'
 import { colors } from '../../design/tokens'
 
 interface GraphPanelProps {
@@ -31,7 +37,15 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     const t = transformRef.current
     ctx.translate(t.x, t.y)
     ctx.scale(t.k, t.k)
-    renderGraph(ctx, nodesRef.current, edgesRef.current, canvas.width, canvas.height, selectedNodeId, hoveredNodeId)
+    renderGraph(
+      ctx,
+      nodesRef.current,
+      edgesRef.current,
+      canvas.width,
+      canvas.height,
+      selectedNodeId,
+      hoveredNodeId
+    )
     ctx.restore()
   }, [selectedNodeId, hoveredNodeId])
 
@@ -40,15 +54,26 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     if (!canvas) return
 
     const graph = getGraph()
-    const nodes: SimNode[] = graph.nodes.map((n) => ({ ...n, x: Math.random() * canvas.width, y: Math.random() * canvas.height }))
+    const nodes: SimNode[] = graph.nodes.map((n) => ({
+      ...n,
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height
+    }))
     const edges: SimEdge[] = graph.edges.map((e) => ({ ...e }))
 
     nodesRef.current = nodes
     edgesRef.current = edges
 
-    const sim = createSimulation(nodes, edges, canvas.width, canvas.height)
-    sim.on('tick', render)
-    simRef.current = sim
+    if (nodes.length > 0) {
+      const sim = createSimulation(nodes, edges, canvas.width, canvas.height)
+      sim.on('tick', render)
+      simRef.current = sim
+      return () => {
+        sim.stop()
+      }
+    } else {
+      render()
+    }
 
     const zoomBehavior = zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.1, 4])
@@ -58,37 +83,41 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       })
 
     select(canvas).call(zoomBehavior)
-
-    return () => { sim.stop() }
   }, [getGraph, render])
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const t = transformRef.current
-    const x = (e.clientX - rect.left - t.x) / t.k
-    const y = (e.clientY - rect.top - t.y) / t.k
-    const node = findNodeAt(nodesRef.current, x, y)
-    setHoveredNode(node?.id ?? null)
-    canvas.style.cursor = node ? 'pointer' : 'default'
-  }, [setHoveredNode])
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const t = transformRef.current
+      const x = (e.clientX - rect.left - t.x) / t.k
+      const y = (e.clientY - rect.top - t.y) / t.k
+      const node = findNodeAt(nodesRef.current, x, y)
+      setHoveredNode(node?.id ?? null)
+      canvas.style.cursor = node ? 'pointer' : 'default'
+    },
+    [setHoveredNode]
+  )
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const t = transformRef.current
-    const x = (e.clientX - rect.left - t.x) / t.k
-    const y = (e.clientY - rect.top - t.y) / t.k
-    const node = findNodeAt(nodesRef.current, x, y)
-    if (node) {
-      setSelectedNode(node.id)
-      onNodeClick(node.id)
-    } else {
-      setSelectedNode(null)
-    }
-  }, [setSelectedNode, onNodeClick])
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const t = transformRef.current
+      const x = (e.clientX - rect.left - t.x) / t.k
+      const y = (e.clientY - rect.top - t.y) / t.k
+      const node = findNodeAt(nodesRef.current, x, y)
+      if (node) {
+        setSelectedNode(node.id)
+        onNodeClick(node.id)
+      } else {
+        setSelectedNode(null)
+      }
+    },
+    [setSelectedNode, onNodeClick]
+  )
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -104,14 +133,29 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     return () => observer.disconnect()
   }, [render])
 
+  const graph = getGraph()
+  const isEmpty = graph.nodes.length === 0
+
   return (
     <div className="h-full relative" style={{ backgroundColor: colors.bg.base }}>
       <canvas
         ref={canvasRef}
-        className="w-full h-full"
+        className="w-full h-full block"
+        style={{ backgroundColor: colors.bg.base }}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
       />
+      {isEmpty && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ color: colors.text.muted }}
+        >
+          <div className="text-center">
+            <p className="text-lg mb-2">No notes yet</p>
+            <p className="text-sm">Create a note to see your knowledge graph</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
