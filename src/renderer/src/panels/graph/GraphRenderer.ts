@@ -1,5 +1,12 @@
-import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, type Simulation } from 'd3-force'
-import type { GraphNode, GraphEdge, RelationshipKind, ArtifactType, Signal } from '@shared/types'
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide,
+  type Simulation
+} from 'd3-force'
+import type { GraphNode, RelationshipKind } from '@shared/types'
 import { ARTIFACT_COLORS, colors } from '../../design/tokens'
 import { SIGNAL_OPACITY } from '@shared/types'
 
@@ -22,23 +29,28 @@ const LINK_STRENGTH: Record<RelationshipKind, number> = {
   connection: 0.3,
   cluster: 0.6,
   tension: -0.2,
-  appears_in: 0.2,
+  appears_in: 0.2
 }
 
 export function createSimulation(
   nodes: SimNode[],
   edges: SimEdge[],
   width: number,
-  height: number,
+  height: number
 ): Simulation<SimNode, SimEdge> {
   return forceSimulation<SimNode>(nodes)
-    .force('link', forceLink<SimNode, SimEdge>(edges)
-      .id((d) => d.id)
-      .strength((d) => Math.abs(LINK_STRENGTH[d.kind]))
+    .force(
+      'link',
+      forceLink<SimNode, SimEdge>(edges)
+        .id((d) => d.id)
+        .strength((d) => Math.abs(LINK_STRENGTH[d.kind]))
     )
     .force('charge', forceManyBody<SimNode>().strength(-120))
     .force('center', forceCenter(width / 2, height / 2))
-    .force('collide', forceCollide<SimNode>().radius((d) => nodeRadius(d.connectionCount) + 4))
+    .force(
+      'collide',
+      forceCollide<SimNode>().radius((d) => nodeRadius(d.connectionCount) + 4)
+    )
 }
 
 export function nodeRadius(connectionCount: number): number {
@@ -52,11 +64,18 @@ export function renderGraph(
   width: number,
   height: number,
   selectedId: string | null,
-  hoveredId: string | null,
+  hoveredId: string | null
 ): void {
   ctx.clearRect(0, 0, width, height)
 
-  const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 2)
+  const gradient = ctx.createRadialGradient(
+    width / 2,
+    height / 2,
+    0,
+    width / 2,
+    height / 2,
+    width / 2
+  )
   gradient.addColorStop(0, '#111113')
   gradient.addColorStop(1, colors.bg.base)
   ctx.fillStyle = gradient
