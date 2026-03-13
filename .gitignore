@@ -4,4 +4,10 @@ out
 .DS_Store
 .eslintcache
 *.log*
+*.tsbuildinfo
 .worktrees/
+
+# Test artifacts
+e2e/screenshots/
+playwright-report/
+test-results/
