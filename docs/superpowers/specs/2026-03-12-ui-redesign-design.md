@@ -37,7 +37,7 @@ Replace the OS-native window chrome with a custom titlebar component.
 - `titleBarStyle: 'hidden'` on BrowserWindow config
 - `trafficLightPosition: { x: 12, y: 12 }` for macOS traffic light inset
 - `titleBarOverlay` config for Windows compatibility
-- New IPC handlers: `window:minimize`, `window:maximize`, `window:close`
+- New IPC handlers: `window:minimize`, `window:maximize`, `window:close` (called via existing `window.electron.ipcRenderer.invoke` pattern, no new preload file needed)
 
 **New component: `Titlebar.tsx`**
 - Height: 38px
@@ -83,7 +83,7 @@ The existing `SplitPane` component handles resizable dividers. The viewport is n
 Replace the flat file list with a hierarchical filesystem tree matching the vault's directory structure.
 
 **File tree behavior**:
-- Reads directory structure from vault filesystem (already available via IPC watcher)
+- Built client-side from flat file paths in `vault-store.files[]` (parse path segments into a tree structure, no new IPC call needed)
 - Collapsible folders with chevron indicators (right-pointing collapsed, down-pointing expanded)
 - Item counts next to each folder name
 - Vault root name with total file count at the top
@@ -136,7 +136,7 @@ An Obsidian-style settings overlay for the graph, sliding in from the right edge
 - Link force: maps to `d3.forceLink().strength()`
 - Link distance: maps to `d3.forceLink().distance()`
 
-**Toggle behavior**: small icon in the top-right corner of the graph area opens/closes the panel. Panel overlays the graph, does not push content.
+**Toggle behavior**: small icon in the top-right corner of the graph area opens/closes the panel. Panel overlays the graph, does not push content. The existing `GraphControls.tsx` pill toggle remains at top-center and is modified in Phase 3C to show Graph/Skills instead of Graph/Editor.
 
 **Persistence**: all values stored in `graph-settings-store.ts` with Zustand persist middleware (localStorage).
 
@@ -223,18 +223,22 @@ Three interaction layers on graph nodes:
 **Double-click**:
 - Opens the clicked node's file in the editor panel (transitions `contentView` to `'editor'`)
 
-**SVG implementation**:
-- Neon glow via `<filter>` element: `feGaussianBlur` + `feColorMatrix` + `feMerge`
-- Each artifact color gets its own pre-defined filter
-- Selected node gets a subtle outer ring (`stroke` circle at larger radius, low opacity)
-- Non-connected elements dimmed via opacity attribute, not visibility (preserves layout)
+**Canvas2D implementation** (the graph uses `<canvas>` + `CanvasRenderingContext2D`, not SVG):
+- Ambient glow on all nodes: `ctx.shadowColor = nodeColor`, `ctx.shadowBlur = 3` (faint, always-on)
+- Hover/selected glow: increase `ctx.shadowBlur` to 12-16 for the active node and its neighbors
+- Dimming: set `ctx.globalAlpha = 0.08` for non-connected nodes/edges, `1.0` for connected
+- Edge brightening on hover: draw connected edges with artifact accent color at `globalAlpha = 0.7` and `lineWidth = 1.5`
+- Selected node outer ring: draw a second `ctx.arc` at `r + 4` with `strokeStyle = accent` and low alpha
+- Labels on hover: `ctx.fillText` for hovered node and connected neighbors (already partially implemented for hover)
+- `useGraphHighlight.ts` hook manages the hover/click/deselect state machine and computes the connected node/edge sets
 
 **Files**:
 
 | Action | File |
 |--------|------|
-| Create | `src/renderer/src/panels/graph/useGraphHighlight.ts` (hover/click selection logic) |
-| Modify | `src/renderer/src/panels/graph/GraphPanel.tsx` (SVG filters, event handlers, opacity management) |
+| Create | `src/renderer/src/panels/graph/useGraphHighlight.ts` (hover/click selection logic, connected set computation) |
+| Modify | `src/renderer/src/panels/graph/GraphRenderer.ts` (glow, dimming, edge brightening, label rendering) |
+| Modify | `src/renderer/src/panels/graph/GraphPanel.tsx` (event handlers, double-click, highlight integration) |
 
 ### 3B: Real-Time Graph Updates
 
@@ -268,19 +272,23 @@ Extends the center panel's content view to include a Skills lens.
 
 **Content view states**: `'graph' | 'editor' | 'skills'`
 
-**Toggle UI**: pill-style toggle centered at the top of the content area. Active tab has `accent.muted` background. Two options: "Graph" and "Skills".
+**Toggle UI**: refactor existing `GraphControls.tsx` pill toggle from Graph/Editor to Graph/Skills. Active tab has `accent.muted` background. Editor is no longer in the pill toggle; it is accessed exclusively via node double-click in the graph or file selection in the sidebar.
 
 **Skills view (placeholder)**: minimal component with icon, title "Skills", and description "Agent capabilities and automation recipes. Coming soon." Clean placeholder ready for future implementation.
 
-**Keyboard**: existing `Cmd+G` cycles graph > skills > graph. Editor is accessed via node double-click or file tree selection.
+**Keyboard shortcut changes**:
+- `Cmd+G`: when in editor view, returns to graph view. When in graph view, switches to skills. When in skills, switches to graph. (Cycles graph > skills > graph, and always escapes editor back to graph.)
+- The existing `onToggleView` handler in `useKeyboard` is updated to implement this cycle.
 
 **Files**:
 
 | Action | File |
 |--------|------|
 | Create | `src/renderer/src/panels/graph/SkillsPlaceholder.tsx` |
+| Modify | `src/renderer/src/panels/graph/GraphControls.tsx` (Graph/Skills toggle, remove Editor button) |
 | Modify | `src/renderer/src/store/graph-store.ts` (add `'skills'` to contentView union) |
-| Modify | `src/renderer/src/App.tsx` (ContentArea renders SkillsPlaceholder) |
+| Modify | `src/renderer/src/App.tsx` (ContentArea renders SkillsPlaceholder, update toggle logic) |
+| Modify | `src/renderer/src/hooks/useKeyboard.ts` (updated Cmd+G cycle) |
 
 ### 3D: Enhanced Node Sizing
 
@@ -317,6 +325,14 @@ Audit and unify all visual styling across every component.
 - All interactive elements get `bg.elevated` hover state with 150ms transition
 - Focus rings: `accent.default` at 0.3 opacity, 2px offset, for keyboard navigation
 - Scrollbar styling: thin, `bg.elevated` thumb, transparent track
+
+**Files**:
+
+| Action | File |
+|--------|------|
+| Modify | `src/renderer/src/design/tokens.ts` (border-radius constants) |
+| Modify | `src/renderer/src/assets/index.css` (scrollbar styles, CSS custom properties) |
+| Modify | All components with hardcoded colors (audit pass) |
 
 ### 4B: Typography System
 
@@ -429,6 +445,13 @@ All animations cataloged with consistent timing.
 
 **Implementation**: add `transitions` and `animations` sections to `tokens.ts` as named constants. Components reference these rather than inline timing values.
 
+**Files**:
+
+| Action | File |
+|--------|------|
+| Modify | `src/renderer/src/design/tokens.ts` (transition/animation constants) |
+| Modify | `src/renderer/src/assets/index.css` (prefers-reduced-motion media query) |
+
 ## Design System Summary
 
 ### Color Tokens (existing, preserved)
@@ -474,7 +497,7 @@ tension: '#F59E0B'
 
 ### File Inventory
 
-**New files (13)**:
+**New files (11)**:
 - `src/renderer/src/components/Titlebar.tsx`
 - `src/renderer/src/components/SettingsModal.tsx`
 - `src/renderer/src/components/StatusBar.tsx`
@@ -486,18 +509,21 @@ tension: '#F59E0B'
 - `src/renderer/src/panels/editor/EditorBreadcrumb.tsx`
 - `src/renderer/src/store/graph-settings-store.ts`
 - `src/renderer/src/store/settings-store.ts`
-- `src/preload/window-controls.ts` (IPC for minimize/maximize/close)
-- (None cross 800-line limit; each is a focused, single-purpose module)
 
-**Modified files (10)**:
+None cross the 800-line limit; each is a focused, single-purpose module.
+
+**Modified files (13)**:
 - `src/main/index.ts` (BrowserWindow config + window control IPC)
 - `src/renderer/src/App.tsx` (titlebar, layout restructure, StatusBar extraction)
 - `src/renderer/src/panels/sidebar/FileTree.tsx` (hierarchy, folders, counts)
 - `src/renderer/src/panels/sidebar/Sidebar.tsx` (action bar, sort dropdown)
 - `src/renderer/src/panels/graph/GraphPanel.tsx` (settings, sizing, highlights, animation)
-- `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling)
+- `src/renderer/src/panels/graph/GraphRenderer.ts` (Canvas2D glow, dimming, edge brightening)
+- `src/renderer/src/panels/graph/GraphControls.tsx` (Graph/Skills toggle, remove Editor button)
+- `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close button guard)
 - `src/renderer/src/panels/editor/EditorPanel.tsx` (toolbar + breadcrumb)
 - `src/renderer/src/store/graph-store.ts` ('skills' in contentView)
+- `src/renderer/src/hooks/useKeyboard.ts` (updated Cmd+G cycle)
 - `src/renderer/src/design/tokens.ts` (type scale, animation constants)
 - `src/renderer/src/assets/index.css` (CSS custom properties)
 
