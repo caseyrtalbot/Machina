@@ -1,6 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect } from 'react'
 import StarterKit from '@tiptap/starter-kit'
+import { Markdown } from '@tiptap/markdown'
 import { colors } from '../../design/tokens'
 
 interface RichEditorProps {
@@ -10,10 +11,10 @@ interface RichEditorProps {
 
 export function RichEditor({ content, onChange }: RichEditorProps) {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, Markdown.configure({ indentation: { style: 'space', size: 2 } })],
     content,
     onUpdate: ({ editor }) => {
-      onChange(editor.getText())
+      onChange(editor.getMarkdown())
     },
     editorProps: {
       attributes: {
@@ -24,7 +25,7 @@ export function RichEditor({ content, onChange }: RichEditorProps) {
   })
 
   useEffect(() => {
-    if (editor && content !== editor.getText()) {
+    if (editor && content !== editor.getMarkdown()) {
       editor.commands.setContent(content)
     }
   }, [content, editor])
