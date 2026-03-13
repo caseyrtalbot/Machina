@@ -122,6 +122,43 @@ function ConnectedSidebar() {
     // TODO: create new folder in vault
   }, [])
 
+  const handleFileAction = useCallback(
+    async (action: { actionId: string; path: string; isDirectory: boolean }) => {
+      switch (action.actionId) {
+        case 'copy-path': {
+          await navigator.clipboard.writeText(action.path)
+          break
+        }
+        case 'reveal-finder': {
+          await window.api.shell.showInFolder(action.path)
+          break
+        }
+        case 'open-default': {
+          await window.api.shell.openPath(action.path)
+          break
+        }
+        case 'duplicate': {
+          const ext = action.path.lastIndexOf('.')
+          const base = ext > 0 ? action.path.slice(0, ext) : action.path
+          const extension = ext > 0 ? action.path.slice(ext) : ''
+          const destPath = `${base} copy${extension}`
+          await window.api.fs.copyFile(action.path, destPath)
+          break
+        }
+        case 'delete': {
+          await window.api.shell.trashItem(action.path)
+          // If the deleted file was active, clear the editor
+          if (action.path === activeNotePath) {
+            setActiveNote(null, null)
+            setContent('')
+          }
+          break
+        }
+      }
+    },
+    [activeNotePath, setActiveNote, setContent]
+  )
+
   return (
     <Sidebar
       nodes={treeNodes}
@@ -138,6 +175,7 @@ function ConnectedSidebar() {
       onNewFile={handleNewFile}
       onNewFolder={handleNewFolder}
       onSortChange={setSortMode}
+      onFileAction={handleFileAction}
     />
   )
 }

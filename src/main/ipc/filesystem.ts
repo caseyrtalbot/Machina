@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, shell } from 'electron'
 import { FileService } from '../services/file-service'
 import { teConfigPath, teStatePath } from '../utils/paths'
 import type { VaultConfig, VaultState } from '../../shared/types'
@@ -75,5 +75,31 @@ export function registerFilesystemIpc(): void {
   ipcMain.handle('vault:read-file', async (_event, filePath: string): Promise<string> => {
     const { readFile } = await import('node:fs/promises')
     return readFile(filePath, 'utf-8')
+  })
+
+  // ── Shell integration ──
+
+  ipcMain.handle('shell:show-in-folder', async (_e, args: { path: string }) => {
+    shell.showItemInFolder(args.path)
+  })
+
+  ipcMain.handle('shell:open-path', async (_e, args: { path: string }) => {
+    return shell.openPath(args.path)
+  })
+
+  ipcMain.handle('shell:trash-item', async (_e, args: { path: string }) => {
+    await shell.trashItem(args.path)
+  })
+
+  // ── File operations for context menu ──
+
+  ipcMain.handle('fs:rename-file', async (_e, args: { oldPath: string; newPath: string }) => {
+    const { rename } = await import('node:fs/promises')
+    await rename(args.oldPath, args.newPath)
+  })
+
+  ipcMain.handle('fs:copy-file', async (_e, args: { srcPath: string; destPath: string }) => {
+    const { copyFile } = await import('node:fs/promises')
+    await copyFile(args.srcPath, args.destPath)
   })
 }

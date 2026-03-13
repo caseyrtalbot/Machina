@@ -89,3 +89,295 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ─── Editor Prose Typography ─── */
+
+.ProseMirror {
+  line-height: 1.7;
+  font-size: 15px;
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+/* Allow text selection within the editor */
+.ProseMirror, .ProseMirror * {
+  user-select: text;
+}
+
+/* ── Headings ── */
+
+.ProseMirror h1 {
+  font-size: 1.75em;
+  font-weight: 700;
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-default);
+  padding-bottom: 0.3em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.4em;
+  font-weight: 600;
+  margin-top: 1.6em;
+  margin-bottom: 0.4em;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror h3 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin-top: 1.4em;
+  margin-bottom: 0.3em;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  font-size: 1em;
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
+  color: var(--color-text-secondary);
+}
+
+/* First heading flush to top */
+.ProseMirror > h1:first-child,
+.ProseMirror > h2:first-child,
+.ProseMirror > h3:first-child,
+.ProseMirror > h4:first-child {
+  margin-top: 0;
+}
+
+/* ── Paragraphs ── */
+
+.ProseMirror p {
+  margin-bottom: 0.75em;
+}
+
+/* ── Inline formatting ── */
+
+.ProseMirror strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+/* ── Blockquotes ── */
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--color-accent-default);
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0.75em;
+  color: var(--color-text-secondary);
+}
+
+.ProseMirror blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* Nested blockquotes */
+.ProseMirror blockquote blockquote {
+  border-left-color: var(--color-text-muted);
+}
+
+/* ── Lists ── */
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.ProseMirror ul { list-style-type: disc; }
+.ProseMirror ol { list-style-type: decimal; }
+.ProseMirror ul ul { list-style-type: circle; }
+.ProseMirror ul ul ul { list-style-type: square; }
+
+.ProseMirror li {
+  margin-bottom: 0.2em;
+}
+
+.ProseMirror li > p {
+  margin-bottom: 0.2em;
+}
+
+/* Task lists (Tiptap extension) */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+  flex-shrink: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background: var(--color-accent-default);
+  border-color: var(--color-accent-default);
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--color-bg-base);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+/* ── Code blocks ── */
+
+.ProseMirror pre {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-container);
+  padding: 1em 1.25em;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-source);
+  line-height: 1.6;
+  margin-bottom: 1em;
+  white-space: pre;
+  tab-size: 4;
+  color: var(--color-text-secondary);
+}
+
+.ProseMirror pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  border-radius: 0;
+  font-family: inherit;
+}
+
+/* Inline code */
+.ProseMirror code {
+  background-color: var(--color-bg-elevated);
+  border-radius: var(--radius-inline);
+  padding: 0.15em 0.4em;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--color-accent-hover);
+}
+
+/* ── Horizontal rules ── */
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--color-border-default);
+  margin: 1.5em 0;
+}
+
+/* ── Links ── */
+
+.ProseMirror a {
+  color: var(--color-accent-default);
+  text-decoration: none;
+  transition: color var(--transition-hover);
+}
+
+.ProseMirror a:hover {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+/* Wiki-links: distinct styling with subtle background tint */
+.ProseMirror a[href^="wikilink:"] {
+  color: var(--color-accent-default);
+  background-color: var(--color-accent-muted);
+  padding: 0.05em 0.3em;
+  border-radius: var(--color-border-default);
+  border-radius: var(--radius-inline);
+  cursor: pointer;
+}
+
+.ProseMirror a[href^="wikilink:"]:hover {
+  background-color: rgba(108, 99, 255, 0.2);
+  text-decoration: none;
+}
+
+/* ── Images ── */
+
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: var(--radius-container);
+  margin: 0.5em 0;
+}
+
+/* ── Properties panel (frontmatter) ── */
+
+.properties-panel {
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+  padding: 10px 24px;
+  transition: all var(--transition-hover);
+}
+
+.properties-panel-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.properties-panel-key {
+  font-size: var(--text-secondary);
+  color: var(--color-text-muted);
+  min-width: 72px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.properties-panel-value {
+  font-size: var(--text-secondary);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.properties-panel-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--radius-inline);
+  font-size: 11px;
+  background: var(--color-accent-muted);
+  color: var(--color-accent-default);
+}

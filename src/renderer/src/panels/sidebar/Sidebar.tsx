@@ -1,6 +1,9 @@
+import { useState, useCallback } from 'react'
 import { SearchBar } from './SearchBar'
 import { WorkspaceFilter } from './WorkspaceFilter'
 import { FileTree } from './FileTree'
+import { FileContextMenu } from './FileContextMenu'
+import type { FileContextMenuState } from './FileContextMenu'
 import type { FlatTreeNode } from './buildFileTree'
 import type { ArtifactType } from '@shared/types'
 import { colors } from '../../design/tokens'
@@ -8,6 +11,12 @@ import { colors } from '../../design/tokens'
 const hoverBgStyle = { '--color-bg-elevated': colors.bg.elevated } as React.CSSProperties
 
 type SortMode = 'modified' | 'name' | 'type'
+
+export interface FileAction {
+  readonly actionId: string
+  readonly path: string
+  readonly isDirectory: boolean
+}
 
 interface SidebarProps {
   nodes: FlatTreeNode[]
@@ -24,6 +33,7 @@ interface SidebarProps {
   onNewFile?: () => void
   onNewFolder?: () => void
   onSortChange?: (mode: SortMode) => void
+  onFileAction?: (action: FileAction) => void
 }
 
 function ActionBar({
@@ -87,8 +97,53 @@ export function Sidebar({
   onToggleDirectory,
   onNewFile,
   onNewFolder,
-  onSortChange
+  onSortChange,
+  onFileAction
 }: SidebarProps) {
+  const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, path: string, isDirectory: boolean) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setContextMenu({ x: e.clientX, y: e.clientY, path, isDirectory })
+    },
+    []
+  )
+
+  const handleContextMenuAction = useCallback(
+    (actionId: string, path: string) => {
+      if (actionId === 'rename') {
+        setRenamingPath(path)
+        return
+      }
+      const node = nodes.find((n) => n.path === path)
+      onFileAction?.({ actionId, path, isDirectory: node?.isDirectory ?? false })
+    },
+    [nodes, onFileAction]
+  )
+
+  const handleRenameConfirm = useCallback(
+    (newName: string) => {
+      if (!renamingPath) return
+      onFileAction?.({ actionId: 'rename-confirm', path: renamingPath, isDirectory: false })
+      // The actual rename is handled by the parent via the newName
+      // We pass it through a slightly different mechanism
+      const parentDir = renamingPath.split('/').slice(0, -1).join('/')
+      const newPath = `${parentDir}/${newName}`
+      window.api.fs
+        .renameFile(renamingPath, newPath)
+        .then(() => {
+          setRenamingPath(null)
+        })
+        .catch(() => {
+          setRenamingPath(null)
+        })
+    },
+    [renamingPath, onFileAction]
+  )
+
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: colors.bg.surface }}>
       <div className="p-2 border-b" style={{ borderColor: colors.border.default }}>
@@ -115,8 +170,18 @@ export function Sidebar({
           artifactTypes={artifactTypes}
           onFileSelect={onFileSelect}
           onToggleDirectory={onToggleDirectory}
+          onContextMenu={handleContextMenu}
+          renamingPath={renamingPath}
+          onRenameConfirm={handleRenameConfirm}
+          onRenameCancel={() => setRenamingPath(null)}
         />
       </div>
+
+      <FileContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onAction={handleContextMenuAction}
+      />
     </div>
   )
 }

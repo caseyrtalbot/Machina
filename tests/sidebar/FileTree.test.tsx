@@ -18,8 +18,21 @@ function makeNode(overrides: Partial<FlatTreeNode> = {}): FlatTreeNode {
 describe('FileTree', () => {
   it('renders directory and file nodes', () => {
     const nodes: FlatTreeNode[] = [
-      makeNode({ name: 'notes', path: '/vault/notes', parentPath: '/vault', isDirectory: true, depth: 0, itemCount: 1 }),
-      makeNode({ name: 'readme.md', path: '/vault/readme.md', parentPath: '/vault', isDirectory: false, depth: 0 })
+      makeNode({
+        name: 'notes',
+        path: '/vault/notes',
+        parentPath: '/vault',
+        isDirectory: true,
+        depth: 0,
+        itemCount: 1
+      }),
+      makeNode({
+        name: 'readme.md',
+        path: '/vault/readme.md',
+        parentPath: '/vault',
+        isDirectory: false,
+        depth: 0
+      })
     ]
     render(
       <FileTree
@@ -31,13 +44,26 @@ describe('FileTree', () => {
       />
     )
     expect(screen.getByText('notes')).toBeDefined()
-    expect(screen.getByText('readme.md')).toBeDefined()
+    expect(screen.getByText('readme')).toBeDefined()
   })
 
   it('hides children when directory is collapsed', () => {
     const nodes: FlatTreeNode[] = [
-      makeNode({ name: 'notes', path: '/vault/notes', parentPath: '/vault', isDirectory: true, depth: 0, itemCount: 1 }),
-      makeNode({ name: 'child.md', path: '/vault/notes/child.md', parentPath: '/vault/notes', isDirectory: false, depth: 1 })
+      makeNode({
+        name: 'notes',
+        path: '/vault/notes',
+        parentPath: '/vault',
+        isDirectory: true,
+        depth: 0,
+        itemCount: 1
+      }),
+      makeNode({
+        name: 'child.md',
+        path: '/vault/notes/child.md',
+        parentPath: '/vault/notes',
+        isDirectory: false,
+        depth: 1
+      })
     ]
     render(
       <FileTree
@@ -54,7 +80,13 @@ describe('FileTree', () => {
 
   it('highlights active file', () => {
     const nodes: FlatTreeNode[] = [
-      makeNode({ name: 'active.md', path: '/vault/active.md', parentPath: '/vault', isDirectory: false, depth: 0 })
+      makeNode({
+        name: 'active.md',
+        path: '/vault/active.md',
+        parentPath: '/vault',
+        isDirectory: false,
+        depth: 0
+      })
     ]
     render(
       <FileTree
@@ -65,14 +97,20 @@ describe('FileTree', () => {
         onToggleDirectory={vi.fn()}
       />
     )
-    const el = screen.getByText('active.md').closest('[data-active="true"]')
+    const el = screen.getByText('active').closest('[data-active="true"]')
     expect(el).not.toBeNull()
   })
 
   it('calls onFileSelect when file clicked', () => {
     const onFileSelect = vi.fn()
     const nodes: FlatTreeNode[] = [
-      makeNode({ name: 'note.md', path: '/vault/note.md', parentPath: '/vault', isDirectory: false, depth: 0 })
+      makeNode({
+        name: 'note.md',
+        path: '/vault/note.md',
+        parentPath: '/vault',
+        isDirectory: false,
+        depth: 0
+      })
     ]
     render(
       <FileTree
@@ -83,14 +121,21 @@ describe('FileTree', () => {
         onToggleDirectory={vi.fn()}
       />
     )
-    fireEvent.click(screen.getByText('note.md'))
+    fireEvent.click(screen.getByText('note'))
     expect(onFileSelect).toHaveBeenCalledWith('/vault/note.md')
   })
 
   it('calls onToggleDirectory when folder clicked', () => {
     const onToggleDirectory = vi.fn()
     const nodes: FlatTreeNode[] = [
-      makeNode({ name: 'folder', path: '/vault/folder', parentPath: '/vault', isDirectory: true, depth: 0, itemCount: 0 })
+      makeNode({
+        name: 'folder',
+        path: '/vault/folder',
+        parentPath: '/vault',
+        isDirectory: true,
+        depth: 0,
+        itemCount: 0
+      })
     ]
     render(
       <FileTree

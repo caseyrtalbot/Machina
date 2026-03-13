@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
@@ -13,15 +13,8 @@ import { FrontmatterHeader } from './FrontmatterHeader'
 import { BacklinksPanel } from './BacklinksPanel'
 import { RichEditor } from './RichEditor'
 import { SourceEditor } from './SourceEditor'
+import { parseFrontmatter, preprocessWikilinks, postprocessWikilinks } from './markdown-utils'
 import { colors } from '../../design/tokens'
-
-/** Strip YAML frontmatter (---...---) from markdown content for rich editing */
-function stripFrontmatter(raw: string): string {
-  if (!raw.startsWith('---')) return raw
-  const end = raw.indexOf('---', 3)
-  if (end === -1) return raw
-  return raw.slice(end + 3).trimStart()
-}
 
 interface EditorPanelProps {
   onNavigate: (id: string) => void
@@ -37,6 +30,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition)
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
+  const files = useVaultStore((s) => s.files)
   const artifact = useVaultStore((s) =>
     activeNoteId ? (s.artifacts.find((a) => a.id === activeNoteId) ?? null) : null
   )
@@ -49,6 +43,15 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
   const { canGoBack, canGoForward, push, goBack, goForward } = useNavigationHistory()
   const prevPathRef = useRef<string | null>(null)
+
+  // Frontmatter: raw string preserved for lossless round-tripping (ref),
+  // parsed data stored as state so changes trigger re-render for the properties panel
+  const frontmatterRawRef = useRef('')
+  // Ref for wikilink navigation so the Tiptap click handler always uses the latest function
+  const resolveAndNavigateRef = useRef((_target: string) => {})
+  const [frontmatterData, setFrontmatterData] = useState<
+    Readonly<Record<string, string | readonly string[]>>
+  >({})
 
   // Push to navigation history when active note changes
   useEffect(() => {
@@ -64,7 +67,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       Markdown,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Link.configure({ openOnClick: false })
+      Link.configure({ openOnClick: false, HTMLAttributes: { rel: null, target: null } })
     ],
     []
   )
@@ -74,7 +77,13 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       if (!ed) return
       const manager = ed.storage.markdown?.manager
       if (manager) {
-        const markdown = manager.serialize(ed.getJSON())
+        let markdown = manager.serialize(ed.getJSON())
+        markdown = postprocessWikilinks(markdown)
+        // Re-prepend original frontmatter for lossless round-tripping
+        const rawFm = frontmatterRawRef.current
+        if (rawFm) {
+          markdown = rawFm + markdown
+        }
         setContent(markdown)
       }
     },
@@ -103,25 +112,66 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     onSelectionUpdate: handleSelectionUpdate,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-full px-8 py-6',
+        class: 'focus:outline-none min-h-full px-8 py-6',
         style: `color: ${colors.text.primary}; font-family: Inter, system-ui, sans-serif;`
+      },
+      // Intercept clicks on wikilinks to navigate instead of following href
+      handleClick: (_view, _pos, event) => {
+        const target = event.target as HTMLElement
+        const anchor = target.closest('a')
+        if (!anchor) return false
+
+        const href = anchor.getAttribute('href')
+        if (!href?.startsWith('wikilink:')) return false
+
+        event.preventDefault()
+        const linkTarget = decodeURIComponent(href.slice('wikilink:'.length))
+        resolveAndNavigateRef.current(linkTarget)
+        return true
       }
     }
   })
 
-  // Load content into editor when file changes (strip frontmatter for rich view)
+  // Keep the ref current so Tiptap's click handler always resolves against latest files
+  resolveAndNavigateRef.current = useCallback(
+    (target: string) => {
+      const normalized = target.toLowerCase()
+      const match = files.find((f) => {
+        const name = f.filename.replace(/\.md$/, '').toLowerCase()
+        return name === normalized
+      })
+
+      if (match) {
+        const { setActiveNote } = useEditorStore.getState()
+        setActiveNote(match.path, match.path)
+        window.api.fs.readFile(match.path).then((fileContent) => {
+          setContent(fileContent)
+        })
+      }
+    },
+    [files, setContent]
+  )
+
+  // Load content into editor when file changes
   useEffect(() => {
     if (!editor || !content) return
     if (activeNotePath === prevPathRef.current) return
     prevPathRef.current = activeNotePath
-    const body = stripFrontmatter(content)
-    // Use the Markdown extension's parser to convert markdown → ProseMirror JSON
+
+    // Parse frontmatter and preprocess wikilinks
+    const parsed = parseFrontmatter(content)
+    frontmatterRawRef.current = parsed.raw
+    setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
+
+    const processedBody = preprocessWikilinks(parsed.body)
+
+    // Use the Markdown extension's parser to convert markdown to ProseMirror JSON
     const manager = editor.storage.markdown?.manager
     if (manager) {
-      const json = manager.parse(body)
+      const json = manager.parse(processedBody)
       editor.commands.setContent(json)
     } else {
-      editor.commands.setContent(body)
+      editor.commands.setContent(processedBody)
     }
   }, [content, editor, activeNotePath])
 
@@ -160,7 +210,12 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
       <EditorToolbar editor={editor} mode={mode} onToggleMode={handleToggleMode} />
 
-      <FrontmatterHeader artifact={artifact} mode={mode} onNavigate={onNavigate} />
+      <FrontmatterHeader
+        artifact={artifact}
+        frontmatter={frontmatterData}
+        mode={mode}
+        onNavigate={onNavigate}
+      />
 
       <div className="flex-1 overflow-y-auto">
         {mode === 'rich' ? (

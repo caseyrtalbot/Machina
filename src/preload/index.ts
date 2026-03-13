@@ -20,6 +20,10 @@ const api = {
       ipcRenderer.invoke('fs:list-files', { dir, pattern }),
     listFilesRecursive: (dir: string) => ipcRenderer.invoke('fs:list-files-recursive', { dir }),
     deleteFile: (path: string) => ipcRenderer.invoke('fs:delete-file', { path }),
+    renameFile: (oldPath: string, newPath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:rename-file', { oldPath, newPath }),
+    copyFile: (srcPath: string, destPath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:copy-file', { srcPath, destPath }),
     selectVault: () => ipcRenderer.invoke('fs:select-vault')
   },
   vault: {
@@ -40,6 +44,11 @@ const api = {
       ipcRenderer.invoke('vault:read-file', filePath),
     deleteFile: (filePath: string): Promise<void> =>
       ipcRenderer.invoke('fs:delete-file', { path: filePath })
+  },
+  shell: {
+    showInFolder: (path: string) => ipcRenderer.invoke('shell:show-in-folder', { path }),
+    openPath: (path: string) => ipcRenderer.invoke('shell:open-path', { path }),
+    trashItem: (path: string) => ipcRenderer.invoke('shell:trash-item', { path })
   },
   terminal: {
     create: (cwd: string, shell?: string) =>
