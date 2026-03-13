@@ -6,8 +6,8 @@ import { Sidebar } from './panels/sidebar/Sidebar'
 import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
 import { GraphPanel } from './panels/graph/GraphPanel'
-import { GraphControls } from './panels/graph/GraphControls'
 import { SkillsPanel } from './panels/skills/SkillsPanel'
+import { ActivityBar } from './components/ActivityBar'
 import { TerminalPanel } from './panels/terminal/TerminalPanel'
 import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
@@ -44,8 +44,7 @@ function ContentArea() {
   )
 
   return (
-    <div className="h-full relative panel-card">
-      <GraphControls />
+    <div className="h-full panel-card">
       {contentView === 'graph' && <GraphPanel onNodeClick={handleNodeClick} />}
       {contentView === 'editor' && <EditorPanel onNavigate={handleNavigate} />}
       {contentView === 'skills' && <SkillsPanel />}
@@ -341,7 +340,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       style={{ backgroundColor: colors.bg.base, color: colors.text.primary }}
     >
       <Titlebar vaultName={vaultName} onOpenSettings={() => setSettingsOpen(true)} />
-      <div className="flex-1 overflow-hidden" style={{ padding: 'var(--panel-gap)' }}>
+      <div className="flex-1 overflow-hidden flex" style={{ padding: 'var(--panel-gap)' }}>
+        <ActivityBar />
         <SplitPane
           left={
             <div className="panel-card h-full">
