@@ -208,7 +208,7 @@ function WorkspaceShell() {
 
   useKeyboard({
     onCommandPalette: () => setPaletteOpen(true),
-    onToggleView: toggleView,
+    onCycleView: toggleView,
     onToggleSourceMode: toggleSourceMode,
     onEscape: () => setPaletteOpen(false)
   })
