@@ -50,4 +50,28 @@ describe('VaultIndex', () => {
     expect(index.getArtifacts()).toHaveLength(0)
     expect(index.getErrors()).toHaveLength(1)
   })
+
+  it('returns backlinks for a target node', () => {
+    const index = new VaultIndex()
+    for (const [f, c] of Object.entries(FILES)) index.addFile(f, c)
+    const backlinks = index.getBacklinks('g2')
+    expect(backlinks).toHaveLength(1)
+    expect(backlinks[0].id).toBe('g1')
+  })
+
+  it('returns empty array when no backlinks exist', () => {
+    const index = new VaultIndex()
+    for (const [f, c] of Object.entries(FILES)) index.addFile(f, c)
+    const backlinks = index.getBacklinks('g1-nonexistent')
+    expect(backlinks).toEqual([])
+  })
+
+  it('returns multiple backlinks from different sources', () => {
+    const index = new VaultIndex()
+    for (const [f, c] of Object.entries(FILES)) index.addFile(f, c)
+    const backlinks = index.getBacklinks('g1')
+    expect(backlinks).toHaveLength(2)
+    const ids = backlinks.map((b) => b.id).sort()
+    expect(ids).toEqual(['c1', 'g2'])
+  })
 })

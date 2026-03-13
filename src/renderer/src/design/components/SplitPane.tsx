@@ -20,6 +20,10 @@ export function SplitPane({
   const [leftWidth, setLeftWidth] = useState(initialLeftWidth)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  const handlersRef = useRef<{
+    move: ((e: MouseEvent) => void) | null
+    up: (() => void) | null
+  }>({ move: null, up: null })
 
   // Clamp initial width once the container has measured
   useEffect(() => {
@@ -34,6 +38,16 @@ export function SplitPane({
       onResize?.(clamped)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    return () => {
+      if (handlersRef.current.move)
+        document.removeEventListener('mousemove', handlersRef.current.move)
+      if (handlersRef.current.up) document.removeEventListener('mouseup', handlersRef.current.up)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [])
 
   const handleMouseDown = useCallback(() => {
     dragging.current = true
@@ -57,8 +71,10 @@ export function SplitPane({
       document.body.style.userSelect = ''
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      handlersRef.current = { move: null, up: null }
     }
 
+    handlersRef.current = { move: handleMouseMove, up: handleMouseUp }
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
   }, [minLeftWidth, minRightWidth, onResize])
@@ -70,8 +86,10 @@ export function SplitPane({
       </div>
       <div
         onMouseDown={handleMouseDown}
-        className="w-[4px] cursor-col-resize bg-transparent hover:bg-[#6C63FF]/30 transition-colors flex-shrink-0"
-      />
+        className="w-[4px] cursor-col-resize flex-shrink-0 flex items-stretch justify-center"
+      >
+        <div className="panel-separator-h" />
+      </div>
       <div className="flex-1 overflow-hidden">{right}</div>
     </div>
   )

@@ -75,7 +75,14 @@ export interface VaultConfig {
 }
 
 export interface VaultState {
+  version: number
   idCounters: Record<string, number>
   lastOpenNote: string | null
   panelLayout: { sidebarWidth: number; terminalWidth: number }
+  contentView: 'graph' | 'editor' | 'skills'
+  graphViewport: { x: number; y: number; k: number }
+  terminalSessions: string[]
+  fileTreeCollapseState: Record<string, boolean>
+  selectedNodeId: string | null
+  recentFiles: string[]
 }

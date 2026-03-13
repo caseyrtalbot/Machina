@@ -54,4 +54,9 @@ export class ShellService {
       this.kill(id)
     }
   }
+
+  getProcessName(sessionId: string): string | null {
+    const pty = this.sessions.get(sessionId)
+    return pty?.process ?? null
+  }
 }

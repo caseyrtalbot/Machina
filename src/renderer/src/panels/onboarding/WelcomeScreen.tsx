@@ -5,14 +5,12 @@ interface WelcomeScreenProps {
   onVaultSelected: (path: string) => void
 }
 
-const ipcRenderer = window.electron.ipcRenderer
-
 async function selectFolder(): Promise<string | null> {
-  return ipcRenderer.invoke('fs:select-vault')
+  return window.api.fs.selectVault()
 }
 
 async function initVault(vaultPath: string): Promise<void> {
-  await ipcRenderer.invoke('vault:init', { vaultPath })
+  await window.api.vault.init(vaultPath)
 }
 
 export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {

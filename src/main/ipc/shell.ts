@@ -27,6 +27,10 @@ export function registerShellIpc(mainWindow: BrowserWindow): void {
   ipcMain.handle('terminal:kill', async (_e, args: { sessionId: string }) => {
     shellService.kill(args.sessionId)
   })
+
+  ipcMain.handle('terminal:process-name', async (_e, args: { sessionId: string }) => {
+    return shellService.getProcessName(args.sessionId)
+  })
 }
 
 export function getShellService(): ShellService {

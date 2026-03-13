@@ -18,8 +18,18 @@ export interface IpcChannels {
   'terminal:write': { request: { sessionId: string; data: string }; response: void }
   'terminal:resize': { request: { sessionId: string; cols: number; rows: number }; response: void }
   'terminal:kill': { request: { sessionId: string }; response: void }
+  'terminal:process-name': { request: { sessionId: string }; response: string | null }
 
   'vault:git-branch': { request: { vaultPath: string }; response: string | null }
+
+  // --- Window (new) ---
+  'window:minimize': { request: void; response: void }
+  'window:maximize': { request: void; response: void }
+  'window:close': { request: void; response: void }
+
+  // --- Config persistence (new) ---
+  'config:read': { request: { scope: string; key: string }; response: unknown }
+  'config:write': { request: { scope: string; key: string; value: unknown }; response: void }
 
   'vault:watch-start': { request: { vaultPath: string }; response: void }
   'vault:watch-stop': { request: void; response: void }

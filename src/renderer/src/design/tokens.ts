@@ -57,5 +57,47 @@ export const typography = {
 } as const
 
 export const transitions = {
-  default: '150ms ease-out'
+  default: '150ms ease-out',
+  hover: '150ms ease-out',
+  tooltip: '100ms ease-in',
+  focusRing: '100ms ease-out',
+  settingsSlide: '250ms ease-out',
+  modalFade: '200ms ease-in',
+  commandPalette: '150ms ease-out'
+} as const
+
+export const typeScale = {
+  display: {
+    pageTitle: { size: '20px', weight: 600, color: colors.text.primary },
+    sectionHeading: { size: '15px', weight: 600, color: colors.text.primary },
+    body: { size: '13px', weight: 400, color: colors.text.primary },
+    secondary: { size: '12px', weight: 400, color: colors.text.secondary },
+    label: {
+      size: '12px',
+      weight: 400,
+      color: colors.text.muted,
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.05em'
+    }
+  },
+  mono: { terminal: { size: '13px' }, source: { size: '12px' }, inline: { size: '12px' } },
+  minSize: '12px'
+} as const
+
+export const borderRadius = { container: 6, inline: 4, round: '50%' } as const
+
+export const animations = {
+  graphNodeHoverGlow: '200ms ease-out',
+  graphNetworkReveal: '200ms ease-out',
+  graphNetworkDim: '300ms ease-out',
+  graphNodeEnter: '400ms ease-out',
+  graphNodeExit: '200ms ease-out',
+  spatialTransition: '250ms ease-out'
+} as const
+
+export const focusRing = {
+  color: colors.accent.default,
+  opacity: 0.3,
+  offset: 2,
+  width: 2
 } as const

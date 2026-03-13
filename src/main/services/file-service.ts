@@ -61,9 +61,16 @@ export class FileService {
     }
 
     const defaultState: VaultState = {
+      version: 1,
       idCounters: {},
       lastOpenNote: null,
-      panelLayout: { sidebarWidth: 260, terminalWidth: 360 }
+      panelLayout: { sidebarWidth: 240, terminalWidth: 400 },
+      contentView: 'graph',
+      graphViewport: { x: 0, y: 0, k: 1 },
+      terminalSessions: [],
+      fileTreeCollapseState: {},
+      selectedNodeId: null,
+      recentFiles: []
     }
 
     const configPath = teConfigPath(vaultPath)

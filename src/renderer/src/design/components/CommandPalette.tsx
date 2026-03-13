@@ -6,6 +6,9 @@ export interface CommandItem {
   label: string
   category: 'note' | 'command'
   shortcut?: string
+  folderPath?: string
+  artifactType?: string
+  matchIndices?: number[]
 }
 
 interface CommandPaletteProps {
@@ -20,11 +23,56 @@ const CATEGORY_LABELS: Record<CommandItem['category'], string> = {
   command: 'Commands'
 }
 
-function filterItems(items: ReadonlyArray<CommandItem>, query: string): ReadonlyArray<CommandItem> {
-  if (query === '') return items
+export function fuzzyMatch(
+  text: string,
+  query: string
+): { match: boolean; score: number; indices: number[] } {
+  const lower = text.toLowerCase()
+  const queryLower = query.toLowerCase()
 
-  const lower = query.toLowerCase()
-  return items.filter((item) => item.label.toLowerCase().includes(lower))
+  if (lower.startsWith(queryLower)) {
+    return { match: true, score: 100, indices: Array.from({ length: queryLower.length }, (_, i) => i) }
+  }
+
+  const substringIdx = lower.indexOf(queryLower)
+  if (substringIdx !== -1) {
+    return {
+      match: true, score: 50,
+      indices: Array.from({ length: queryLower.length }, (_, i) => substringIdx + i),
+    }
+  }
+
+  const indices: number[] = []
+  let qi = 0
+  for (let i = 0; i < lower.length && qi < queryLower.length; i++) {
+    if (lower[i] === queryLower[qi]) { indices.push(i); qi++ }
+  }
+  return qi === queryLower.length
+    ? { match: true, score: 10, indices }
+    : { match: false, score: 0, indices: [] }
+}
+
+export function filterItems(
+  items: ReadonlyArray<CommandItem>,
+  query: string
+): ReadonlyArray<CommandItem & { matchIndices?: number[] }> {
+  if (query === '') return items as ReadonlyArray<CommandItem & { matchIndices?: number[] }>
+
+  const isCommandMode = query.startsWith('>') || query.startsWith('/')
+  const searchQuery = isCommandMode ? query.slice(1).trim() : query
+  const candidates = isCommandMode
+    ? items.filter((item) => item.category === 'command')
+    : items
+  if (searchQuery === '') return candidates as ReadonlyArray<CommandItem & { matchIndices?: number[] }>
+
+  return candidates
+    .map((item) => {
+      const result = fuzzyMatch(item.label, searchQuery)
+      return { ...item, matchIndices: result.indices, _match: result.match, _score: result.score }
+    })
+    .filter((r) => r._match)
+    .sort((a, b) => b._score - a._score)
+    .map(({ _match, _score, ...rest }) => rest)
 }
 
 function groupByCategory(
@@ -45,6 +93,20 @@ function groupByCategory(
     category,
     items: categoryItems
   }))
+}
+
+function HighlightedLabel({ label, indices }: { label: string; indices?: number[] }) {
+  if (!indices || indices.length === 0) return <span>{label}</span>
+  const indexSet = new Set(indices)
+  return (
+    <span>
+      {label.split('').map((char, i) => (
+        <span key={i} style={indexSet.has(i) ? { color: colors.accent.default, fontWeight: 600 } : undefined}>
+          {char}
+        </span>
+      ))}
+    </span>
+  )
 }
 
 // Thin wrapper: gates rendering on isOpen so inner component mounts fresh each time
@@ -144,7 +206,7 @@ function CommandPaletteInner({ onClose, items, onSelect }: Omit<CommandPalettePr
             type="text"
             value={query}
             onChange={handleQueryChange}
-            placeholder="Search notes and commands..."
+            placeholder="Search notes... (> for commands)"
             className="w-full bg-transparent outline-none text-sm"
             style={{
               color: colors.text.primary,
@@ -197,7 +259,7 @@ function CommandPaletteInner({ onClose, items, onSelect }: Omit<CommandPalettePr
                       onClick={() => handleSelect(item)}
                       onMouseEnter={() => setSelectedIndex(currentIndex)}
                     >
-                      <span>{item.label}</span>
+                      <HighlightedLabel label={item.label} indices={(item as any).matchIndices} />
 
                       {item.shortcut && (
                         <span

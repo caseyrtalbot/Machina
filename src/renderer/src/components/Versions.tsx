@@ -1,7 +1,11 @@
 import { useState } from 'react'
 
 function Versions(): React.JSX.Element {
-  const [versions] = useState(window.electron.process.versions)
+  const [versions] = useState(() => {
+    // Note: process versions are no longer exposed via window.api
+    // This component would need a new IPC channel if reactivated
+    return { electron: '', chrome: '', node: '' }
+  })
 
   return (
     <ul className="versions">

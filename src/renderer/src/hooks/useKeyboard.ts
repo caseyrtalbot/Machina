@@ -4,7 +4,7 @@ interface KeyboardConfig {
   onToggleSidebar?: () => void
   onToggleTerminal?: () => void
   onNewNote?: () => void
-  onToggleView?: () => void
+  onCycleView?: () => void
   onToggleSourceMode?: () => void
   onCommandPalette?: () => void
   onSave?: () => void
@@ -19,7 +19,7 @@ const META_KEY_BINDINGS: ReadonlyArray<{
   { key: 'b', handler: 'onToggleSidebar' },
   { key: '`', handler: 'onToggleTerminal' },
   { key: 'n', handler: 'onNewNote' },
-  { key: 'g', handler: 'onToggleView' },
+  { key: 'g', handler: 'onCycleView' },
   { key: '/', handler: 'onToggleSourceMode' },
   { key: 'k', handler: 'onCommandPalette' },
   { key: 's', handler: 'onSave' },

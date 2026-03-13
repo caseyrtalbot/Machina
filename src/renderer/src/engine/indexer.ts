@@ -63,6 +63,20 @@ export class VaultIndex {
     )
   }
 
+  getBacklinks(targetId: string): Artifact[] {
+    const graph = this.getGraph()
+    const sourceIds = new Set<string>()
+    for (const edge of graph.edges) {
+      if (edge.target === targetId && edge.source !== targetId) {
+        sourceIds.add(edge.source)
+      }
+      if (edge.source === targetId && edge.target !== targetId && edge.kind !== 'appears_in') {
+        sourceIds.add(edge.target)
+      }
+    }
+    return this.getArtifacts().filter((a) => sourceIds.has(a.id))
+  }
+
   getErrors(): ParseError[] {
     return [...this.errors]
   }

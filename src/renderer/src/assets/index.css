@@ -1,1 +1,75 @@
 @import 'tailwindcss';
+
+:root {
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --text-page-title: 20px;
+  --text-section-heading: 15px;
+  --text-body: 13px;
+  --text-secondary: 12px;
+  --text-label: 12px;
+  --text-mono-terminal: 13px;
+  --text-mono-source: 12px;
+  --text-mono-inline: 12px;
+  --radius-container: 6px;
+  --radius-inline: 4px;
+  --radius-round: 50%;
+  --transition-hover: 150ms ease-out;
+  --transition-tooltip: 100ms ease-in;
+  --transition-focus-ring: 100ms ease-out;
+  --transition-settings-slide: 250ms ease-out;
+  --transition-modal-fade: 200ms ease-in;
+  --transition-command-palette: 150ms ease-out;
+  --color-bg-base: #0A0A0B;
+  --color-bg-surface: #111113;
+  --color-bg-elevated: #1A1A1D;
+  --color-border-default: #2A2A2E;
+  --color-text-primary: #EDEDEF;
+  --color-text-secondary: #8B8B8E;
+  --color-text-muted: #5A5A5E;
+  --color-accent-default: #6C63FF;
+  --color-accent-hover: #7B73FF;
+  --color-accent-muted: rgba(108, 99, 255, 0.12);
+}
+
+@media (resolution < 2dppx) {
+  :root {
+    --text-page-title: 21px;
+    --text-section-heading: 16px;
+    --text-body: 14px;
+    --text-secondary: 13px;
+    --text-label: 13px;
+    --text-mono-terminal: 14px;
+    --text-mono-source: 13px;
+    --text-mono-inline: 13px;
+  }
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--color-bg-elevated) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-bg-elevated); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-default); }
+
+.focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.3); }
+.interactive-hover { transition: background-color var(--transition-hover); }
+.interactive-hover:hover { background-color: var(--color-bg-elevated); }
+
+.panel-separator-h {
+  width: 1px;
+  background: linear-gradient(to bottom, transparent 0%, var(--color-border-default) 20%, var(--color-border-default) 80%, transparent 100%);
+}
+
+.panel-separator-v {
+  height: 1px;
+  background: linear-gradient(to right, transparent 0%, var(--color-border-default) 20%, var(--color-border-default) 80%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
