@@ -15,6 +15,7 @@ import {
 } from './GraphRenderer'
 import { useGraphHighlight } from './useGraphHighlight'
 import { useGraphAnimation } from './useGraphAnimation'
+import { useGraphKeyboard } from './useGraphKeyboard'
 import { GraphMinimap } from './GraphMinimap'
 import { GraphContextMenu } from './GraphContextMenu'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
@@ -25,8 +26,8 @@ import { colors } from '../../design/tokens'
 // ---------------------------------------------------------------------------
 
 function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() =>
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const [reduced, setReduced] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
   useEffect(() => {
     const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -51,7 +52,7 @@ function LoadingSkeleton() {
             className="w-2 h-2 rounded-full animate-pulse"
             style={{
               backgroundColor: colors.accent.default,
-              animationDelay: `${delay}ms`,
+              animationDelay: `${delay}ms`
             }}
           />
         ))}
@@ -111,6 +112,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     [nodeSizeMode, baseNodeSize]
   )
   const [isSimulating, setIsSimulating] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -127,6 +129,38 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   // Integration hooks
   const highlightHook = useGraphHighlight(edgesRef.current ?? [])
   const animation = useGraphAnimation(handleSimRestart, reducedMotion)
+
+  // Positioned nodes for keyboard navigation (only nodes with resolved coordinates)
+  const positionedNodes = useMemo(
+    () =>
+      (nodesRef.current ?? []).filter(
+        (n): n is SimNode & { x: number; y: number } =>
+          typeof n.x === 'number' && typeof n.y === 'number'
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodesRef.current]
+  )
+
+  // Keyboard navigation
+  useGraphKeyboard({
+    nodes: positionedNodes,
+    edges: (edgesRef.current ?? []).map((e) => ({
+      source: typeof e.source === 'string' ? e.source : e.source.id,
+      target: typeof e.target === 'string' ? e.target : e.target.id,
+      kind: e.kind
+    })),
+    selectedNodeId,
+    onSelectNode: setSelectedNode,
+    onOpenNode: (id) => {
+      setSelectedNode(id)
+      setContentView('editor')
+      onNodeClick(id)
+    },
+    onToggleSelect: (id) => {
+      setSelectedNode(selectedNodeId === id ? null : id)
+    },
+    enabled: isFocused
+  })
 
   // -------------------------------------------------------------------------
   // Render callback
@@ -159,7 +193,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       canvasWidth: w,
       canvasHeight: h,
       reducedMotion,
-      skipAmbientSprites: skipSpritesRef.current,
+      skipAmbientSprites: skipSpritesRef.current
     })
 
     ctx.restore()
@@ -191,7 +225,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       return {
         ...n,
         x: prev?.x ?? Math.random() * canvas.clientWidth,
-        y: prev?.y ?? Math.random() * canvas.clientHeight,
+        y: prev?.y ?? Math.random() * canvas.clientHeight
       }
     }) as SimNode[]
 
@@ -252,7 +286,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         centerForce,
         repelForce,
         linkForce: linkForceStrength,
-        linkDistance,
+        linkDistance
       }
 
       sim = createSimulation(
@@ -301,7 +335,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     linkDistance,
     isAnimating,
     render,
-    animation,
+    animation
   ])
 
   // -------------------------------------------------------------------------
@@ -338,7 +372,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     const t = transformRef.current
     return {
       x: (clientX - rect.left - t.x) / t.k,
-      y: (clientY - rect.top - t.y) / t.k,
+      y: (clientY - rect.top - t.y) / t.k
     }
   }, [])
 
@@ -447,7 +481,13 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   const isEmpty = !graph.nodes.length
 
   return (
-    <div className="h-full relative" style={{ backgroundColor: colors.bg.base }}>
+    <div
+      className="h-full relative focus-ring"
+      tabIndex={0}
+      style={{ backgroundColor: colors.bg.base }}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+    >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
@@ -473,14 +513,10 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
           edges={edgesRef.current ?? []}
           transform={transformRef.current}
           canvasWidth={
-            canvasRef.current?.width
-              ? canvasRef.current.width / window.devicePixelRatio
-              : 800
+            canvasRef.current?.width ? canvasRef.current.width / window.devicePixelRatio : 800
           }
           canvasHeight={
-            canvasRef.current?.height
-              ? canvasRef.current.height / window.devicePixelRatio
-              : 600
+            canvasRef.current?.height ? canvasRef.current.height / window.devicePixelRatio : 600
           }
           onPan={handleMinimapPan}
         />
@@ -508,7 +544,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         style={{
           backgroundColor: settingsOpen ? colors.accent.muted : colors.bg.elevated,
           color: settingsOpen ? colors.accent.default : colors.text.muted,
-          border: `1px solid ${colors.border.default}`,
+          border: `1px solid ${colors.border.default}`
         }}
         aria-label="Toggle graph settings"
         title="Graph Settings"
