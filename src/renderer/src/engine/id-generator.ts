@@ -8,14 +8,14 @@ const PREFIX_TO_TYPE: Record<string, string> = Object.fromEntries(
 
 export function generateId(
   type: ArtifactType,
-  counters: IdCounters,
+  counters: IdCounters
 ): { id: string; updatedCounters: IdCounters } {
   const prefix = TYPE_PREFIXES[type]
   const current = counters[type] ?? 0
   const next = current + 1
   return {
     id: `${prefix}${next}`,
-    updatedCounters: { ...counters, [type]: next },
+    updatedCounters: { ...counters, [type]: next }
   }
 }
 

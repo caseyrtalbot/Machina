@@ -1,4 +1,10 @@
-import type { Artifact, GraphNode, GraphEdge, KnowledgeGraph, RelationshipKind } from '@shared/types'
+import type {
+  Artifact,
+  GraphNode,
+  GraphEdge,
+  KnowledgeGraph,
+  RelationshipKind
+} from '@shared/types'
 
 export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
   const nodes = new Map<string, GraphNode>()
@@ -12,15 +18,16 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
       title: a.title,
       type: a.type,
       signal: a.signal,
-      connectionCount: 0,
+      connectionCount: 0
     })
   }
 
   function addEdge(source: string, target: string, kind: RelationshipKind): void {
     // For non-directional edges, normalize key order to deduplicate
-    const key = kind === 'appears_in'
-      ? `${source}->${target}:${kind}`
-      : `${[source, target].sort().join('<->')}:${kind}`
+    const key =
+      kind === 'appears_in'
+        ? `${source}->${target}:${kind}`
+        : `${[source, target].sort().join('<->')}:${kind}`
 
     if (edgeSet.has(key)) return
     edgeSet.add(key)
@@ -32,7 +39,7 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
         title: target,
         type: 'note',
         signal: 'untested',
-        connectionCount: 0,
+        connectionCount: 0
       })
     }
 

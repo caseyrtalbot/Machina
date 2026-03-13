@@ -14,7 +14,7 @@ export class VaultWatcher {
       ignored: [/(^|[/\\])\../, /node_modules/],
       persistent: true,
       ignoreInitial: false,
-      awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 50 },
+      awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 50 }
     })
 
     const handleEvent = (event: FileEvent) => (path: string) => {

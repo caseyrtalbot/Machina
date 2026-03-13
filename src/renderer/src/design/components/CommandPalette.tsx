@@ -17,13 +17,10 @@ interface CommandPaletteProps {
 
 const CATEGORY_LABELS: Record<CommandItem['category'], string> = {
   note: 'Notes',
-  command: 'Commands',
+  command: 'Commands'
 }
 
-function filterItems(
-  items: ReadonlyArray<CommandItem>,
-  query: string
-): ReadonlyArray<CommandItem> {
+function filterItems(items: ReadonlyArray<CommandItem>, query: string): ReadonlyArray<CommandItem> {
   if (query === '') return items
 
   const lower = query.toLowerCase()
@@ -46,11 +43,18 @@ function groupByCategory(
 
   return Array.from(groups.entries()).map(([category, categoryItems]) => ({
     category,
-    items: categoryItems,
+    items: categoryItems
   }))
 }
 
-export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPaletteProps) {
+// Thin wrapper: gates rendering on isOpen so inner component mounts fresh each time
+export function CommandPalette({ isOpen, ...rest }: CommandPaletteProps) {
+  if (!isOpen) return null
+  return <CommandPaletteInner {...rest} />
+}
+
+// Inner component: owns all state, mounts/unmounts with isOpen
+function CommandPaletteInner({ onClose, items, onSelect }: Omit<CommandPaletteProps, 'isOpen'>) {
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -59,17 +63,15 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
   const filtered = useMemo(() => filterItems(items, query), [items, query])
   const groups = useMemo(() => groupByCategory(filtered), [filtered])
 
+  // Focus input on mount
   useEffect(() => {
-    if (isOpen) {
-      setQuery('')
-      setSelectedIndex(0)
-      requestAnimationFrame(() => inputRef.current?.focus())
-    }
-  }, [isOpen])
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }, [])
 
-  useEffect(() => {
+  const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value)
     setSelectedIndex(0)
-  }, [query])
+  }, [])
 
   const handleSelect = useCallback(
     (item: CommandItem) => {
@@ -116,9 +118,10 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
     selectedEl?.scrollIntoView({ block: 'nearest' })
   }, [selectedIndex])
 
-  if (!isOpen) return null
-
-  let flatIndex = 0
+  const groupBaseOffsets = groups.reduce<number[]>((offsets, _group, i) => {
+    offsets.push(i === 0 ? 0 : offsets[i - 1] + groups[i - 1].items.length)
+    return offsets
+  }, [])
 
   return (
     <div
@@ -130,20 +133,17 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
         className="w-full max-w-lg rounded-xl border shadow-2xl overflow-hidden"
         style={{
           backgroundColor: colors.bg.elevated,
-          borderColor: colors.border.default,
+          borderColor: colors.border.default
         }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <div
-          className="px-4 py-3 border-b"
-          style={{ borderColor: colors.border.default }}
-        >
+        <div className="px-4 py-3 border-b" style={{ borderColor: colors.border.default }}>
           <input
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleQueryChange}
             placeholder="Search notes and commands..."
             className="w-full bg-transparent outline-none text-sm"
             style={{
@@ -151,26 +151,21 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
               fontFamily: typography.fontFamily.body,
               backgroundColor: colors.bg.surface,
               padding: '8px 12px',
-              borderRadius: '8px',
+              borderRadius: '8px'
             }}
           />
         </div>
 
-        <div
-          ref={listRef}
-          className="max-h-80 overflow-y-auto py-2"
-        >
+        <div ref={listRef} className="max-h-80 overflow-y-auto py-2">
           {filtered.length === 0 && (
-            <div
-              className="px-4 py-6 text-center text-sm"
-              style={{ color: colors.text.muted }}
-            >
+            <div className="px-4 py-6 text-center text-sm" style={{ color: colors.text.muted }}>
               No results found
             </div>
           )}
 
-          {groups.map((group) => {
+          {groups.map((group, groupIndex) => {
             const categoryLabel = CATEGORY_LABELS[group.category]
+            const baseOffset = groupBaseOffsets[groupIndex]
 
             return (
               <div key={group.category}>
@@ -179,15 +174,14 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
                   style={{
                     color: colors.text.muted,
                     fontFamily: typography.fontFamily.body,
-                    letterSpacing: typography.metadata.letterSpacing,
+                    letterSpacing: typography.metadata.letterSpacing
                   }}
                 >
                   {categoryLabel}
                 </div>
 
-                {group.items.map((item) => {
-                  const currentIndex = flatIndex
-                  flatIndex += 1
+                {group.items.map((item, itemIndex) => {
+                  const currentIndex = baseOffset + itemIndex
                   const isSelected = currentIndex === selectedIndex
 
                   return (
@@ -198,7 +192,7 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
                       style={{
                         color: colors.text.primary,
                         backgroundColor: isSelected ? colors.accent.muted : 'transparent',
-                        fontFamily: typography.fontFamily.body,
+                        fontFamily: typography.fontFamily.body
                       }}
                       onClick={() => handleSelect(item)}
                       onMouseEnter={() => setSelectedIndex(currentIndex)}
@@ -211,7 +205,7 @@ export function CommandPalette({ isOpen, onClose, items, onSelect }: CommandPale
                           style={{
                             color: colors.text.muted,
                             fontFamily: typography.fontFamily.mono,
-                            backgroundColor: colors.bg.surface,
+                            backgroundColor: colors.bg.surface
                           }}
                         >
                           {item.shortcut}

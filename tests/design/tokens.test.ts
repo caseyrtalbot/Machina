@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { colors, spacing, typography, ARTIFACT_COLORS } from '../../src/renderer/src/design/tokens'
+import { colors, ARTIFACT_COLORS } from '../../src/renderer/src/design/tokens'
 
 describe('design tokens', () => {
   it('has all background layers', () => {

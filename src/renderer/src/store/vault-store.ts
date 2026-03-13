@@ -56,7 +56,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       const state: VaultState = await ipcRenderer.invoke('vault:read-state', { vaultPath })
 
       // List all .md files recursively
-      const filePaths: string[] = await ipcRenderer.invoke('fs:list-files-recursive', { dir: vaultPath })
+      const filePaths: string[] = await ipcRenderer.invoke('fs:list-files-recursive', {
+        dir: vaultPath
+      })
 
       // Read and parse each file
       const files: VaultFile[] = []
@@ -72,7 +74,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
           path: filePath,
           filename,
           title: artifact?.title ?? filename.replace(/\.md$/, ''),
-          modified: artifact?.modified ?? new Date().toISOString().split('T')[0],
+          modified: artifact?.modified ?? new Date().toISOString().split('T')[0]
         })
       }
 
@@ -85,5 +87,5 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
 
   getGraph: () => get().index.getGraph(),
   getArtifact: (id) => get().index.getArtifact(id),
-  search: (query) => get().index.search(query),
+  search: (query) => get().index.search(query)
 }))

@@ -33,5 +33,5 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     else current.add(type)
     set({ typeFilters: current })
   },
-  setSignalFilter: (signal) => set({ signalFilter: signal }),
+  setSignalFilter: (signal) => set({ signalFilter: signal })
 }))

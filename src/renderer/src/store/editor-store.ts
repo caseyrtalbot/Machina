@@ -25,5 +25,5 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setActiveNote: (id, path) => set({ activeNoteId: id, activeNotePath: path, isDirty: false }),
   setMode: (mode) => set({ mode }),
   setContent: (content) => set({ content, isDirty: true }),
-  setDirty: (dirty) => set({ isDirty: dirty }),
+  setDirty: (dirty) => set({ isDirty: dirty })
 }))

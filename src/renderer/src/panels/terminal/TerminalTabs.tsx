@@ -21,12 +21,15 @@ export function TerminalTabs({ onNewTab }: TerminalTabsProps) {
           style={{
             borderColor: colors.border.default,
             backgroundColor: session.id === activeSessionId ? colors.bg.elevated : 'transparent',
-            color: session.id === activeSessionId ? colors.text.primary : colors.text.secondary,
+            color: session.id === activeSessionId ? colors.text.primary : colors.text.secondary
           }}
         >
           <span>{session.title}</span>
           <button
-            onClick={(e) => { e.stopPropagation(); removeSession(session.id) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              removeSession(session.id)
+            }}
             className="ml-1 hover:text-white"
             style={{ color: colors.text.muted }}
           >

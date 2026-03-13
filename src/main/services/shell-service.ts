@@ -23,7 +23,7 @@ export class ShellService {
       cols: 80,
       rows: 24,
       cwd,
-      env: process.env as Record<string, string>,
+      env: process.env as Record<string, string>
     })
 
     pty.onData((data) => this.onData(sessionId, data))

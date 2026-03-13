@@ -50,7 +50,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           className="text-xs px-2 py-1 rounded transition-colors"
           style={{
             backgroundColor: mode === 'rich' ? colors.accent.muted : 'transparent',
-            color: mode === 'rich' ? colors.accent.default : colors.text.muted,
+            color: mode === 'rich' ? colors.accent.default : colors.text.muted
           }}
         >
           Rich
@@ -60,7 +60,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           className="text-xs px-2 py-1 rounded transition-colors"
           style={{
             backgroundColor: mode === 'source' ? colors.accent.muted : 'transparent',
-            color: mode === 'source' ? colors.accent.default : colors.text.muted,
+            color: mode === 'source' ? colors.accent.default : colors.text.muted
           }}
         >
           Source

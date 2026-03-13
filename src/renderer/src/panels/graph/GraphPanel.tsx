@@ -64,13 +64,11 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     nodesRef.current = nodes
     edgesRef.current = edges
 
+    let sim: ReturnType<typeof createSimulation> | null = null
     if (nodes.length > 0) {
-      const sim = createSimulation(nodes, edges, canvas.width, canvas.height)
+      sim = createSimulation(nodes, edges, canvas.width, canvas.height)
       sim.on('tick', render)
       simRef.current = sim
-      return () => {
-        sim.stop()
-      }
     } else {
       render()
     }
@@ -82,7 +80,12 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         render()
       })
 
-    select(canvas).call(zoomBehavior)
+    const selection = select(canvas).call(zoomBehavior)
+
+    return () => {
+      sim?.stop()
+      selection.on('.zoom', null)
+    }
   }, [getGraph, render])
 
   const handleMouseMove = useCallback(

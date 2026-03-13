@@ -23,7 +23,7 @@ const META_KEY_BINDINGS: ReadonlyArray<{
   { key: '/', handler: 'onToggleSourceMode' },
   { key: 'k', handler: 'onCommandPalette' },
   { key: 's', handler: 'onSave' },
-  { key: 't', handler: 'onNewTerminalTab' },
+  { key: 't', handler: 'onNewTerminalTab' }
 ]
 
 export function useKeyboard(config: KeyboardConfig): void {

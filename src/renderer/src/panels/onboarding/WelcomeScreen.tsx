@@ -54,7 +54,7 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.bg.base,
+        backgroundColor: colors.bg.base
       }}
     >
       <div
@@ -62,7 +62,7 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '40px',
+          gap: '40px'
         }}
       >
         {/* Header */}
@@ -75,7 +75,7 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
               fontFamily: typography.fontFamily.display,
               color: colors.text.primary,
               letterSpacing: '-0.02em',
-              lineHeight: 1.2,
+              lineHeight: 1.2
             }}
           >
             Thought Engine
@@ -86,7 +86,7 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
               fontSize: '16px',
               fontFamily: typography.fontFamily.body,
               color: colors.text.secondary,
-              lineHeight: 1.5,
+              lineHeight: 1.5
             }}
           >
             Your local-first knowledge engine
@@ -99,7 +99,7 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            width: '280px',
+            width: '280px'
           }}
         >
           <button
@@ -114,15 +114,13 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
               fontFamily: typography.fontFamily.body,
               color: '#FFFFFF',
               backgroundColor:
-                hoveredButton === 'create'
-                  ? colors.accent.hover
-                  : colors.accent.default,
+                hoveredButton === 'create' ? colors.accent.hover : colors.accent.default,
               border: 'none',
               borderRadius: '8px',
               cursor: isLoading ? 'default' : 'pointer',
               opacity: isLoading ? 0.6 : 1,
               transition: `background-color ${transitions.default}, opacity ${transitions.default}`,
-              lineHeight: 1.5,
+              lineHeight: 1.5
             }}
           >
             Create New Vault
@@ -138,21 +136,16 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
               fontSize: '14px',
               fontWeight: 500,
               fontFamily: typography.fontFamily.body,
-              color:
-                hoveredButton === 'open'
-                  ? colors.text.primary
-                  : colors.text.secondary,
+              color: hoveredButton === 'open' ? colors.text.primary : colors.text.secondary,
               backgroundColor: 'transparent',
               border: `1px solid ${
-                hoveredButton === 'open'
-                  ? colors.accent.default
-                  : colors.border.default
+                hoveredButton === 'open' ? colors.accent.default : colors.border.default
               }`,
               borderRadius: '8px',
               cursor: isLoading ? 'default' : 'pointer',
               opacity: isLoading ? 0.6 : 1,
               transition: `color ${transitions.default}, border-color ${transitions.default}, opacity ${transitions.default}`,
-              lineHeight: 1.5,
+              lineHeight: 1.5
             }}
           >
             Open Existing Folder

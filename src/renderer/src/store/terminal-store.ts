@@ -15,23 +15,25 @@ interface TerminalStore {
   renameSession: (id: string, title: string) => void
 }
 
-export const useTerminalStore = create<TerminalStore>((set, get) => ({
+export const useTerminalStore = create<TerminalStore>((set) => ({
   sessions: [],
   activeSessionId: null,
 
-  addSession: (session) => set((s) => ({
-    sessions: [...s.sessions, session],
-    activeSessionId: session.id,
-  })),
-  removeSession: (id) => set((s) => {
-    const sessions = s.sessions.filter(t => t.id !== id)
-    const activeSessionId = s.activeSessionId === id
-      ? (sessions[sessions.length - 1]?.id ?? null)
-      : s.activeSessionId
-    return { sessions, activeSessionId }
-  }),
+  addSession: (session) =>
+    set((s) => ({
+      sessions: [...s.sessions, session],
+      activeSessionId: session.id
+    })),
+  removeSession: (id) =>
+    set((s) => {
+      const sessions = s.sessions.filter((t) => t.id !== id)
+      const activeSessionId =
+        s.activeSessionId === id ? (sessions[sessions.length - 1]?.id ?? null) : s.activeSessionId
+      return { sessions, activeSessionId }
+    }),
   setActiveSession: (id) => set({ activeSessionId: id }),
-  renameSession: (id, title) => set((s) => ({
-    sessions: s.sessions.map(t => t.id === id ? { ...t, title } : t),
-  })),
+  renameSession: (id, title) =>
+    set((s) => ({
+      sessions: s.sessions.map((t) => (t.id === id ? { ...t, title } : t))
+    }))
 }))

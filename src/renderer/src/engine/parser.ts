@@ -28,7 +28,10 @@ export function parseArtifact(content: string, filename: string): Result<Artifac
   const { data, content: body } = parsed
 
   if (!data || typeof data !== 'object' || !data.id || !data.title || !data.type) {
-    return { ok: false, error: `Missing required frontmatter fields (id, title, type) in ${filename}` }
+    return {
+      ok: false,
+      error: `Missing required frontmatter fields (id, title, type) in ${filename}`
+    }
   }
 
   if (!VALID_TYPES.has(data.type)) {
@@ -53,8 +56,8 @@ export function parseArtifact(content: string, filename: string): Result<Artifac
       clusters_with: toStringArray(data.clusters_with),
       tensions_with: toStringArray(data.tensions_with),
       appears_in: toStringArray(data.appears_in),
-      body: body.trim(),
-    },
+      body: body.trim()
+    }
   }
 }
 
@@ -64,7 +67,7 @@ export function serializeArtifact(artifact: Artifact): string {
     title: artifact.title,
     type: artifact.type,
     created: artifact.created,
-    modified: artifact.modified,
+    modified: artifact.modified
   }
 
   if (artifact.source) frontmatter.source = artifact.source

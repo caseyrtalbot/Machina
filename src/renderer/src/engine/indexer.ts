@@ -55,10 +55,11 @@ export class VaultIndex {
 
   search(query: string): Artifact[] {
     const lower = query.toLowerCase()
-    return this.getArtifacts().filter(a =>
-      a.title.toLowerCase().includes(lower) ||
-      a.tags.some(t => t.toLowerCase().includes(lower)) ||
-      a.body.toLowerCase().includes(lower)
+    return this.getArtifacts().filter(
+      (a) =>
+        a.title.toLowerCase().includes(lower) ||
+        a.tags.some((t) => t.toLowerCase().includes(lower)) ||
+        a.body.toLowerCase().includes(lower)
     )
   }
 

@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type {
-  ArtifactType, Signal, Artifact, Relationship,
-  RelationshipKind, GraphNode, GraphEdge, VaultConfig, VaultState,
-} from '@shared/types'
+import type { ArtifactType, Signal, Artifact } from '@shared/types'
 
 describe('shared types', () => {
   it('creates a valid Artifact', () => {
@@ -20,7 +17,7 @@ describe('shared types', () => {
       clusters_with: [],
       tensions_with: [],
       appears_in: [],
-      body: 'Test body content',
+      body: 'Test body content'
     }
     expect(artifact.id).toBe('g1')
     expect(artifact.type).toBe('gene')

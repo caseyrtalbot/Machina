@@ -18,9 +18,9 @@ export function RichEditor({ content, onChange }: RichEditorProps) {
     editorProps: {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-full px-8 py-6',
-        style: `color: ${colors.text.primary}; font-family: Inter, system-ui, sans-serif;`,
-      },
-    },
+        style: `color: ${colors.text.primary}; font-family: Inter, system-ui, sans-serif;`
+      }
+    }
   })
 
   useEffect(() => {

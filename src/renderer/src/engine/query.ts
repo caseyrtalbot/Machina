@@ -45,7 +45,10 @@ export function getNeighborhood(index: VaultIndex, id: string, depth: number = 1
   return visited
 }
 
-export function filterByWorkspace(artifacts: readonly Artifact[], workspace: string | null): Artifact[] {
+export function filterByWorkspace(
+  artifacts: readonly Artifact[],
+  workspace: string | null
+): Artifact[] {
   if (!workspace) return [...artifacts]
   return [...artifacts]
 }

@@ -1,8 +1,8 @@
 export const ARTIFACT_TYPES = ['gene', 'constraint', 'research', 'output', 'note', 'index'] as const
-export type ArtifactType = typeof ARTIFACT_TYPES[number]
+export type ArtifactType = (typeof ARTIFACT_TYPES)[number]
 
 export const SIGNALS = ['untested', 'emerging', 'validated', 'core'] as const
-export type Signal = typeof SIGNALS[number]
+export type Signal = (typeof SIGNALS)[number]
 
 export const TYPE_PREFIXES: Record<ArtifactType, string> = {
   gene: 'g',
@@ -10,14 +10,14 @@ export const TYPE_PREFIXES: Record<ArtifactType, string> = {
   research: 'r',
   output: 'o',
   note: 'n',
-  index: 'i',
+  index: 'i'
 }
 
 export const SIGNAL_OPACITY: Record<Signal, number> = {
   core: 1.0,
   validated: 0.85,
   emerging: 0.7,
-  untested: 0.4,
+  untested: 0.4
 }
 
 export interface Artifact {
@@ -38,7 +38,7 @@ export interface Artifact {
 }
 
 export const RELATIONSHIP_KINDS = ['connection', 'cluster', 'tension', 'appears_in'] as const
-export type RelationshipKind = typeof RELATIONSHIP_KINDS[number]
+export type RelationshipKind = (typeof RELATIONSHIP_KINDS)[number]
 
 export interface Relationship {
   source: string

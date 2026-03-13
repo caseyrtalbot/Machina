@@ -14,7 +14,7 @@ export function WorkspaceFilter({ workspaces, active, onSelect }: WorkspaceFilte
         className="px-2 py-0.5 rounded whitespace-nowrap transition-colors"
         style={{
           backgroundColor: active === null ? colors.accent.muted : 'transparent',
-          color: active === null ? colors.accent.default : colors.text.secondary,
+          color: active === null ? colors.accent.default : colors.text.secondary
         }}
       >
         All
@@ -26,7 +26,7 @@ export function WorkspaceFilter({ workspaces, active, onSelect }: WorkspaceFilte
           className="px-2 py-0.5 rounded whitespace-nowrap transition-colors"
           style={{
             backgroundColor: active === ws ? colors.accent.muted : 'transparent',
-            color: active === ws ? colors.accent.default : colors.text.secondary,
+            color: active === ws ? colors.accent.default : colors.text.secondary
           }}
         >
           {ws}

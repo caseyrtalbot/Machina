@@ -21,12 +21,10 @@ export class FileService {
 
   async listFiles(dir: string, pattern?: string): Promise<string[]> {
     const entries = await readdir(dir, { withFileTypes: true })
-    let files = entries
-      .filter(e => e.isFile())
-      .map(e => join(dir, e.name))
+    let files = entries.filter((e) => e.isFile()).map((e) => join(dir, e.name))
 
     if (pattern === '*.md') {
-      files = files.filter(f => extname(f) === '.md')
+      files = files.filter((f) => extname(f) === '.md')
     }
 
     return files
@@ -40,7 +38,7 @@ export class FileService {
       const fullPath = join(dir, entry.name)
       if (entry.name.startsWith('.')) continue
       if (entry.isDirectory()) {
-        results.push(...await this.listFilesRecursive(fullPath))
+        results.push(...(await this.listFilesRecursive(fullPath)))
       } else if (entry.isFile() && extname(entry.name) === '.md') {
         results.push(fullPath)
       }
@@ -59,13 +57,13 @@ export class FileService {
       version: 1,
       fonts: { display: 'Inter', body: 'Inter', mono: 'JetBrains Mono' },
       workspaces: [],
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     }
 
     const defaultState: VaultState = {
       idCounters: {},
       lastOpenNote: null,
-      panelLayout: { sidebarWidth: 260, terminalWidth: 360 },
+      panelLayout: { sidebarWidth: 260, terminalWidth: 360 }
     }
 
     const configPath = teConfigPath(vaultPath)

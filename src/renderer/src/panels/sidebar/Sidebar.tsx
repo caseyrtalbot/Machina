@@ -22,7 +22,7 @@ export function Sidebar({
   onSearch,
   onWorkspaceSelect,
   onFileSelect,
-  onToggleDirectory,
+  onToggleDirectory
 }: SidebarProps) {
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: colors.bg.surface }}>

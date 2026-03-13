@@ -145,17 +145,21 @@ export function TerminalPanel() {
   useEffect(() => {
     if (didInit.current) return
     didInit.current = true
-    createTerminalInstance()
+    // Defer to avoid synchronous setState during effect execution
+    queueMicrotask(() => {
+      createTerminalInstance()
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup all terminals on unmount
   useEffect(() => {
+    const instances = instancesRef.current
     return () => {
-      for (const [sessionId, instance] of instancesRef.current) {
+      for (const [sessionId, instance] of instances) {
         instance.terminal.dispose()
         ipcRenderer.invoke('terminal:kill', { sessionId })
       }
-      instancesRef.current.clear()
+      instances.clear()
     }
   }, [])
 

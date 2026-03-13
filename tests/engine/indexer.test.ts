@@ -4,7 +4,7 @@ import { VaultIndex } from '@engine/indexer'
 const FILES: Record<string, string> = {
   'g1.md': `---\nid: g1\ntitle: Gene One\ntype: gene\ncreated: 2026-03-12\nmodified: 2026-03-12\nconnections:\n  - g2\nclusters_with:\n  - g2\n---\nBody one`,
   'g2.md': `---\nid: g2\ntitle: Gene Two\ntype: gene\ncreated: 2026-03-12\nmodified: 2026-03-12\n---\nBody two`,
-  'c1.md': `---\nid: c1\ntitle: Constraint\ntype: constraint\ncreated: 2026-03-12\nmodified: 2026-03-12\ntensions_with:\n  - g1\n---\nBody three`,
+  'c1.md': `---\nid: c1\ntitle: Constraint\ntype: constraint\ncreated: 2026-03-12\nmodified: 2026-03-12\ntensions_with:\n  - g1\n---\nBody three`
 }
 
 describe('VaultIndex', () => {

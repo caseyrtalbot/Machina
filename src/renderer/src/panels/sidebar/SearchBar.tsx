@@ -21,7 +21,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
       style={{
         backgroundColor: colors.bg.elevated,
         color: colors.text.primary,
-        border: `1px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`
       }}
     />
   )

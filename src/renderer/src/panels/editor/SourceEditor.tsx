@@ -37,9 +37,9 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
         EditorView.theme({
           '&': { height: '100%', fontSize: '14px' },
           '.cm-scroller': { fontFamily: '"JetBrains Mono", monospace' },
-          '.cm-content': { padding: '16px 0' },
-        }),
-      ],
+          '.cm-content': { padding: '16px 0' }
+        })
+      ]
     })
 
     const view = new EditorView({ state, parent: containerRef.current })
@@ -57,7 +57,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
     const currentContent = view.state.doc.toString()
     if (currentContent !== content) {
       view.dispatch({
-        changes: { from: 0, to: currentContent.length, insert: content },
+        changes: { from: 0, to: currentContent.length, insert: content }
       })
     }
   }, [content])
