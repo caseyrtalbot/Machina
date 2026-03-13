@@ -325,6 +325,7 @@ Promoted from Phase 2 because it becomes the primary navigation tool. Users need
 | Create | `src/renderer/src/components/PanelErrorBoundary.tsx` |
 | Create | `src/renderer/src/lib/config-storage.ts` (IPC-backed Zustand storage adapter, with version migration support) |
 | Create | `src/main/ipc/config.ts` (config:read, config:write handlers) |
+| Modify | `src/shared/ipc-channels.ts` (add window:*, config:*, terminal:process-name channel types) |
 | Modify | `src/main/index.ts` (BrowserWindow config, register config IPC, workspace restore) |
 | Modify | `src/main/services/vault-watcher.ts` (configurable ignores) |
 | Modify | `src/renderer/src/App.tsx` (titlebar, error boundaries, layout, session hydration) |
@@ -455,7 +456,7 @@ A tabbed modal opened from the titlebar settings gear.
 
 | Action | File |
 |--------|------|
-| Create | `src/renderer/src/components/SettingsModal.tsx` (full implementation, replacing Phase 1 stub) |
+| Modify | `src/renderer/src/components/SettingsModal.tsx` (full implementation, replacing Phase 1 stub) |
 | Create | `src/renderer/src/store/settings-store.ts` |
 | Modify | `src/renderer/src/App.tsx` (wire modal open from titlebar) |
 
@@ -872,18 +873,20 @@ tension: '#F59E0B'
 - `src/renderer/src/store/graph-settings-store.ts`
 - `src/renderer/src/store/settings-store.ts`
 
-**Modified files (19)**:
+**Modified files (20)**:
 - `src/preload/index.ts` (typed IPC channel allowlist, remove blanket electronAPI)
+- `src/shared/ipc-channels.ts` (add window:*, config:*, terminal:process-name channel types)
 - `src/main/index.ts` (BrowserWindow config, config IPC registration, workspace restore)
-- `src/main/ipc/shell.ts` (expose PTY process name)
+- `src/main/ipc/shell.ts` (expose PTY process name via terminal:process-name)
 - `src/main/services/vault-watcher.ts` (configurable ignores, expanded defaults)
-- `src/renderer/src/App.tsx` (titlebar, error boundaries, layout, session hydration, command palette wiring)
+- `src/renderer/src/App.tsx` (titlebar, error boundaries, layout, session hydration, command palette wiring, migrate IPC calls in StatusBar)
+- `src/renderer/src/store/vault-store.ts` (migrate `window.electron.ipcRenderer` to `window.api.*`)
 - `src/renderer/src/panels/sidebar/FileTree.tsx` (hierarchy, folders, counts, inline rename, delete)
 - `src/renderer/src/panels/sidebar/Sidebar.tsx` (action bar, sort dropdown)
 - `src/renderer/src/panels/graph/GraphPanel.tsx` (settings, sizing, highlights, animation, minimap, loading state, keyboard, right-click, spatial transition)
 - `src/renderer/src/panels/graph/GraphRenderer.ts` (Canvas2D glow sprites, dimming, edge brightening, viewport culling, LOD, renderer interface)
 - `src/renderer/src/panels/graph/GraphControls.tsx` (Graph/Skills toggle, remove Editor button)
-- `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close guard, rename, search addon, font zoom)
+- `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close guard, rename, search addon, font zoom, migrate IPC calls)
 - `src/renderer/src/panels/editor/EditorPanel.tsx` (toolbar, breadcrumb, frontmatter, backlinks, conflict notification bar)
 - `src/renderer/src/design/components/CommandPalette.tsx` (fuzzy search, recent files, command routing)
 - `src/renderer/src/store/graph-store.ts` ('skills' in contentView)
@@ -891,7 +894,6 @@ tension: '#F59E0B'
 - `src/renderer/src/design/tokens.ts` (type scale, animation constants)
 - `src/renderer/src/assets/index.css` (CSS custom properties, prefers-reduced-motion)
 - `src/renderer/src/engine/indexer.ts` (add `getBacklinks(id)` method)
-- All renderer IPC call sites (migrate from `window.electron.*` to `window.api.*`)
 
 ## Constraints
 
