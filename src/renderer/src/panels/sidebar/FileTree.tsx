@@ -213,6 +213,7 @@ function FileRow({
         <span
           className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
           style={{ backgroundColor: getArtifactColor(artifactType) }}
+          title={artifactType ?? 'note'}
         />
       )}
       {isRenaming ? (
