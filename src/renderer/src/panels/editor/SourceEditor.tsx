@@ -15,6 +15,11 @@ interface SourceEditorProps {
 export function SourceEditor({ content, onChange }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const onChangeRef = useRef(onChange)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -31,7 +36,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChange(update.state.doc.toString())
+            onChangeRef.current(update.state.doc.toString())
           }
         }),
         EditorView.theme({
