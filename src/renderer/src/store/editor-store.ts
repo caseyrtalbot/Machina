@@ -74,6 +74,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
 
     const state = get()
+    if (state.isDirty && state.activeNotePath && state.content) {
+      window.api.fs.writeFile(state.activeNotePath, state.content).catch(() => {})
+    }
     const title = titleFromPath(path)
     const tabs = state.openTabs.some((t) => t.path === path)
       ? state.openTabs
@@ -101,7 +104,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const state = get()
     // Flush pending save for current file before switching
     if (state.isDirty && state.activeNotePath && state.content) {
-      window.api.fs.writeFile(state.activeNotePath, state.content)
+      window.api.fs.writeFile(state.activeNotePath, state.content).catch(() => {})
     }
     const resolvedTitle = title ?? titleFromPath(path)
     const tabs = state.openTabs.some((t) => t.path === path)
@@ -123,7 +126,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const state = get()
     // Flush any pending save for the file being closed
     if (state.activeNotePath === path && state.isDirty && state.content) {
-      window.api.fs.writeFile(path, state.content)
+      window.api.fs.writeFile(path, state.content).catch(() => {})
     }
     const tabs = state.openTabs.filter((t) => t.path !== path)
 
@@ -146,7 +149,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const state = get()
     // Flush any pending save for the current file before switching
     if (state.isDirty && state.activeNotePath && state.content) {
-      window.api.fs.writeFile(state.activeNotePath, state.content)
+      window.api.fs.writeFile(state.activeNotePath, state.content).catch(() => {})
     }
     if (state.activeNotePath === path) return
     const history = pushHistory(state.historyStack, state.historyIndex, path)
@@ -162,6 +165,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   goBack: () => {
     const state = get()
+    if (state.isDirty && state.activeNotePath && state.content) {
+      window.api.fs.writeFile(state.activeNotePath, state.content).catch(() => {})
+    }
     if (state.historyIndex <= 0) return
     const newIndex = state.historyIndex - 1
     const path = state.historyStack[newIndex]
@@ -176,6 +182,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   goForward: () => {
     const state = get()
+    if (state.isDirty && state.activeNotePath && state.content) {
+      window.api.fs.writeFile(state.activeNotePath, state.content).catch(() => {})
+    }
     if (state.historyIndex >= state.historyStack.length - 1) return
     const newIndex = state.historyIndex + 1
     const path = state.historyStack[newIndex]
@@ -193,6 +202,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 export function flushPendingSave(): void {
   const { isDirty, content, activeNotePath } = useEditorStore.getState()
   if (!isDirty || !activeNotePath || !content) return
-  window.api.fs.writeFile(activeNotePath, content)
+  window.api.fs.writeFile(activeNotePath, content).catch(() => {})
   useEditorStore.getState().markSaved()
 }

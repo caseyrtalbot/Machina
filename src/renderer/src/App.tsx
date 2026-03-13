@@ -13,7 +13,7 @@ import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useVaultStore } from './store/vault-store'
-import { useEditorStore } from './store/editor-store'
+import { useEditorStore, flushPendingSave } from './store/editor-store'
 import { useGraphStore } from './store/graph-store'
 import { colors } from './design/tokens'
 import { Titlebar } from './components/Titlebar'
@@ -468,10 +468,7 @@ export default function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      const { isDirty, content, activeNotePath } = useEditorStore.getState()
-      if (isDirty && activeNotePath && content) {
-        window.api.fs.writeFile(activeNotePath, content)
-      }
+      flushPendingSave()
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
