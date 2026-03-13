@@ -19,43 +19,8 @@ import { colors } from './design/tokens'
 import { Titlebar } from './components/Titlebar'
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
+import { StatusBar } from './components/StatusBar'
 import type { ArtifactType } from '@shared/types'
-
-function StatusBar() {
-  const vaultPath = useVaultStore((s) => s.vaultPath)
-  const fileCount = useVaultStore((s) => s.files.length)
-  const [gitBranch, setGitBranch] = useState<string | null>(null)
-  const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
-
-  useEffect(() => {
-    if (!vaultPath) return
-    window.api.vault
-      .gitBranch(vaultPath)
-      .then(setGitBranch)
-      .catch(() => setGitBranch(null))
-  }, [vaultPath])
-
-  return (
-    <div
-      className="h-6 flex items-center px-3 text-[11px] border-t flex-shrink-0"
-      style={{
-        backgroundColor: colors.bg.surface,
-        color: colors.text.muted,
-        borderColor: colors.border.default
-      }}
-    >
-      <span>{vaultName}</span>
-      <span className="mx-2">&middot;</span>
-      <span>{fileCount} notes</span>
-      {gitBranch && (
-        <>
-          <span className="mx-2">&middot;</span>
-          <span>{gitBranch}</span>
-        </>
-      )}
-    </div>
-  )
-}
 
 function ContentArea() {
   const contentView = useGraphStore((s) => s.contentView)
