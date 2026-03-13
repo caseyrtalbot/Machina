@@ -102,4 +102,17 @@ export function registerFilesystemIpc(): void {
     const { copyFile } = await import('node:fs/promises')
     await copyFile(args.srcPath, args.destPath)
   })
+
+  ipcMain.handle('fs:create-folder', async (_e, args: { defaultPath: string }) => {
+    const result = await dialog.showOpenDialog({
+      defaultPath: args.defaultPath,
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('fs:mkdir', async (_e, args: { path: string }) => {
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(args.path, { recursive: true })
+  })
 }

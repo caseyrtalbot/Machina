@@ -1,4 +1,3 @@
-import { useState, useCallback } from 'react'
 import { colors, transitions } from '../../design/tokens'
 
 export interface BreadcrumbSegment {
@@ -20,55 +19,9 @@ export function parseBreadcrumb(filePath: string, vaultPath: string): readonly B
     return {
       name: isLast ? part.replace(/\.md$/, '') : part,
       path: builtPath,
-      isFile: isLast && part.endsWith('.md'),
+      isFile: isLast && part.endsWith('.md')
     }
   })
-}
-
-interface NavigationHistory {
-  readonly stack: readonly string[]
-  readonly index: number
-}
-
-interface UseNavigationHistoryReturn {
-  readonly currentPath: string | null
-  readonly canGoBack: boolean
-  readonly canGoForward: boolean
-  push: (path: string) => void
-  goBack: () => void
-  goForward: () => void
-}
-
-export function useNavigationHistory(): UseNavigationHistoryReturn {
-  const [history, setHistory] = useState<NavigationHistory>({ stack: [], index: -1 })
-
-  const push = useCallback((path: string) => {
-    setHistory((prev) => {
-      const truncated = prev.stack.slice(0, prev.index + 1)
-      return {
-        stack: [...truncated, path],
-        index: truncated.length,
-      }
-    })
-  }, [])
-
-  const goBack = useCallback(() => {
-    setHistory((prev) =>
-      prev.index > 0 ? { ...prev, index: prev.index - 1 } : prev
-    )
-  }, [])
-
-  const goForward = useCallback(() => {
-    setHistory((prev) =>
-      prev.index < prev.stack.length - 1 ? { ...prev, index: prev.index + 1 } : prev
-    )
-  }, [])
-
-  const canGoBack = history.index > 0
-  const canGoForward = history.index < history.stack.length - 1
-  const currentPath = history.stack[history.index] ?? null
-
-  return { currentPath, canGoBack, canGoForward, push, goBack, goForward }
 }
 
 interface NavButtonProps {
@@ -91,7 +44,7 @@ function NavButton({ onClick, disabled, title, children }: NavButtonProps) {
         opacity: disabled ? 0.4 : 1,
         transition: transitions.default,
         backgroundColor: 'transparent',
-        fontSize: 11,
+        fontSize: 11
       }}
     >
       {children}
@@ -116,7 +69,7 @@ export function EditorBreadcrumb({
   canGoForward,
   onGoBack,
   onGoForward,
-  onNavigate,
+  onNavigate
 }: EditorBreadcrumbProps) {
   const segments = parseBreadcrumb(filePath, vaultPath)
 
@@ -126,7 +79,7 @@ export function EditorBreadcrumb({
       style={{
         height: 28,
         backgroundColor: colors.bg.surface,
-        borderBottom: `1px solid ${colors.border.default}`,
+        borderBottom: `1px solid ${colors.border.default}`
       }}
     >
       <NavButton onClick={onGoBack} disabled={!canGoBack} title="Go back">
@@ -136,17 +89,12 @@ export function EditorBreadcrumb({
         ›
       </NavButton>
 
-      <div
-        className="w-px h-3 mx-0.5"
-        style={{ backgroundColor: colors.border.default }}
-      />
+      <div className="w-px h-3 mx-0.5" style={{ backgroundColor: colors.border.default }} />
 
       <div className="flex items-center gap-0.5 overflow-hidden">
         {segments.map((segment, index) => (
           <div key={segment.path} className="flex items-center gap-0.5 min-w-0">
-            {index > 0 && (
-              <span style={{ color: colors.text.muted, fontSize: 11 }}>/</span>
-            )}
+            {index > 0 && <span style={{ color: colors.text.muted, fontSize: 11 }}>/</span>}
             <button
               onClick={() => onNavigate?.(segment.path)}
               className="truncate transition-colors"
@@ -156,7 +104,7 @@ export function EditorBreadcrumb({
                 maxWidth: 120,
                 background: 'transparent',
                 cursor: onNavigate ? 'pointer' : 'default',
-                transition: transitions.default,
+                transition: transitions.default
               }}
               title={segment.name}
             >

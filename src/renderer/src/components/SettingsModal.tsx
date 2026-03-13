@@ -3,6 +3,7 @@ import { colors } from '../design/tokens'
 import { useSettingsStore } from '../store/settings-store'
 import { useGraphSettingsStore } from '../store/graph-settings-store'
 import { useVaultStore } from '../store/vault-store'
+import { FontPicker } from './FontPicker'
 
 // ---- Types ----
 
@@ -153,15 +154,7 @@ function AppearanceTab() {
         <SliderInput value={fontSize} min={10} max={24} step={1} onChange={setFontSize} />
       </SettingRow>
       <SettingRow label="Font Family">
-        <SelectInput
-          value={fontFamily}
-          options={[
-            { value: 'Inter', label: 'Inter' },
-            { value: 'System', label: 'System' },
-            { value: 'JetBrains Mono', label: 'JetBrains Mono' }
-          ]}
-          onChange={setFontFamily}
-        />
+        <FontPicker value={fontFamily} onChange={setFontFamily} />
       </SettingRow>
       <SettingRow label="Theme">
         <span className="text-xs" style={{ color: colors.text.muted }}>

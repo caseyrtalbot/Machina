@@ -24,7 +24,10 @@ const api = {
       ipcRenderer.invoke('fs:rename-file', { oldPath, newPath }),
     copyFile: (srcPath: string, destPath: string): Promise<void> =>
       ipcRenderer.invoke('fs:copy-file', { srcPath, destPath }),
-    selectVault: () => ipcRenderer.invoke('fs:select-vault')
+    selectVault: () => ipcRenderer.invoke('fs:select-vault'),
+    createFolder: (defaultPath: string): Promise<string | null> =>
+      ipcRenderer.invoke('fs:create-folder', { defaultPath }),
+    mkdir: (path: string): Promise<void> => ipcRenderer.invoke('fs:mkdir', { path })
   },
   vault: {
     init: (vaultPath: string) => ipcRenderer.invoke('vault:init', { vaultPath }),

@@ -20,6 +20,7 @@ import { Titlebar } from './components/Titlebar'
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
 import { StatusBar } from './components/StatusBar'
+import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { ArtifactType } from '@shared/types'
 
 function ContentArea() {
@@ -52,6 +53,8 @@ function ContentArea() {
   )
 }
 
+const EMPTY_SET = new Set<string>()
+
 function ConnectedSidebar() {
   const files = useVaultStore((s) => s.files)
   const config = useVaultStore((s) => s.config)
@@ -66,11 +69,38 @@ function ConnectedSidebar() {
   const setContentView = useGraphStore((s) => s.setContentView)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<'modified' | 'name' | 'type'>('modified')
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const treeNodes = useMemo(() => {
+  const allTreeNodes = useMemo(() => {
     const paths = files.map((f) => f.path)
     return buildFileTree(paths, vaultPath ?? '')
   }, [files, vaultPath])
+
+  const treeNodes = useMemo(() => {
+    if (!searchQuery.trim()) return allTreeNodes
+
+    const query = searchQuery.toLowerCase()
+    // Find files whose names match the search
+    const matchingFiles = new Set(
+      allTreeNodes
+        .filter((n) => !n.isDirectory && n.name.toLowerCase().includes(query))
+        .map((n) => n.path)
+    )
+    // Collect all ancestor directories needed to display matching files
+    const requiredDirs = new Set<string>()
+    for (const node of allTreeNodes) {
+      if (matchingFiles.has(node.path)) {
+        let parent: string | undefined = node.parentPath
+        while (parent) {
+          if (requiredDirs.has(parent)) break
+          requiredDirs.add(parent)
+          const parentNode = allTreeNodes.find((n) => n.path === parent)
+          parent = parentNode?.parentPath
+        }
+      }
+    }
+    return allTreeNodes.filter((n) => matchingFiles.has(n.path) || requiredDirs.has(n.path))
+  }, [allTreeNodes, searchQuery])
 
   const artifactTypes = useMemo(() => {
     const map = new Map<string, ArtifactType>()
@@ -98,8 +128,8 @@ function ConnectedSidebar() {
     [setActiveNote, setContentView, setContent]
   )
 
-  const handleSearch = useCallback((_query: string) => {
-    // TODO: wire to vault index search
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query)
   }, [])
 
   const handleToggleDirectory = useCallback((path: string) => {
@@ -114,17 +144,60 @@ function ConnectedSidebar() {
     })
   }, [])
 
-  const handleNewFile = useCallback(() => {
-    // TODO: create new file in vault
-  }, [])
+  const handleNewFile = useCallback(async () => {
+    if (!vaultPath) return
 
-  const handleNewFolder = useCallback(() => {
-    // TODO: create new folder in vault
-  }, [])
+    // Find a unique filename: Untitled.md, Untitled 1.md, Untitled 2.md, ...
+    const existingPaths = new Set(files.map((f) => f.path))
+    let filename = 'Untitled.md'
+    let counter = 1
+    while (existingPaths.has(`${vaultPath}/${filename}`)) {
+      filename = `Untitled ${counter}.md`
+      counter++
+    }
+
+    const filePath = `${vaultPath}/${filename}`
+    const now = new Date().toISOString().slice(0, 10)
+    const title = filename.replace('.md', '')
+    const content = `---\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
+
+    await window.api.fs.writeFile(filePath, content)
+    // Select the new file in the editor
+    setActiveNote(filePath, filePath)
+    setContentView('editor')
+    setContent(content)
+  }, [vaultPath, files, setActiveNote, setContentView, setContent])
+
+  const handleNewFolder = useCallback(async () => {
+    if (!vaultPath) return
+    // Open native Finder dialog scoped to the vault root.
+    // The dialog's "New Folder" button lets users create folders in place.
+    await window.api.fs.createFolder(vaultPath)
+  }, [vaultPath])
 
   const handleFileAction = useCallback(
     async (action: { actionId: string; path: string; isDirectory: boolean }) => {
       switch (action.actionId) {
+        case 'new-file': {
+          // Create new note inside the right-clicked folder
+          const dir = action.path
+          const existingPaths = new Set(files.map((f) => f.path))
+          let filename = 'Untitled.md'
+          let counter = 1
+          while (existingPaths.has(`${dir}/${filename}`)) {
+            filename = `Untitled ${counter}.md`
+            counter++
+          }
+          const filePath = `${dir}/${filename}`
+          const now = new Date().toISOString().slice(0, 10)
+          const title = filename.replace('.md', '')
+          const content = `---\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
+          await window.api.fs.writeFile(filePath, content)
+          setActiveNote(filePath, filePath)
+          setContentView('editor')
+          setContent(content)
+          break
+        }
         case 'copy-path': {
           await navigator.clipboard.writeText(action.path)
           break
@@ -156,7 +229,7 @@ function ConnectedSidebar() {
         }
       }
     },
-    [activeNotePath, setActiveNote, setContent]
+    [activeNotePath, files, setActiveNote, setContent, setContentView]
   )
 
   return (
@@ -165,7 +238,7 @@ function ConnectedSidebar() {
       workspaces={config?.workspaces ?? []}
       activeWorkspace={activeWorkspace}
       activeFilePath={activeNotePath}
-      collapsedPaths={collapsedPaths}
+      collapsedPaths={searchQuery.trim() ? EMPTY_SET : collapsedPaths}
       artifactTypes={artifactTypes}
       sortMode={sortMode}
       onSearch={handleSearch}
@@ -406,6 +479,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <GoogleFontLoader />
       {isLoading ? (
         <LoadingSkeleton />
       ) : vaultPath ? (

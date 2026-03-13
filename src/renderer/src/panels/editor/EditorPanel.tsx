@@ -8,7 +8,8 @@ import Link from '@tiptap/extension-link'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
 import { EditorToolbar } from './EditorToolbar'
-import { EditorBreadcrumb, useNavigationHistory } from './EditorBreadcrumb'
+import { EditorBreadcrumb } from './EditorBreadcrumb'
+import { TabBar } from './TabBar'
 import { FrontmatterHeader } from './FrontmatterHeader'
 import { BacklinksPanel } from './BacklinksPanel'
 import { RichEditor } from './RichEditor'
@@ -27,7 +28,22 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const content = useEditorStore((s) => s.content)
   const setMode = useEditorStore((s) => s.setMode)
   const setContent = useEditorStore((s) => s.setContent)
+  const loadContent = useEditorStore((s) => s.loadContent)
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition)
+
+  // Tabs
+  const openTabs = useEditorStore((s) => s.openTabs)
+  const switchTab = useEditorStore((s) => s.switchTab)
+  const closeTab = useEditorStore((s) => s.closeTab)
+
+  // Navigation (from store)
+  const historyIndex = useEditorStore((s) => s.historyIndex)
+  const historyStack = useEditorStore((s) => s.historyStack)
+  const goBack = useEditorStore((s) => s.goBack)
+  const goForward = useEditorStore((s) => s.goForward)
+
+  const canGoBack = historyIndex > 0
+  const canGoForward = historyIndex < historyStack.length - 1
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const files = useVaultStore((s) => s.files)
@@ -41,8 +57,8 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     [activeNoteId, getBacklinks]
   )
 
-  const { canGoBack, canGoForward, push, goBack, goForward } = useNavigationHistory()
-  const prevPathRef = useRef<string | null>(null)
+  // Track which path we last loaded from disk
+  const prevLoadedPathRef = useRef<string | null>(null)
 
   // Frontmatter: raw string preserved for lossless round-tripping (ref),
   // parsed data stored as state so changes trigger re-render for the properties panel
@@ -52,13 +68,6 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const [frontmatterData, setFrontmatterData] = useState<
     Readonly<Record<string, string | readonly string[]>>
   >({})
-
-  // Push to navigation history when active note changes
-  useEffect(() => {
-    if (activeNotePath) {
-      push(activeNotePath)
-    }
-  }, [activeNotePath, push])
 
   // Build Tiptap extensions
   const extensions = useMemo(
@@ -113,7 +122,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     editorProps: {
       attributes: {
         class: 'focus:outline-none min-h-full px-8 py-6',
-        style: `color: ${colors.text.primary}; font-family: Inter, system-ui, sans-serif;`
+        style: `color: ${colors.text.primary};`
       },
       // Intercept clicks on wikilinks to navigate instead of following href
       handleClick: (_view, _pos, event) => {
@@ -142,30 +151,44 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       })
 
       if (match) {
-        const { setActiveNote } = useEditorStore.getState()
-        setActiveNote(match.path, match.path)
-        window.api.fs.readFile(match.path).then((fileContent) => {
-          setContent(fileContent)
-        })
+        useEditorStore.getState().openTab(match.path, match.filename.replace(/\.md$/, ''))
       }
     },
-    [files, setContent]
+    [files]
   )
 
-  // Load content into editor when file changes
+  // Load file content from disk when active note path changes
   useEffect(() => {
-    if (!editor || !content) return
-    if (activeNotePath === prevPathRef.current) return
-    prevPathRef.current = activeNotePath
+    if (!activeNotePath || activeNotePath === prevLoadedPathRef.current) return
+    prevLoadedPathRef.current = activeNotePath
 
-    // Parse frontmatter and preprocess wikilinks
+    window.api.fs
+      .readFile(activeNotePath)
+      .then((fileContent) => {
+        // Guard against stale async: only apply if still the active path
+        if (useEditorStore.getState().activeNotePath === activeNotePath) {
+          loadContent(fileContent)
+        }
+      })
+      .catch(() => {
+        if (useEditorStore.getState().activeNotePath === activeNotePath) {
+          loadContent('')
+        }
+      })
+  }, [activeNotePath, loadContent])
+
+  // Sync loaded content into Tiptap editor when content changes for a new file
+  useEffect(() => {
+    if (!editor || !content || !activeNotePath) return
+    // Only sync on fresh file loads, not user edits
+    if (useEditorStore.getState().isDirty) return
+
     const parsed = parseFrontmatter(content)
     frontmatterRawRef.current = parsed.raw
     setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
 
     const processedBody = preprocessWikilinks(parsed.body)
 
-    // Use the Markdown extension's parser to convert markdown to ProseMirror JSON
     const manager = editor.storage.markdown?.manager
     if (manager) {
       const json = manager.parse(processedBody)
@@ -199,6 +222,13 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: colors.bg.base }}>
+      <TabBar
+        tabs={openTabs}
+        activePath={activeNotePath}
+        onSwitch={switchTab}
+        onClose={closeTab}
+      />
+
       <EditorBreadcrumb
         filePath={filePath}
         vaultPath={resolvedVaultPath}
