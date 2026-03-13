@@ -1,7 +1,7 @@
 # Thought Engine UI Redesign: Design Specification
 
 **Date**: 2026-03-12
-**Status**: V2 (incorporates architecture review)
+**Status**: V3 (incorporates deep architectural review)
 **Project**: `/Users/caseytalbot/Projects/thought-engine/`
 
 ## Product Vision
@@ -24,8 +24,8 @@ Relationships between ideas are the primary object. Documents are substrate that
 
 | Phase | Name | Focus |
 |-------|------|-------|
-| 1 | Foundation | Custom titlebar, layout skeleton, session persistence, error boundaries |
-| 2 | Function | Filesystem tree, graph controls, terminal tabs, settings, command palette |
+| 1 | Foundation | IPC security, custom titlebar, layout skeleton, session persistence, error boundaries, command palette |
+| 2 | Function | Filesystem tree, graph controls, terminal tabs, settings |
 | 3 | Interaction | Neon highlights, physics sliders, real-time graph, Graph/Skills toggle, graph minimap |
 | 4 | Polish | Theme coherence, transitions, typography, editor toolbar, backlinks, status bar |
 
@@ -73,9 +73,160 @@ No app-level undo/redo system in V1, but all destructive operations (file delete
 
 Future consideration: command pattern for app-level undo.
 
+### IPC Security Model
+
+The current preload (`src/preload/index.ts`) exposes the full `electronAPI` from `@electron-toolkit/preload` with no channel allowlist. Any renderer code can invoke any IPC channel. This is a security gap that must be closed in Phase 1.
+
+**Phase 1 requirement**: replace the blanket `electronAPI` exposure with a typed channel allowlist:
+
+```typescript
+// src/preload/index.ts — Phase 1 replacement
+const api = {
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    maximize: () => ipcRenderer.invoke('window:maximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+  },
+  config: {
+    read: (scope: string, key: string) => ipcRenderer.invoke('config:read', scope, key),
+    write: (scope: string, key: string, value: unknown) => ipcRenderer.invoke('config:write', scope, key, value),
+  },
+  vault: {
+    readFile: (path: string) => ipcRenderer.invoke('vault:read-file', path),
+    writeFile: (path: string, content: string) => ipcRenderer.invoke('vault:write-file', path, content),
+    listFiles: (dir: string) => ipcRenderer.invoke('vault:list-files', dir),
+    deleteFile: (path: string) => ipcRenderer.invoke('vault:delete-file', path),
+    renameFile: (oldPath: string, newPath: string) => ipcRenderer.invoke('vault:rename-file', oldPath, newPath),
+  },
+  shell: {
+    create: (opts: ShellCreateOpts) => ipcRenderer.invoke('shell:create', opts),
+    resize: (id: string, cols: number, rows: number) => ipcRenderer.invoke('shell:resize', id, cols, rows),
+    write: (id: string, data: string) => ipcRenderer.invoke('shell:write', id, data),
+    kill: (id: string) => ipcRenderer.invoke('shell:kill', id),
+    getProcessName: (id: string) => ipcRenderer.invoke('shell:process-name', id),
+  },
+  watcher: {
+    onFileChange: (callback: FileChangeCallback) => { /* ... */ },
+  },
+}
+```
+
+Only channels in this allowlist are callable from the renderer. The existing `window.electron.ipcRenderer.invoke` pattern is removed. All renderer code migrates to `window.api.<domain>.<method>()`. This is a breaking change to all existing IPC call sites, so it must be done as the first task in Phase 1 before any other IPC work builds on the old pattern.
+
+### Chokidar Watcher Hardening
+
+The current `VaultWatcher` (`src/main/services/vault-watcher.ts`) only ignores dotfiles (`/(^|[/\\])\../`) and `node_modules`. On large vaults this will fire on build artifacts, vendor directories, and other noise.
+
+**Phase 1 addition**: extend the watcher with configurable ignore patterns:
+
+- Default ignores: dotfiles, `node_modules`, `dist`, `build`, `.thought-engine` (own config dir)
+- Vault-level configurable ignores: read from `<vault>/.thought-engine/config.json` under key `watcher.ignorePatterns` (array of glob strings, same syntax as `.gitignore`)
+- Changes to ignore patterns require watcher restart (not hot-reloaded, acceptable for a settings change)
+
+### Edge Data Model
+
+All relationship data comes from YAML frontmatter fields in each `.md` file. The parser (`src/renderer/src/engine/parser.ts`) extracts four relationship arrays:
+
+| Frontmatter field | RelationshipKind | Directionality | Edge dedup |
+|---|---|---|---|
+| `connections` | `connection` | Non-directional | Sorted pair key |
+| `clusters_with` | `cluster` | Non-directional | Sorted pair key |
+| `tensions_with` | `tension` | Non-directional | Sorted pair key |
+| `appears_in` | `appears_in` | Directional (source appears in target) | Ordered pair key |
+
+**No wiki-link parsing.** The body content is not scanned for `[[target]]` links. All edges are explicit frontmatter declarations. This is a deliberate design choice: explicit relationships are higher signal than implicit text references. Wiki-link parsing may be added as a future enhancement (separate edge kind, visually distinguished), but is out of scope for this spec.
+
+Ghost nodes are created for any frontmatter reference pointing to an `id` not found in the vault (dangling references). These render as dimmer, smaller nodes in the graph.
+
+### Zustand Store Discipline
+
+Four existing stores (`vault-store`, `editor-store`, `graph-store`, `terminal-store`) plus two new ones (`graph-settings-store`, `settings-store`). Rules for cross-store interaction:
+
+1. **No store subscribes to another store.** If Component A needs data from store X and store Y, Component A selects from both stores independently. No store imports or subscribes to another store's state.
+2. **Selector granularity**: always select the narrowest slice needed. `useGraphStore(s => s.contentView)` not `useGraphStore()`. This prevents re-renders when unrelated state changes.
+3. **Derived data in components or hooks, not stores.** The adjacency list for hover highlighting lives in `useGraphHighlight.ts` (a hook), not in `graph-store`. Stores hold raw state; hooks and components compute derived state.
+4. **Actions that span stores go through event handlers in components**, not through store-to-store coupling. Example: double-clicking a graph node updates `graph-store.contentView` to `'editor'` AND `editor-store.activeFile` to the clicked file. The `GraphPanel` click handler calls both actions, not a single action that reaches into both stores.
+
+### Testing Strategy
+
+Not a test plan for every component, but a targeted strategy for the units that are hardest to debug when broken:
+
+| Unit | Test type | Why |
+|---|---|---|
+| `buildFileTree.ts` (Phase 2A) | Unit | Flat-to-tree path conversion has edge cases (empty dirs, deeply nested, duplicate names). Pure function, easy to test. |
+| `useGraphHighlight.ts` (Phase 3A) | Unit | Adjacency list construction + connected set computation. State machine transitions (idle/hover/click/deselect). Pure logic extracted from hook for testing. |
+| Graph diff logic in `useGraphAnimation.ts` (Phase 3B) | Unit | Add/remove/rename detection by file path. Rename = remove+add with same content hash. Batching accumulation. |
+| `config-storage.ts` (Phase 1) | Integration | IPC round-trip: write config value, read it back. Ensures the Zustand storage adapter works with the IPC config handlers. |
+| IPC channel allowlist (Phase 1) | Integration | Verify that channels NOT in the allowlist are rejected. Verify all listed channels resolve. |
+
+Existing 35 tests must pass throughout all phases. New test files follow existing `vitest` patterns.
+
+### State Versioning
+
+The persistence files (`workspace.json`, `config.json`, `settings.json`) will evolve across versions. Each file includes a `version` field (integer, starting at 1). On read, the app checks the version and runs migration functions if the stored version is behind the current expected version.
+
+```typescript
+// Migration registry pattern
+const migrations: Record<number, (state: unknown) => unknown> = {
+  1: (s) => s, // V1 is baseline, no migration needed
+  2: (s) => ({ ...s, newField: defaultValue }), // V1 -> V2
+}
+```
+
+If the version is missing (pre-versioning file), treat as version 0 and run all migrations. If the version is higher than expected (user downgraded), load as-is with a console warning (don't crash, don't drop data).
+
+### Multi-Vault Architectural Direction
+
+V1 is single-vault. But the architecture must not make multi-vault painful to add later. Constraints:
+
+- All vault-level state (files, graph, config) lives in stores that accept a vault path parameter, not singletons that assume one global vault
+- The titlebar already shows a single vault tab. Multi-vault means multiple tabs, each switching the vault context for the stores below
+- Per-vault stores, not a single store with vault partitions. When switching vaults, the old vault's stores are preserved in memory (or serialized) and the new vault's stores are activated
+- The watcher already accepts `vaultPath` as a parameter. Multi-vault = multiple watcher instances
+
+No multi-vault code ships in V1. This section documents the constraints so V1 doesn't accidentally paint us into a corner.
+
+### File Conflict Resolution
+
+When the terminal agent writes to a file the user has open in the editor:
+
+1. The chokidar watcher fires a `change` event
+2. `vault-store` updates the file content
+3. If `editor-store.activeFile` matches the changed file:
+   - If the editor has **no unsaved changes**: silently reload the editor content from the updated vault-store data
+   - If the editor has **unsaved changes**: show a non-modal notification bar at the top of the editor: "This file was modified externally. [Reload] [Keep my changes]"
+   - "Reload" discards editor state and loads the new content
+   - "Keep my changes" dismisses the notification; the user's version wins until they save (at which point their version overwrites the agent's)
+
+This is the minimum viable conflict resolution. No merge, no diff view. The notification is the key, so the user knows something changed.
+
 ## Phase 1: Foundation
 
-### Custom Titlebar
+### 1A: IPC Security Lockdown
+
+**Must be the first task in Phase 1.** All subsequent phases build on the new IPC pattern.
+
+Replace the blanket `electronAPI` exposure in `src/preload/index.ts` with the typed channel allowlist defined in the IPC Security Model cross-cutting section. Migrate all existing renderer IPC call sites from `window.electron.ipcRenderer.invoke(...)` to `window.api.<domain>.<method>(...)`.
+
+**Files**:
+
+| Action | File |
+|--------|------|
+| Modify | `src/preload/index.ts` (replace blanket electronAPI with typed allowlist) |
+| Create | `src/preload/api.d.ts` (TypeScript declarations for `window.api`) |
+| Modify | All renderer files using `window.electron.ipcRenderer.*` (migrate to `window.api.*`) |
+
+### 1B: Chokidar Watcher Hardening
+
+Extend `VaultWatcher` with configurable ignore patterns as defined in the Chokidar Watcher Hardening cross-cutting section.
+
+**Files**:
+
+| Action | File |
+|--------|------|
+| Modify | `src/main/services/vault-watcher.ts` (configurable ignores, expanded defaults) |
+
+### 1C: Custom Titlebar
 
 Replace the OS-native window chrome with a custom titlebar component.
 
@@ -83,7 +234,7 @@ Replace the OS-native window chrome with a custom titlebar component.
 - `titleBarStyle: 'hidden'` on BrowserWindow config
 - `trafficLightPosition: { x: 12, y: 12 }` for macOS traffic light inset
 - `titleBarOverlay` config for Windows compatibility
-- New IPC handlers: `window:minimize`, `window:maximize`, `window:close` (called via existing `window.electron.ipcRenderer.invoke` pattern, no new preload file needed)
+- New IPC handlers: `window:minimize`, `window:maximize`, `window:close` (called via new `window.api.window.*` pattern from 1A)
 - New IPC handlers for persistence: `config:read`, `config:write` (reads/writes JSON files)
 
 **New component: `Titlebar.tsx`**
@@ -94,7 +245,7 @@ Replace the OS-native window chrome with a custom titlebar component.
 - Settings gear icon at far right, opens SettingsModal
 - All clickable elements inside the drag region get `-webkit-app-region: no-drag`
 
-### Layout Structure
+### 1D: Layout Structure
 
 ```
 App (h-screen w-screen, flex column)
@@ -104,28 +255,50 @@ App (h-screen w-screen, flex column)
 │       ├── PanelErrorBoundary > Sidebar (240px default, resizable)
 │       ├── PanelErrorBoundary > ContentArea (flex-1)
 │       │   ├── GraphControls (overlay toggle)
-│       │   └── GraphPanel | EditorPanel | SkillsPlaceholder
-│       └── PanelErrorBoundary > TerminalPanel (320px default, resizable)
+│       │   └── GraphPanel | EditorPanel | SkillsPanel
+│       └── PanelErrorBoundary > TerminalPanel (400px default, resizable)
 ├── StatusBar (24px, flex-shrink-0)
 └── CommandPalette (overlay)
     SettingsModal (overlay)
 ```
 
-The existing `SplitPane` component handles resizable dividers. The viewport is now: titlebar (38px) + panels (flex) + status bar (24px).
+The existing `SplitPane` component handles resizable dividers. The viewport is now: titlebar (38px) + panels (flex) + status bar (24px). Terminal default is 400px (320px is too narrow for meaningful CLI output with typical 80-column formatting).
 
 **What stays the same**: all panel internals, all four Zustand stores (internal logic unchanged, persistence adapter swapped), all IPC handlers, existing tests.
 
-### Files
+### 1E: Command Palette
+
+Promoted from Phase 2 because it becomes the primary navigation tool. Users need fast file/command access from day one, not after the filesystem tree lands.
+
+**Modes**:
+- **Default**: fuzzy search across file names, recent files (top 5, sorted by last opened), and runnable commands
+- **File search**: type to fuzzy-match file names. Enter opens in editor. Results show folder path and artifact type dot.
+- **Command search**: prefix with `>` to filter to commands only (like VS Code). Commands: toggle graph/editor, toggle sidebar, toggle terminal, new note, open settings, re-index vault, zoom to fit graph.
+- **Future**: `/` prefix for slash-commands that pipe to the terminal agent (not implemented in V1, but the prefix routing architecture should support it)
+
+**Behavior**:
+- `Cmd+K` opens, `Escape` closes
+- Most recent files shown immediately on open (before typing)
+- Fuzzy matching with highlighted match characters
+- Arrow keys to navigate, Enter to select
+- Palette dismisses on selection
+
+### 1F: Files (Phase 1 Total)
 
 | Action | File |
 |--------|------|
+| Modify | `src/preload/index.ts` (typed channel allowlist) |
+| Create | `src/preload/api.d.ts` (TypeScript declarations for `window.api`) |
 | Create | `src/renderer/src/components/Titlebar.tsx` |
 | Create | `src/renderer/src/components/SettingsModal.tsx` (stub) |
 | Create | `src/renderer/src/components/PanelErrorBoundary.tsx` |
-| Create | `src/renderer/src/lib/config-storage.ts` (IPC-backed Zustand storage adapter) |
+| Create | `src/renderer/src/lib/config-storage.ts` (IPC-backed Zustand storage adapter, with version migration support) |
 | Create | `src/main/ipc/config.ts` (config:read, config:write handlers) |
 | Modify | `src/main/index.ts` (BrowserWindow config, register config IPC, workspace restore) |
+| Modify | `src/main/services/vault-watcher.ts` (configurable ignores) |
 | Modify | `src/renderer/src/App.tsx` (titlebar, error boundaries, layout, session hydration) |
+| Modify | `src/renderer/src/design/components/CommandPalette.tsx` (fuzzy search, recent files, command prefix routing) |
+| Modify | All renderer IPC call sites (migrate to `window.api.*`) |
 
 ## Phase 2: Function
 
@@ -205,7 +378,7 @@ An Obsidian-style settings overlay for the graph, sliding in from the right edge
 
 ### 2C: Terminal Tabs
 
-Restyle the existing terminal tab bar to match the target design.
+Restyle the existing terminal tab bar to match the target design. Default terminal panel width is 400px (set in Phase 1 layout).
 
 **Tab bar**:
 - Active tab: elevated background (`bg.elevated`) + colored dot (green for shell, purple for Claude)
@@ -219,11 +392,13 @@ Restyle the existing terminal tab bar to match the target design.
 - Scrollback buffer: 10,000 lines (configurable in settings). Prevents memory bloat from long agent sessions.
 - In-terminal search: `Cmd+F` when terminal is focused opens a search bar within the terminal panel (xterm.js addon: `@xterm/addon-search`)
 
+**Terminal zoom**: `Cmd+=` / `Cmd+-` when terminal is focused adjusts terminal font size independently of the app font size. Stored in terminal settings.
+
 **Files**:
 
 | Action | File |
 |--------|------|
-| Modify | `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close guard, rename, search) |
+| Modify | `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close guard, rename, search, zoom) |
 | Modify | `src/main/ipc/shell.ts` (expose PTY process name) |
 
 ### 2D: Basic Settings Modal
@@ -252,30 +427,6 @@ A tabbed modal opened from the titlebar settings gear.
 | Create | `src/renderer/src/components/SettingsModal.tsx` (full implementation, replacing Phase 1 stub) |
 | Create | `src/renderer/src/store/settings-store.ts` |
 | Modify | `src/renderer/src/App.tsx` (wire modal open from titlebar) |
-
-### 2E: Command Palette
-
-Full specification for the `Cmd+K` command palette (already in layout tree but never specified).
-
-**Modes**:
-- **Default**: fuzzy search across file names, recent files (top 5, sorted by last opened), and runnable commands
-- **File search**: type to fuzzy-match file names. Enter opens in editor. Results show folder path and artifact type dot.
-- **Command search**: prefix with `>` to filter to commands only (like VS Code). Commands: toggle graph/editor, toggle sidebar, toggle terminal, new note, open settings, re-index vault, zoom to fit graph.
-- **Future**: `/` prefix for slash-commands that pipe to the terminal agent (not implemented in V1, but the prefix routing architecture should support it)
-
-**Behavior**:
-- `Cmd+K` opens, `Escape` closes
-- Most recent files shown immediately on open (before typing)
-- Fuzzy matching with highlighted match characters
-- Arrow keys to navigate, Enter to select
-- Palette dismisses on selection
-
-**Files**:
-
-| Action | File |
-|--------|------|
-| Modify | `src/renderer/src/design/components/CommandPalette.tsx` (fuzzy search, recent files, command prefix routing) |
-| Modify | `src/renderer/src/App.tsx` (expanded command handler) |
 
 ## Phase 3: Interaction
 
@@ -371,7 +522,7 @@ Extends the center panel's content view to include a Skills lens.
 
 **Toggle UI**: refactor existing `GraphControls.tsx` pill toggle from Graph/Editor to Graph/Skills. Active tab has `accent.muted` background. Editor is no longer in the pill toggle; it is accessed exclusively via node double-click in the graph or file selection in the sidebar.
 
-**Skills view (placeholder)**: minimal component with icon, title "Skills", and description "Agent capabilities and automation recipes. Coming soon." Clean placeholder ready for future implementation.
+**Skills view (minimal-functional, not placeholder)**: instead of a dead "coming soon" page, show the vault's `.claude/` commands and skills if they exist. Read the vault's `.claude/commands/` directory (if present) and display them as a list of available agent skills with name, description (from file comment header), and a "Run in Terminal" button that sends the command to the active terminal session. If no `.claude/` directory exists, show an empty state explaining how to add skills. This provides immediate value (the user can see and launch their Claude skills) while the full Skills experience is designed in a future spec.
 
 **Keyboard shortcut changes**:
 - `Cmd+G`: when in editor view, returns to graph view. When in graph view, switches to skills. When in skills, switches to graph. (Cycles graph > skills > graph, and always escapes editor back to graph.)
@@ -381,10 +532,10 @@ Extends the center panel's content view to include a Skills lens.
 
 | Action | File |
 |--------|------|
-| Create | `src/renderer/src/panels/graph/SkillsPlaceholder.tsx` |
+| Create | `src/renderer/src/panels/skills/SkillsPanel.tsx` (reads .claude/commands, list UI, run button) |
 | Modify | `src/renderer/src/panels/graph/GraphControls.tsx` (Graph/Skills toggle, remove Editor button) |
 | Modify | `src/renderer/src/store/graph-store.ts` (add `'skills'` to contentView union) |
-| Modify | `src/renderer/src/App.tsx` (ContentArea renders SkillsPlaceholder, update toggle logic) |
+| Modify | `src/renderer/src/App.tsx` (ContentArea renders SkillsPanel, update toggle logic) |
 | Modify | `src/renderer/src/hooks/useKeyboard.ts` (updated Cmd+G cycle) |
 
 ### 3D: Enhanced Node Sizing
@@ -570,7 +721,7 @@ All animations cataloged with consistent timing.
 - Focus ring: 100ms ease-out
 
 **Panel transitions**:
-- Graph to Editor crossfade: 200ms
+- Graph to Editor: zoom-to-node spatial transition (250ms). The graph zooms into the selected node until the node fills the content area, then crossfades to the editor over the last 100ms. This reinforces the "inspect" mental model: you're diving into a node, not switching tabs. Reverse: editor to graph zooms back out from the node's position.
 - Settings panel slide: 250ms ease-out
 - Modal overlay: 200ms fade-in
 - Command palette: 150ms scale + fade
@@ -663,16 +814,17 @@ tension: '#F59E0B'
 
 ### File Inventory
 
-**New files (19)**:
+**New files (21)**:
+- `src/preload/api.d.ts` (TypeScript declarations for `window.api`)
 - `src/renderer/src/components/Titlebar.tsx`
 - `src/renderer/src/components/SettingsModal.tsx`
 - `src/renderer/src/components/StatusBar.tsx`
 - `src/renderer/src/components/PanelErrorBoundary.tsx`
-- `src/renderer/src/lib/config-storage.ts`
+- `src/renderer/src/lib/config-storage.ts` (IPC-backed Zustand storage adapter with version migration)
 - `src/main/ipc/config.ts`
 - `src/renderer/src/panels/sidebar/buildFileTree.ts`
 - `src/renderer/src/panels/graph/GraphSettingsPanel.tsx`
-- `src/renderer/src/panels/graph/SkillsPlaceholder.tsx`
+- `src/renderer/src/panels/skills/SkillsPanel.tsx`
 - `src/renderer/src/panels/graph/useGraphHighlight.ts`
 - `src/renderer/src/panels/graph/useGraphAnimation.ts`
 - `src/renderer/src/panels/graph/GraphContextMenu.tsx`
@@ -687,22 +839,25 @@ tension: '#F59E0B'
 - `src/renderer/src/store/graph-settings-store.ts`
 - `src/renderer/src/store/settings-store.ts`
 
-**Modified files (16)**:
+**Modified files (18)**:
+- `src/preload/index.ts` (typed IPC channel allowlist, remove blanket electronAPI)
 - `src/main/index.ts` (BrowserWindow config, config IPC registration, workspace restore)
 - `src/main/ipc/shell.ts` (expose PTY process name)
-- `src/renderer/src/App.tsx` (titlebar, error boundaries, layout, session hydration, expanded command handler)
+- `src/main/services/vault-watcher.ts` (configurable ignores, expanded defaults)
+- `src/renderer/src/App.tsx` (titlebar, error boundaries, layout, session hydration, command palette wiring)
 - `src/renderer/src/panels/sidebar/FileTree.tsx` (hierarchy, folders, counts, inline rename, delete)
 - `src/renderer/src/panels/sidebar/Sidebar.tsx` (action bar, sort dropdown)
-- `src/renderer/src/panels/graph/GraphPanel.tsx` (settings, sizing, highlights, animation, minimap, loading state, keyboard, right-click)
+- `src/renderer/src/panels/graph/GraphPanel.tsx` (settings, sizing, highlights, animation, minimap, loading state, keyboard, right-click, spatial transition)
 - `src/renderer/src/panels/graph/GraphRenderer.ts` (Canvas2D glow sprites, dimming, edge brightening, viewport culling, LOD, renderer interface)
 - `src/renderer/src/panels/graph/GraphControls.tsx` (Graph/Skills toggle, remove Editor button)
-- `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close guard, rename, search addon)
-- `src/renderer/src/panels/editor/EditorPanel.tsx` (toolbar, breadcrumb, frontmatter, backlinks)
+- `src/renderer/src/panels/terminal/TerminalPanel.tsx` (tab styling, close guard, rename, search addon, font zoom)
+- `src/renderer/src/panels/editor/EditorPanel.tsx` (toolbar, breadcrumb, frontmatter, backlinks, conflict notification bar)
 - `src/renderer/src/design/components/CommandPalette.tsx` (fuzzy search, recent files, command routing)
 - `src/renderer/src/store/graph-store.ts` ('skills' in contentView)
 - `src/renderer/src/hooks/useKeyboard.ts` (updated Cmd+G cycle)
 - `src/renderer/src/design/tokens.ts` (type scale, animation constants)
 - `src/renderer/src/assets/index.css` (CSS custom properties, prefers-reduced-motion)
+- All renderer IPC call sites (migrate from `window.electron.*` to `window.api.*`)
 
 ## Constraints
 
