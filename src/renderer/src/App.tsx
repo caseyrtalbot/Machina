@@ -275,7 +275,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const toggleView = useCallback(() => {
     if (contentView === 'editor') setContentView('graph')
     else if (contentView === 'graph') setContentView('skills')
-    else setContentView('graph')
+    else setContentView('editor')
   }, [contentView, setContentView])
 
   const toggleSourceMode = useCallback(() => {
@@ -465,6 +465,17 @@ export default function App() {
       })
       .catch(() => {})
   }, [orchestrateLoad])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const { isDirty, content, activeNotePath } = useEditorStore.getState()
+      if (isDirty && activeNotePath && content) {
+        window.api.fs.writeFile(activeNotePath, content)
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
 
   useEffect(() => {
     const unsub = window.api.on.fileChanged(async (data) => {
