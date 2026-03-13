@@ -7,6 +7,7 @@ import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
 import { GraphPanel } from './panels/graph/GraphPanel'
 import { GraphControls } from './panels/graph/GraphControls'
+import { SkillsPanel } from './panels/skills/SkillsPanel'
 import { TerminalPanel } from './panels/terminal/TerminalPanel'
 import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
@@ -79,11 +80,9 @@ function ContentArea() {
   return (
     <div className="h-full relative">
       <GraphControls />
-      {contentView === 'graph' ? (
-        <GraphPanel onNodeClick={handleNodeClick} />
-      ) : (
-        <EditorPanel onNavigate={handleNavigate} />
-      )}
+      {contentView === 'graph' && <GraphPanel onNodeClick={handleNodeClick} />}
+      {contentView === 'editor' && <EditorPanel onNavigate={handleNavigate} />}
+      {contentView === 'skills' && <SkillsPanel />}
     </div>
   )
 }
@@ -171,7 +170,7 @@ function ConnectedSidebar() {
 
 const BUILT_IN_COMMANDS: CommandItem[] = [
   { id: 'cmd:new-note', label: 'New Note', category: 'command', shortcut: '\u2318N' },
-  { id: 'cmd:toggle-view', label: 'Toggle Graph/Editor', category: 'command', shortcut: '\u2318G' },
+  { id: 'cmd:toggle-view', label: 'Cycle View', category: 'command', shortcut: '\u2318G' },
   { id: 'cmd:toggle-sidebar', label: 'Toggle Sidebar', category: 'command', shortcut: '\u2318B' },
   { id: 'cmd:toggle-terminal', label: 'Toggle Terminal', category: 'command', shortcut: '\u2318`' },
   {
@@ -198,7 +197,9 @@ function WorkspaceShell() {
   const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
 
   const toggleView = useCallback(() => {
-    setContentView(contentView === 'editor' ? 'graph' : 'editor')
+    if (contentView === 'editor') setContentView('graph')
+    else if (contentView === 'graph') setContentView('skills')
+    else setContentView('graph')
   }, [contentView, setContentView])
 
   const toggleSourceMode = useCallback(() => {
@@ -339,7 +340,9 @@ export default function App() {
       const state = useVaultStore.getState().state
       if (state) {
         if (state.contentView)
-          useGraphStore.getState().setContentView(state.contentView as 'editor' | 'graph')
+          useGraphStore
+            .getState()
+            .setContentView(state.contentView as 'editor' | 'graph' | 'skills')
         if (state.selectedNodeId) useGraphStore.getState().setSelectedNode(state.selectedNodeId)
         if (state.lastOpenNote)
           useEditorStore.getState().setActiveNote(state.lastOpenNote, state.lastOpenNote)
