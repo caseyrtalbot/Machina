@@ -3,6 +3,7 @@ import { useVaultWorker } from './engine/useVaultWorker'
 import { ThemeProvider } from './design/Theme'
 import { SplitPane } from './design/components/SplitPane'
 import { Sidebar } from './panels/sidebar/Sidebar'
+import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
 import { GraphPanel } from './panels/graph/GraphPanel'
 import { GraphControls } from './panels/graph/GraphControls'
@@ -17,6 +18,7 @@ import { colors } from './design/tokens'
 import { Titlebar } from './components/Titlebar'
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
+import type { ArtifactType } from '@shared/types'
 
 function StatusBar() {
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -91,46 +93,78 @@ function ConnectedSidebar() {
   const config = useVaultStore((s) => s.config)
   const activeWorkspace = useVaultStore((s) => s.activeWorkspace)
   const setActiveWorkspace = useVaultStore((s) => s.setActiveWorkspace)
+  const vaultPath = useVaultStore((s) => s.vaultPath)
+  const artifacts = useVaultStore((s) => s.artifacts)
+  const fileToId = useVaultStore((s) => s.fileToId)
   const setActiveNote = useEditorStore((s) => s.setActiveNote)
   const activeNotePath = useEditorStore((s) => s.activeNotePath)
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
+  const [sortMode, setSortMode] = useState<'modified' | 'name' | 'type'>('modified')
+
+  const treeNodes = useMemo(() => {
+    const paths = files.map((f) => f.path)
+    return buildFileTree(paths, vaultPath ?? '')
+  }, [files, vaultPath])
+
+  const artifactTypes = useMemo(() => {
+    const map = new Map<string, ArtifactType>()
+    // Invert fileToId: path -> artifactId, then look up each artifact's type
+    for (const [filePath, artifactId] of Object.entries(fileToId)) {
+      const artifact = artifacts.find((a) => a.id === artifactId)
+      if (artifact) {
+        map.set(filePath, artifact.type)
+      }
+    }
+    return map
+  }, [artifacts, fileToId])
 
   const handleFileSelect = useCallback(
     (path: string) => {
-      const file = files.find((f) => f.path === path)
-      if (file) {
-        setActiveNote(file.path, file.path)
-      }
+      setActiveNote(path, path)
     },
-    [files, setActiveNote]
+    [setActiveNote]
   )
 
   const handleSearch = useCallback((_query: string) => {
     // TODO: wire to vault index search
   }, [])
 
-  const handleToggleDirectory = useCallback((_path: string) => {
-    // TODO: directory collapse state
+  const handleToggleDirectory = useCallback((path: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) {
+        next.delete(path)
+      } else {
+        next.add(path)
+      }
+      return next
+    })
   }, [])
 
-  const treeItems = files.map((f) => ({
-    path: f.path,
-    filename: f.filename,
-    title: f.title,
-    modified: f.modified,
-    isDirectory: false as const,
-    depth: 0
-  }))
+  const handleNewFile = useCallback(() => {
+    // TODO: create new file in vault
+  }, [])
+
+  const handleNewFolder = useCallback(() => {
+    // TODO: create new folder in vault
+  }, [])
 
   return (
     <Sidebar
-      items={treeItems}
+      nodes={treeNodes}
       workspaces={config?.workspaces ?? []}
       activeWorkspace={activeWorkspace}
       activeFilePath={activeNotePath}
+      collapsedPaths={collapsedPaths}
+      artifactTypes={artifactTypes}
+      sortMode={sortMode}
       onSearch={handleSearch}
       onWorkspaceSelect={setActiveWorkspace}
       onFileSelect={handleFileSelect}
       onToggleDirectory={handleToggleDirectory}
+      onNewFile={handleNewFile}
+      onNewFolder={handleNewFolder}
+      onSortChange={setSortMode}
     />
   )
 }
