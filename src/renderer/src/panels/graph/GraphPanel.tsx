@@ -1,5 +1,5 @@
-import { useRef, useEffect, useCallback, useState } from 'react'
-import { zoom, type D3ZoomEvent } from 'd3-zoom'
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react'
+import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
 import { select } from 'd3-selection'
 import { useVaultStore } from '../../store/vault-store'
 import { useGraphStore } from '../../store/graph-store'
@@ -10,89 +10,172 @@ import {
   findNodeAt,
   type SimNode,
   type SimEdge,
-  type RenderConfig
+  type NodeSizeConfig,
+  type SimulationConfig
 } from './GraphRenderer'
+import { useGraphHighlight } from './useGraphHighlight'
+import { useGraphAnimation } from './useGraphAnimation'
+import { GraphMinimap } from './GraphMinimap'
+import { GraphContextMenu } from './GraphContextMenu'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
 import { colors } from '../../design/tokens'
+
+// ---------------------------------------------------------------------------
+// Accessibility: reduced motion preference
+// ---------------------------------------------------------------------------
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() =>
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+  return reduced
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton: three pulsing dots shown during simulation warmup
+// ---------------------------------------------------------------------------
+
+function LoadingSkeleton() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="flex gap-2">
+        {[0, 200, 400].map((delay) => (
+          <div
+            key={delay}
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{
+              backgroundColor: colors.accent.default,
+              animationDelay: `${delay}ms`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// GraphPanel
+// ---------------------------------------------------------------------------
 
 interface GraphPanelProps {
   onNodeClick: (id: string) => void
 }
 
 export function GraphPanel({ onNodeClick }: GraphPanelProps) {
+  // Canvas and simulation refs
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<ReturnType<typeof createSimulation> | null>(null)
-  const nodesRef = useRef<SimNode[]>([])
-  const edgesRef = useRef<SimEdge[]>([])
+  const nodesRef = useRef<SimNode[] | null>(null)
+  const edgesRef = useRef<SimEdge[] | null>(null)
   const transformRef = useRef({ x: 0, y: 0, k: 1 })
+  const zoomBehaviorRef = useRef<ZoomBehavior<HTMLCanvasElement, unknown> | null>(null)
+  const prevNodesRef = useRef<SimNode[]>([])
+  const skipSpritesRef = useRef(false)
+  const rafIdRef = useRef<number | null>(null)
 
-  const [settingsOpen, setSettingsOpen] = useState(false)
-
+  // Store selectors (all narrow to avoid unnecessary re-renders)
   const graph = useVaultStore((s) => s.graph)
   const fileToId = useVaultStore((s) => s.fileToId)
-  const { selectedNodeId, hoveredNodeId, setSelectedNode, setHoveredNode } = useGraphStore()
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId)
+  const hoveredNodeId = useGraphStore((s) => s.hoveredNodeId)
+  const setSelectedNode = useGraphStore((s) => s.setSelectedNode)
+  const setHoveredNode = useGraphStore((s) => s.setHoveredNode)
+  const setContentView = useGraphStore((s) => s.setContentView)
 
-  // Graph settings - narrow selectors
   const showOrphans = useGraphSettingsStore((s) => s.showOrphans)
   const showExistingOnly = useGraphSettingsStore((s) => s.showExistingOnly)
   const baseNodeSize = useGraphSettingsStore((s) => s.baseNodeSize)
+  const nodeSizeMode = useGraphSettingsStore((s) => s.nodeSizeMode)
   const linkOpacity = useGraphSettingsStore((s) => s.linkOpacity)
   const linkThickness = useGraphSettingsStore((s) => s.linkThickness)
   const showArrows = useGraphSettingsStore((s) => s.showArrows)
   const textFadeThreshold = useGraphSettingsStore((s) => s.textFadeThreshold)
   const isAnimating = useGraphSettingsStore((s) => s.isAnimating)
+  const showMinimap = useGraphSettingsStore((s) => s.showMinimap)
   const centerForce = useGraphSettingsStore((s) => s.centerForce)
   const repelForce = useGraphSettingsStore((s) => s.repelForce)
   const linkForceStrength = useGraphSettingsStore((s) => s.linkForce)
   const linkDistance = useGraphSettingsStore((s) => s.linkDistance)
   const groups = useGraphSettingsStore((s) => s.groups)
 
+  // Derived state
+  const sizeConfig = useMemo<NodeSizeConfig>(
+    () => ({ mode: nodeSizeMode, baseSize: baseNodeSize }),
+    [nodeSizeMode, baseNodeSize]
+  )
+  const [isSimulating, setIsSimulating] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    nodeId: string
+  } | null>(null)
+  const reducedMotion = useReducedMotion()
+
+  // Simulation reheat handler (must be declared before hooks that depend on it)
+  const handleSimRestart = useCallback((alpha: number) => {
+    simRef.current?.alpha(alpha).restart()
+  }, [])
+
+  // Integration hooks
+  const highlightHook = useGraphHighlight(edgesRef.current ?? [])
+  const animation = useGraphAnimation(handleSimRestart, reducedMotion)
+
+  // -------------------------------------------------------------------------
+  // Render callback
+  // -------------------------------------------------------------------------
+
   const render = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    const nodes = nodesRef.current
+    const edges = edgesRef.current
+    if (!nodes || !edges) return
 
-    const groupColors = Object.fromEntries(
-      Object.entries(groups).map(([type, cfg]) => [type, cfg.color])
-    )
-
-    const renderConfig: RenderConfig = {
-      baseNodeSize,
-      linkOpacity,
-      linkThickness,
-      showArrows,
-      textFadeThreshold,
-      zoomLevel: transformRef.current.k,
-      groupColors
-    }
+    const t = transformRef.current
+    const dpr = window.devicePixelRatio
+    const w = canvas.width / dpr
+    const h = canvas.height / dpr
 
     ctx.save()
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    const t = transformRef.current
+    ctx.scale(dpr, dpr)
     ctx.translate(t.x, t.y)
     ctx.scale(t.k, t.k)
-    renderGraph(
-      ctx,
-      nodesRef.current,
-      edgesRef.current,
-      canvas.width,
-      canvas.height,
-      selectedNodeId,
-      hoveredNodeId,
-      renderConfig
-    )
+
+    const frameDuration = renderGraph(ctx, nodes, edges, w, h, selectedNodeId, hoveredNodeId, {
+      highlight: highlightHook.state,
+      sizeConfig,
+      transform: t,
+      canvasWidth: w,
+      canvasHeight: h,
+      reducedMotion,
+      skipAmbientSprites: skipSpritesRef.current,
+    })
+
     ctx.restore()
-  }, [
-    selectedNodeId,
-    hoveredNodeId,
-    baseNodeSize,
-    linkOpacity,
-    linkThickness,
-    showArrows,
-    textFadeThreshold,
-    groups
-  ])
+
+    // Adaptive quality: skip ambient sprites if last frame exceeded budget
+    skipSpritesRef.current = frameDuration > 16
+
+    // Continue render loop while animations are active
+    if (animation.hasActiveAnimations()) {
+      rafIdRef.current = requestAnimationFrame(render)
+    }
+  }, [selectedNodeId, hoveredNodeId, sizeConfig, reducedMotion, highlightHook.state, animation])
+
+  // -------------------------------------------------------------------------
+  // Graph data pipeline: filter, diff, simulate
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -101,12 +184,16 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     // Build set of existing node IDs from fileToId mapping
     const existingNodeIds = new Set(Object.values(fileToId))
 
-    // Start with all nodes and apply filters
-    let filteredNodes = graph.nodes.map((n) => ({
-      ...n,
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height
-    })) as SimNode[]
+    // Start with all nodes, preserving existing positions when possible
+    const prevNodeMap = new Map(prevNodesRef.current.map((n) => [n.id, n]))
+    let filteredNodes = graph.nodes.map((n) => {
+      const prev = prevNodeMap.get(n.id)
+      return {
+        ...n,
+        x: prev?.x ?? Math.random() * canvas.clientWidth,
+        y: prev?.y ?? Math.random() * canvas.clientHeight,
+      }
+    }) as SimNode[]
 
     let filteredEdges: SimEdge[] = graph.edges.map((e) => ({ ...e }))
 
@@ -141,42 +228,69 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       return nodeIdSet.has(srcId) && nodeIdSet.has(tgtId)
     })
 
+    // Diff against previous nodes for enter/exit animations
+    const diff = animation.diffNodes(prevNodesRef.current, filteredNodes)
+    animation.detectRenames(diff.removed, diff.added)
+
+    // Update refs
     nodesRef.current = filteredNodes
     edgesRef.current = filteredEdges
+    prevNodesRef.current = filteredNodes
+
+    // Queue enter/exit animations
+    if (diff.added.length > 0) {
+      animation.queueEnter(diff.added as SimNode[])
+    }
+    if (diff.removed.length > 0) {
+      animation.queueExit(diff.removed as SimNode[])
+    }
 
     let sim: ReturnType<typeof createSimulation> | null = null
+
     if (filteredNodes.length > 0) {
-      sim = createSimulation(filteredNodes, filteredEdges, canvas.width, canvas.height, {
+      const simConfig: SimulationConfig = {
         centerForce,
         repelForce,
         linkForce: linkForceStrength,
-        linkDistance
-      })
+        linkDistance,
+      }
+
+      sim = createSimulation(
+        filteredNodes,
+        filteredEdges,
+        canvas.clientWidth,
+        canvas.clientHeight,
+        simConfig
+      )
+
       if (!isAnimating) {
         sim.stop()
       }
-      sim.on('tick', render)
+
+      sim.on('tick', () => {
+        nodesRef.current = filteredNodes
+        edgesRef.current = filteredEdges
+        render()
+      })
+
+      // Track when simulation settles
+      sim.on('end', () => setIsSimulating(false))
+      setIsSimulating(true)
+
       simRef.current = sim
     } else {
       render()
     }
 
-    const zoomBehavior = zoom<HTMLCanvasElement, unknown>()
-      .scaleExtent([0.1, 4])
-      .on('zoom', (event: D3ZoomEvent<HTMLCanvasElement, unknown>) => {
-        transformRef.current = event.transform
-        render()
-      })
-
-    const selection = select(canvas).call(zoomBehavior)
-
     return () => {
       sim?.stop()
-      selection.on('.zoom', null)
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
     }
   }, [
     graph,
-    render,
     fileToId,
     showOrphans,
     showExistingOnly,
@@ -185,70 +299,208 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     repelForce,
     linkForceStrength,
     linkDistance,
-    isAnimating
+    isAnimating,
+    render,
+    animation,
   ])
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const rect = canvas.getBoundingClientRect()
-      const t = transformRef.current
-      const x = (e.clientX - rect.left - t.x) / t.k
-      const y = (e.clientY - rect.top - t.y) / t.k
-      const node = findNodeAt(nodesRef.current, x, y)
-      setHoveredNode(node?.id ?? null)
-      canvas.style.cursor = node ? 'pointer' : 'default'
-    },
-    [setHoveredNode]
-  )
-
-  const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const rect = canvas.getBoundingClientRect()
-      const t = transformRef.current
-      const x = (e.clientX - rect.left - t.x) / t.k
-      const y = (e.clientY - rect.top - t.y) / t.k
-      const node = findNodeAt(nodesRef.current, x, y)
-      if (node) {
-        setSelectedNode(node.id)
-        onNodeClick(node.id)
-      } else {
-        setSelectedNode(null)
-      }
-    },
-    [setSelectedNode, onNodeClick]
-  )
+  // -------------------------------------------------------------------------
+  // Zoom setup
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const observer = new ResizeObserver(() => {
-      canvas.width = canvas.clientWidth * window.devicePixelRatio
-      canvas.height = canvas.clientHeight * window.devicePixelRatio
-      const ctx = canvas.getContext('2d')
-      if (ctx) ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
+
+    const zb = zoom<HTMLCanvasElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        transformRef.current = event.transform
+        render()
+      })
+
+    select(canvas).call(zb)
+    zoomBehaviorRef.current = zb
+
+    return () => {
+      select(canvas).on('.zoom', null)
+    }
+  }, [render])
+
+  // -------------------------------------------------------------------------
+  // Coordinate transform helper
+  // -------------------------------------------------------------------------
+
+  const toGraphCoords = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    const t = transformRef.current
+    return {
+      x: (clientX - rect.left - t.x) / t.k,
+      y: (clientY - rect.top - t.y) / t.k,
+    }
+  }, [])
+
+  // -------------------------------------------------------------------------
+  // Mouse event handlers
+  // -------------------------------------------------------------------------
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const coords = toGraphCoords(e.clientX, e.clientY)
+      if (!coords) return
+      const node = findNodeAt(nodesRef.current ?? [], coords.x, coords.y)
+      highlightHook.handleHover(node?.id ?? null)
+      const canvas = canvasRef.current
+      if (canvas) canvas.style.cursor = node ? 'pointer' : 'default'
+    },
+    [toGraphCoords, highlightHook]
+  )
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      setContextMenu(null)
+      const coords = toGraphCoords(e.clientX, e.clientY)
+      if (!coords) return
+      const node = findNodeAt(nodesRef.current ?? [], coords.x, coords.y)
+      if (node) {
+        highlightHook.handleClick(node.id)
+        onNodeClick(node.id)
+      } else {
+        highlightHook.handleClick(null)
+      }
+    },
+    [toGraphCoords, highlightHook, onNodeClick]
+  )
+
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const coords = toGraphCoords(e.clientX, e.clientY)
+      if (!coords) return
+      const node = findNodeAt(nodesRef.current ?? [], coords.x, coords.y)
+      if (node) {
+        highlightHook.handleDoubleClick(node.id)
+        setContentView('editor')
+        onNodeClick(node.id)
+      }
+    },
+    [toGraphCoords, highlightHook, setContentView, onNodeClick]
+  )
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      e.preventDefault()
+      const coords = toGraphCoords(e.clientX, e.clientY)
+      if (!coords) return
+      const node = findNodeAt(nodesRef.current ?? [], coords.x, coords.y)
+      if (node) {
+        setContextMenu({ x: e.clientX, y: e.clientY, nodeId: node.id })
+      }
+    },
+    [toGraphCoords]
+  )
+
+  // -------------------------------------------------------------------------
+  // Minimap pan handler (no d3-transition, direct transform application)
+  // -------------------------------------------------------------------------
+
+  const handleMinimapPan = useCallback((graphX: number, graphY: number) => {
+    const canvas = canvasRef.current
+    const zb = zoomBehaviorRef.current
+    if (!canvas || !zb) return
+    const t = transformRef.current
+    const dpr = window.devicePixelRatio
+    const canvasW = canvas.width / dpr
+    const canvasH = canvas.height / dpr
+    const newX = canvasW / 2 - graphX * t.k
+    const newY = canvasH / 2 - graphY * t.k
+    const newTransform = zoomIdentity.translate(newX, newY).scale(t.k)
+    select(canvas).call(zb.transform, newTransform)
+  }, [])
+
+  // -------------------------------------------------------------------------
+  // Resize observer: keep canvas dimensions in sync with layout
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const dpr = window.devicePixelRatio
+      const w = entry.contentRect.width
+      const h = entry.contentRect.height
+      canvas.width = w * dpr
+      canvas.height = h * dpr
       render()
     })
     observer.observe(canvas)
     return () => observer.disconnect()
   }, [render])
 
-  const isEmpty = graph.nodes.length === 0
+  // -------------------------------------------------------------------------
+  // JSX
+  // -------------------------------------------------------------------------
+
+  const isEmpty = !graph.nodes.length
 
   return (
     <div className="h-full relative" style={{ backgroundColor: colors.bg.base }}>
       <canvas
         ref={canvasRef}
-        className="w-full h-full block"
-        style={{ backgroundColor: colors.bg.base }}
+        className="absolute inset-0 w-full h-full"
         onMouseMove={handleMouseMove}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
       />
 
-      {/* Settings toggle button */}
+      {isSimulating && !isEmpty && <LoadingSkeleton />}
+
+      {isEmpty && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <p className="text-sm" style={{ color: colors.text.muted }}>
+            No notes yet. Create one to see the graph.
+          </p>
+        </div>
+      )}
+
+      {showMinimap && !isEmpty && (
+        <GraphMinimap
+          nodes={nodesRef.current ?? []}
+          edges={edgesRef.current ?? []}
+          transform={transformRef.current}
+          canvasWidth={
+            canvasRef.current?.width
+              ? canvasRef.current.width / window.devicePixelRatio
+              : 800
+          }
+          canvasHeight={
+            canvasRef.current?.height
+              ? canvasRef.current.height / window.devicePixelRatio
+              : 600
+          }
+          onPan={handleMinimapPan}
+        />
+      )}
+
+      {contextMenu && (
+        <GraphContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          nodeId={contextMenu.nodeId}
+          onClose={() => setContextMenu(null)}
+          onOpenInEditor={(id) => {
+            onNodeClick(id)
+            setContextMenu(null)
+          }}
+        />
+      )}
+
+      <GraphSettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
       <button
         type="button"
         onClick={() => setSettingsOpen((prev) => !prev)}
@@ -256,7 +508,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         style={{
           backgroundColor: settingsOpen ? colors.accent.muted : colors.bg.elevated,
           color: settingsOpen ? colors.accent.default : colors.text.muted,
-          border: `1px solid ${colors.border.default}`
+          border: `1px solid ${colors.border.default}`,
         }}
         aria-label="Toggle graph settings"
         title="Graph Settings"
@@ -284,21 +536,6 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
           />
         </svg>
       </button>
-
-      {/* Graph settings panel */}
-      <GraphSettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-
-      {isEmpty && (
-        <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ color: colors.text.muted }}
-        >
-          <div className="text-center">
-            <p className="text-lg mb-2">No notes yet</p>
-            <p className="text-sm">Create a note to see your knowledge graph</p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
