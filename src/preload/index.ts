@@ -35,7 +35,13 @@ const api = {
     gitBranch: (vaultPath: string) =>
       ipcRenderer.invoke('vault:git-branch', { vaultPath }) as Promise<string | null>,
     watchStart: (vaultPath: string) => ipcRenderer.invoke('vault:watch-start', { vaultPath }),
-    watchStop: () => ipcRenderer.invoke('vault:watch-stop')
+    watchStop: () => ipcRenderer.invoke('vault:watch-stop'),
+    listCommands: (dirPath: string): Promise<string[]> =>
+      ipcRenderer.invoke('vault:list-commands', dirPath),
+    readFile: (filePath: string): Promise<string> =>
+      ipcRenderer.invoke('vault:read-file', filePath),
+    deleteFile: (filePath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:delete-file', { path: filePath })
   },
   terminal: {
     create: (cwd: string, shell?: string) =>

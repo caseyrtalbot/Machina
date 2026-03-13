@@ -63,6 +63,21 @@ export function registerFilesystemIpc(): void {
     }
   )
 
+  ipcMain.handle('vault:list-commands', async (_event, dirPath: string): Promise<string[]> => {
+    const { readdir } = await import('node:fs/promises')
+    try {
+      const entries = await readdir(dirPath)
+      return entries.filter((f) => f.endsWith('.md')).map((f) => `${dirPath}/${f}`)
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('vault:read-file', async (_event, filePath: string): Promise<string> => {
+    const { readFile } = await import('node:fs/promises')
+    return readFile(filePath, 'utf-8')
+  })
+
   ipcMain.handle('vault:git-branch', async (_e, args: { vaultPath: string }) => {
     return new Promise<string | null>((resolve) => {
       execFile(
