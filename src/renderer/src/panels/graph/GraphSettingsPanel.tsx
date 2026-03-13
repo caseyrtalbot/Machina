@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGraphSettingsStore } from '../../store/graph-settings-store'
+import type { NodeSizeMode } from '../../store/graph-settings-store'
 import { colors } from '../../design/tokens'
 import { ARTIFACT_TYPES } from '@shared/types'
 import type { ArtifactType } from '@shared/types'
@@ -18,10 +19,7 @@ interface SliderRowProps {
 function SliderRow({ label, value, min, max, step, onChange }: SliderRowProps) {
   return (
     <div className="flex items-center gap-2 py-1">
-      <span
-        className="flex-1 text-xs truncate"
-        style={{ color: colors.text.secondary }}
-      >
+      <span className="flex-1 text-xs truncate" style={{ color: colors.text.secondary }}>
         {label}
       </span>
       <input
@@ -33,10 +31,7 @@ function SliderRow({ label, value, min, max, step, onChange }: SliderRowProps) {
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="w-20 accent-violet-500"
       />
-      <span
-        className="w-10 text-right text-xs tabular-nums"
-        style={{ color: colors.text.muted }}
-      >
+      <span className="w-10 text-right text-xs tabular-nums" style={{ color: colors.text.muted }}>
         {value}
       </span>
     </div>
@@ -134,6 +129,8 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
   const setGroupColor = useGraphSettingsStore((s) => s.setGroupColor)
 
   // Display
+  const nodeSizeMode = useGraphSettingsStore((s) => s.nodeSizeMode)
+  const setNodeSizeMode = useGraphSettingsStore((s) => s.setNodeSizeMode)
   const baseNodeSize = useGraphSettingsStore((s) => s.baseNodeSize)
   const setBaseNodeSize = useGraphSettingsStore((s) => s.setBaseNodeSize)
   const linkOpacity = useGraphSettingsStore((s) => s.linkOpacity)
@@ -200,7 +197,6 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-2">
-
         {/* Filters section */}
         <SectionHeader
           title="Filters"
@@ -209,11 +205,7 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
         />
         {openSections.filters && (
           <div className="pb-3">
-            <ToggleRow
-              label="Show orphans"
-              checked={showOrphans}
-              onChange={setShowOrphans}
-            />
+            <ToggleRow label="Show orphans" checked={showOrphans} onChange={setShowOrphans} />
             <ToggleRow
               label="Show existing only"
               checked={showExistingOnly}
@@ -222,10 +214,7 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
           </div>
         )}
 
-        <div
-          className="my-1"
-          style={{ height: 1, backgroundColor: colors.border.default }}
-        />
+        <div className="my-1" style={{ height: 1, backgroundColor: colors.border.default }} />
 
         {/* Groups section */}
         <SectionHeader
@@ -257,7 +246,9 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
                       onClick={() => setGroupVisible(type, !group.visible)}
                       className="text-xs px-1.5 py-0.5 rounded transition-colors duration-150 focus:outline-none"
                       style={{
-                        backgroundColor: group.visible ? colors.accent.muted : colors.border.default,
+                        backgroundColor: group.visible
+                          ? colors.accent.muted
+                          : colors.border.default,
                         color: group.visible ? colors.accent.default : colors.text.muted
                       }}
                     >
@@ -270,10 +261,7 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
           </div>
         )}
 
-        <div
-          className="my-1"
-          style={{ height: 1, backgroundColor: colors.border.default }}
-        />
+        <div className="my-1" style={{ height: 1, backgroundColor: colors.border.default }} />
 
         {/* Display section */}
         <SectionHeader
@@ -283,6 +271,25 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
         />
         {openSections.display && (
           <div className="pb-3">
+            <div className="flex items-center justify-between py-1">
+              <span className="text-xs" style={{ color: colors.text.secondary }}>
+                Node Size Mode
+              </span>
+              <select
+                value={nodeSizeMode}
+                onChange={(e) => setNodeSizeMode(e.target.value as NodeSizeMode)}
+                style={{
+                  backgroundColor: colors.bg.elevated,
+                  color: colors.text.primary,
+                  borderColor: colors.border.default
+                }}
+                className="text-xs rounded px-2 py-0.5 border"
+              >
+                <option value="degree">Degree (connections)</option>
+                <option value="uniform">Uniform</option>
+                <option value="content">Content length</option>
+              </select>
+            </div>
             <SliderRow
               label="Node size"
               value={baseNodeSize}
@@ -307,11 +314,7 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
               step={0.5}
               onChange={setLinkThickness}
             />
-            <ToggleRow
-              label="Show arrows"
-              checked={showArrows}
-              onChange={setShowArrows}
-            />
+            <ToggleRow label="Show arrows" checked={showArrows} onChange={setShowArrows} />
             <SliderRow
               label="Text fade"
               value={textFadeThreshold}
@@ -320,18 +323,11 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
               step={0.1}
               onChange={setTextFadeThreshold}
             />
-            <ToggleRow
-              label="Show minimap"
-              checked={showMinimap}
-              onChange={setShowMinimap}
-            />
+            <ToggleRow label="Show minimap" checked={showMinimap} onChange={setShowMinimap} />
           </div>
         )}
 
-        <div
-          className="my-1"
-          style={{ height: 1, backgroundColor: colors.border.default }}
-        />
+        <div className="my-1" style={{ height: 1, backgroundColor: colors.border.default }} />
 
         {/* Forces section */}
         <SectionHeader

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ArtifactType } from '@shared/types'
 
-type NodeSizeMode = 'degree' | 'uniform' | 'content'
+export type NodeSizeMode = 'degree' | 'uniform' | 'content'
 
 interface GroupConfig {
   visible: boolean
@@ -43,12 +43,12 @@ interface GraphSettingsState {
 }
 
 const DEFAULT_GROUPS: Record<ArtifactType, GroupConfig> = {
-  gene:       { visible: true, color: '#6C63FF' },
+  gene: { visible: true, color: '#6C63FF' },
   constraint: { visible: true, color: '#EF4444' },
-  research:   { visible: true, color: '#2DD4BF' },
-  output:     { visible: true, color: '#EC4899' },
-  note:       { visible: true, color: '#8B8B8E' },
-  index:      { visible: true, color: '#38BDF8' },
+  research: { visible: true, color: '#2DD4BF' },
+  output: { visible: true, color: '#EC4899' },
+  note: { visible: true, color: '#8B8B8E' },
+  index: { visible: true, color: '#38BDF8' }
 }
 
 export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => ({
@@ -93,5 +93,5 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
     const groups = { ...get().groups }
     groups[type] = { ...groups[type], color }
     set({ groups })
-  },
+  }
 }))
