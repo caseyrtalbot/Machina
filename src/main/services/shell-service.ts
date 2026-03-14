@@ -23,7 +23,11 @@ export class ShellService {
       cols: 80,
       rows: 24,
       cwd,
-      env: process.env as Record<string, string>
+      env: {
+        ...(process.env as Record<string, string>),
+        // Disable zsh partial-line indicator (highlighted "%") on fresh spawn
+        PROMPT_EOL_MARK: ''
+      }
     })
 
     pty.onData((data) => this.onData(sessionId, data))
