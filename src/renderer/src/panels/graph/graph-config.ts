@@ -13,6 +13,8 @@ export interface SimNode extends GraphNode {
   fy?: number | null
   /** Pre-resolved display color (set by panel from group rules). */
   _color?: string
+  /** Whether this node has been visited/opened by the user. */
+  _visited?: boolean
 }
 
 export interface SimEdge {
@@ -26,6 +28,7 @@ export interface SimulationConfig {
   repelForce: number
   linkForce: number
   linkDistance: number
+  enableRadial?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +65,7 @@ export interface RenderOptions {
 export const GRAPH_PALETTE = {
   canvasBg: '#0a0a12',
   defaultNote: '#8a8a9e',
+  visitedNote: '#b8a9c9',
   defaultTag: '#e6a237',
   defaultAttach: '#6b7280',
   linkDefault: 'rgba(255, 255, 255, 0.04)',
@@ -69,6 +73,7 @@ export const GRAPH_PALETTE = {
   linkDimmed: 'rgba(255, 255, 255, 0)',
   labelColor: 'rgba(255, 255, 255, 0.7)',
   selectedRing: '#2dd4bf',
+  tagStroke: '#e6a237',
   vignetteEdge: 'rgba(0, 0, 0, 0.4)'
 } as const
 

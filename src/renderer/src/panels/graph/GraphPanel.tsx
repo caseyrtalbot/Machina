@@ -85,6 +85,12 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   // Drag state refs (hot path — no React state)
   const dragNodeRef = useRef<SimNode | null>(null)
   const isDraggingRef = useRef(false)
+  const dragStartTimeRef = useRef(0)
+
+  // Visited node tracking (persisted in localStorage)
+  const visitedRef = useRef<Set<string>>(
+    new Set(JSON.parse(localStorage.getItem('graph-visited') ?? '[]'))
+  )
 
   // Store selectors (narrow to avoid unnecessary re-renders)
   const graph = useVaultStore((s) => s.graph)
@@ -110,6 +116,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   const repelForce = useGraphSettingsStore((s) => s.repelForce)
   const linkForceStrength = useGraphSettingsStore((s) => s.linkForce)
   const linkDistance = useGraphSettingsStore((s) => s.linkDistance)
+  const enableRadial = useGraphSettingsStore((s) => s.enableRadial)
 
   // UI state
   const [isFocused, setIsFocused] = useState(false)
@@ -298,8 +305,10 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     }
 
     // Assign _color from group rules (top-to-bottom, first match wins)
+    // and mark visited nodes
     for (const node of simNodes) {
       node._color = resolveGroupColor(groupRules, node) ?? undefined
+      node._visited = visitedRef.current.has(node.id)
     }
 
     // Diff for animations
@@ -319,7 +328,8 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         centerForce,
         repelForce,
         linkForce: linkForceStrength,
-        linkDistance
+        linkDistance,
+        enableRadial
       }
 
       const sim = createSimulation(
@@ -428,6 +438,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       if (node) {
         isDraggingRef.current = true
         dragNodeRef.current = node
+        dragStartTimeRef.current = Date.now()
         // Pin the node at its current position
         node.fx = node.x
         node.fy = node.y
@@ -484,13 +495,33 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
   const handleMouseUp = useCallback(() => {
     if (isDraggingRef.current) {
+      const dragDuration = Date.now() - dragStartTimeRef.current
+      const draggedNode = dragNodeRef.current
+
+      // Unpin node on drag end (Quartz behavior: nodes return to simulation)
+      if (draggedNode) {
+        draggedNode.fx = null
+        draggedNode.fy = null
+      }
+
       isDraggingRef.current = false
       dragNodeRef.current = null
       runtimeRef.current?.simulation?.alphaTarget(0)
       const canvas = canvasRef.current
       if (canvas) canvas.style.cursor = 'default'
+
+      // Short drag = click: open the node (Quartz: <500ms threshold)
+      if (dragDuration < 500 && draggedNode) {
+        // Track as visited
+        visitedRef.current.add(draggedNode.id)
+        localStorage.setItem('graph-visited', JSON.stringify([...visitedRef.current]))
+        draggedNode._visited = true
+
+        highlightHook.handleClick(draggedNode.id)
+        onNodeClick(draggedNode.id)
+      }
     }
-  }, [])
+  }, [highlightHook, onNodeClick])
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -507,6 +538,11 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
           nodeSizeMultiplier
         ) ?? null
       if (node) {
+        // Track as visited
+        visitedRef.current.add(node.id)
+        localStorage.setItem('graph-visited', JSON.stringify([...visitedRef.current]))
+        node._visited = true
+
         highlightHook.handleClick(node.id)
         onNodeClick(node.id)
       } else {

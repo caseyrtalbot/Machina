@@ -4,6 +4,7 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
+  forceRadial,
   type Simulation,
   type ForceManyBody,
   type ForceLink,
@@ -75,7 +76,15 @@ export function createSimulation(
     .force('center', forceCenter(width / 2, height / 2).strength(config.centerForce))
     .force(
       'collide',
-      forceCollide<SimNode>().radius((d) => computeNodeRadius(d) + 4)
+      forceCollide<SimNode>()
+        .radius((d) => computeNodeRadius(d) + 4)
+        .iterations(3)
+    )
+    .force(
+      'radial',
+      config.enableRadial
+        ? forceRadial((Math.min(width, height) / 2) * 0.8, width / 2, height / 2).strength(0.2)
+        : null
     )
 }
 
@@ -105,9 +114,8 @@ export function updateSimulationForces(
 // ---------------------------------------------------------------------------
 
 export function computeNodeRadius(node: SimNode, multiplier: number = 1): number {
-  const base = Math.min(16, Math.max(3, Math.sqrt(Math.max(1, node.connectionCount)) * 3))
-  const typeScale = node.type === 'tag' ? 0.7 : 1
-  return base * typeScale * multiplier
+  const base = 2 + Math.sqrt(node.connectionCount)
+  return base * multiplier
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +126,7 @@ export function resolveNodeColor(node: SimNode): string {
   if (node._color) return node._color
   if (node.type === 'tag') return GRAPH_PALETTE.defaultTag
   if (node.type === 'attachment') return GRAPH_PALETTE.defaultAttach
+  if (node._visited) return GRAPH_PALETTE.visitedNote
   return GRAPH_PALETTE.defaultNote
 }
 
@@ -496,7 +505,19 @@ export function renderGraph(
       ctx.globalAlpha = vn.matchesSearch ? 1 : 0.15
       drawNodeShape(ctx, vn.node, vn.node.x, vn.node.y, vn.r)
       ctx.fill()
+
+      // Tag nodes: colored stroke ring (Quartz-style visual distinction)
+      if (vn.node.type === 'tag') {
+        ctx.strokeStyle = GRAPH_PALETTE.tagStroke
+        ctx.lineWidth = 2
+      }
       ctx.stroke()
+
+      // Reset stroke for next node
+      if (vn.node.type === 'tag') {
+        ctx.strokeStyle = lightenHex(color, 0.2)
+        ctx.lineWidth = 1
+      }
     }
   }
   ctx.globalAlpha = 1
@@ -597,7 +618,17 @@ export function renderGraph(
 
     ctx.globalAlpha = labelAlpha
     ctx.fillStyle = GRAPH_PALETTE.labelColor
-    ctx.fillText(vn.node.title, vn.node.x, vn.node.y + vn.r + LABEL_OFFSET_BELOW)
+
+    // Hovered label scales up 1.1x (Quartz-inspired micro-interaction)
+    if (isHovered) {
+      ctx.save()
+      ctx.translate(vn.node.x, vn.node.y + vn.r + LABEL_OFFSET_BELOW)
+      ctx.scale(1.1, 1.1)
+      ctx.fillText(vn.node.title, 0, 0)
+      ctx.restore()
+    } else {
+      ctx.fillText(vn.node.title, vn.node.x, vn.node.y + vn.r + LABEL_OFFSET_BELOW)
+    }
   }
   ctx.globalAlpha = 1
 

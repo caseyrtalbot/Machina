@@ -260,6 +260,8 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
   const setLinkForce = useGraphSettingsStore((s) => s.setLinkForce)
   const linkDistance = useGraphSettingsStore((s) => s.linkDistance)
   const setLinkDistance = useGraphSettingsStore((s) => s.setLinkDistance)
+  const enableRadial = useGraphSettingsStore((s) => s.enableRadial)
+  const setEnableRadial = useGraphSettingsStore((s) => s.setEnableRadial)
 
   if (!isOpen) return null
 
@@ -521,6 +523,13 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
                 step={5}
                 onChange={setLinkDistance}
               />
+              <div className="flex items-center gap-2 mt-2">
+                <TogglePill
+                  label="Radial constraint"
+                  active={enableRadial}
+                  onToggle={() => setEnableRadial(!enableRadial)}
+                />
+              </div>
             </div>
           )}
         </div>

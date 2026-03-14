@@ -55,6 +55,7 @@ interface GraphSettingsState {
   repelForce: number
   linkForce: number
   linkDistance: number
+  enableRadial: boolean
 
   // Setters
   setGraphMode: (mode: 'global' | 'local') => void
@@ -79,6 +80,7 @@ interface GraphSettingsState {
   setRepelForce: (value: number) => void
   setLinkForce: (value: number) => void
   setLinkDistance: (value: number) => void
+  setEnableRadial: (value: boolean) => void
 }
 
 let nextRuleId = 100
@@ -109,6 +111,7 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
   repelForce: -120,
   linkForce: 0.7,
   linkDistance: 50,
+  enableRadial: false,
 
   // Setters
   setGraphMode: (mode) => set({ graphMode: mode }),
@@ -170,7 +173,8 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
   setCenterForce: (value) => set({ centerForce: value }),
   setRepelForce: (value) => set({ repelForce: value }),
   setLinkForce: (value) => set({ linkForce: value }),
-  setLinkDistance: (value) => set({ linkDistance: value })
+  setLinkDistance: (value) => set({ linkDistance: value }),
+  setEnableRadial: (value) => set({ enableRadial: value })
 }))
 
 // ---------------------------------------------------------------------------
