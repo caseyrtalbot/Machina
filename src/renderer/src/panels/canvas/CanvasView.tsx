@@ -5,6 +5,7 @@ import { createCanvasNode } from '@shared/canvas-types'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { TextCard } from './TextCard'
 import { NoteCard } from './NoteCard'
+import { TerminalCard } from './TerminalCard'
 import { EdgeLayer } from './EdgeLayer'
 import { ConnectionDragOverlay } from './ConnectionDragOverlay'
 
@@ -80,7 +81,7 @@ export function CanvasView() {
             case 'note':
               return <NoteCard key={node.id} node={node} />
             case 'terminal':
-              return null // Task 11
+              return <TerminalCard key={node.id} node={node} />
             default:
               return null
           }
