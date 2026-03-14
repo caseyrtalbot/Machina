@@ -64,9 +64,9 @@ function ActionBar({
         onClick={onNewFolder}
         className="px-2 py-0.5 rounded hover:bg-[var(--color-bg-elevated)] transition-colors cursor-pointer"
         style={hoverBgStyle}
-        title="New folder"
+        title="Open a different vault"
       >
-        + Folder
+        Open Vault
       </button>
       <div className="flex-1" />
       <select

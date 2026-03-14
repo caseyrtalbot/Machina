@@ -59,7 +59,7 @@ function ContentArea() {
 
 const EMPTY_SET = new Set<string>()
 
-function ConnectedSidebar() {
+function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
   const files = useVaultStore((s) => s.files)
   const config = useVaultStore((s) => s.config)
   const activeWorkspace = useVaultStore((s) => s.activeWorkspace)
@@ -166,12 +166,13 @@ function ConnectedSidebar() {
     setContentView('editor')
   }, [vaultPath, files, openTab, setContentView])
 
-  const handleNewFolder = useCallback(async () => {
-    if (!vaultPath) return
-    // Open native Finder dialog scoped to the vault root.
-    // The dialog's "New Folder" button lets users create folders in place.
-    await window.api.fs.createFolder(vaultPath)
-  }, [vaultPath])
+  const handleOpenVault = useCallback(async () => {
+    const path = await window.api.fs.selectVault()
+    if (!path) return
+    flushPendingSave()
+    await window.api.vault.watchStop()
+    await onLoadVault(path)
+  }, [onLoadVault])
 
   const handleFileAction = useCallback(
     async (action: { actionId: string; path: string; isDirectory: boolean }) => {
@@ -241,7 +242,7 @@ function ConnectedSidebar() {
       onFileSelect={handleFileSelect}
       onToggleDirectory={handleToggleDirectory}
       onNewFile={handleNewFile}
-      onNewFolder={handleNewFolder}
+      onNewFolder={handleOpenVault}
       onSortChange={setSortMode}
       onFileAction={handleFileAction}
     />
@@ -362,7 +363,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           left={
             <div className="panel-card h-full">
               <PanelErrorBoundary name="Sidebar">
-                <ConnectedSidebar />
+                <ConnectedSidebar onLoadVault={onLoadVault} />
               </PanelErrorBoundary>
             </div>
           }
