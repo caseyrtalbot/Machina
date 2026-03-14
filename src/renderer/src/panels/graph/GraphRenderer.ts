@@ -7,43 +7,11 @@ import {
   type Simulation
 } from 'd3-force'
 import type { GraphNode, RelationshipKind } from '@shared/types'
-import { getArtifactColor, animations, getComputedCssColor } from '../../design/tokens'
+import { getArtifactColor, getComputedCssColor } from '../../design/tokens'
 import { SIGNAL_OPACITY } from '@shared/types'
 // Glow sprites available but not used in hot path for performance
 // import { GlowSpriteCache, drawGlowSprite } from './glowSprites'
 import type { HighlightState } from './useGraphHighlight'
-
-// ---------------------------------------------------------------------------
-// Animation utilities
-// ---------------------------------------------------------------------------
-
-let _prefersReducedMotion: boolean | null = null
-export function prefersReducedMotion(): boolean {
-  if (_prefersReducedMotion === null) {
-    _prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
-      _prefersReducedMotion = e.matches
-    })
-  }
-  return _prefersReducedMotion
-}
-
-export function parseAnimationMs(timing: string): number {
-  const match = timing.match(/^(\d+)ms/)
-  return match ? parseInt(match[1], 10) : 0
-}
-
-export const ANIMATION_MS = {
-  nodeHoverGlow: () =>
-    prefersReducedMotion() ? 0 : parseAnimationMs(animations.graphNodeHoverGlow),
-  networkReveal: () =>
-    prefersReducedMotion() ? 0 : parseAnimationMs(animations.graphNetworkReveal),
-  networkDim: () => (prefersReducedMotion() ? 0 : parseAnimationMs(animations.graphNetworkDim)),
-  nodeEnter: () => (prefersReducedMotion() ? 0 : parseAnimationMs(animations.graphNodeEnter)),
-  nodeExit: () => (prefersReducedMotion() ? 0 : parseAnimationMs(animations.graphNodeExit)),
-  spatialTransition: () =>
-    prefersReducedMotion() ? 0 : parseAnimationMs(animations.spatialTransition)
-} as const
 
 export type { NodeSizeMode } from '../../store/graph-settings-store'
 
@@ -198,22 +166,13 @@ export function createSimulation(
 // Node radius helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Legacy alias: computes radius based on connection count using DEFAULT_SIZE_CONFIG.
- * Retained for backward compatibility with createSimulation and findNodeAt.
- */
-export function nodeRadius(connectionCount: number): number {
+/** Computes radius based on connection count (used by simulation collision + findNodeAt). */
+function nodeRadius(connectionCount: number): number {
   return Math.min(18, Math.max(6, 6 + connectionCount * 2))
 }
 
-/**
- * Compute node radius according to a NodeSizeConfig.
- */
-export function computeNodeRadius(
-  node: SimNode,
-  config: NodeSizeConfig,
-  charCount?: number
-): number {
+/** Compute node radius according to a NodeSizeConfig. */
+function computeNodeRadius(node: SimNode, config: NodeSizeConfig, charCount?: number): number {
   switch (config.mode) {
     case 'uniform':
       return config.baseSize

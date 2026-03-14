@@ -40,8 +40,6 @@ export const ARTIFACT_COLORS: Record<BuiltInArtifactType, string> = {
   index: '#38bdf8'
 }
 
-export const DEFAULT_ARTIFACT_COLOR = '#94a3b8'
-
 // Palette excludes colors already used by built-in types
 const CUSTOM_TYPE_PALETTE = [
   '#c084fc', // purple (distinct from research #a78bfa)
