@@ -158,7 +158,7 @@ function ConnectedSidebar() {
     const filePath = `${vaultPath}/${filename}`
     const now = new Date().toISOString().slice(0, 10)
     const title = filename.replace('.md', '')
-    const content = `---\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
+    const content = `---\nid: ${title}\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
 
     await window.api.fs.writeFile(filePath, content)
     // Select the new file in the editor
@@ -189,7 +189,7 @@ function ConnectedSidebar() {
           const filePath = `${dir}/${filename}`
           const now = new Date().toISOString().slice(0, 10)
           const title = filename.replace('.md', '')
-          const content = `---\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
+          const content = `---\nid: ${title}\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
           await window.api.fs.writeFile(filePath, content)
           openTab(filePath, title)
           setContentView('editor')

@@ -12,6 +12,7 @@ interface GroupConfig {
 interface GraphSettingsState {
   showOrphans: boolean
   showExistingOnly: boolean
+  showTags: boolean
   baseNodeSize: number
   nodeSizeMode: NodeSizeMode
   linkOpacity: number
@@ -27,6 +28,7 @@ interface GraphSettingsState {
   groups: Record<ArtifactType, GroupConfig>
   setShowOrphans: (value: boolean) => void
   setShowExistingOnly: (value: boolean) => void
+  setShowTags: (value: boolean) => void
   setBaseNodeSize: (value: number) => void
   setNodeSizeMode: (value: NodeSizeMode) => void
   setLinkOpacity: (value: number) => void
@@ -55,6 +57,7 @@ const DEFAULT_GROUPS: Record<ArtifactType, GroupConfig> = {
 export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => ({
   showOrphans: true,
   showExistingOnly: false,
+  showTags: true,
   baseNodeSize: 4,
   nodeSizeMode: 'degree',
   linkOpacity: 0.4,
@@ -71,6 +74,7 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
 
   setShowOrphans: (value) => set({ showOrphans: value }),
   setShowExistingOnly: (value) => set({ showExistingOnly: value }),
+  setShowTags: (value) => set({ showTags: value }),
   setBaseNodeSize: (value) => set({ baseNodeSize: value }),
   setNodeSizeMode: (value) => set({ nodeSizeMode: value }),
   setLinkOpacity: (value) => set({ linkOpacity: value }),

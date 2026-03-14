@@ -91,6 +91,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
   const showOrphans = useGraphSettingsStore((s) => s.showOrphans)
   const showExistingOnly = useGraphSettingsStore((s) => s.showExistingOnly)
+  const showTags = useGraphSettingsStore((s) => s.showTags)
   const baseNodeSize = useGraphSettingsStore((s) => s.baseNodeSize)
   const nodeSizeMode = useGraphSettingsStore((s) => s.nodeSizeMode)
   const isAnimating = useGraphSettingsStore((s) => s.isAnimating)
@@ -232,6 +233,11 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       return groupCfg ? groupCfg.visible : true
     })
 
+    // Filter out tag nodes when showTags is false
+    if (!showTags) {
+      filteredNodes = filteredNodes.filter((n) => n.type !== 'tag')
+    }
+
     // showExistingOnly: keep only nodes that map to a real vault file
     if (showExistingOnly) {
       filteredNodes = filteredNodes.filter((n) => existingNodeIds.has(n.id))
@@ -323,6 +329,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     fileToId,
     showOrphans,
     showExistingOnly,
+    showTags,
     groups,
     centerForce,
     repelForce,

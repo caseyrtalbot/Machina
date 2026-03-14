@@ -3,16 +3,35 @@ import type { Artifact } from '@shared/types'
 import { getArtifactColor, colors, transitions } from '../../design/tokens'
 
 /**
- * Finds the line containing targetId in body and returns a 100-character
- * window centered around the match. Returns an empty string when not found.
+ * Finds the line containing targetId (or a [[targetTitle]] wikilink) in body
+ * and returns a 100-character window centered around the match.
+ * Returns an empty string when not found.
  */
-export function extractContext(body: string, targetId: string): string {
-  const lineIndex = body.indexOf(targetId)
-  if (lineIndex === -1) return ''
+export function extractContext(body: string, targetId: string, targetTitle?: string): string {
+  let matchIndex = body.indexOf(targetId)
+  let matchLength = targetId.length
+
+  // Fallback: search for [[title]] wikilink form when ID isn't in body text
+  if (matchIndex === -1 && targetTitle) {
+    const wikilinkForm = `[[${targetTitle}]]`
+    matchIndex = body.indexOf(wikilinkForm)
+    matchLength = wikilinkForm.length
+    // Also try [[title|display]] pattern
+    if (matchIndex === -1) {
+      const wikilinkPrefix = `[[${targetTitle}|`
+      matchIndex = body.indexOf(wikilinkPrefix)
+      if (matchIndex !== -1) {
+        const closeIdx = body.indexOf(']]', matchIndex)
+        matchLength = closeIdx !== -1 ? closeIdx + 2 - matchIndex : wikilinkPrefix.length
+      }
+    }
+  }
+
+  if (matchIndex === -1) return ''
 
   const half = 50
-  const start = Math.max(0, lineIndex - half)
-  const end = Math.min(body.length, lineIndex + targetId.length + half)
+  const start = Math.max(0, matchIndex - half)
+  const end = Math.min(body.length, matchIndex + matchLength + half)
   const snippet = body.slice(start, end)
 
   const prefix = start > 0 ? '\u2026' : ''
@@ -23,12 +42,18 @@ export function extractContext(body: string, targetId: string): string {
 interface BacklinkItemProps {
   artifact: Artifact
   currentNoteId: string
+  currentNoteTitle?: string
   onNavigate: (id: string) => void
 }
 
-function BacklinkItem({ artifact, currentNoteId, onNavigate }: BacklinkItemProps) {
+function BacklinkItem({
+  artifact,
+  currentNoteId,
+  currentNoteTitle,
+  onNavigate
+}: BacklinkItemProps) {
   const typeColor = getArtifactColor(artifact.type)
-  const context = extractContext(artifact.body, currentNoteId)
+  const context = extractContext(artifact.body, currentNoteId, currentNoteTitle)
 
   return (
     <button
@@ -57,11 +82,17 @@ function BacklinkItem({ artifact, currentNoteId, onNavigate }: BacklinkItemProps
 
 interface BacklinksPanelProps {
   currentNoteId: string
+  currentNoteTitle?: string
   backlinks: Artifact[]
   onNavigate: (id: string) => void
 }
 
-export function BacklinksPanel({ currentNoteId, backlinks, onNavigate }: BacklinksPanelProps) {
+export function BacklinksPanel({
+  currentNoteId,
+  currentNoteTitle,
+  backlinks,
+  onNavigate
+}: BacklinksPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   if (backlinks.length === 0) return null
@@ -106,6 +137,7 @@ export function BacklinksPanel({ currentNoteId, backlinks, onNavigate }: Backlin
               key={artifact.id}
               artifact={artifact}
               currentNoteId={currentNoteId}
+              currentNoteTitle={currentNoteTitle}
               onNavigate={onNavigate}
             />
           ))}

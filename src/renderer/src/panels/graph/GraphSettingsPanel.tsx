@@ -122,6 +122,8 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
   const setShowOrphans = useGraphSettingsStore((s) => s.setShowOrphans)
   const showExistingOnly = useGraphSettingsStore((s) => s.showExistingOnly)
   const setShowExistingOnly = useGraphSettingsStore((s) => s.setShowExistingOnly)
+  const showTags = useGraphSettingsStore((s) => s.showTags)
+  const setShowTags = useGraphSettingsStore((s) => s.setShowTags)
 
   // Groups
   const groups = useGraphSettingsStore((s) => s.groups)
@@ -211,6 +213,7 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
               checked={showExistingOnly}
               onChange={setShowExistingOnly}
             />
+            <ToggleRow label="Show tags" checked={showTags} onChange={setShowTags} />
           </div>
         )}
 

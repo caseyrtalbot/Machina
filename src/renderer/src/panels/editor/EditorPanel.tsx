@@ -258,6 +258,15 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
         frontmatter={frontmatterData}
         mode={mode}
         onNavigate={onNavigate}
+        onFrontmatterChange={(newRaw) => {
+          frontmatterRawRef.current = newRaw
+          // Parse the updated frontmatter for display
+          const parsed = parseFrontmatter(newRaw)
+          setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
+          // Reconstruct full content: new frontmatter + existing body
+          const currentParsed = parseFrontmatter(content ?? '')
+          setContent(newRaw + currentParsed.body)
+        }}
       />
 
       <div className="flex-1 overflow-y-auto">
@@ -270,6 +279,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
       <BacklinksPanel
         currentNoteId={activeNoteId ?? ''}
+        currentNoteTitle={artifact?.title}
         backlinks={backlinks}
         onNavigate={onNavigate}
       />
