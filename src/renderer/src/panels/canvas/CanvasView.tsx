@@ -1,18 +1,30 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CanvasSurface } from './CanvasSurface'
 import { useCanvasStore } from '../../store/canvas-store'
-import { createCanvasNode } from '@shared/canvas-types'
+import { createCanvasNode, type CanvasNode } from '@shared/canvas-types'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { TextCard } from './TextCard'
 import { NoteCard } from './NoteCard'
 import { TerminalCard } from './TerminalCard'
 import { EdgeLayer } from './EdgeLayer'
 import { ConnectionDragOverlay } from './ConnectionDragOverlay'
+import { CommandStack } from './canvas-commands'
 
 export function CanvasView() {
   const nodes = useCanvasStore((s) => s.nodes)
   const clearSelection = useCanvasStore((s) => s.clearSelection)
   const addNode = useCanvasStore((s) => s.addNode)
+  const commandStack = useRef(new CommandStack())
+
+  const addNodeWithUndo = useCallback(
+    (node: CanvasNode) => {
+      commandStack.current.execute({
+        execute: () => addNode(node),
+        undo: () => useCanvasStore.getState().removeNode(node.id)
+      })
+    },
+    [addNode]
+  )
 
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -40,10 +52,10 @@ export function CanvasView() {
         x: contextMenu.canvasX,
         y: contextMenu.canvasY
       })
-      addNode(node)
+      addNodeWithUndo(node)
       setContextMenu(null)
     },
-    [contextMenu, addNode]
+    [contextMenu, addNodeWithUndo]
   )
 
   useEffect(() => {
@@ -64,6 +76,21 @@ export function CanvasView() {
             removeNode(id)
           }
         }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.metaKey) return
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        commandStack.current.undo()
+      } else if (e.key === 'z' && e.shiftKey) {
+        e.preventDefault()
+        commandStack.current.redo()
       }
     }
     window.addEventListener('keydown', handler)
