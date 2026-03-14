@@ -15,6 +15,12 @@ const PROD_CSP = [
   "img-src 'self' data:"
 ].join('; ')
 
+// Prevent EPIPE from node-pty/shell service from crashing the app
+process.on('uncaughtException', (err) => {
+  if (err.message === 'write EPIPE') return
+  console.error('Uncaught exception:', err)
+})
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): BrowserWindow {

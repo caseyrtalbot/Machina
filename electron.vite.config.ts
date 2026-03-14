@@ -28,7 +28,32 @@ export default defineConfig({
     },
     plugins: [react(), tailwindcss()],
     optimizeDeps: {
-      include: ['gray-matter']
+      include: [
+        'react-dom/client',
+        'zustand',
+        'zustand/middleware',
+        'gray-matter',
+        'd3-force',
+        'd3-quadtree',
+        'd3-zoom',
+        'd3-selection',
+        '@tiptap/react',
+        '@tiptap/starter-kit',
+        '@tiptap/markdown',
+        '@tiptap/extension-task-list',
+        '@tiptap/extension-task-item',
+        '@tiptap/extension-link',
+        '@codemirror/state',
+        '@codemirror/view',
+        '@codemirror/lang-markdown',
+        '@codemirror/theme-one-dark',
+        '@codemirror/commands',
+        '@codemirror/search',
+        'xterm',
+        '@xterm/addon-fit',
+        '@xterm/addon-web-links',
+        '@xterm/addon-search'
+      ]
     }
   }
 })
