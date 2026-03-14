@@ -95,6 +95,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   const dragNodeRef = useRef<SimNode | null>(null)
   const isDraggingRef = useRef(false)
   const dragStartTimeRef = useRef(0)
+  const dragMovedRef = useRef(false)
 
   // Visited node tracking (persisted in localStorage)
   const visitedRef = useRef<Set<string>>(
@@ -488,6 +489,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         isDraggingRef.current = true
         dragNodeRef.current = node
         dragStartTimeRef.current = Date.now()
+        dragMovedRef.current = false
         // Pin the node at its current position
         node.fx = node.x
         node.fy = node.y
@@ -510,6 +512,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
       // Drag-to-pin: move pinned node
       if (isDraggingRef.current && dragNodeRef.current) {
+        dragMovedRef.current = true
         dragNodeRef.current.fx = coords.x
         dragNodeRef.current.fy = coords.y
         runtimeRef.current?.markQuadtreeDirty()
@@ -552,15 +555,15 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
   const handleMouseUp = useCallback(() => {
     if (isDraggingRef.current) {
-      const dragDuration = Date.now() - dragStartTimeRef.current
       const draggedNode = dragNodeRef.current
 
       isDraggingRef.current = false
       dragNodeRef.current = null
       const canvas = canvasRef.current
 
-      // Short drag = click: open the node (Quartz: <500ms threshold)
-      if (dragDuration < 500 && draggedNode) {
+      // Click = mousedown + mouseup with NO mousemove in between
+      const isClick = !dragMovedRef.current
+      if (isClick && draggedNode) {
         // Unpin immediately for clicks
         if (draggedNode) {
           draggedNode.fx = null
