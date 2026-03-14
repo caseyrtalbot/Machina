@@ -55,8 +55,8 @@ export function createSimulation(
 ): Simulation<SimNode, SimEdge> {
   const n = nodes.length
   const isLarge = n > LARGE_GRAPH_THRESHOLD
-  const alphaDecay = isLarge ? 0.04 : 0.02
-  const velocityDecay = isLarge ? 0.5 : 0.4
+  const alphaDecay = isLarge ? 0.05 : 0.03
+  const velocityDecay = isLarge ? 0.6 : 0.5
 
   const charge = forceManyBody<SimNode>().strength(config.repelForce)
   if (isLarge) charge.theta(1.2)

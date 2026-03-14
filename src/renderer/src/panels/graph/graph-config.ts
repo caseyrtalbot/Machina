@@ -93,7 +93,7 @@ export const LINK_STRENGTH: Record<RelationshipKind, number> = {
 export const LARGE_GRAPH_THRESHOLD = 200
 
 export const DEFAULT_SIM_CONFIG: SimulationConfig = {
-  centerForce: 0.05,
+  centerForce: 0.02,
   repelForce: -120,
   linkForce: 0.7,
   linkDistance: 50

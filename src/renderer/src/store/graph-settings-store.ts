@@ -31,31 +31,31 @@ const DEFAULT_GROUP_RULES: GroupRule[] = [
 
 interface GraphSettingsState {
   // Filters
-  graphMode: 'global' | 'local'
-  localGraphDepth: number
-  searchQuery: string
-  showOrphans: boolean
-  showExistingOnly: boolean
-  showTags: boolean
-  showAttachments: boolean
+  readonly graphMode: 'global' | 'local'
+  readonly localGraphDepth: number
+  readonly searchQuery: string
+  readonly showOrphans: boolean
+  readonly showExistingOnly: boolean
+  readonly showTags: boolean
+  readonly showAttachments: boolean
 
   // Groups (coloring)
-  groupRules: GroupRule[]
+  readonly groupRules: readonly GroupRule[]
 
   // Display
-  nodeSizeMultiplier: number
-  linkThickness: number
-  showArrows: boolean
-  textFadeThreshold: number
-  isAnimating: boolean
-  showMinimap: boolean
+  readonly nodeSizeMultiplier: number
+  readonly linkThickness: number
+  readonly showArrows: boolean
+  readonly textFadeThreshold: number
+  readonly isAnimating: boolean
+  readonly showMinimap: boolean
 
   // Forces
-  centerForce: number
-  repelForce: number
-  linkForce: number
-  linkDistance: number
-  enableRadial: boolean
+  readonly centerForce: number
+  readonly repelForce: number
+  readonly linkForce: number
+  readonly linkDistance: number
+  readonly enableRadial: boolean
 
   // Setters
   setGraphMode: (mode: 'global' | 'local') => void
@@ -107,7 +107,7 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
   showMinimap: true,
 
   // Forces (Obsidian-style defaults)
-  centerForce: 0.05,
+  centerForce: 0.02,
   repelForce: -120,
   linkForce: 0.7,
   linkDistance: 50,

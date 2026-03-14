@@ -14,7 +14,7 @@ describe('graph-settings-store', () => {
     const state = useGraphSettingsStore.getState()
     expect(state.showOrphans).toBe(true)
     expect(state.nodeSizeMultiplier).toBe(1)
-    expect(state.centerForce).toBe(0.05)
+    expect(state.centerForce).toBe(0.02)
     expect(state.repelForce).toBe(-120)
     expect(state.isAnimating).toBe(true)
     expect(state.linkThickness).toBe(1)
@@ -62,7 +62,9 @@ describe('graph-settings-store', () => {
     const first = rules[0]
     useGraphSettingsStore.getState().removeGroupRule(first.id)
     expect(useGraphSettingsStore.getState().groupRules).toHaveLength(rules.length - 1)
-    expect(useGraphSettingsStore.getState().groupRules.find((r) => r.id === first.id)).toBeUndefined()
+    expect(
+      useGraphSettingsStore.getState().groupRules.find((r) => r.id === first.id)
+    ).toBeUndefined()
   })
 
   it('updates a group rule query', () => {
@@ -134,12 +136,7 @@ describe('matchGroupRule', () => {
   })
 
   it('matches type fallback', () => {
-    expect(
-      matchGroupRule(
-        { id: '1', query: 'gene', color: '#fff' },
-        { type: 'gene' }
-      )
-    ).toBe(true)
+    expect(matchGroupRule({ id: '1', query: 'gene', color: '#fff' }, { type: 'gene' })).toBe(true)
   })
 })
 

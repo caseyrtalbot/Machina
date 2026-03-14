@@ -271,7 +271,16 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   // Re-render on display-only changes (no sim recreation needed)
   useEffect(() => {
     runtimeRef.current?.requestRender()
-  }, [linkThickness, textFadeThreshold, showArrows, nodeSizeMultiplier, searchQuery])
+  }, [
+    linkThickness,
+    textFadeThreshold,
+    showArrows,
+    nodeSizeMultiplier,
+    searchQuery,
+    hoveredNodeId,
+    selectedNodeId,
+    highlightHook.state
+  ])
 
   // -------------------------------------------------------------------------
   // Effect 1 — Topology change: creates new simulation
@@ -349,6 +358,11 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         runtime.requestRender()
       })
 
+      // When simulation settles, stop it completely so nodes are static
+      sim.on('end', () => {
+        runtime.requestRender()
+      })
+
       runtime.simulation = sim
     } else {
       runtime.simulation = null
@@ -386,14 +400,29 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
     const zb = zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.1, 8])
-      .filter(() => {
+      .filter((event) => {
         // Suppress d3's default drag when we're node-dragging
         if (isDraggingRef.current) return false
+        // Suppress d3 pan when mousedown is on a node (let our drag handler take it)
+        if (event.type === 'mousedown' || event.type === 'touchstart') {
+          const rect = canvas.getBoundingClientRect()
+          const t = transformRef.current
+          const gx = (event.clientX - rect.left - t.x) / t.k
+          const gy = (event.clientY - rect.top - t.y) / t.k
+          const hit = runtimeRef.current?.findNodeAt(
+            nodesRef.current ?? [],
+            gx,
+            gy,
+            nodeSizeMultiplier
+          )
+          if (hit) return false // let our mouseDown handle it
+        }
         return true
       })
       .on('zoom', (event) => {
         transformRef.current = event.transform
-        render()
+        // Use ref to avoid recreating this effect when render changes
+        renderRef.current()
       })
 
     select(canvas).call(zb)
@@ -402,7 +431,9 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     return () => {
       select(canvas).on('.zoom', null)
     }
-  }, [render])
+    // Intentionally stable — uses renderRef for render, not the render callback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // -------------------------------------------------------------------------
   // Coordinate transform helper
@@ -442,7 +473,8 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         // Pin the node at its current position
         node.fx = node.x
         node.fy = node.y
-        runtimeRef.current?.simulation?.alphaTarget(0.3).restart()
+        // Gentle reheat — keep neighbors calm while dragging
+        runtimeRef.current?.simulation?.alphaTarget(0.1).restart()
         const canvas = canvasRef.current
         if (canvas) canvas.style.cursor = 'grabbing'
       }
@@ -475,7 +507,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       highlightHook.handleHover(node?.id ?? null)
 
       const canvas = canvasRef.current
-      if (canvas) canvas.style.cursor = node ? 'pointer' : 'default'
+      if (canvas) canvas.style.cursor = node ? 'grab' : 'default'
 
       // Tooltip
       if (node) {
@@ -498,20 +530,19 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       const dragDuration = Date.now() - dragStartTimeRef.current
       const draggedNode = dragNodeRef.current
 
-      // Unpin node on drag end (Quartz behavior: nodes return to simulation)
-      if (draggedNode) {
-        draggedNode.fx = null
-        draggedNode.fy = null
-      }
-
       isDraggingRef.current = false
       dragNodeRef.current = null
-      runtimeRef.current?.simulation?.alphaTarget(0)
       const canvas = canvasRef.current
-      if (canvas) canvas.style.cursor = 'default'
 
       // Short drag = click: open the node (Quartz: <500ms threshold)
       if (dragDuration < 500 && draggedNode) {
+        // Unpin immediately for clicks
+        if (draggedNode) {
+          draggedNode.fx = null
+          draggedNode.fy = null
+        }
+        runtimeRef.current?.simulation?.alphaTarget(0)
+
         // Track as visited
         visitedRef.current.add(draggedNode.id)
         localStorage.setItem('graph-visited', JSON.stringify([...visitedRef.current]))
@@ -519,6 +550,19 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
         highlightHook.handleClick(draggedNode.id)
         onNodeClick(draggedNode.id)
+        if (canvas) canvas.style.cursor = 'grab'
+      } else {
+        // Real drag: spring-back — unpin and let sim gently settle
+        if (draggedNode) {
+          draggedNode.fx = null
+          draggedNode.fy = null
+        }
+        // Gentle spring-back: low alpha so node drifts back smoothly
+        const sim = runtimeRef.current?.simulation
+        if (sim) {
+          sim.alphaTarget(0).alpha(0.15).restart()
+        }
+        if (canvas) canvas.style.cursor = 'grab'
       }
     }
   }, [highlightHook, onNodeClick])
@@ -631,11 +675,14 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       const h = entry.contentRect.height
       canvas.width = w * dpr
       canvas.height = h * dpr
-      render()
+      // Use ref to avoid re-creating this observer on render changes
+      renderRef.current()
     })
     observer.observe(canvas)
     return () => observer.disconnect()
-  }, [render])
+    // Intentionally stable — uses renderRef, not render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // -------------------------------------------------------------------------
   // Minimap: highlighted node IDs (focal + neighbors during hover)
