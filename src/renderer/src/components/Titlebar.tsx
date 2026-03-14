@@ -12,39 +12,48 @@ export function Titlebar({ vaultName, onOpenSettings }: TitlebarProps) {
       style={
         {
           backgroundColor: colors.bg.base,
-          borderBottom: `1px solid ${colors.border.subtle}`,
+          borderBottom: '1px solid var(--border-subtle)',
           WebkitAppRegion: 'drag'
         } as React.CSSProperties
       }
     >
       {/* Traffic light spacer (macOS native) */}
       <div className="w-[70px] flex-shrink-0" />
-      {/* Vault tab */}
+      {/* Vault tab — text only, no filled pill */}
       <div
-        className="flex items-center gap-2 px-3 py-1 rounded-md text-sm"
+        className="flex items-center gap-2 px-3 py-1 text-[13px]"
         style={
           {
-            backgroundColor: colors.bg.elevated,
             color: colors.text.primary,
+            fontWeight: 500,
             WebkitAppRegion: 'no-drag'
           } as React.CSSProperties
         }
       >
-        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.accent.default }} />
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: colors.accent.default }}
+        />
         <span className="truncate max-w-[200px]">{vaultName}</span>
       </div>
       <div className="flex-1" />
       {/* Settings gear */}
       <button
         onClick={onOpenSettings}
-        className="p-1.5 rounded-md transition-colors hover:bg-[var(--color-bg-elevated)]"
+        className="p-1.5 rounded transition-opacity"
         style={
           {
             color: colors.text.secondary,
-            WebkitAppRegion: 'no-drag',
-            '--color-bg-elevated': colors.bg.elevated
+            opacity: 0.6,
+            WebkitAppRegion: 'no-drag'
           } as React.CSSProperties
         }
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '1'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0.6'
+        }}
         title="Settings"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">

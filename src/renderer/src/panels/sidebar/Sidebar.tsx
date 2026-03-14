@@ -50,7 +50,7 @@ function ActionBar({
   return (
     <div
       className="flex items-center gap-1 px-2 py-1 border-b text-xs"
-      style={{ borderColor: colors.border.default, color: colors.text.secondary }}
+      style={{ borderColor: 'var(--border-subtle)', color: colors.text.secondary }}
     >
       <button
         onClick={onNewFile}
@@ -145,8 +145,8 @@ export function Sidebar({
   )
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: colors.bg.base }}>
-      <div className="p-2 border-b" style={{ borderColor: colors.border.default }}>
+    <div className="h-full flex flex-col">
+      <div className="p-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
         <SearchBar onSearch={onSearch} />
       </div>
       <ActionBar

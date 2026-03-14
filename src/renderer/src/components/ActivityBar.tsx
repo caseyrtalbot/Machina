@@ -97,12 +97,8 @@ export function ActivityBar() {
 
   return (
     <div
-      className="flex flex-col items-center shrink-0 py-2 gap-1"
-      style={{
-        width: 44,
-        backgroundColor: colors.bg.base,
-        borderRight: `1px solid ${colors.border.default}`
-      }}
+      className="flex flex-col items-center shrink-0 py-3 gap-1"
+      style={{ width: 48, backgroundColor: colors.bg.base }}
     >
       {ITEMS.map(({ view, label, icon }) => {
         const isActive = contentView === view
@@ -110,16 +106,32 @@ export function ActivityBar() {
           <button
             key={view}
             onClick={() => setContentView(view)}
-            className="flex items-center justify-center rounded-md transition-colors"
+            className="relative flex items-center justify-center transition-opacity"
             style={{
-              width: 34,
-              height: 34,
-              backgroundColor: isActive ? colors.accent.muted : 'transparent',
-              color: isActive ? colors.accent.default : colors.text.muted
+              width: 36,
+              height: 36,
+              opacity: isActive ? 1 : 0.5,
+              color: colors.text.primary
+            }}
+            onMouseEnter={(e) => {
+              if (!isActive) e.currentTarget.style.opacity = '0.85'
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive) e.currentTarget.style.opacity = '0.5'
             }}
             title={label}
             aria-label={`Switch to ${label} view`}
           >
+            {isActive && (
+              <span
+                className="absolute left-0 rounded-r"
+                style={{
+                  width: 3,
+                  height: 20,
+                  backgroundColor: colors.accent.default
+                }}
+              />
+            )}
             {icon}
           </button>
         )

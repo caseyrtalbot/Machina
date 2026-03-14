@@ -63,9 +63,9 @@ export function TerminalTabs({
       data-testid="terminal-tabs"
       className="flex items-center overflow-x-auto gap-1 shrink-0"
       style={{
-        height: 40,
-        padding: '4px 8px 4px',
-        borderBottom: `1px solid ${colors.border.subtle}`
+        height: 32,
+        padding: '0 8px',
+        borderBottom: '1px solid var(--border-subtle)'
       }}
     >
       {sessions.map((session) => {
@@ -76,20 +76,27 @@ export function TerminalTabs({
           <div
             key={session.id}
             onClick={() => setActiveSession(session.id)}
-            className="flex items-center gap-1.5 cursor-pointer group shrink-0 whitespace-nowrap"
+            className="relative flex items-center gap-1.5 cursor-pointer group shrink-0 whitespace-nowrap"
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: 12,
-              borderRadius: 6,
-              border: isActive
-                ? '1px solid rgba(0, 229, 191, 0.3)'
-                : '1px solid rgba(255, 255, 255, 0.06)',
-              backgroundColor: isActive ? 'rgba(0, 229, 191, 0.06)' : 'transparent',
-              boxShadow: isActive ? '0 0 8px rgba(0, 229, 191, 0.08)' : 'none',
+              fontWeight: isActive ? 500 : 400,
               color: isActive ? colors.text.primary : colors.text.secondary,
               transition: '150ms ease-out'
             }}
           >
+            {/* Active bottom indicator */}
+            {isActive && (
+              <span
+                className="absolute bottom-0 left-2 right-2"
+                style={{
+                  height: 2,
+                  borderRadius: 1,
+                  backgroundColor: colors.accent.default
+                }}
+              />
+            )}
+
             {/* Status dot */}
             <span
               className="shrink-0 rounded-full"
@@ -133,14 +140,14 @@ export function TerminalTabs({
                   e.stopPropagation()
                   onCloseTab(session.id)
                 }}
-                className="opacity-0 group-hover:opacity-100"
+                className="opacity-0 group-hover:opacity-60"
                 style={{
-                  color: colors.text.muted,
+                  color: colors.text.primary,
                   fontSize: 11,
                   transition: '150ms ease-out'
                 }}
               >
-                ×
+                x
               </button>
             )}
           </div>
@@ -148,8 +155,14 @@ export function TerminalTabs({
       })}
       <button
         onClick={onNewTab}
-        className="px-2 py-1 text-xs transition-colors"
-        style={{ color: colors.text.muted }}
+        className="px-2 py-1 text-xs transition-opacity"
+        style={{ color: colors.text.muted, opacity: 0.6 }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '1'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0.6'
+        }}
       >
         +
       </button>

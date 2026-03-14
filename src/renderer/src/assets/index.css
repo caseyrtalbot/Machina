@@ -49,7 +49,8 @@ body {
 
   /* ── Visual Language ── */
   --panel-gap: 4px;
-  --card-radius: 8px;
+  --panel-radius: 8px;
+  --panel-padding: 12px 16px;
   --border-subtle: rgba(255, 255, 255, 0.08);
   --neon-glow: 0 0 8px rgba(0, 229, 191, 0.12);
   --color-accent-focus: rgba(0, 229, 191, 0.3);
@@ -80,20 +81,10 @@ body {
 .interactive-hover:hover { background-color: var(--color-bg-elevated); }
 
 .panel-card {
-  background: var(--color-bg-base);
-  border-radius: var(--card-radius);
-  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+  border-radius: var(--panel-radius);
+  border: 1px solid var(--border-subtle);
   overflow: hidden;
-}
-
-.panel-separator-h {
-  width: 1px;
-  background: linear-gradient(to bottom, transparent 0%, var(--color-border-default) 20%, var(--color-border-default) 80%, transparent 100%);
-}
-
-.panel-separator-v {
-  height: 1px;
-  background: linear-gradient(to right, transparent 0%, var(--color-border-default) 20%, var(--color-border-default) 80%, transparent 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {

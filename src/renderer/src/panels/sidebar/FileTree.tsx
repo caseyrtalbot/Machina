@@ -85,7 +85,7 @@ export function FileTree({
   const visibleNodes = nodes.filter((n) => isVisible(n, collapsedPaths, nodes))
 
   return (
-    <div data-testid="file-tree" className="text-sm select-none">
+    <div data-testid="file-tree" className="text-sm select-none px-1 py-1">
       {visibleNodes.map((node) =>
         node.isDirectory ? (
           <DirectoryRow
@@ -133,21 +133,27 @@ function DirectoryRow({
   onRenameConfirm?: (newName: string) => void
   onRenameCancel?: () => void
 }) {
-  const paddingLeft = 8 + node.depth * 20
+  const paddingLeft = 8 + node.depth * 16
 
   return (
     <div
       onClick={() => onToggleDirectory(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, true)}
-      className="flex items-center py-1 cursor-pointer hover:bg-[var(--color-bg-elevated)] transition-colors"
-      style={
-        {
-          paddingLeft,
-          color: colors.text.primary,
-          fontWeight: 500,
-          '--color-bg-elevated': colors.bg.elevated
-        } as React.CSSProperties
-      }
+      className="flex items-center py-0.5 cursor-pointer rounded transition-colors"
+      style={{
+        paddingLeft,
+        paddingRight: 8,
+        marginBottom: 1,
+        color: colors.text.primary,
+        fontWeight: 500,
+        fontSize: 13
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = ''
+      }}
     >
       <span className="mr-1.5 flex items-center" style={{ color: colors.text.muted }}>
         <Chevron isExpanded={!isCollapsed} />
@@ -162,7 +168,14 @@ function DirectoryRow({
         <span className="truncate flex-1">{node.name}</span>
       )}
       {!isRenaming && node.itemCount > 0 && (
-        <span className="ml-auto mr-2 text-xs" style={{ color: colors.text.muted }}>
+        <span
+          className="ml-auto text-[11px]"
+          style={{
+            color: colors.text.muted,
+            opacity: 0.4,
+            fontVariantNumeric: 'tabular-nums'
+          }}
+        >
           {node.itemCount}
         </span>
       )}
@@ -190,24 +203,29 @@ function FileRow({
   onRenameCancel?: () => void
 }) {
   // Files get extra left padding to align past the chevron space of their parent
-  const paddingLeft = 8 + node.depth * 20 + 20
+  const paddingLeft = 8 + node.depth * 16 + 20
 
   return (
     <div
       data-active={isActive ? 'true' : 'false'}
       onClick={() => onFileSelect(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
-      className="flex items-center py-1 cursor-pointer hover:bg-[var(--color-bg-elevated)] transition-colors"
-      style={
-        {
-          paddingLeft,
-          backgroundColor: isActive ? colors.accent.muted : undefined,
-          color: isActive ? colors.text.primary : colors.text.secondary,
-          fontWeight: 400,
-          borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
-          '--color-bg-elevated': colors.bg.elevated
-        } as React.CSSProperties
-      }
+      className="flex items-center py-0.5 cursor-pointer rounded transition-colors"
+      style={{
+        paddingLeft,
+        paddingRight: 8,
+        marginBottom: 1,
+        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.08)' : undefined,
+        color: isActive ? colors.text.primary : colors.text.secondary,
+        fontWeight: 400,
+        fontSize: 13
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) e.currentTarget.style.backgroundColor = ''
+      }}
     >
       {artifactType && (
         <span

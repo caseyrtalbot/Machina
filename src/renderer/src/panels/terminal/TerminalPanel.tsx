@@ -367,7 +367,7 @@ export function TerminalPanel() {
         <div
           ref={activeContainerRef}
           className="flex-1 overflow-hidden"
-          style={{ padding: '4px 0 0 4px' }}
+          style={{ padding: '4px 0 0 8px' }}
         />
       )}
     </div>

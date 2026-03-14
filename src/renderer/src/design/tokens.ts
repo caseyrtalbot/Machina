@@ -36,11 +36,11 @@ export const ARTIFACT_COLORS: Record<BuiltInArtifactType, string> = {
   constraint: '#ef4444',
   research: '#a78bfa',
   output: '#f472b6',
-  note: '#64748b',
+  note: '#94a3b8',
   index: '#38bdf8'
 }
 
-export const DEFAULT_ARTIFACT_COLOR = '#64748b'
+export const DEFAULT_ARTIFACT_COLOR = '#94a3b8'
 
 // Palette excludes colors already used by built-in types
 const CUSTOM_TYPE_PALETTE = [
@@ -124,7 +124,7 @@ export const borderRadius = { container: 6, inline: 4, card: 8, round: '50%' } a
 
 /* ── Visual Language ──────────────────────────────────────────────────────
  * Named tokens for the floating-card panel aesthetic.
- * Use these in CSS via var(--panel-gap), var(--card-radius), var(--border-subtle).
+ * Use these in CSS via var(--panel-gap), var(--panel-radius), var(--border-subtle).
  *
  * Panels render as cards inset from the app chrome and each other by --panel-gap.
  * Depth comes from background-contrast (surface on base), not drop shadows.

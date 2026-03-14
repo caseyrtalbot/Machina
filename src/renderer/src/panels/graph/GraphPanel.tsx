@@ -39,29 +39,6 @@ function useReducedMotion(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Loading skeleton: three pulsing dots shown during simulation warmup
-// ---------------------------------------------------------------------------
-
-function LoadingSkeleton() {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="flex gap-2">
-        {[0, 200, 400].map((delay) => (
-          <div
-            key={delay}
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{
-              backgroundColor: colors.accent.default,
-              animationDelay: `${delay}ms`
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // GraphPanel
 // ---------------------------------------------------------------------------
 
@@ -80,6 +57,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   const prevNodesRef = useRef<SimNode[]>([])
   const skipSpritesRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
+  const renderRef = useRef<() => void>(() => {})
 
   // Store selectors (all narrow to avoid unnecessary re-renders)
   const graph = useVaultStore((s) => s.graph)
@@ -96,6 +74,10 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   const nodeSizeMode = useGraphSettingsStore((s) => s.nodeSizeMode)
   const isAnimating = useGraphSettingsStore((s) => s.isAnimating)
   const showMinimap = useGraphSettingsStore((s) => s.showMinimap)
+  const linkOpacity = useGraphSettingsStore((s) => s.linkOpacity)
+  const linkThickness = useGraphSettingsStore((s) => s.linkThickness)
+  const textFadeThreshold = useGraphSettingsStore((s) => s.textFadeThreshold)
+  const showArrows = useGraphSettingsStore((s) => s.showArrows)
   const centerForce = useGraphSettingsStore((s) => s.centerForce)
   const repelForce = useGraphSettingsStore((s) => s.repelForce)
   const linkForceStrength = useGraphSettingsStore((s) => s.linkForce)
@@ -107,7 +89,6 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     () => ({ mode: nodeSizeMode, baseSize: baseNodeSize }),
     [nodeSizeMode, baseNodeSize]
   )
-  const [isSimulating, setIsSimulating] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -178,7 +159,10 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
 
     ctx.save()
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Background fill in screen-space (before transform)
     ctx.scale(dpr, dpr)
+    ctx.fillStyle = colors.bg.base
+    ctx.fillRect(0, 0, w, h)
     ctx.translate(t.x, t.y)
     ctx.scale(t.k, t.k)
 
@@ -189,7 +173,11 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       canvasWidth: w,
       canvasHeight: h,
       reducedMotion,
-      skipAmbientSprites: skipSpritesRef.current
+      skipAmbientSprites: skipSpritesRef.current,
+      linkOpacity,
+      linkThickness,
+      textFadeThreshold,
+      showArrows
     })
 
     ctx.restore()
@@ -201,7 +189,28 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     if (animation.hasActiveAnimations()) {
       rafIdRef.current = requestAnimationFrame(render)
     }
-  }, [selectedNodeId, hoveredNodeId, sizeConfig, reducedMotion, highlightHook.state, animation])
+  }, [
+    selectedNodeId,
+    hoveredNodeId,
+    sizeConfig,
+    reducedMotion,
+    highlightHook.state,
+    animation,
+    linkOpacity,
+    linkThickness,
+    textFadeThreshold,
+    showArrows
+  ])
+
+  // Keep renderRef in sync so simulation tick uses the latest render without recreating sim
+  useEffect(() => {
+    renderRef.current = render
+  }, [render])
+
+  // Re-render on display-only settings changes (no sim recreation needed)
+  useEffect(() => {
+    renderRef.current()
+  }, [linkOpacity, linkThickness, textFadeThreshold, showArrows, sizeConfig])
 
   // -------------------------------------------------------------------------
   // Graph data pipeline: filter, diff, simulate
@@ -305,16 +314,12 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
       sim.on('tick', () => {
         nodesRef.current = filteredNodes
         edgesRef.current = filteredEdges
-        render()
+        renderRef.current()
       })
-
-      // Track when simulation settles
-      sim.on('end', () => setIsSimulating(false))
-      setIsSimulating(true)
 
       simRef.current = sim
     } else {
-      render()
+      renderRef.current()
     }
 
     return () => {
@@ -324,6 +329,8 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         rafIdRef.current = null
       }
     }
+    // render excluded intentionally — accessed via renderRef to avoid sim recreation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     graph,
     fileToId,
@@ -336,7 +343,6 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
     linkForceStrength,
     linkDistance,
     isAnimating,
-    render,
     animation
   ])
 
@@ -500,8 +506,6 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         onContextMenu={handleContextMenu}
       />
 
-      {isSimulating && !isEmpty && <LoadingSkeleton />}
-
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center">
           <p className="text-sm" style={{ color: colors.text.muted }}>
@@ -547,7 +551,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         style={{
           backgroundColor: settingsOpen ? colors.accent.muted : colors.bg.elevated,
           color: settingsOpen ? colors.accent.default : colors.text.muted,
-          border: `1px solid ${colors.border.default}`
+          border: '1px solid var(--border-subtle)'
         }}
         aria-label="Toggle graph settings"
         title="Graph Settings"

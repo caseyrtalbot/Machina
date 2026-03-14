@@ -17,11 +17,12 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         setQuery(e.target.value)
         onSearch(e.target.value)
       }}
-      className="w-full px-3 py-1.5 text-sm rounded outline-none"
+      className="w-full px-3 py-1.5 text-sm outline-none"
       style={{
-        backgroundColor: colors.bg.elevated,
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
         color: colors.text.primary,
-        border: `1px solid ${colors.border.default}`
+        border: 'none',
+        borderRadius: 6
       }}
     />
   )
