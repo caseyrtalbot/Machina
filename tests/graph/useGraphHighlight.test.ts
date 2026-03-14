@@ -187,3 +187,29 @@ describe('interpolateGlow', () => {
     expect(done).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// fade state persistence
+// ---------------------------------------------------------------------------
+
+describe('fade state persistence', () => {
+  it('interpolateGlow returns intermediate values during fade-out', () => {
+    const result = interpolateGlow(1, 0, 0, 75) // halfway through 150ms
+    expect(result.value).toBeGreaterThan(0)
+    expect(result.value).toBeLessThan(1)
+    expect(result.done).toBe(false)
+  })
+
+  it('interpolateGlow completes at full duration', () => {
+    const result = interpolateGlow(1, 0, 0, 150)
+    expect(result.value).toBe(0)
+    expect(result.done).toBe(true)
+  })
+
+  it('easeOut produces smooth curve values', () => {
+    // At t=0.5: 1 - (1-0.5)^2 = 1 - 0.25 = 0.75
+    expect(easeOut(0.5)).toBe(0.75)
+    expect(easeOut(0)).toBe(0)
+    expect(easeOut(1)).toBe(1)
+  })
+})

@@ -1,6 +1,6 @@
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react'
 import { useGraphStore } from '../../store/graph-store'
-import type { SimNode, SimEdge } from './GraphRenderer'
+import type { SimNode, SimEdge } from './graph-config'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +136,11 @@ export function useGraphHighlight(edges: readonly SimEdge[]): {
   // Tracks whether a node is click-locked (prevents hover from changing focus)
   const clickLockedRef = useRef<string | null>(null)
 
+  // Persist the highlight topology during fade-out so the renderer knows which
+  // nodes were highlighted while glowIntensity is still non-zero
+  const fadeConnectedSetRef = useRef<ReadonlySet<string>>(EMPTY_SET)
+  const fadeFocusedNodeIdRef = useRef<string | null>(null)
+
   // Glow animation tracking
   const glowRef = useRef<GlowTrack>({
     current: 0,
@@ -199,14 +204,25 @@ export function useGraphHighlight(edges: readonly SimEdge[]): {
     [tickGlow]
   )
 
-  // Trigger glow transitions when focus changes
+  // Trigger glow transitions when focus changes; snapshot topology for fade-out
   useEffect(() => {
     if (focusedNodeId) {
+      fadeConnectedSetRef.current = connectedSet
+      fadeFocusedNodeIdRef.current = focusedNodeId
       setGlowTarget(1)
     } else {
+      // Keep refs as-is until glowIntensity reaches 0
       setGlowTarget(0)
     }
-  }, [focusedNodeId, setGlowTarget])
+  }, [focusedNodeId, connectedSet, setGlowTarget])
+
+  // Clear fade state once the glow animation finishes and there is no active focus
+  useEffect(() => {
+    if (glowIntensity === 0 && !focusedNodeId) {
+      fadeConnectedSetRef.current = EMPTY_SET
+      fadeFocusedNodeIdRef.current = null
+    }
+  }, [glowIntensity, focusedNodeId])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -248,8 +264,8 @@ export function useGraphHighlight(edges: readonly SimEdge[]): {
   return {
     state: {
       mode,
-      focusedNodeId,
-      connectedSet,
+      focusedNodeId: focusedNodeId ?? fadeFocusedNodeIdRef.current,
+      connectedSet: focusedNodeId ? connectedSet : fadeConnectedSetRef.current,
       glowIntensity
     },
     adjacency,
