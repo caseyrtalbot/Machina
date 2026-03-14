@@ -26,6 +26,9 @@ export default defineConfig({
         '@engine': resolve('src/renderer/src/engine')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      include: ['gray-matter']
+    }
   }
 })
