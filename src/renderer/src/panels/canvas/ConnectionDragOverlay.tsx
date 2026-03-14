@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { createCanvasEdge, type CanvasSide } from '@shared/canvas-types'
 import { colors } from '../../design/tokens'
@@ -10,47 +10,47 @@ interface DragState {
   cursorY: number
 }
 
-// Export a singleton event bus for anchor dots to trigger
-let onDragStartCallback: ((fromNodeId: string, fromSide: CanvasSide) => void) | null = null
-let onDragEndCallback: ((toNodeId: string, toSide: CanvasSide) => void) | null = null
+// Ref-based event bus avoids stale closures in callbacks
+const dragRef: { current: DragState | null } = { current: null }
+let setDragFn: ((state: DragState | null) => void) | null = null
+let addEdgeFn: ((edge: ReturnType<typeof createCanvasEdge>) => void) | null = null
 
 export function startConnectionDrag(fromNodeId: string, fromSide: CanvasSide): void {
-  onDragStartCallback?.(fromNodeId, fromSide)
+  const state = { fromNodeId, fromSide, cursorX: 0, cursorY: 0 }
+  dragRef.current = state
+  setDragFn?.(state)
 }
 
 export function endConnectionDrag(toNodeId: string, toSide: CanvasSide): void {
-  onDragEndCallback?.(toNodeId, toSide)
+  const drag = dragRef.current
+  if (!drag) return
+  if (drag.fromNodeId !== toNodeId) {
+    addEdgeFn?.(createCanvasEdge(drag.fromNodeId, toNodeId, drag.fromSide, toSide))
+  }
+  dragRef.current = null
+  setDragFn?.(null)
 }
 
 export function ConnectionDragOverlay() {
   const [drag, setDrag] = useState<DragState | null>(null)
   const addEdge = useCanvasStore((s) => s.addEdge)
 
-  onDragStartCallback = useCallback(
-    (fromNodeId: string, fromSide: CanvasSide) => {
-      setDrag({ fromNodeId, fromSide, cursorX: 0, cursorY: 0 })
-    },
-    []
-  )
-
-  onDragEndCallback = useCallback(
-    (toNodeId: string, toSide: CanvasSide) => {
-      if (!drag) return
-      if (drag.fromNodeId !== toNodeId) {
-        addEdge(createCanvasEdge(drag.fromNodeId, toNodeId, drag.fromSide, toSide))
-      }
-      setDrag(null)
-    },
-    [drag, addEdge]
-  )
+  // Keep the module-level refs in sync
+  setDragFn = setDrag
+  addEdgeFn = addEdge
 
   useEffect(() => {
     if (!drag) return
 
     const onMove = (e: PointerEvent) => {
-      setDrag((prev) => prev ? { ...prev, cursorX: e.clientX, cursorY: e.clientY } : null)
+      const next = { ...dragRef.current!, cursorX: e.clientX, cursorY: e.clientY }
+      dragRef.current = next
+      setDrag(next)
     }
-    const onUp = () => setDrag(null)
+    const onUp = () => {
+      dragRef.current = null
+      setDrag(null)
+    }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)

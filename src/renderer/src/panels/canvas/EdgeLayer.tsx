@@ -2,28 +2,33 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { colors } from '../../design/tokens'
 import type { CanvasEdge, CanvasNode, CanvasSide } from '@shared/canvas-types'
 
-function getAnchorPoint(
-  node: CanvasNode,
-  side: CanvasSide
-): { x: number; y: number } {
+function getAnchorPoint(node: CanvasNode, side: CanvasSide): { x: number; y: number } {
   const { x, y } = node.position
   const { width, height } = node.size
 
   switch (side) {
-    case 'top': return { x: x + width / 2, y }
-    case 'bottom': return { x: x + width / 2, y: y + height }
-    case 'left': return { x, y: y + height / 2 }
-    case 'right': return { x: x + width, y: y + height / 2 }
+    case 'top':
+      return { x: x + width / 2, y }
+    case 'bottom':
+      return { x: x + width / 2, y: y + height }
+    case 'left':
+      return { x, y: y + height / 2 }
+    case 'right':
+      return { x: x + width, y: y + height / 2 }
   }
 }
 
 function getControlOffset(side: CanvasSide, distance: number): { dx: number; dy: number } {
   const offset = Math.min(distance * 0.4, 120)
   switch (side) {
-    case 'top': return { dx: 0, dy: -offset }
-    case 'bottom': return { dx: 0, dy: offset }
-    case 'left': return { dx: -offset, dy: 0 }
-    case 'right': return { dx: offset, dy: 0 }
+    case 'top':
+      return { dx: 0, dy: -offset }
+    case 'bottom':
+      return { dx: 0, dy: offset }
+    case 'left':
+      return { dx: -offset, dy: 0 }
+    case 'right':
+      return { dx: offset, dy: 0 }
   }
 }
 
@@ -61,10 +66,10 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
       <path
         d={d}
         fill="none"
-        stroke={isSelected ? colors.accent.default : colors.text.muted}
-        strokeWidth={isSelected ? 2 : 1.5}
+        stroke={isSelected ? colors.accent.default : colors.text.secondary}
+        strokeWidth={isSelected ? 2.5 : 1.5}
         markerEnd="url(#arrowhead)"
-        opacity={0.7}
+        opacity={isSelected ? 1 : 0.6}
       />
     </g>
   )
@@ -76,8 +81,8 @@ export function EdgeLayer() {
 
   return (
     <svg
-      className="absolute inset-0 pointer-events-none overflow-visible"
-      style={{ width: 0, height: 0 }}
+      className="absolute pointer-events-none"
+      style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible' }}
     >
       <defs>
         <marker
@@ -89,11 +94,7 @@ export function EdgeLayer() {
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <polygon
-            points="0 0, 10 3.5, 0 7"
-            fill={colors.text.muted}
-            opacity="0.7"
-          />
+          <polygon points="0 0, 10 3.5, 0 7" fill={colors.text.secondary} opacity="0.8" />
         </marker>
       </defs>
       <g style={{ pointerEvents: 'all' }}>

@@ -35,7 +35,7 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
   return (
     <div
       data-canvas-node
-      className="absolute flex flex-col overflow-hidden"
+      className="absolute flex flex-col"
       style={{
         left: node.position.x,
         top: node.position.y,
