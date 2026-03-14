@@ -1,6 +1,7 @@
 import matter from 'gray-matter'
 import type { Artifact, Signal } from '@shared/types'
 import type { Result } from './types'
+import { extractWikilinks } from './wikilink-extractor'
 
 const VALID_SIGNALS = new Set<string>(['untested', 'emerging', 'validated', 'core'])
 
@@ -16,6 +17,24 @@ function toDateString(val: unknown): string {
   return new Date().toISOString().split('T')[0]
 }
 
+/**
+ * Extract the filename stem from a path.
+ * `/path/to/Claude Code Playbook.md` → `Claude Code Playbook`
+ */
+function filenameStem(filepath: string): string {
+  const basename = filepath.split('/').pop() ?? filepath
+  return basename.replace(/\.md$/i, '')
+}
+
+/**
+ * Extract the first H1 heading from markdown body.
+ * Returns null if no H1 is found.
+ */
+function extractTitleFromBody(body: string): string | null {
+  const match = body.match(/^#\s+(.+)$/m)
+  return match ? match[1].trim() : null
+}
+
 export function parseArtifact(content: string, filename: string): Result<Artifact> {
   let parsed: matter.GrayMatterFile<string>
   try {
@@ -25,32 +44,33 @@ export function parseArtifact(content: string, filename: string): Result<Artifac
   }
 
   const { data, content: body } = parsed
+  const stem = filenameStem(filename)
 
-  if (!data || typeof data !== 'object' || !data.id || !data.title) {
-    return {
-      ok: false,
-      error: `Missing required frontmatter fields (id, title) in ${filename}`
-    }
-  }
+  // Derive id: explicit frontmatter → filename stem
+  const id = data?.id ? String(data.id) : stem
 
-  const signal = VALID_SIGNALS.has(data.signal) ? (data.signal as Signal) : 'untested'
+  // Derive title: explicit frontmatter → first H1 → filename stem
+  const title = data?.title ? String(data.title) : (extractTitleFromBody(body) ?? stem)
+
+  const signal = VALID_SIGNALS.has(data?.signal) ? (data.signal as Signal) : 'untested'
 
   return {
     ok: true,
     value: {
-      id: String(data.id),
-      title: String(data.title),
-      type: typeof data.type === 'string' && data.type ? data.type : 'note',
-      created: toDateString(data.created),
-      modified: toDateString(data.modified),
-      source: data.source ? String(data.source) : undefined,
-      frame: data.frame ? String(data.frame) : undefined,
+      id,
+      title,
+      type: typeof data?.type === 'string' && data.type ? data.type : 'note',
+      created: toDateString(data?.created),
+      modified: toDateString(data?.modified),
+      source: data?.source ? String(data.source) : undefined,
+      frame: data?.frame ? String(data.frame) : undefined,
       signal,
-      tags: toStringArray(data.tags),
-      connections: toStringArray(data.connections),
-      clusters_with: toStringArray(data.clusters_with),
-      tensions_with: toStringArray(data.tensions_with),
-      appears_in: toStringArray(data.appears_in),
+      tags: toStringArray(data?.tags),
+      connections: toStringArray(data?.connections),
+      clusters_with: toStringArray(data?.clusters_with),
+      tensions_with: toStringArray(data?.tensions_with),
+      appears_in: toStringArray(data?.appears_in),
+      wikilinks: extractWikilinks(body),
       body: body.trim()
     }
   }

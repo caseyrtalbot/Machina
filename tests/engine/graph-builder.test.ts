@@ -14,6 +14,7 @@ function makeArtifact(
     clusters_with: [],
     tensions_with: [],
     appears_in: [],
+    wikilinks: [],
     body: '',
     ...overrides
   }
@@ -91,5 +92,132 @@ describe('buildGraph', () => {
     const graph = buildGraph(artifacts)
     const connectionEdges = graph.edges.filter((e) => e.kind === 'connection')
     expect(connectionEdges).toHaveLength(1)
+  })
+
+  // --- Wikilink edge tests ---
+
+  it('creates wikilink edges by resolving title to ID', () => {
+    const artifacts = [
+      makeArtifact({
+        id: 'g1',
+        title: 'Gene One',
+        type: 'gene',
+        wikilinks: ['Gene Two']
+      }),
+      makeArtifact({ id: 'g2', title: 'Gene Two', type: 'gene' })
+    ]
+    const graph = buildGraph(artifacts)
+    const wikilinkEdges = graph.edges.filter((e) => e.kind === 'wikilink')
+    expect(wikilinkEdges).toHaveLength(1)
+    expect(wikilinkEdges[0]).toEqual({ source: 'g1', target: 'g2', kind: 'wikilink' })
+  })
+
+  it('creates ghost nodes for unresolved wikilinks', () => {
+    const artifacts = [
+      makeArtifact({
+        id: 'g1',
+        title: 'Gene One',
+        type: 'gene',
+        wikilinks: ['Missing Note']
+      })
+    ]
+    const graph = buildGraph(artifacts)
+    const ghost = graph.nodes.find((n) => n.id === 'ghost:Missing Note')
+    expect(ghost).toBeDefined()
+    expect(ghost!.title).toBe('Missing Note')
+    const wikilinkEdges = graph.edges.filter((e) => e.kind === 'wikilink')
+    expect(wikilinkEdges).toHaveLength(1)
+    expect(wikilinkEdges[0].target).toBe('ghost:Missing Note')
+  })
+
+  it('skips wikilink self-links', () => {
+    const artifacts = [
+      makeArtifact({
+        id: 'g1',
+        title: 'Gene One',
+        type: 'gene',
+        wikilinks: ['Gene One']
+      })
+    ]
+    const graph = buildGraph(artifacts)
+    expect(graph.edges).toHaveLength(0)
+  })
+
+  it('resolves wikilinks case-insensitively', () => {
+    const artifacts = [
+      makeArtifact({
+        id: 'g1',
+        title: 'Gene One',
+        type: 'gene',
+        wikilinks: ['gene two']
+      }),
+      makeArtifact({ id: 'g2', title: 'Gene Two', type: 'gene' })
+    ]
+    const graph = buildGraph(artifacts)
+    const wikilinkEdges = graph.edges.filter((e) => e.kind === 'wikilink')
+    expect(wikilinkEdges).toHaveLength(1)
+    expect(wikilinkEdges[0].target).toBe('g2')
+  })
+
+  it('deduplicates wikilink against existing explicit connection', () => {
+    const artifacts = [
+      makeArtifact({
+        id: 'g1',
+        title: 'Gene One',
+        type: 'gene',
+        connections: ['g2'],
+        wikilinks: ['Gene Two']
+      }),
+      makeArtifact({ id: 'g2', title: 'Gene Two', type: 'gene' })
+    ]
+    const graph = buildGraph(artifacts)
+    // Should only have the explicit connection, no wikilink edge
+    expect(graph.edges).toHaveLength(1)
+    expect(graph.edges[0].kind).toBe('connection')
+  })
+
+  // --- Tag node tests ---
+
+  it('creates tag nodes with tag: prefix', () => {
+    const artifacts = [
+      makeArtifact({ id: 'g1', title: 'G1', type: 'gene', tags: ['positioning'] })
+    ]
+    const graph = buildGraph(artifacts)
+    const tagNode = graph.nodes.find((n) => n.id === 'tag:positioning')
+    expect(tagNode).toBeDefined()
+    expect(tagNode!.title).toBe('#positioning')
+    expect(tagNode!.type).toBe('tag')
+    expect(tagNode!.signal).toBe('core')
+  })
+
+  it('creates tag edges between artifacts and tag nodes', () => {
+    const artifacts = [
+      makeArtifact({ id: 'g1', title: 'G1', type: 'gene', tags: ['moats'] })
+    ]
+    const graph = buildGraph(artifacts)
+    const tagEdges = graph.edges.filter((e) => e.kind === 'tag')
+    expect(tagEdges).toHaveLength(1)
+    expect(tagEdges[0]).toEqual({ source: 'g1', target: 'tag:moats', kind: 'tag' })
+  })
+
+  it('shares one tag node across multiple artifacts', () => {
+    const artifacts = [
+      makeArtifact({ id: 'g1', title: 'G1', type: 'gene', tags: ['strategy'] }),
+      makeArtifact({ id: 'g2', title: 'G2', type: 'gene', tags: ['strategy'] })
+    ]
+    const graph = buildGraph(artifacts)
+    const tagNodes = graph.nodes.filter((n) => n.type === 'tag')
+    expect(tagNodes).toHaveLength(1)
+    const tagEdges = graph.edges.filter((e) => e.kind === 'tag')
+    expect(tagEdges).toHaveLength(2)
+  })
+
+  it('creates no tag nodes when no artifacts have tags', () => {
+    const artifacts = [
+      makeArtifact({ id: 'g1', title: 'G1', type: 'gene' })
+    ]
+    const graph = buildGraph(artifacts)
+    const tagNodes = graph.nodes.filter((n) => n.type === 'tag')
+    expect(tagNodes).toHaveLength(0)
   })
 })

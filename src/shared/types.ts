@@ -39,10 +39,18 @@ export interface Artifact {
   clusters_with: string[]
   tensions_with: string[]
   appears_in: string[]
+  wikilinks: readonly string[]
   body: string
 }
 
-export const RELATIONSHIP_KINDS = ['connection', 'cluster', 'tension', 'appears_in'] as const
+export const RELATIONSHIP_KINDS = [
+  'connection',
+  'cluster',
+  'tension',
+  'appears_in',
+  'wikilink',
+  'tag'
+] as const
 export type RelationshipKind = (typeof RELATIONSHIP_KINDS)[number]
 
 export interface Relationship {

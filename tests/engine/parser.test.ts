@@ -70,9 +70,14 @@ describe('parseArtifact', () => {
     expect(result.value.tags).toEqual([])
   })
 
-  it('returns error for missing frontmatter', () => {
+  it('derives id and title for files without frontmatter', () => {
     const result = parseArtifact(NO_FRONTMATTER, 'no-fm.md')
-    expect(result.ok).toBe(false)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.id).toBe('no-fm')
+    expect(result.value.title).toBe('No Frontmatter')
+    expect(result.value.type).toBe('note')
+    expect(result.value.body).toContain('Just plain markdown.')
   })
 
   it('returns error for malformed YAML', () => {
@@ -112,6 +117,90 @@ A note without an explicit type.`
     const result = parseArtifact(md, 'no-type.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
+    expect(result.value.type).toBe('note')
+  })
+
+  it('derives id from filename when frontmatter has no id', () => {
+    const md = `---
+title: Claude Code Playbook
+tags: [coding, ai]
+---
+
+# Claude Code Playbook
+
+Content here.`
+
+    const result = parseArtifact(md, '/vault/Coding/Claude Code Playbook.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.id).toBe('Claude Code Playbook')
+    expect(result.value.title).toBe('Claude Code Playbook')
+    expect(result.value.tags).toEqual(['coding', 'ai'])
+  })
+
+  it('derives title from first H1 when frontmatter has no title', () => {
+    const md = `---
+id: n99
+tags: [test]
+---
+
+# My Great Note
+
+Some body text.`
+
+    const result = parseArtifact(md, 'my-note.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.id).toBe('n99')
+    expect(result.value.title).toBe('My Great Note')
+  })
+
+  it('falls back to filename stem when no title or H1', () => {
+    const md = `---
+tags: [orphan]
+---
+
+Just body text, no heading.`
+
+    const result = parseArtifact(md, 'stray-thought.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.id).toBe('stray-thought')
+    expect(result.value.title).toBe('stray-thought')
+  })
+
+  it('extracts wikilinks from body during parse', () => {
+    const md = `---
+id: n1
+title: Note One
+---
+
+See [[Note Two]] and [[Note Three|display]] for more.`
+
+    const result = parseArtifact(md, 'note-one.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.wikilinks).toEqual(['Note Two', 'Note Three'])
+  })
+
+  it('handles Obsidian-style frontmatter with custom properties', () => {
+    const md = `---
+title: The Four Pillars
+Parent: "[[VIBE CODING]]"
+Source: Notion
+tags: [methodology]
+---
+
+# The Four Pillars
+
+AI as Scheduled Capacity.`
+
+    const result = parseArtifact(md, 'The Four Pillars.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.id).toBe('The Four Pillars')
+    expect(result.value.title).toBe('The Four Pillars')
+    expect(result.value.tags).toEqual(['methodology'])
     expect(result.value.type).toBe('note')
   })
 })

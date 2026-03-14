@@ -44,11 +44,13 @@ describe('VaultIndex', () => {
     expect(results).toHaveLength(2)
   })
 
-  it('skips malformed files gracefully', () => {
+  it('parses files without frontmatter using lenient defaults', () => {
     const index = new VaultIndex()
     index.addFile('bad.md', 'no frontmatter here')
-    expect(index.getArtifacts()).toHaveLength(0)
-    expect(index.getErrors()).toHaveLength(1)
+    // Lenient parser derives id from filename, so this succeeds
+    expect(index.getArtifacts()).toHaveLength(1)
+    expect(index.getArtifacts()[0].id).toBe('bad')
+    expect(index.getErrors()).toHaveLength(0)
   })
 
   it('returns backlinks for a target node', () => {
