@@ -174,6 +174,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
         }}
         tabIndex={-1}
         style={{
+          minHeight: 0,
+          overflow: 'hidden',
           outline: focused ? `1px solid ${colors.accent.default}` : 'none',
           outlineOffset: -1
         }}
@@ -181,7 +183,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
         <div
           ref={termContainerRef}
           className="w-full h-full"
-          style={{ padding: '4px 0 0 4px' }}
+          style={{ padding: '4px 0 0 4px', minHeight: 0 }}
         />
         {sessionDead && (
           <div

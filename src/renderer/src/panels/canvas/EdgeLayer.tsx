@@ -82,7 +82,9 @@ export function EdgeLayer() {
   return (
     <svg
       className="absolute pointer-events-none"
-      style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible' }}
+      width="1"
+      height="1"
+      style={{ left: 0, top: 0, overflow: 'visible' }}
     >
       <defs>
         <marker
