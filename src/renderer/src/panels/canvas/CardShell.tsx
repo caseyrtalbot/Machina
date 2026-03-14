@@ -1,8 +1,9 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
 import { colors, borderRadius } from '../../design/tokens'
-import type { CanvasNode } from '@shared/canvas-types'
+import { startConnectionDrag, endConnectionDrag } from './ConnectionDragOverlay'
+import type { CanvasNode, CanvasSide } from '@shared/canvas-types'
 
 interface CardShellProps {
   node: CanvasNode
@@ -17,6 +18,7 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
+  const [hovered, setHovered] = useState(false)
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -45,6 +47,8 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
         boxShadow: isSelected ? `0 0 0 1px ${colors.accent.default}` : 'none'
       }}
       onClick={handleClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {/* Header / drag handle */}
       <div
@@ -55,10 +59,7 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
         }}
         onPointerDown={onDragStart}
       >
-        <span
-          className="text-xs font-medium truncate"
-          style={{ color: colors.text.secondary }}
-        >
+        <span className="text-xs font-medium truncate" style={{ color: colors.text.secondary }}>
           {title}
         </span>
         <button
@@ -92,20 +93,42 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
         style={{ width: 12, height: 12 }}
         onPointerDown={onResizeStart}
       >
-        <svg
-          width={12}
-          height={12}
-          viewBox="0 0 12 12"
-          style={{ color: colors.text.muted }}
-        >
-          <path
-            d="M10 2L2 10M10 6L6 10"
-            stroke="currentColor"
-            strokeWidth="1"
-            opacity="0.5"
-          />
+        <svg width={12} height={12} viewBox="0 0 12 12" style={{ color: colors.text.muted }}>
+          <path d="M10 2L2 10M10 6L6 10" stroke="currentColor" strokeWidth="1" opacity="0.5" />
         </svg>
       </div>
+
+      {/* Anchor dots for edge creation */}
+      {hovered &&
+        (['top', 'right', 'bottom', 'left'] as CanvasSide[]).map((side) => {
+          const style: React.CSSProperties = {
+            position: 'absolute',
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            backgroundColor: colors.accent.default,
+            cursor: 'crosshair',
+            zIndex: 10,
+            ...(side === 'top' && { top: -5, left: '50%', marginLeft: -5 }),
+            ...(side === 'bottom' && { bottom: -5, left: '50%', marginLeft: -5 }),
+            ...(side === 'left' && { left: -5, top: '50%', marginTop: -5 }),
+            ...(side === 'right' && { right: -5, top: '50%', marginTop: -5 })
+          }
+          return (
+            <div
+              key={side}
+              style={style}
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                startConnectionDrag(node.id, side)
+              }}
+              onPointerUp={(e) => {
+                e.stopPropagation()
+                endConnectionDrag(node.id, side)
+              }}
+            />
+          )
+        })}
     </div>
   )
 }

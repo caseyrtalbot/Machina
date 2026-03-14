@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CanvasSurface } from './CanvasSurface'
 import { useCanvasStore } from '../../store/canvas-store'
 import { createCanvasNode } from '@shared/canvas-types'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { TextCard } from './TextCard'
+import { EdgeLayer } from './EdgeLayer'
+import { ConnectionDragOverlay } from './ConnectionDragOverlay'
 
 export function CanvasView() {
   const nodes = useCanvasStore((s) => s.nodes)
@@ -42,15 +44,42 @@ export function CanvasView() {
     [contextMenu, addNode]
   )
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const { selectedEdgeId, removeEdge, selectedNodeIds, removeNode, focusedTerminalId } =
+          useCanvasStore.getState()
+        // Don't delete while editing text or terminal is focused
+        if (focusedTerminalId) return
+        if (document.activeElement?.tagName === 'TEXTAREA') return
+        if (document.activeElement?.tagName === 'INPUT') return
+
+        if (selectedEdgeId) {
+          removeEdge(selectedEdgeId)
+        }
+        if (selectedNodeIds.size > 0) {
+          for (const id of selectedNodeIds) {
+            removeNode(id)
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   return (
     <div className="h-full relative">
       <CanvasSurface onDoubleClick={handleDoubleClick} onBackgroundClick={handleBackgroundClick}>
+        <EdgeLayer />
         {nodes.map((node) => {
           if (node.type === 'text') return <TextCard key={node.id} node={node} />
           // NoteCard and TerminalCard will be added later
           return null
         })}
       </CanvasSurface>
+
+      <ConnectionDragOverlay />
 
       {contextMenu && (
         <CanvasContextMenu
