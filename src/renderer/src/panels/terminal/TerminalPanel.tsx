@@ -10,7 +10,7 @@ import { generateClaudeMd } from '../../engine/claude-md-template'
 import { colors } from '../../design/tokens'
 import 'xterm/css/xterm.css'
 
-const FONT_SIZE_DEFAULT = 13
+const FONT_SIZE_DEFAULT = 12
 const FONT_SIZE_MIN = 8
 const FONT_SIZE_MAX = 28
 
@@ -161,23 +161,31 @@ export function TerminalPanel() {
     }
   }, [removeSession])
 
-  // Auto-fit on resize
+  // Auto-fit on resize (debounced to prevent spurious prompt redraws)
   useEffect(() => {
     const container = activeContainerRef.current
     if (!container) return
 
-    const observer = new ResizeObserver(() => {
-      if (!activeSessionId) return
-      const instance = instancesRef.current.get(activeSessionId)
-      if (!instance) return
+    let timerId: ReturnType<typeof setTimeout> | null = null
 
-      instance.fitAddon.fit()
-      const { cols, rows } = instance.terminal
-      window.api.terminal.resize(activeSessionId, cols, rows)
+    const observer = new ResizeObserver(() => {
+      if (timerId) clearTimeout(timerId)
+      timerId = setTimeout(() => {
+        if (!activeSessionId) return
+        const instance = instancesRef.current.get(activeSessionId)
+        if (!instance) return
+
+        instance.fitAddon.fit()
+        const { cols, rows } = instance.terminal
+        window.api.terminal.resize(activeSessionId, cols, rows)
+      }, 80)
     })
 
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      if (timerId) clearTimeout(timerId)
+      observer.disconnect()
+    }
   }, [activeSessionId])
 
   // Keyboard shortcuts: Cmd+F (search), Cmd+=/ Cmd+- (zoom)

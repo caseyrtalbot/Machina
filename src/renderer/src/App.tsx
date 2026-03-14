@@ -386,7 +386,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
             />
           }
           initialLeftWidth={220}
-          minLeftWidth={180}
+          minLeftWidth={220}
           minRightWidth={580}
         />
       </div>
