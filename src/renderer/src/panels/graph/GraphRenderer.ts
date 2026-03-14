@@ -7,108 +7,36 @@ import {
   type Simulation
 } from 'd3-force'
 import { quadtree, type Quadtree } from 'd3-quadtree'
-import type { GraphNode, RelationshipKind } from '@shared/types'
-import type { HighlightState } from './useGraphHighlight'
+import {
+  GRAPH_PALETTE,
+  LINK_STRENGTH,
+  LARGE_GRAPH_THRESHOLD,
+  DEFAULT_SIM_CONFIG,
+  CULL_MARGIN,
+  LABEL_OFFSET_BELOW,
+  ARROW_SIZE,
+  BOKEH_RADIUS_SCALE,
+  BOKEH_FILL_ALPHA,
+  BOKEH_SHADOW_BLUR,
+  NEIGHBOR_SHADOW_BLUR,
+  FOCAL_SHADOW_BLUR
+} from './graph-config'
+import type { SimNode, SimEdge, SimulationConfig, RenderOptions } from './graph-config'
 
 // ---------------------------------------------------------------------------
-// Core types
+// Render constants (file-local, not extracted)
 // ---------------------------------------------------------------------------
 
-export interface SimNode extends GraphNode {
-  x: number
-  y: number
-  vx?: number
-  vy?: number
-  fx?: number | null
-  fy?: number | null
-  /** Pre-resolved display color (set by panel from group rules). */
-  _color?: string
-}
-
-export interface SimEdge {
-  source: string | SimNode
-  target: string | SimNode
-  kind: RelationshipKind
-}
-
-export interface SimulationConfig {
-  centerForce: number
-  repelForce: number
-  linkForce: number
-  linkDistance: number
-}
-
-// ---------------------------------------------------------------------------
-// Deep Space palette — graph-specific colors independent of app theme
-// ---------------------------------------------------------------------------
-
-export const GRAPH_PALETTE = {
-  canvasBg: '#0a0a12',
-  defaultNote: '#8a8a9e',
-  defaultTag: '#e6a237',
-  defaultAttach: '#6b7280',
-  linkDefault: 'rgba(255, 255, 255, 0.04)',
-  linkActive: '#2dd4bf',
-  linkDimmed: 'rgba(255, 255, 255, 0)',
-  labelColor: 'rgba(255, 255, 255, 0.7)',
-  selectedRing: '#2dd4bf',
-  vignetteEdge: 'rgba(0, 0, 0, 0.4)'
-} as const
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const DEFAULT_SIM_CONFIG: SimulationConfig = {
-  centerForce: 0.05,
-  repelForce: -120,
-  linkForce: 0.7,
-  linkDistance: 50
-}
-
-const LINK_STRENGTH: Record<RelationshipKind, number> = {
-  connection: 0.3,
-  cluster: 0.6,
-  tension: -0.2,
-  appears_in: 0.2,
-  wikilink: 0.15,
-  tag: 0.1
-}
-
-// Render constants
 const LABEL_FONT = '11px Inter, system-ui, sans-serif'
-const LABEL_OFFSET_BELOW = 10
 const SELECTED_RING_WIDTH = 2
-const CULL_MARGIN = 40
-
-// Bokeh constants
-const BOKEH_RADIUS_SCALE = 1.5
-const BOKEH_FILL_ALPHA = 0.08
-const BOKEH_SHADOW_BLUR = 8
 const BOKEH_SHADOW_ALPHA = 0.04
 
-// Glow constants
-const FOCAL_SHADOW_BLUR = 16
-const NEIGHBOR_SHADOW_BLUR = 6
-
-// Arrow constants
-const ARROW_SIZE = 6
-
 // ---------------------------------------------------------------------------
-// Render options
+// Backwards-compatible re-exports (consumers will be updated in a later task)
 // ---------------------------------------------------------------------------
 
-export interface RenderOptions {
-  highlight: HighlightState
-  transform: { x: number; y: number; k: number }
-  canvasWidth: number
-  canvasHeight: number
-  nodeSizeMultiplier: number
-  linkThickness: number
-  textFadeThreshold: number
-  showArrows: boolean
-  searchQuery: string
-}
+export type { SimNode, SimEdge, SimulationConfig, RenderOptions }
+export { GRAPH_PALETTE }
 
 // ---------------------------------------------------------------------------
 // Simulation
@@ -122,7 +50,7 @@ export function createSimulation(
   config: SimulationConfig = DEFAULT_SIM_CONFIG
 ): Simulation<SimNode, SimEdge> {
   const n = nodes.length
-  const isLarge = n > 200
+  const isLarge = n > LARGE_GRAPH_THRESHOLD
   const alphaDecay = isLarge ? 0.04 : 0.02
   const velocityDecay = isLarge ? 0.5 : 0.4
 
