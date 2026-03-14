@@ -22,7 +22,9 @@ import {
   BOKEH_FILL_ALPHA,
   BOKEH_SHADOW_BLUR,
   NEIGHBOR_SHADOW_BLUR,
-  FOCAL_SHADOW_BLUR
+  FOCAL_SHADOW_BLUR,
+  HOVER_SHADOW_BLUR,
+  LINK_AMBIENT_BLUR
 } from './graph-config'
 import type { SimNode, SimEdge, SimulationConfig, RenderOptions } from './graph-config'
 import type { GraphRenderRuntime } from './graph-runtime'
@@ -345,8 +347,11 @@ export function renderGraph(
     // All non-highlighted edges: invisible
     // (spec: "all other links: invisible (alpha 0)")
 
-    // Highlighted edges: teal
-    ctx.globalAlpha = 0.7
+    // Highlighted edges: polished off-white with ambient glow
+    ctx.save()
+    ctx.shadowColor = GRAPH_PALETTE.linkGlow
+    ctx.shadowBlur = LINK_AMBIENT_BLUR
+    ctx.globalAlpha = 1
     ctx.strokeStyle = GRAPH_PALETTE.linkActive
     ctx.lineWidth = 1.5 * linkThickness
     ctx.setLineDash([])
@@ -360,6 +365,7 @@ export function renderGraph(
       ctx.lineTo(target.x, target.y)
     }
     ctx.stroke()
+    ctx.restore()
 
     // Arrowheads for highlighted edges (batched)
     if (showArrows) {
@@ -546,6 +552,22 @@ export function renderGraph(
       focalEntry.node.y - sprite.height / 2
     )
     ctx.globalAlpha = 1
+  }
+
+  // Hover glow micro-interaction (subtle glow on any hovered node)
+  if (hoveredId) {
+    const hoveredEntry = visibleNodes.find((v) => v.node.id === hoveredId)
+    if (hoveredEntry && !hoveredEntry.isDimmed) {
+      const glowColor = hexToRgba(hoveredEntry.color, 0.35)
+      const sprite = runtime.glowCache.get(glowColor, hoveredEntry.r, HOVER_SHADOW_BLUR)
+      ctx.globalAlpha = 0.45
+      ctx.drawImage(
+        sprite.source,
+        hoveredEntry.node.x - sprite.width / 2,
+        hoveredEntry.node.y - sprite.height / 2
+      )
+      ctx.globalAlpha = 1
+    }
   }
 
   // Selected node: teal ring

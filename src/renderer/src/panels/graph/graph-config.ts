@@ -69,7 +69,8 @@ export const GRAPH_PALETTE = {
   defaultTag: '#e6a237',
   defaultAttach: '#6b7280',
   linkDefault: 'rgba(255, 255, 255, 0.04)',
-  linkActive: '#2dd4bf',
+  linkActive: 'rgba(232, 229, 240, 0.8)',
+  linkGlow: 'rgba(210, 208, 220, 0.25)',
   linkDimmed: 'rgba(255, 255, 255, 0)',
   labelColor: 'rgba(255, 255, 255, 0.7)',
   selectedRing: '#2dd4bf',
@@ -115,3 +116,5 @@ export const BOKEH_SHADOW_BLUR = 8
 // Glow constants
 export const NEIGHBOR_SHADOW_BLUR = 6
 export const FOCAL_SHADOW_BLUR = 16
+export const HOVER_SHADOW_BLUR = 10
+export const LINK_AMBIENT_BLUR = 6
