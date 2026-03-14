@@ -61,10 +61,27 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
       if (termContainerRef.current) {
         term.open(termContainerRef.current)
-        fitAddon.fit()
 
+        // Force xterm viewport to fill the container
+        const xtermEl = termContainerRef.current.querySelector('.xterm') as HTMLElement | null
+        if (xtermEl) {
+          xtermEl.style.height = '100%'
+        }
+        const screenEl = termContainerRef.current.querySelector(
+          '.xterm-screen'
+        ) as HTMLElement | null
+        if (screenEl) {
+          screenEl.style.height = '100%'
+        }
+
+        fitAddon.fit()
         const { cols, rows } = term
         window.api.terminal.resize(sessionId!, cols, rows)
+
+        // Re-fit after layout settles (flexbox may not have final dimensions yet)
+        requestAnimationFrame(() => {
+          if (!cancelled) fitAddon.fit()
+        })
       }
 
       term.onData((data) => {

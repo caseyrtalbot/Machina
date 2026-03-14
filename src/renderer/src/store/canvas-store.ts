@@ -27,6 +27,7 @@ interface CanvasStore {
   moveNode: (id: string, position: { x: number; y: number }) => void
   resizeNode: (id: string, size: { width: number; height: number }) => void
   updateNodeContent: (id: string, content: string) => void
+  updateNodeType: (id: string, type: CanvasNode['type']) => void
 
   // Edge mutations
   addEdge: (edge: CanvasEdge) => void
@@ -86,8 +87,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   markSaved: () => set({ isDirty: false }),
 
-  addNode: (node) =>
-    set((s) => ({ nodes: [...s.nodes, node], isDirty: true })),
+  addNode: (node) => set((s) => ({ nodes: [...s.nodes, node], isDirty: true })),
 
   removeNode: (id) =>
     set((s) => ({
@@ -119,8 +119,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       isDirty: true
     })),
 
-  addEdge: (edge) =>
-    set((s) => ({ edges: [...s.edges, edge], isDirty: true })),
+  updateNodeType: (id, type) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) => (n.id === id ? { ...n, type, content: '' } : n)),
+      isDirty: true
+    })),
+
+  addEdge: (edge) => set((s) => ({ edges: [...s.edges, edge], isDirty: true })),
 
   removeEdge: (id) =>
     set((s) => ({

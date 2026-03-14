@@ -7,7 +7,6 @@ import {
   endConnectionDrag,
   isConnectionDragActive
 } from './ConnectionDragOverlay'
-import { createCanvasNode, createCanvasEdge } from '@shared/canvas-types'
 import type { CanvasNode, CanvasSide } from '@shared/canvas-types'
 
 interface CardShellProps {
@@ -58,19 +57,13 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
     [node.id]
   )
 
-  // Spawn a terminal card linked to this one
-  const handleSpawnTerminal = useCallback(
+  // Convert this card into a terminal
+  const handleConvertToTerminal = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
-      const { addNode, addEdge } = useCanvasStore.getState()
-      const termNode = createCanvasNode('terminal', {
-        x: node.position.x + node.size.width + 40,
-        y: node.position.y
-      })
-      addNode(termNode)
-      addEdge(createCanvasEdge(node.id, termNode.id, 'right', 'left'))
+      useCanvasStore.getState().updateNodeType(node.id, 'terminal')
     },
-    [node.id, node.position.x, node.position.y, node.size.width]
+    [node.id]
   )
 
   return (
@@ -108,7 +101,7 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
           {/* Terminal spawn button (not on terminal cards) */}
           {node.type !== 'terminal' && (
             <button
-              onClick={handleSpawnTerminal}
+              onClick={handleConvertToTerminal}
               className="flex items-center justify-center rounded hover:opacity-80"
               style={{ width: 18, height: 18, color: colors.text.muted }}
               aria-label="Open terminal"
@@ -155,14 +148,14 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
         {children}
       </div>
 
-      {/* Resize handle */}
+      {/* Resize handle — z-index ensures it stays above xterm in terminal cards */}
       <div
         className="absolute bottom-0 right-0 cursor-nwse-resize"
-        style={{ width: 12, height: 12 }}
+        style={{ width: 16, height: 16, zIndex: 5 }}
         onPointerDown={onResizeStart}
       >
-        <svg width={12} height={12} viewBox="0 0 12 12" style={{ color: colors.text.muted }}>
-          <path d="M10 2L2 10M10 6L6 10" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+        <svg width={16} height={16} viewBox="0 0 16 16" style={{ color: colors.text.muted }}>
+          <path d="M14 2L2 14M14 8L8 14" stroke="currentColor" strokeWidth="1" opacity="0.5" />
         </svg>
       </div>
 

@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
-import { createCanvasEdge, type CanvasSide, type CanvasNode } from '@shared/canvas-types'
+import {
+  createCanvasEdge,
+  createCanvasNode,
+  type CanvasSide,
+  type CanvasNode
+} from '@shared/canvas-types'
 import { colors } from '../../design/tokens'
 
 interface DragState {
@@ -134,7 +139,42 @@ export function ConnectionDragOverlay() {
       dragRef.current = next
       setDrag(next)
     }
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
+      const drag = dragRef.current
+      if (drag) {
+        // No card caught the drop — create a new text card at cursor position
+        const surface = document.querySelector('[data-canvas-surface]')
+        if (surface) {
+          const surfaceRect = surface.getBoundingClientRect()
+          const { viewport, addNode, addEdge } = useCanvasStore.getState()
+
+          // Screen coords → canvas coords
+          const canvasX = (e.clientX - surfaceRect.left - viewport.x) / viewport.zoom
+          const canvasY = (e.clientY - surfaceRect.top - viewport.y) / viewport.zoom
+
+          const newNode = createCanvasNode('text', {
+            x: canvasX - 130,
+            y: canvasY - 70
+          })
+          addNode(newNode)
+
+          // Connect from source side to opposite side on new card
+          const oppositeSide: Record<CanvasSide, CanvasSide> = {
+            top: 'bottom',
+            bottom: 'top',
+            left: 'right',
+            right: 'left'
+          }
+          addEdge(
+            createCanvasEdge(
+              drag.fromNodeId,
+              newNode.id,
+              drag.fromSide,
+              oppositeSide[drag.fromSide]
+            )
+          )
+        }
+      }
       dragRef.current = null
       setDrag(null)
     }
