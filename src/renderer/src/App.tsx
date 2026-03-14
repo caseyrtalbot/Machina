@@ -218,9 +218,11 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
         }
         case 'delete': {
           await window.api.shell.trashItem(action.path)
-          // If the deleted file was active, close its tab
           const { closeTab: storeCloseTab } = useEditorStore.getState()
           storeCloseTab(action.path)
+          // Remove from file list immediately so the UI updates
+          const current = useVaultStore.getState().files
+          useVaultStore.getState().setFiles(current.filter((f) => f.path !== action.path))
           break
         }
       }
@@ -495,6 +497,8 @@ export default function App() {
     const unsub = window.api.on.fileChanged(async (data) => {
       if (data.event === 'unlink') {
         removeFile(data.path)
+        const currentFiles = useVaultStore.getState().files
+        setFiles(currentFiles.filter((f) => f.path !== data.path))
       } else {
         updateFile(data.path, await window.api.fs.readFile(data.path))
       }
