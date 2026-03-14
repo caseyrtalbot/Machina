@@ -4,9 +4,11 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
-  type Simulation
+  type Simulation,
+  type ForceManyBody,
+  type ForceLink,
+  type ForceCenter
 } from 'd3-force'
-import { quadtree, type Quadtree } from 'd3-quadtree'
 import {
   GRAPH_PALETTE,
   LINK_STRENGTH,
@@ -22,6 +24,7 @@ import {
   FOCAL_SHADOW_BLUR
 } from './graph-config'
 import type { SimNode, SimEdge, SimulationConfig, RenderOptions } from './graph-config'
+import type { GraphRenderRuntime } from './graph-runtime'
 
 // ---------------------------------------------------------------------------
 // Render constants (file-local, not extracted)
@@ -37,6 +40,13 @@ const BOKEH_SHADOW_ALPHA = 0.04
 
 export type { SimNode, SimEdge, SimulationConfig, RenderOptions }
 export { GRAPH_PALETTE }
+
+// ---------------------------------------------------------------------------
+// Memoized color utility caches (pure function caches, deterministic)
+// ---------------------------------------------------------------------------
+
+const hexToRgbaCache = new Map<string, string>()
+const lightenHexCache = new Map<string, string>()
 
 // ---------------------------------------------------------------------------
 // Simulation
@@ -77,11 +87,31 @@ export function createSimulation(
 }
 
 // ---------------------------------------------------------------------------
-// Node radius: sqrt(inbound links), min 3px, max 16px
-// Tag nodes are 0.7× the note size
+// Update simulation forces (hot-path for settings changes)
 // ---------------------------------------------------------------------------
 
-function computeNodeRadius(node: SimNode, multiplier: number = 1): number {
+export function updateSimulationForces(
+  sim: Simulation<SimNode, SimEdge>,
+  config: SimulationConfig
+): void {
+  const charge = sim.force('charge') as ForceManyBody<SimNode> | undefined
+  if (charge) charge.strength(config.repelForce)
+  const link = sim.force('link') as ForceLink<SimNode, SimEdge> | undefined
+  if (link) {
+    link.strength((d: SimEdge) => Math.abs(LINK_STRENGTH[d.kind]) * config.linkForce)
+    link.distance(config.linkDistance)
+  }
+  const center = sim.force('center') as ForceCenter<SimNode> | undefined
+  if (center) center.strength(config.centerForce)
+  sim.alpha(0.3).restart()
+}
+
+// ---------------------------------------------------------------------------
+// Node radius: sqrt(inbound links), min 3px, max 16px
+// Tag nodes are 0.7x the note size
+// ---------------------------------------------------------------------------
+
+export function computeNodeRadius(node: SimNode, multiplier: number = 1): number {
   const base = Math.min(16, Math.max(3, Math.sqrt(Math.max(1, node.connectionCount)) * 3))
   const typeScale = node.type === 'tag' ? 0.7 : 1
   return base * typeScale * multiplier
@@ -91,7 +121,7 @@ function computeNodeRadius(node: SimNode, multiplier: number = 1): number {
 // Node color: resolved from _color (group rule) or defaults
 // ---------------------------------------------------------------------------
 
-function getNodeColor(node: SimNode): string {
+export function resolveNodeColor(node: SimNode): string {
   if (node._color) return node._color
   if (node.type === 'tag') return GRAPH_PALETTE.defaultTag
   if (node.type === 'attachment') return GRAPH_PALETTE.defaultAttach
@@ -99,24 +129,42 @@ function getNodeColor(node: SimNode): string {
 }
 
 // ---------------------------------------------------------------------------
-// Color utilities
+// Color utilities (memoized)
 // ---------------------------------------------------------------------------
 
 function hexToRgba(hex: string, alpha: number): string {
+  const key = `${hex}:${alpha}`
+  const cached = hexToRgbaCache.get(key)
+  if (cached !== undefined) return cached
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  const result = `rgba(${r}, ${g}, ${b}, ${alpha})`
+  hexToRgbaCache.set(key, result)
+  return result
 }
 
 function lightenHex(hex: string, factor: number): string {
+  const key = `${hex}:${factor}`
+  const cached = lightenHexCache.get(key)
+  if (cached !== undefined) return cached
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   const lr = Math.min(255, Math.round(r + (255 - r) * factor))
   const lg = Math.min(255, Math.round(g + (255 - g) * factor))
   const lb = Math.min(255, Math.round(b + (255 - b) * factor))
-  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
+  const result = `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
+  lightenHexCache.set(key, result)
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Coordinate guard
+// ---------------------------------------------------------------------------
+
+function hasValidCoords(node: SimNode): boolean {
+  return Number.isFinite(node.x) && Number.isFinite(node.y)
 }
 
 // ---------------------------------------------------------------------------
@@ -168,14 +216,13 @@ function isEdgeConnected(edge: SimEdge, connectedSet: ReadonlySet<string>): bool
 // Vignette (screen-space post-effect)
 // ---------------------------------------------------------------------------
 
-export function renderVignette(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  const cx = w / 2
-  const cy = h / 2
-  const radius = Math.sqrt(cx * cx + cy * cy)
-  const gradient = ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius)
-  gradient.addColorStop(0, 'transparent')
-  gradient.addColorStop(1, GRAPH_PALETTE.vignetteEdge)
-  ctx.fillStyle = gradient
+export function renderVignette(
+  ctx: CanvasRenderingContext2D,
+  runtime: GraphRenderRuntime,
+  w: number,
+  h: number
+): void {
+  ctx.fillStyle = runtime.getVignetteGradient(ctx, w, h)
   ctx.fillRect(0, 0, w, h)
 }
 
@@ -223,10 +270,10 @@ function drawNodeShape(
 }
 
 // ---------------------------------------------------------------------------
-// Arrowhead
+// Arrowhead: trace only (no beginPath/closePath/fill per arrow)
 // ---------------------------------------------------------------------------
 
-function drawArrowhead(
+function traceArrowhead(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
@@ -244,7 +291,6 @@ function drawArrowhead(
   const tipX = tx - ux * targetRadius
   const tipY = ty - uy * targetRadius
 
-  ctx.beginPath()
   ctx.moveTo(tipX, tipY)
   ctx.lineTo(
     tipX - ux * ARROW_SIZE + uy * ARROW_SIZE * 0.4,
@@ -254,8 +300,7 @@ function drawArrowhead(
     tipX - ux * ARROW_SIZE - uy * ARROW_SIZE * 0.4,
     tipY - uy * ARROW_SIZE + ux * ARROW_SIZE * 0.4
   )
-  ctx.closePath()
-  ctx.fill()
+  ctx.lineTo(tipX, tipY)
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +309,7 @@ function drawArrowhead(
 
 export function renderGraph(
   ctx: CanvasRenderingContext2D,
+  runtime: GraphRenderRuntime,
   nodes: readonly SimNode[],
   edges: readonly SimEdge[],
   _width: number,
@@ -306,24 +352,26 @@ export function renderGraph(
     for (const edge of edges) {
       const source = edge.source as SimNode
       const target = edge.target as SimNode
-      if (!source.x || !target.x) continue
+      if (!hasValidCoords(source) || !hasValidCoords(target)) continue
       if (!isEdgeConnected(edge, connectedSet)) continue
       ctx.moveTo(source.x, source.y)
       ctx.lineTo(target.x, target.y)
     }
     ctx.stroke()
 
-    // Arrowheads for highlighted edges
+    // Arrowheads for highlighted edges (batched)
     if (showArrows) {
       ctx.fillStyle = GRAPH_PALETTE.linkActive
+      ctx.beginPath()
       for (const edge of edges) {
         const source = edge.source as SimNode
         const target = edge.target as SimNode
-        if (!source.x || !target.x) continue
+        if (!hasValidCoords(source) || !hasValidCoords(target)) continue
         if (!isEdgeConnected(edge, connectedSet)) continue
         const tr = computeNodeRadius(target, multiplier)
-        drawArrowhead(ctx, source.x, source.y, target.x, target.y, tr)
+        traceArrowhead(ctx, source.x, source.y, target.x, target.y, tr)
       }
+      ctx.fill()
     }
   } else {
     // Normal mode: gossamer threads
@@ -335,22 +383,24 @@ export function renderGraph(
     for (const edge of edges) {
       const source = edge.source as SimNode
       const target = edge.target as SimNode
-      if (!source.x || !target.x) continue
+      if (!hasValidCoords(source) || !hasValidCoords(target)) continue
       ctx.moveTo(source.x, source.y)
       ctx.lineTo(target.x, target.y)
     }
     ctx.stroke()
 
-    // Arrowheads for normal mode
+    // Arrowheads for normal mode (batched)
     if (showArrows) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.04)'
+      ctx.beginPath()
       for (const edge of edges) {
         const source = edge.source as SimNode
         const target = edge.target as SimNode
-        if (!source.x || !target.x) continue
+        if (!hasValidCoords(source) || !hasValidCoords(target)) continue
         const tr = computeNodeRadius(target, multiplier)
-        drawArrowhead(ctx, source.x, source.y, target.x, target.y, tr)
+        traceArrowhead(ctx, source.x, source.y, target.x, target.y, tr)
       }
+      ctx.fill()
     }
   }
   ctx.setLineDash([])
@@ -373,7 +423,7 @@ export function renderGraph(
   const visibleNodes: VisibleNode[] = []
 
   for (const node of nodes) {
-    if (!node.x || !node.y) continue
+    if (!hasValidCoords(node)) continue
     if (!isNodeInView(node, cullBounds)) continue
 
     const isFocal = node.id === focusedNodeId
@@ -381,13 +431,13 @@ export function renderGraph(
     const isDimmed = highlightActive && !isFocal && !isNeighbor
     const matchesSearch = !searchQuery || node.title.toLowerCase().includes(searchQuery)
     const r = computeNodeRadius(node, multiplier)
-    const color = getNodeColor(node)
+    const color = resolveNodeColor(node)
 
     visibleNodes.push({ node, r, color, isFocal, isNeighbor, isDimmed, matchesSearch })
   }
 
   // -----------------------------------------------------------------------
-  // Stage 3: BOKEH pass — dimmed/defocused nodes
+  // Stage 3: BOKEH pass -- dimmed/defocused nodes (glow sprites)
   // -----------------------------------------------------------------------
 
   if (highlightActive) {
@@ -401,25 +451,36 @@ export function renderGraph(
     }
 
     for (const [color, group] of bokehByColor) {
-      ctx.fillStyle = hexToRgba(color, BOKEH_FILL_ALPHA)
-      ctx.shadowColor = hexToRgba(color, BOKEH_SHADOW_ALPHA)
-      ctx.shadowBlur = BOKEH_SHADOW_BLUR
-      ctx.strokeStyle = 'transparent'
+      const bokehColor = hexToRgba(color, BOKEH_FILL_ALPHA)
+      const sprite = runtime.glowCache.get(bokehColor, 8, BOKEH_SHADOW_BLUR)
 
       for (const vn of group) {
-        // Bokeh: always circles, radius × 1.5, no stroke, no label
+        const bokehR = vn.r * BOKEH_RADIUS_SCALE
+        const scale = (bokehR * 2 + BOKEH_SHADOW_BLUR * 2) / sprite.width
+        ctx.globalAlpha = BOKEH_SHADOW_ALPHA
+        ctx.drawImage(
+          sprite.source,
+          vn.node.x - (sprite.width * scale) / 2,
+          vn.node.y - (sprite.height * scale) / 2,
+          sprite.width * scale,
+          sprite.height * scale
+        )
+      }
+
+      // Also draw the actual bokeh circles (fill only, no stroke)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = hexToRgba(color, BOKEH_FILL_ALPHA)
+      for (const vn of group) {
         ctx.beginPath()
         ctx.arc(vn.node.x, vn.node.y, vn.r * BOKEH_RADIUS_SCALE, 0, Math.PI * 2)
         ctx.fill()
       }
     }
-
-    ctx.shadowColor = 'transparent'
-    ctx.shadowBlur = 0
   }
+  ctx.globalAlpha = 1
 
   // -----------------------------------------------------------------------
-  // Stage 4: BRIGHT pass — focal + neighbor nodes
+  // Stage 4: BRIGHT pass -- focal + neighbor nodes
   // -----------------------------------------------------------------------
 
   // Group bright nodes by color for batched fills
@@ -447,30 +508,34 @@ export function renderGraph(
   }
   ctx.globalAlpha = 1
 
-  // Neighbor glow (subtle)
+  // Neighbor glow (glow sprite)
   if (highlightActive) {
     for (const vn of visibleNodes) {
       if (!vn.isNeighbor) continue
-      ctx.shadowColor = hexToRgba(vn.color, 0.6)
-      ctx.shadowBlur = NEIGHBOR_SHADOW_BLUR
-      ctx.fillStyle = vn.color
-      drawNodeShape(ctx, vn.node, vn.node.x, vn.node.y, vn.r)
-      ctx.fill()
+      const glowColor = hexToRgba(vn.color, 0.6)
+      const sprite = runtime.glowCache.get(glowColor, vn.r, NEIGHBOR_SHADOW_BLUR)
+      ctx.globalAlpha = 0.6
+      ctx.drawImage(
+        sprite.source,
+        vn.node.x - sprite.width / 2,
+        vn.node.y - sprite.height / 2
+      )
     }
-    ctx.shadowColor = 'transparent'
-    ctx.shadowBlur = 0
+    ctx.globalAlpha = 1
   }
 
-  // Focal node glow (strong)
+  // Focal node glow (glow sprite)
   const focalEntry = visibleNodes.find((v) => v.isFocal)
   if (focalEntry) {
-    ctx.shadowColor = hexToRgba(focalEntry.color, 0.6)
-    ctx.shadowBlur = FOCAL_SHADOW_BLUR
-    ctx.fillStyle = focalEntry.color
-    drawNodeShape(ctx, focalEntry.node, focalEntry.node.x, focalEntry.node.y, focalEntry.r)
-    ctx.fill()
-    ctx.shadowColor = 'transparent'
-    ctx.shadowBlur = 0
+    const glowColor = hexToRgba(focalEntry.color, 0.6)
+    const sprite = runtime.glowCache.get(glowColor, focalEntry.r, FOCAL_SHADOW_BLUR)
+    ctx.globalAlpha = 0.6
+    ctx.drawImage(
+      sprite.source,
+      focalEntry.node.x - sprite.width / 2,
+      focalEntry.node.y - sprite.height / 2
+    )
+    ctx.globalAlpha = 1
   }
 
   // Selected node: teal ring
@@ -488,7 +553,29 @@ export function renderGraph(
   ctx.globalAlpha = 1
 
   // -----------------------------------------------------------------------
-  // Stage 5: LABELS — drawn BELOW node center
+  // Stage 4b: Retained exit overlay
+  // -----------------------------------------------------------------------
+
+  runtime.pruneCompletedExits()
+  if (runtime.retainedExits.size > 0) {
+    const now = performance.now()
+    for (const [, exit] of runtime.retainedExits) {
+      const elapsed = now - exit.startTime
+      const t = Math.min(1, elapsed / exit.duration)
+      const opacity = 1 - t
+      const scale = 1 - 0.5 * t
+      if (opacity <= 0) continue
+      ctx.globalAlpha = opacity
+      const r = computeNodeRadius(exit.node, options.nodeSizeMultiplier) * scale
+      ctx.fillStyle = resolveNodeColor(exit.node)
+      drawNodeShape(ctx, exit.node, exit.node.x, exit.node.y, r)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // -----------------------------------------------------------------------
+  // Stage 5: LABELS -- drawn BELOW node center
   // -----------------------------------------------------------------------
 
   ctx.font = LABEL_FONT
@@ -532,68 +619,4 @@ export function renderGraph(
   }
 
   return duration
-}
-
-// ---------------------------------------------------------------------------
-// Quadtree-based hit testing
-// ---------------------------------------------------------------------------
-
-let nodeQuadtree: Quadtree<SimNode> | null = null
-
-/** Rebuild the quadtree from current node positions. Call each frame. */
-export function updateQuadtree(nodes: readonly SimNode[]): void {
-  nodeQuadtree = quadtree<SimNode>()
-    .x((d) => d.x)
-    .y((d) => d.y)
-    .addAll(nodes.filter((n) => n.x && n.y) as SimNode[])
-}
-
-/** Find nearest node within generous hit radius using quadtree. */
-export function findNodeAt(
-  nodes: readonly SimNode[],
-  x: number,
-  y: number,
-  multiplier: number = 1
-): SimNode | null {
-  // Rebuild quadtree if stale (fallback: always rebuild, ~0.1ms for 500 nodes)
-  if (!nodeQuadtree || nodeQuadtree.size() !== nodes.filter((n) => n.x && n.y).length) {
-    updateQuadtree(nodes)
-  }
-  if (!nodeQuadtree) return null
-
-  let closest: SimNode | null = null
-  let closestDist = Infinity
-
-  // Search within a generous radius (max node size + padding)
-  const searchRadius = 24 * multiplier
-  const x0 = x - searchRadius
-  const y0 = y - searchRadius
-  const x1 = x + searchRadius
-  const y1 = y + searchRadius
-
-  nodeQuadtree.visit((quadNode, qx0, qy0, qx1, qy1) => {
-    if (!quadNode.length) {
-      // Leaf node — check each point in this cell
-      let current: typeof quadNode | undefined = quadNode
-      do {
-        const d = current.data
-        const r = computeNodeRadius(d, multiplier) + 8 // generous hit area
-        const dx = x - d.x
-        const dy = y - d.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-
-        if (dist < r && dist < closestDist) {
-          closest = d
-          closestDist = dist
-        }
-
-        current = current.next
-      } while (current)
-    }
-
-    // Prune branches outside the search area
-    return qx0 > x1 || qy0 > y1 || qx1 < x0 || qy1 < y0
-  })
-
-  return closest
 }
