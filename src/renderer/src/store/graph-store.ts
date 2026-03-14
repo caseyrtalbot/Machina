@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ArtifactType, Signal } from '@shared/types'
 
-type ContentView = 'editor' | 'graph' | 'skills'
+type ContentView = 'editor' | 'graph' | 'skills' | 'canvas'
 
 interface GraphStore {
   contentView: ContentView

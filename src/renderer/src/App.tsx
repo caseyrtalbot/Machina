@@ -7,6 +7,7 @@ import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
 import { GraphPanel } from './panels/graph/GraphPanel'
 import { SkillsPanel } from './panels/skills/SkillsPanel'
+import { CanvasView } from './panels/canvas/CanvasView'
 import { ActivityBar } from './components/ActivityBar'
 import { TerminalPanel } from './panels/terminal/TerminalPanel'
 import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
@@ -47,6 +48,7 @@ function ContentArea() {
     <div className="h-full panel-card">
       {contentView === 'graph' && <GraphPanel onNodeClick={handleNodeClick} />}
       {contentView === 'editor' && <EditorPanel onNavigate={handleNavigate} />}
+      {contentView === 'canvas' && <CanvasView />}
       {contentView === 'skills' && <SkillsPanel />}
     </div>
   )
@@ -273,7 +275,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
   const toggleView = useCallback(() => {
     if (contentView === 'editor') setContentView('graph')
-    else if (contentView === 'graph') setContentView('skills')
+    else if (contentView === 'graph') setContentView('canvas')
+    else if (contentView === 'canvas') setContentView('skills')
     else setContentView('editor')
   }, [contentView, setContentView])
 
@@ -441,7 +444,7 @@ export default function App() {
         if (state.contentView)
           useGraphStore
             .getState()
-            .setContentView(state.contentView as 'editor' | 'graph' | 'skills')
+            .setContentView(state.contentView as 'editor' | 'graph' | 'skills' | 'canvas')
         if (state.selectedNodeId) useGraphStore.getState().setSelectedNode(state.selectedNodeId)
         if (state.lastOpenNote)
           useEditorStore.getState().setActiveNote(state.lastOpenNote, state.lastOpenNote)

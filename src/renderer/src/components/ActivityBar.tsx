@@ -1,7 +1,7 @@
 import { useGraphStore } from '../store/graph-store'
 import { colors } from '../design/tokens'
 
-type ContentView = 'editor' | 'graph' | 'skills'
+type ContentView = 'editor' | 'graph' | 'skills' | 'canvas'
 
 interface ActivityItem {
   view: ContentView
@@ -12,7 +12,16 @@ interface ActivityItem {
 const ICON_SIZE = 20
 
 const EditorIcon = (
-  <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={ICON_SIZE}
+    height={ICON_SIZE}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
     <line x1="8" y1="13" x2="16" y2="13" />
@@ -21,7 +30,16 @@ const EditorIcon = (
 )
 
 const GraphIcon = (
-  <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={ICON_SIZE}
+    height={ICON_SIZE}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="6" cy="6" r="2.5" />
     <circle cx="18" cy="8" r="2.5" />
     <circle cx="8" cy="18" r="2.5" />
@@ -33,15 +51,43 @@ const GraphIcon = (
 )
 
 const SkillsIcon = (
-  <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={ICON_SIZE}
+    height={ICON_SIZE}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <polyline points="4 17 10 11 4 5" />
     <line x1="12" y1="19" x2="20" y2="19" />
+  </svg>
+)
+
+const CanvasIcon = (
+  <svg
+    width={ICON_SIZE}
+    height={ICON_SIZE}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="7" height="5" rx="1" />
+    <rect x="14" y="16" width="7" height="5" rx="1" />
+    <path d="M10 5.5h4a2 2 0 0 1 2 2v4" />
+    <path d="M14 18.5h-4a2 2 0 0 1-2-2v-4" />
   </svg>
 )
 
 const ITEMS: ActivityItem[] = [
   { view: 'editor', label: 'Editor', icon: EditorIcon },
   { view: 'graph', label: 'Graph', icon: GraphIcon },
+  { view: 'canvas', label: 'Canvas', icon: CanvasIcon },
   { view: 'skills', label: 'Skills', icon: SkillsIcon }
 ]
 
