@@ -13,6 +13,7 @@ import { TerminalPanel } from './panels/terminal/TerminalPanel'
 import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
 import { useKeyboard } from './hooks/useKeyboard'
+import { useCanvasFilePaths, useCanvasConnectionCounts } from './hooks/useCanvasAwareness'
 import { useVaultStore } from './store/vault-store'
 import { useEditorStore, flushPendingSave } from './store/editor-store'
 import { useGraphStore } from './store/graph-store'
@@ -122,6 +123,9 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
     }
     return map
   }, [artifacts, fileToId])
+
+  const onCanvasPaths = useCanvasFilePaths()
+  const canvasConnectionCounts = useCanvasConnectionCounts(onCanvasPaths)
 
   const openTab = useEditorStore((s) => s.openTab)
 
@@ -245,6 +249,8 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
       activeFilePath={activeNotePath}
       collapsedPaths={searchQuery.trim() ? EMPTY_SET : collapsedPaths}
       artifactTypes={artifactTypes}
+      onCanvasPaths={onCanvasPaths}
+      canvasConnectionCounts={canvasConnectionCounts}
       sortMode={sortMode}
       onSearch={handleSearch}
       onWorkspaceSelect={setActiveWorkspace}
@@ -279,6 +285,7 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
 function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showTerminal, setShowTerminal] = useState(false)
   const files = useVaultStore((s) => s.files)
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const contentView = useGraphStore((s) => s.contentView)
@@ -311,10 +318,15 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
     if (path) storeCloseTab(path)
   }, [])
 
+  const toggleTerminal = useCallback(() => {
+    setShowTerminal((prev) => !prev)
+  }, [])
+
   useKeyboard({
     onCommandPalette: () => setPaletteOpen(true),
     onCycleView: toggleView,
     onToggleSourceMode: toggleSourceMode,
+    onToggleTerminal: toggleTerminal,
     onCloseTab: handleCloseTab,
     onEscape: () => setPaletteOpen(false)
   })
@@ -340,6 +352,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         toggleView()
       } else if (item.id === 'cmd:toggle-mode') {
         toggleSourceMode()
+      } else if (item.id === 'cmd:toggle-terminal') {
+        toggleTerminal()
       } else if (item.id === 'cmd:open-settings') {
         setSettingsOpen(true)
       } else if (item.id === 'cmd:reindex-vault') {
@@ -357,7 +371,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         }
       }
     },
-    [setContentView, toggleView, toggleSourceMode, setSettingsOpen, vaultPath]
+    [setContentView, toggleView, toggleSourceMode, toggleTerminal, setSettingsOpen, vaultPath]
   )
 
   return (
@@ -366,7 +380,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       style={{ backgroundColor: colors.bg.base, color: colors.text.primary }}
     >
       <Titlebar vaultName={vaultName} onOpenSettings={() => setSettingsOpen(true)} />
-      <div className="flex-1 overflow-hidden flex" style={{ padding: 'var(--panel-gap)' }}>
+      <div className="flex-1 overflow-hidden flex">
         <ActivityBar />
         <SplitPane
           left={
@@ -377,27 +391,33 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
             </div>
           }
           right={
-            <SplitPane
-              left={
-                <PanelErrorBoundary name="Content">
-                  <ContentArea />
-                </PanelErrorBoundary>
-              }
-              right={
-                <div className="panel-card h-full">
-                  <PanelErrorBoundary name="Terminal">
-                    <TerminalPanel />
+            showTerminal ? (
+              <SplitPane
+                left={
+                  <PanelErrorBoundary name="Content">
+                    <ContentArea />
                   </PanelErrorBoundary>
-                </div>
-              }
-              initialLeftWidth={480}
-              minLeftWidth={280}
-              minRightWidth={300}
-            />
+                }
+                right={
+                  <div className="panel-card h-full">
+                    <PanelErrorBoundary name="Terminal">
+                      <TerminalPanel />
+                    </PanelErrorBoundary>
+                  </div>
+                }
+                initialLeftWidth={480}
+                minLeftWidth={280}
+                minRightWidth={300}
+              />
+            ) : (
+              <PanelErrorBoundary name="Content">
+                <ContentArea />
+              </PanelErrorBoundary>
+            )
           }
           initialLeftWidth={220}
           minLeftWidth={220}
-          minRightWidth={580}
+          minRightWidth={showTerminal ? 580 : 280}
         />
       </div>
       <StatusBar />

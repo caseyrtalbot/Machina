@@ -9,6 +9,8 @@ export interface FileTreeProps {
   activeFilePath: string | null
   collapsedPaths: Set<string>
   artifactTypes?: Map<string, ArtifactType>
+  onCanvasPaths?: ReadonlySet<string>
+  canvasConnectionCounts?: ReadonlyMap<string, number>
   onFileSelect: (path: string) => void
   onToggleDirectory: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string, isDirectory: boolean) => void
@@ -76,6 +78,8 @@ export function FileTree({
   activeFilePath,
   collapsedPaths,
   artifactTypes,
+  onCanvasPaths,
+  canvasConnectionCounts,
   onFileSelect,
   onToggleDirectory,
   onContextMenu,
@@ -105,6 +109,8 @@ export function FileTree({
             node={node}
             isActive={node.path === activeFilePath}
             artifactType={artifactTypes?.get(node.path)}
+            isOnCanvas={onCanvasPaths?.has(node.path) ?? false}
+            canvasConnectionCount={canvasConnectionCounts?.get(node.path) ?? 0}
             onFileSelect={onFileSelect}
             onContextMenu={onContextMenu}
             isRenaming={renamingPath === node.path}
@@ -188,6 +194,8 @@ function FileRow({
   node,
   isActive,
   artifactType,
+  isOnCanvas,
+  canvasConnectionCount,
   onFileSelect,
   onContextMenu,
   isRenaming,
@@ -197,6 +205,8 @@ function FileRow({
   node: FlatTreeNode
   isActive: boolean
   artifactType?: ArtifactType
+  isOnCanvas: boolean
+  canvasConnectionCount: number
   onFileSelect: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string, isDirectory: boolean) => void
   isRenaming?: boolean
@@ -205,6 +215,11 @@ function FileRow({
 }) {
   // Files get extra left padding to align past the chevron space of their parent
   const paddingLeft = 8 + node.depth * 16 + 20
+
+  // Canvas ring: inner gap (surface) + accent ring + soft glow
+  const canvasRingShadow = isOnCanvas
+    ? `0 0 0 2px ${colors.bg.surface}, 0 0 0 3.5px ${colors.accent.default}, 0 0 6px ${colors.accent.muted}`
+    : undefined
 
   return (
     <div
@@ -245,13 +260,27 @@ function FileRow({
         if (!isActive) e.currentTarget.style.backgroundColor = ''
       }}
     >
-      {artifactType && (
+      {artifactType ? (
         <span
           className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
-          style={{ backgroundColor: getArtifactColor(artifactType) }}
-          title={artifactType ?? 'note'}
+          style={{
+            backgroundColor: getArtifactColor(artifactType),
+            boxShadow: canvasRingShadow,
+            transition: 'box-shadow 150ms ease-out'
+          }}
+          title={artifactType}
         />
-      )}
+      ) : isOnCanvas ? (
+        <span
+          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+          style={{
+            backgroundColor: colors.accent.default,
+            boxShadow: canvasRingShadow,
+            transition: 'box-shadow 150ms ease-out'
+          }}
+          title="on canvas"
+        />
+      ) : null}
       {isRenaming ? (
         <RenameInput
           initialValue={node.name}
@@ -260,6 +289,19 @@ function FileRow({
         />
       ) : (
         <span className="truncate flex-1">{displayName(node.name)}</span>
+      )}
+      {canvasConnectionCount >= 2 && (
+        <span
+          className="ml-auto flex-shrink-0"
+          style={{
+            color: colors.accent.default,
+            opacity: 0.6,
+            fontSize: 10,
+            fontVariantNumeric: 'tabular-nums'
+          }}
+        >
+          {canvasConnectionCount}
+        </span>
       )}
     </div>
   )
