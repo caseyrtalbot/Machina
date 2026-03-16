@@ -24,13 +24,13 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
     })
   }
 
-  // Build title resolution index for wikilinks: normalized title -> artifact ID
+  // Build title resolution index for concept nodes: normalized title -> artifact ID
   const titleToId = new Map<string, string>()
   for (const a of artifacts) {
     const key = a.title.toLowerCase()
     if (titleToId.has(key)) {
       console.warn(
-        `[graph-builder] Duplicate title "${a.title}" (ids: ${titleToId.get(key)}, ${a.id}). Wikilinks will resolve to the last-seen.`
+        `[graph-builder] Duplicate title "${a.title}" (ids: ${titleToId.get(key)}, ${a.id}). Concept links will resolve to the last-seen.`
       )
     }
     titleToId.set(key, a.id)
@@ -84,29 +84,29 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
     for (const id of a.appears_in) addEdge(a.id, id, 'appears_in')
   }
 
-  // Build edges from wikilinks in body text
+  // Build edges from concept nodes in body text
   for (const a of artifacts) {
-    for (const target of a.wikilinks) {
+    for (const target of a.concepts) {
       const resolvedId = titleToId.get(target.toLowerCase())
       if (resolvedId) {
         // Skip self-links
         if (resolvedId === a.id) continue
         // Skip if explicit frontmatter edge already exists between these nodes
         if (hasExplicitEdge(a.id, resolvedId)) continue
-        addEdge(a.id, resolvedId, 'wikilink')
+        addEdge(a.id, resolvedId, 'concept')
       } else {
-        // Ghost node: use normalized target as ID
-        const ghostId = `ghost:${target}`
+        // Ghost node: normalize ID by lowercase for case-insensitive dedup
+        const ghostId = `ghost:${target.toLowerCase()}`
         if (!nodes.has(ghostId)) {
           nodes.set(ghostId, {
             id: ghostId,
             title: target,
-            type: 'note',
+            type: 'concept',
             signal: 'untested',
             connectionCount: 0
           })
         }
-        addEdge(a.id, ghostId, 'wikilink')
+        addEdge(a.id, ghostId, 'concept')
       }
     }
   }

@@ -3,7 +3,7 @@ import type { Artifact } from '@shared/types'
 import { getArtifactColor, colors, transitions } from '../../design/tokens'
 
 /**
- * Finds the line containing targetId (or a [[targetTitle]] wikilink) in body
+ * Finds the line containing targetId (or a `<node>targetTitle</node>` concept tag) in body
  * and returns a 100-character window centered around the match.
  * Returns an empty string when not found.
  */
@@ -11,18 +11,19 @@ export function extractContext(body: string, targetId: string, targetTitle?: str
   let matchIndex = body.indexOf(targetId)
   let matchLength = targetId.length
 
-  // Fallback: search for [[title]] wikilink form when ID isn't in body text
+  // Fallback: search for <node>title</node> concept node when ID isn't in body text
   if (matchIndex === -1 && targetTitle) {
-    const wikilinkForm = `[[${targetTitle}]]`
-    matchIndex = body.indexOf(wikilinkForm)
-    matchLength = wikilinkForm.length
-    // Also try [[title|display]] pattern
+    const conceptForm = `<node>${targetTitle}</node>`
+    matchIndex = body.indexOf(conceptForm)
+    matchLength = conceptForm.length
+    // Case-insensitive fallback
     if (matchIndex === -1) {
-      const wikilinkPrefix = `[[${targetTitle}|`
-      matchIndex = body.indexOf(wikilinkPrefix)
+      const lower = targetTitle.toLowerCase()
+      const bodyLower = body.toLowerCase()
+      const conceptLower = `<node>${lower}</node>`
+      matchIndex = bodyLower.indexOf(conceptLower)
       if (matchIndex !== -1) {
-        const closeIdx = body.indexOf(']]', matchIndex)
-        matchLength = closeIdx !== -1 ? closeIdx + 2 - matchIndex : wikilinkPrefix.length
+        matchLength = conceptLower.length
       }
     }
   }

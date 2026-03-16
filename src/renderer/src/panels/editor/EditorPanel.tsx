@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useEditor } from '@tiptap/react'
+import type { EditorView } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import TaskList from '@tiptap/extension-task-list'
@@ -14,7 +15,9 @@ import { FrontmatterHeader } from './FrontmatterHeader'
 import { BacklinksPanel } from './BacklinksPanel'
 import { RichEditor } from './RichEditor'
 import { SourceEditor } from './SourceEditor'
-import { parseFrontmatter, preprocessWikilinks, postprocessWikilinks } from './markdown-utils'
+import { parseFrontmatter, migrateLegacyWikilinks } from './markdown-utils'
+import { ConceptNodeMark } from './extensions/concept-node-mark'
+import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
 import { colors } from '../../design/tokens'
 
 interface EditorPanelProps {
@@ -46,7 +49,6 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const canGoForward = historyIndex < historyStack.length - 1
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
-  const files = useVaultStore((s) => s.files)
   const artifact = useVaultStore((s) =>
     activeNoteId ? (s.artifacts.find((a) => a.id === activeNoteId) ?? null) : null
   )
@@ -63,11 +65,16 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   // Frontmatter: raw string preserved for lossless round-tripping (ref),
   // parsed data stored as state so changes trigger re-render for the properties panel
   const frontmatterRawRef = useRef('')
-  // Ref for wikilink navigation so the Tiptap click handler always uses the latest function
-  const resolveAndNavigateRef = useRef((_target: string) => {})
   const [frontmatterData, setFrontmatterData] = useState<
     Readonly<Record<string, string | readonly string[]>>
   >({})
+
+  // Context menu state for concept node linking
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    actions: ContextMenuAction[]
+  } | null>(null)
 
   // Build Tiptap extensions
   const extensions = useMemo(
@@ -76,7 +83,8 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       Markdown,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Link.configure({ openOnClick: false, HTMLAttributes: { rel: null, target: null } })
+      Link.configure({ openOnClick: false, HTMLAttributes: { rel: null, target: null } }),
+      ConceptNodeMark
     ],
     []
   )
@@ -87,7 +95,6 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       const manager = ed.storage.markdown?.manager
       if (manager) {
         let markdown = manager.serialize(ed.getJSON())
-        markdown = postprocessWikilinks(markdown)
         // Re-prepend original frontmatter for lossless round-tripping
         const rawFm = frontmatterRawRef.current
         if (rawFm) {
@@ -114,6 +121,44 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     [setCursorPosition]
   )
 
+  // Right-click handler: show context menu for concept node linking
+  const handleContextMenu = useCallback((view: EditorView, event: MouseEvent) => {
+    const { from, to, empty } = view.state.selection
+    if (empty) return false
+
+    // Guard: only allow single-paragraph (single-block) selections
+    const $from = view.state.doc.resolve(from)
+    const $to = view.state.doc.resolve(to)
+    if ($from.depth < 1 || $from.node(1) !== $to.node(1)) return false
+
+    event.preventDefault()
+
+    const hasConceptMark = view.state.doc.rangeHasMark(
+      from,
+      to,
+      view.state.schema.marks.conceptNode
+    )
+
+    const actions: ContextMenuAction[] = hasConceptMark
+      ? [
+          {
+            label: 'Unlink concept',
+            onClick: () => editorRef.current?.commands.unsetConceptNode()
+          }
+        ]
+      : [
+          {
+            label: 'Link as concept',
+            onClick: () => editorRef.current?.commands.setConceptNode()
+          }
+        ]
+
+    setContextMenu({ x: event.clientX, y: event.clientY, actions })
+    return true
+  }, [])
+
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null)
+
   const editor = useEditor({
     extensions,
     content: '',
@@ -124,38 +169,13 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
         class: 'focus:outline-none min-h-full px-8 py-6',
         style: `color: ${colors.text.primary};`
       },
-      // Intercept clicks on wikilinks to navigate instead of following href
-      handleClick: (_view, _pos, event) => {
-        const target = event.target as HTMLElement
-        const anchor = target.closest('a')
-        if (!anchor) return false
-
-        const href = anchor.getAttribute('href')
-        if (!href?.startsWith('wikilink:')) return false
-
-        event.preventDefault()
-        const linkTarget = decodeURIComponent(href.slice('wikilink:'.length))
-        resolveAndNavigateRef.current(linkTarget)
-        return true
+      handleDOMEvents: {
+        contextmenu: (view, event) => handleContextMenu(view, event)
       }
     }
   })
 
-  // Keep the ref current so Tiptap's click handler always resolves against latest files
-  resolveAndNavigateRef.current = useCallback(
-    (target: string) => {
-      const normalized = target.toLowerCase()
-      const match = files.find((f) => {
-        const name = f.filename.replace(/\.md$/, '').toLowerCase()
-        return name === normalized
-      })
-
-      if (match) {
-        useEditorStore.getState().openTab(match.path, match.filename.replace(/\.md$/, ''))
-      }
-    },
-    [files]
-  )
+  editorRef.current = editor
 
   // Load file content from disk when active note path changes
   useEffect(() => {
@@ -187,16 +207,22 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     frontmatterRawRef.current = parsed.raw
     setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
 
-    const processedBody = preprocessWikilinks(parsed.body)
+    // Migrate legacy [[wikilinks]] to <node> tags on load
+    let body = parsed.body
+    if (body.includes('[[')) {
+      body = migrateLegacyWikilinks(body)
+      // Mark dirty so the migrated content gets auto-saved
+      setContent(parsed.raw + body)
+    }
 
     const manager = editor.storage.markdown?.manager
     if (manager) {
-      const json = manager.parse(processedBody)
+      const json = manager.parse(body)
       editor.commands.setContent(json)
     } else {
-      editor.commands.setContent(processedBody)
+      editor.commands.setContent(body)
     }
-  }, [content, editor, activeNotePath])
+  }, [content, editor, activeNotePath, setContent])
 
   // Autosave: debounce writes by 1 second
   useEffect(() => {
@@ -283,6 +309,15 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
         backlinks={backlinks}
         onNavigate={onNavigate}
       />
+
+      {contextMenu && (
+        <EditorContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenu.actions}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

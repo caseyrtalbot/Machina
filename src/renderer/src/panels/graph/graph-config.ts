@@ -87,7 +87,7 @@ export const LINK_STRENGTH: Record<RelationshipKind, number> = {
   cluster: 0.6,
   tension: -0.2,
   appears_in: 0.2,
-  wikilink: 0.15,
+  concept: 0.15,
   tag: 0.1
 }
 

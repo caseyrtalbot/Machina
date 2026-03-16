@@ -1,6 +1,6 @@
 /**
  * Markdown preprocessing utilities for the editor.
- * Handles frontmatter extraction and wikilink transformation.
+ * Handles frontmatter extraction and legacy wikilink migration.
  */
 
 export interface ParsedFrontmatter {
@@ -86,26 +86,15 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
 }
 
 /**
- * Convert [[wikilinks]] to standard markdown links before Tiptap parsing.
- * Supports [[target]] and [[target|display text]] syntax.
+ * Migrate legacy [[wikilink]] syntax to `<node>` concept nodes.
+ * Handles both [[target]] and [[target|display]] forms (uses target, not display).
+ * Idempotent: content already using `<node>` tags is unaffected.
  */
-export function preprocessWikilinks(markdown: string): string {
-  return markdown.replace(/\[\[([^\]]+)\]\]/g, (_match, inner: string) => {
-    const pipeIdx = inner.indexOf('|')
-    const target = pipeIdx >= 0 ? inner.slice(0, pipeIdx) : inner
-    const display = pipeIdx >= 0 ? inner.slice(pipeIdx + 1) : inner
-    return `[${display}](wikilink:${encodeURIComponent(target)})`
-  })
-}
-
-/**
- * Convert wikilink:-scheme links back to [[wikilink]] syntax on serialize.
- */
-export function postprocessWikilinks(markdown: string): string {
-  return markdown.replace(/\[([^\]]+)\]\(wikilink:([^)]+)\)/g, (_match, display, encoded) => {
-    const target = decodeURIComponent(encoded)
-    return display === target ? `[[${target}]]` : `[[${target}|${display}]]`
-  })
+export function migrateLegacyWikilinks(markdown: string): string {
+  return markdown.replace(
+    /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g,
+    (_m, target) => `<node>${target.trim()}</node>`
+  )
 }
 
 /**

@@ -1,7 +1,7 @@
 import matter from 'gray-matter'
 import type { Artifact, Signal } from '@shared/types'
 import type { Result } from './types'
-import { extractWikilinks } from './wikilink-extractor'
+import { extractConceptNodes } from './concept-extractor'
 
 const VALID_SIGNALS = new Set<string>(['untested', 'emerging', 'validated', 'core'])
 
@@ -70,7 +70,7 @@ export function parseArtifact(content: string, filename: string): Result<Artifac
       clusters_with: toStringArray(data?.clusters_with),
       tensions_with: toStringArray(data?.tensions_with),
       appears_in: toStringArray(data?.appears_in),
-      wikilinks: extractWikilinks(body),
+      concepts: extractConceptNodes(body),
       body: body.trim()
     }
   }

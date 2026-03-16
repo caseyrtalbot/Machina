@@ -414,20 +414,19 @@ body::after {
   text-decoration: underline;
 }
 
-/* Wiki-links: distinct styling with subtle background tint */
-.ProseMirror a[href^="wikilink:"] {
+/* Concept nodes: styled inline pills for linked concepts */
+.ProseMirror node {
   color: var(--color-accent-default);
   background-color: var(--color-accent-muted);
-  padding: 0.1em 0.35em;
-  border-radius: var(--radius-inline);
+  padding: 1px 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background-color 150ms ease-out, box-shadow 150ms ease-out;
   font-weight: 500;
 }
 
-.ProseMirror a[href^="wikilink:"]:hover {
+.ProseMirror node:hover {
   background-color: var(--color-accent-subtle);
-  text-decoration: none;
   box-shadow: 0 0 0 1px var(--color-accent-muted);
 }
 

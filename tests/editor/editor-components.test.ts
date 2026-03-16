@@ -4,7 +4,8 @@ import { describe, it, expect } from 'vitest'
 
 describe('parseBreadcrumb', () => {
   it('parses a file path into breadcrumb segments', async () => {
-    const { parseBreadcrumb } = await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
+    const { parseBreadcrumb } =
+      await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
     const segments = parseBreadcrumb('/vault/folder/note.md', '/vault')
     expect(segments).toHaveLength(2)
     // Folder segment
@@ -16,7 +17,8 @@ describe('parseBreadcrumb', () => {
   })
 
   it('handles deeply nested paths', async () => {
-    const { parseBreadcrumb } = await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
+    const { parseBreadcrumb } =
+      await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
     const segments = parseBreadcrumb('/vault/a/b/c/d.md', '/vault')
     expect(segments).toHaveLength(4)
     expect(segments[3].isFile).toBe(true)
@@ -24,7 +26,8 @@ describe('parseBreadcrumb', () => {
   })
 
   it('handles root-level file', async () => {
-    const { parseBreadcrumb } = await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
+    const { parseBreadcrumb } =
+      await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
     const segments = parseBreadcrumb('/vault/root.md', '/vault')
     expect(segments).toHaveLength(1)
     expect(segments[0].isFile).toBe(true)
@@ -37,7 +40,8 @@ describe('parseBreadcrumb', () => {
 
 describe('buildMetadataEntries', () => {
   it('builds entries from artifact fields', async () => {
-    const { buildMetadataEntries } = await import('../../src/renderer/src/panels/editor/FrontmatterHeader')
+    const { buildMetadataEntries } =
+      await import('../../src/renderer/src/panels/editor/FrontmatterHeader')
     const artifact = {
       id: 'test-1',
       type: 'gene' as const,
@@ -50,7 +54,7 @@ describe('buildMetadataEntries', () => {
       clusters_with: [],
       tensions_with: [],
       appears_in: [],
-      body: 'test body',
+      body: 'test body'
     }
     const entries = buildMetadataEntries(artifact)
     // Always: ID, Type, Signal, Created, Modified (5 base) + Tags (1) = 6
@@ -61,7 +65,8 @@ describe('buildMetadataEntries', () => {
   })
 
   it('omits optional fields when absent', async () => {
-    const { buildMetadataEntries } = await import('../../src/renderer/src/panels/editor/FrontmatterHeader')
+    const { buildMetadataEntries } =
+      await import('../../src/renderer/src/panels/editor/FrontmatterHeader')
     const artifact = {
       id: 'test-2',
       type: 'note' as const,
@@ -74,7 +79,7 @@ describe('buildMetadataEntries', () => {
       clusters_with: [],
       tensions_with: [],
       appears_in: [],
-      body: '',
+      body: ''
     }
     const entries = buildMetadataEntries(artifact)
     expect(entries.find((e) => e.label === 'Source')).toBeUndefined()
@@ -100,5 +105,12 @@ describe('extractContext', () => {
     const result = extractContext(body, 'nonexistent-id')
     // Source explicitly returns '' when targetId is absent
     expect(result).toBe('')
+  })
+
+  it('finds context via concept node tag', async () => {
+    const { extractContext } = await import('../../src/renderer/src/panels/editor/BacklinksPanel')
+    const body = 'Some text about <node>strategy</node> and more'
+    const result = extractContext(body, 'nonexistent-id', 'strategy')
+    expect(result).toContain('<node>strategy</node>')
   })
 })

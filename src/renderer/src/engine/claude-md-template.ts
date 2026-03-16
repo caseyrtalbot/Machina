@@ -81,6 +81,19 @@ When the user asks you to:
 - \`/status\` — Report vault health: orphan nodes, signal distribution, type coverage
 - \`/promote <id>\` — Suggest signal promotion with justification
 
+## Concept Nodes
+
+Inline concept links use \`<node>\` HTML tags in the markdown body:
+
+\`\`\`markdown
+Some text about <node>strategy</node> and how it relates to <node>feedback loops</node>.
+\`\`\`
+
+- When two files both link the same concept (e.g., \`<node>strategy</node>\`), the graph shows them connected through that shared concept node.
+- No new file is created when a concept is linked. Connections emerge naturally from shared concepts across files.
+- Concept matching is case-insensitive: \`<node>Strategy</node>\` and \`<node>strategy</node>\` resolve to the same graph node.
+- **Do not use \`[[wikilink]]\` syntax.** Use \`<node>term</node>\` instead.
+
 ## Custom Fields
 
 If you see additional frontmatter fields in existing vault files (e.g., \`source\`, \`frame\`, \`domain\`), propagate them in new files where appropriate. Match the vault's conventions.

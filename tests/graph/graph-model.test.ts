@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { buildGlobalGraphModel, buildLocalGraphModel } from '../../src/renderer/src/panels/graph/graph-model'
+import {
+  buildGlobalGraphModel,
+  buildLocalGraphModel
+} from '../../src/renderer/src/panels/graph/graph-model'
 import type { GraphFilters } from '../../src/renderer/src/panels/graph/graph-model'
 import type { KnowledgeGraph } from '@shared/types'
 
@@ -22,13 +25,25 @@ function makeGraph(): KnowledgeGraph {
       { id: 'n2', title: 'Note 2', type: 'note', signal: 'emerging', connectionCount: 1 },
       { id: 'n3', title: 'Note 3', type: 'note', signal: 'validated', connectionCount: 1 },
       { id: 't1', title: 'Tag 1', type: 'tag', signal: 'untested', connectionCount: 1 },
-      { id: 'a1', title: 'Attachment 1', type: 'attachment', signal: 'untested', connectionCount: 1 },
+      {
+        id: 'a1',
+        title: 'Attachment 1',
+        type: 'attachment',
+        signal: 'untested',
+        connectionCount: 1
+      },
       { id: 'orphan', title: 'Orphan', type: 'note', signal: 'untested', connectionCount: 0 },
-      { id: 'ghost:unresolved', title: 'Unresolved', type: 'note', signal: 'untested', connectionCount: 0 }
+      {
+        id: 'ghost:unresolved',
+        title: 'Unresolved',
+        type: 'note',
+        signal: 'untested',
+        connectionCount: 0
+      }
     ],
     edges: [
       { source: 'n1', target: 'n2', kind: 'connection' },
-      { source: 'n1', target: 'n3', kind: 'wikilink' },
+      { source: 'n1', target: 'n3', kind: 'concept' },
       { source: 'n2', target: 't1', kind: 'tag' },
       { source: 'n3', target: 'a1', kind: 'connection' }
     ]

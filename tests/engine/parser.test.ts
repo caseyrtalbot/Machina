@@ -169,18 +169,18 @@ Just body text, no heading.`
     expect(result.value.title).toBe('stray-thought')
   })
 
-  it('extracts wikilinks from body during parse', () => {
+  it('extracts concept nodes from body during parse', () => {
     const md = `---
 id: n1
 title: Note One
 ---
 
-See [[Note Two]] and [[Note Three|display]] for more.`
+See <node>Note Two</node> and <node>Note Three</node> for more.`
 
     const result = parseArtifact(md, 'note-one.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.wikilinks).toEqual(['Note Two', 'Note Three'])
+    expect(result.value.concepts).toEqual(['Note Two', 'Note Three'])
   })
 
   it('handles Obsidian-style frontmatter with custom properties', () => {

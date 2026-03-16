@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseFrontmatter,
-  preprocessWikilinks,
-  postprocessWikilinks,
+  migrateLegacyWikilinks,
   serializeFrontmatter
 } from '../../src/renderer/src/panels/editor/markdown-utils'
 
-// ─── parseFrontmatter ────────────────────────────────────────────────────────
+// --- parseFrontmatter ---
 
 describe('parseFrontmatter', () => {
   it('returns empty data and full content when no frontmatter exists', () => {
@@ -74,71 +73,48 @@ describe('parseFrontmatter', () => {
   })
 })
 
-// ─── preprocessWikilinks ─────────────────────────────────────────────────────
+// --- migrateLegacyWikilinks ---
 
-describe('preprocessWikilinks', () => {
-  it('converts simple wikilinks to markdown links', () => {
-    const result = preprocessWikilinks('See [[My Note]] for details.')
-    expect(result).toBe('See [My Note](wikilink:My%20Note) for details.')
+describe('migrateLegacyWikilinks', () => {
+  it('converts simple wikilinks to concept nodes', () => {
+    const result = migrateLegacyWikilinks('See [[My Note]] for details.')
+    expect(result).toBe('See <node>My Note</node> for details.')
   })
 
-  it('converts piped wikilinks with display text', () => {
-    const result = preprocessWikilinks('Check [[Target Page|display text]] here.')
-    expect(result).toBe('Check [display text](wikilink:Target%20Page) here.')
+  it('converts piped wikilinks using target (not display)', () => {
+    const result = migrateLegacyWikilinks('Check [[Target Page|display text]] here.')
+    expect(result).toBe('Check <node>Target Page</node> here.')
   })
 
   it('handles multiple wikilinks in one line', () => {
-    const result = preprocessWikilinks('Links: [[A]], [[B]], and [[C]].')
-    expect(result).toContain('[A](wikilink:A)')
-    expect(result).toContain('[B](wikilink:B)')
-    expect(result).toContain('[C](wikilink:C)')
+    const result = migrateLegacyWikilinks('Links: [[A]], [[B]], and [[C]].')
+    expect(result).toBe('Links: <node>A</node>, <node>B</node>, and <node>C</node>.')
   })
 
   it('leaves text without wikilinks unchanged', () => {
     const text = 'No wikilinks here, just [regular](link).'
-    expect(preprocessWikilinks(text)).toBe(text)
+    expect(migrateLegacyWikilinks(text)).toBe(text)
   })
 
-  it('handles wikilinks with special characters', () => {
-    const result = preprocessWikilinks('See [[Note (2024)]] for details.')
-    expect(result).toBe('See [Note (2024)](wikilink:Note%20(2024)) for details.')
-  })
-})
-
-// ─── postprocessWikilinks ────────────────────────────────────────────────────
-
-describe('postprocessWikilinks', () => {
-  it('converts wikilink-scheme links back to wikilink syntax', () => {
-    const result = postprocessWikilinks('[My Note](wikilink:My%20Note)')
-    expect(result).toBe('[[My Note]]')
+  it('leaves existing concept nodes unchanged', () => {
+    const text = 'Already <node>migrated</node> content.'
+    expect(migrateLegacyWikilinks(text)).toBe(text)
   })
 
-  it('restores piped wikilinks when display differs from target', () => {
-    const result = postprocessWikilinks('[display text](wikilink:Target%20Page)')
-    expect(result).toBe('[[Target Page|display text]]')
+  it('handles mixed legacy and new syntax', () => {
+    const text = 'Old [[legacy]] and new <node>modern</node>.'
+    expect(migrateLegacyWikilinks(text)).toBe(
+      'Old <node>legacy</node> and new <node>modern</node>.'
+    )
   })
 
-  it('round-trips simple wikilinks correctly', () => {
-    const original = 'See [[My Note]] and [[Other Note]] for more.'
-    const processed = preprocessWikilinks(original)
-    const restored = postprocessWikilinks(processed)
-    expect(restored).toBe(original)
-  })
-
-  it('round-trips piped wikilinks correctly', () => {
-    const original = 'See [[Target|custom label]] for details.'
-    const processed = preprocessWikilinks(original)
-    const restored = postprocessWikilinks(processed)
-    expect(restored).toBe(original)
-  })
-
-  it('leaves non-wikilink markdown links unchanged', () => {
-    const text = '[Click here](https://example.com)'
-    expect(postprocessWikilinks(text)).toBe(text)
+  it('trims whitespace from targets', () => {
+    const result = migrateLegacyWikilinks('See [[ spaced target ]] here.')
+    expect(result).toBe('See <node>spaced target</node> here.')
   })
 })
 
-// ─── serializeFrontmatter ────────────────────────────────────────────────────
+// --- serializeFrontmatter ---
 
 describe('serializeFrontmatter', () => {
   it('serializes simple key-value pairs', () => {
