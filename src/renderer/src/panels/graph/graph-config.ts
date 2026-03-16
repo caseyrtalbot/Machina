@@ -68,7 +68,7 @@ export const GRAPH_PALETTE = {
   visitedNote: '#b8a9c9',
   defaultTag: '#e6a237',
   defaultAttach: '#6b7280',
-  linkDefault: 'rgba(255, 255, 255, 0.04)',
+  linkDefault: 'rgba(180, 170, 210, 0.06)',
   linkActive: 'rgba(232, 229, 240, 0.8)',
   linkGlow: 'rgba(210, 208, 220, 0.25)',
   linkDimmed: 'rgba(255, 255, 255, 0)',
@@ -93,10 +93,10 @@ export const LINK_STRENGTH: Record<RelationshipKind, number> = {
 export const LARGE_GRAPH_THRESHOLD = 200
 
 export const DEFAULT_SIM_CONFIG: SimulationConfig = {
-  centerForce: 0.02,
-  repelForce: -120,
-  linkForce: 0.7,
-  linkDistance: 50
+  centerForce: 0.03,
+  repelForce: -200,
+  linkForce: 0.5,
+  linkDistance: 80
 }
 
 // ---------------------------------------------------------------------------

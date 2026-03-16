@@ -11,8 +11,6 @@ import type { KnowledgeGraph } from '@shared/types'
 // ---------------------------------------------------------------------------
 
 const defaultFilters: GraphFilters = {
-  showTags: true,
-  showAttachments: true,
   showOrphans: true,
   showExistingOnly: false,
   searchQuery: ''
@@ -24,28 +22,13 @@ function makeGraph(): KnowledgeGraph {
       { id: 'n1', title: 'Note 1', type: 'note', signal: 'untested', connectionCount: 2 },
       { id: 'n2', title: 'Note 2', type: 'note', signal: 'emerging', connectionCount: 1 },
       { id: 'n3', title: 'Note 3', type: 'note', signal: 'validated', connectionCount: 1 },
-      { id: 't1', title: 'Tag 1', type: 'tag', signal: 'untested', connectionCount: 1 },
-      {
-        id: 'a1',
-        title: 'Attachment 1',
-        type: 'attachment',
-        signal: 'untested',
-        connectionCount: 1
-      },
-      { id: 'orphan', title: 'Orphan', type: 'note', signal: 'untested', connectionCount: 0 },
-      {
-        id: 'ghost:unresolved',
-        title: 'Unresolved',
-        type: 'note',
-        signal: 'untested',
-        connectionCount: 0
-      }
+      { id: 'n4', title: 'Note 4', type: 'note', signal: 'untested', connectionCount: 1 },
+      { id: 'orphan', title: 'Orphan', type: 'note', signal: 'untested', connectionCount: 0 }
     ],
     edges: [
       { source: 'n1', target: 'n2', kind: 'connection' },
-      { source: 'n1', target: 'n3', kind: 'concept' },
-      { source: 'n2', target: 't1', kind: 'tag' },
-      { source: 'n3', target: 'a1', kind: 'connection' }
+      { source: 'n1', target: 'n3', kind: 'co-occurrence' },
+      { source: 'n3', target: 'n4', kind: 'connection' }
     ]
   }
 }
@@ -61,36 +44,6 @@ describe('buildGlobalGraphModel', () => {
 
     expect(model.nodes).toHaveLength(graph.nodes.length)
     expect(model.edges).toHaveLength(graph.edges.length)
-  })
-
-  it('filters out tag nodes when showTags=false and removes their edges', () => {
-    const graph = makeGraph()
-    const filters: GraphFilters = { ...defaultFilters, showTags: false }
-    const model = buildGlobalGraphModel(graph, filters)
-
-    const nodeIds = model.nodes.map((n) => n.id)
-    expect(nodeIds).not.toContain('t1')
-
-    // Edge from n2 → t1 must also be removed
-    const hasTagEdge = model.edges.some(
-      (e) => String(e.source) === 't1' || String(e.target) === 't1'
-    )
-    expect(hasTagEdge).toBe(false)
-  })
-
-  it('filters out attachment nodes when showAttachments=false', () => {
-    const graph = makeGraph()
-    const filters: GraphFilters = { ...defaultFilters, showAttachments: false }
-    const model = buildGlobalGraphModel(graph, filters)
-
-    const nodeIds = model.nodes.map((n) => n.id)
-    expect(nodeIds).not.toContain('a1')
-
-    // Edge touching a1 must also be removed
-    const hasAttachmentEdge = model.edges.some(
-      (e) => String(e.source) === 'a1' || String(e.target) === 'a1'
-    )
-    expect(hasAttachmentEdge).toBe(false)
   })
 
   it('filters orphans when showOrphans=false (node with no edges AND connectionCount=0)', () => {
@@ -117,7 +70,19 @@ describe('buildGlobalGraphModel', () => {
   })
 
   it('filters ghost nodes when showExistingOnly=true', () => {
-    const graph = makeGraph()
+    const graph: KnowledgeGraph = {
+      nodes: [
+        ...makeGraph().nodes,
+        {
+          id: 'ghost:unresolved',
+          title: 'Unresolved',
+          type: 'note',
+          signal: 'untested',
+          connectionCount: 0
+        }
+      ],
+      edges: makeGraph().edges
+    }
     const filters: GraphFilters = { ...defaultFilters, showExistingOnly: true }
     const model = buildGlobalGraphModel(graph, filters)
 
@@ -150,29 +115,28 @@ describe('buildLocalGraphModel', () => {
 
   it('depth=1 returns center node and its immediate neighbors only', () => {
     const graph = makeGraph()
-    // n1 connects to n2 and n3; depth=1 → {n1, n2, n3}
+    // n1 connects to n2 (connection) and n3 (co-occurrence); depth=1 → {n1, n2, n3}
     const model = buildLocalGraphModel(graph, 'n1', 1, defaultFilters)
 
     const nodeIds = model.nodes.map((n) => n.id)
     expect(nodeIds).toContain('n1')
     expect(nodeIds).toContain('n2')
     expect(nodeIds).toContain('n3')
-    // t1 is a neighbor of n2 (one hop from n1 via n2), not a direct neighbor of n1
-    expect(nodeIds).not.toContain('t1')
+    // n4 is a neighbor of n3 (two hops from n1), not a direct neighbor of n1
+    expect(nodeIds).not.toContain('n4')
     expect(nodeIds).not.toContain('orphan')
   })
 
   it('depth=2 extends one more hop beyond direct neighbors', () => {
     const graph = makeGraph()
-    // n1 → n2 → t1 (hop 2); n1 → n3 → a1 (hop 2)
+    // n1 → n3 → n4 (hop 2)
     const model = buildLocalGraphModel(graph, 'n1', 2, defaultFilters)
 
     const nodeIds = model.nodes.map((n) => n.id)
     expect(nodeIds).toContain('n1')
     expect(nodeIds).toContain('n2')
     expect(nodeIds).toContain('n3')
-    expect(nodeIds).toContain('t1')
-    expect(nodeIds).toContain('a1')
+    expect(nodeIds).toContain('n4')
   })
 
   it('does not include isolated nodes outside the reachable depth', () => {
@@ -186,25 +150,14 @@ describe('buildLocalGraphModel', () => {
   it('only includes edges where both endpoints are in the visited set', () => {
     const graph = makeGraph()
     // depth=1 from n1: visited = {n1, n2, n3}
-    // Valid edges: n1→n2 (connection), n1→n3 (wikilink)
-    // Edge n2→t1 must be excluded (t1 not visited)
+    // Valid edges: n1→n2 (connection), n1→n3 (co-occurrence)
+    // Edge n3→n4 must be excluded (n4 not visited)
     const model = buildLocalGraphModel(graph, 'n1', 1, defaultFilters)
 
     const edgePairs = model.edges.map((e) => `${String(e.source)}-${String(e.target)}`)
     expect(edgePairs).toContain('n1-n2')
     expect(edgePairs).toContain('n1-n3')
-    expect(edgePairs).not.toContain('n2-t1')
-    expect(edgePairs).not.toContain('n3-a1')
-  })
-
-  it('applies filters to local subgraph (showTags=false removes tag nodes)', () => {
-    const graph = makeGraph()
-    const filters: GraphFilters = { ...defaultFilters, showTags: false }
-    // With depth=2, t1 is reachable but showTags=false should exclude it
-    const model = buildLocalGraphModel(graph, 'n1', 2, filters)
-
-    const nodeIds = model.nodes.map((n) => n.id)
-    expect(nodeIds).not.toContain('t1')
+    expect(edgePairs).not.toContain('n3-n4')
   })
 
   it('applies filters to local subgraph (showOrphans=false removes disconnected subgraph nodes)', () => {
@@ -212,9 +165,13 @@ describe('buildLocalGraphModel', () => {
     const graph: KnowledgeGraph = {
       nodes: [
         { id: 'center', title: 'Center', type: 'note', signal: 'untested', connectionCount: 1 },
-        { id: 'neighbor', title: 'Neighbor', type: 'note', signal: 'untested', connectionCount: 1 },
-        // This tag node is reachable at depth=1 via 'center' but the edge is tag type
-        // After showTags=false filtering, it would become orphaned
+        {
+          id: 'neighbor',
+          title: 'Neighbor',
+          type: 'note',
+          signal: 'untested',
+          connectionCount: 1
+        },
         { id: 'solo', title: 'Solo', type: 'note', signal: 'untested', connectionCount: 0 }
       ],
       edges: [
@@ -237,13 +194,12 @@ describe('buildLocalGraphModel', () => {
 
   it('starts BFS from any node, not just one with many connections', () => {
     const graph = makeGraph()
-    // Start from n2 at depth=1: neighbors are n1 (via connection) and t1 (via tag)
+    // Start from n2 at depth=1: neighbors are n1 (via connection)
     const model = buildLocalGraphModel(graph, 'n2', 1, defaultFilters)
 
     const nodeIds = model.nodes.map((n) => n.id)
     expect(nodeIds).toContain('n2')
     expect(nodeIds).toContain('n1')
-    expect(nodeIds).toContain('t1')
     expect(nodeIds).not.toContain('orphan')
   })
 })

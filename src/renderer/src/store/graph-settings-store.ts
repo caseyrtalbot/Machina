@@ -36,8 +36,7 @@ interface GraphSettingsState {
   readonly searchQuery: string
   readonly showOrphans: boolean
   readonly showExistingOnly: boolean
-  readonly showTags: boolean
-  readonly showAttachments: boolean
+  readonly minEdgeWeight: number
 
   // Groups (coloring)
   readonly groupRules: readonly GroupRule[]
@@ -63,8 +62,7 @@ interface GraphSettingsState {
   setSearchQuery: (value: string) => void
   setShowOrphans: (value: boolean) => void
   setShowExistingOnly: (value: boolean) => void
-  setShowTags: (value: boolean) => void
-  setShowAttachments: (value: boolean) => void
+  setMinEdgeWeight: (value: number) => void
   setGroupRules: (rules: GroupRule[]) => void
   addGroupRule: () => void
   removeGroupRule: (id: string) => void
@@ -90,8 +88,7 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
   searchQuery: '',
   showOrphans: true,
   showExistingOnly: false,
-  showTags: true,
-  showAttachments: true,
+  minEdgeWeight: 0.3,
 
   // Groups
   groupRules: DEFAULT_GROUP_RULES,
@@ -104,11 +101,11 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
   isAnimating: true,
   showMinimap: true,
 
-  // Forces (Obsidian-style defaults)
-  centerForce: 0.02,
-  repelForce: -120,
-  linkForce: 0.7,
-  linkDistance: 50,
+  // Forces
+  centerForce: 0.03,
+  repelForce: -200,
+  linkForce: 0.5,
+  linkDistance: 80,
   enableRadial: false,
 
   // Setters
@@ -117,8 +114,7 @@ export const useGraphSettingsStore = create<GraphSettingsState>()((set, get) => 
   setSearchQuery: (value) => set({ searchQuery: value }),
   setShowOrphans: (value) => set({ showOrphans: value }),
   setShowExistingOnly: (value) => set({ showExistingOnly: value }),
-  setShowTags: (value) => set({ showTags: value }),
-  setShowAttachments: (value) => set({ showAttachments: value }),
+  setMinEdgeWeight: (value) => set({ minEdgeWeight: value }),
 
   setGroupRules: (rules) => set({ groupRules: rules }),
 

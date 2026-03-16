@@ -6,8 +6,6 @@ export interface GraphModel {
 }
 
 export interface GraphFilters {
-  showTags: boolean
-  showAttachments: boolean
   showOrphans: boolean
   showExistingOnly: boolean
   searchQuery: string
@@ -17,11 +15,13 @@ function getNodeId(node: GraphNode): string {
   return node.id
 }
 
-function applyFilters(nodes: readonly GraphNode[], edges: readonly GraphEdge[], filters: GraphFilters): GraphModel {
+function applyFilters(
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
+  filters: GraphFilters
+): GraphModel {
   // Step 1: filter nodes
   let filteredNodes = nodes.filter((node) => {
-    if (!filters.showTags && node.type === 'tag') return false
-    if (!filters.showAttachments && node.type === 'attachment') return false
     if (filters.showExistingOnly && node.id.startsWith('ghost:')) return false
     return true
   })
