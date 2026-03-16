@@ -227,10 +227,8 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
   const setShowOrphans = useGraphSettingsStore((s) => s.setShowOrphans)
   const showExistingOnly = useGraphSettingsStore((s) => s.showExistingOnly)
   const setShowExistingOnly = useGraphSettingsStore((s) => s.setShowExistingOnly)
-  const showTags = useGraphSettingsStore((s) => s.showTags)
-  const setShowTags = useGraphSettingsStore((s) => s.setShowTags)
-  const showAttachments = useGraphSettingsStore((s) => s.showAttachments)
-  const setShowAttachments = useGraphSettingsStore((s) => s.setShowAttachments)
+  const minEdgeWeight = useGraphSettingsStore((s) => s.minEdgeWeight)
+  const setMinEdgeWeight = useGraphSettingsStore((s) => s.setMinEdgeWeight)
 
   // Groups
   const groupRules = useGraphSettingsStore((s) => s.groupRules)
@@ -356,16 +354,6 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
               />
               <div className="flex flex-wrap gap-1.5">
                 <TogglePill
-                  label="Tags"
-                  active={showTags}
-                  onToggle={() => setShowTags(!showTags)}
-                />
-                <TogglePill
-                  label="Attachments"
-                  active={showAttachments}
-                  onToggle={() => setShowAttachments(!showAttachments)}
-                />
-                <TogglePill
                   label="Existing only"
                   active={showExistingOnly}
                   onToggle={() => setShowExistingOnly(!showExistingOnly)}
@@ -460,10 +448,18 @@ export function GraphSettingsPanel({ isOpen, onClose }: GraphSettingsPanelProps)
                 label="Link thickness"
                 value={linkThickness}
                 min={0.3}
-                max={3}
+                max={2}
                 step={0.1}
                 onChange={setLinkThickness}
                 formatValue={(v) => `${v.toFixed(1)}px`}
+              />
+              <SliderRow
+                label="Min edge weight"
+                value={minEdgeWeight}
+                min={0.1}
+                max={1.0}
+                step={0.05}
+                onChange={setMinEdgeWeight}
               />
 
               {/* Animate button */}
