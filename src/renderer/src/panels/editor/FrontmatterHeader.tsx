@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react'
 import type { Artifact } from '@shared/types'
 import { colors, transitions } from '../../design/tokens'
+import { getArtifactColor } from '../../design/tokens'
 import { serializeFrontmatter } from './markdown-utils'
 
 // ── Types ──
@@ -58,8 +59,8 @@ function TagChip({ tag, onRemove }: TagChipProps) {
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
       style={{
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
         color: '#f59e0b',
+        border: '1px solid rgba(245, 158, 11, 0.3)',
         transition: transitions.default
       }}
     >
@@ -152,6 +153,14 @@ function PropertyRow({ propKey, value, onChangeValue, onRemove }: PropertyRowPro
   const isTagField = propKey.toLowerCase() === 'tags'
   const icon = getPropertyIcon(propKey)
 
+  const labelStyle = {
+    color: colors.text.muted,
+    fontSize: '11px',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase' as const,
+    fontFamily: 'var(--font-mono)'
+  }
+
   if (isTagField) {
     const tagArray = Array.isArray(value)
       ? value.map(String)
@@ -162,15 +171,10 @@ function PropertyRow({ propKey, value, onChangeValue, onRemove }: PropertyRowPro
             .filter(Boolean)
         : []
     return (
-      <div className="flex items-start gap-3 py-1.5 group">
-        <div className="flex items-center gap-1.5 shrink-0" style={{ minWidth: 100 }}>
-          <span className="text-xs" style={{ color: colors.text.muted }}>
-            {icon}
-          </span>
-          <span className="text-xs" style={{ color: colors.text.muted }}>
-            {propKey}
-          </span>
-        </div>
+      <div className="flex items-start gap-3 py-1 group">
+        <span className="shrink-0" style={{ ...labelStyle, minWidth: 80 }}>
+          {propKey}
+        </span>
         <div className="flex-1">
           <TagInput tags={tagArray} onChange={(tags) => onChangeValue(tags)} />
         </div>
@@ -188,21 +192,16 @@ function PropertyRow({ propKey, value, onChangeValue, onRemove }: PropertyRowPro
   }
 
   return (
-    <div className="flex items-center gap-3 py-1.5 group">
-      <div className="flex items-center gap-1.5 shrink-0" style={{ minWidth: 100 }}>
-        <span className="text-xs" style={{ color: colors.text.muted }}>
-          {icon}
-        </span>
-        <span className="text-xs" style={{ color: colors.text.muted }}>
-          {propKey}
-        </span>
-      </div>
+    <div className="flex items-center gap-3 py-1 group">
+      <span className="shrink-0" style={{ ...labelStyle, minWidth: 80 }}>
+        {propKey}
+      </span>
       <input
         type="text"
         value={Array.isArray(value) ? value.join(', ') : String(value)}
         onChange={(e) => onChangeValue(e.target.value)}
         className="flex-1 bg-transparent border-0 outline-none text-xs"
-        style={{ color: colors.text.primary }}
+        style={{ color: colors.text.secondary }}
       />
       <button
         type="button"
@@ -399,108 +398,110 @@ export function FrontmatterHeader({
     return []
   })()
 
+  // Determine the artifact type for the badge
+  const artifactType = (properties['type'] as string) ?? artifact?.type ?? 'note'
+  const badgeColor = getArtifactColor(artifactType)
+
   return (
     <div
-      className="border-b"
       style={{
-        borderColor: colors.border.default,
-        backgroundColor: colors.bg.surface,
         transition: transitions.default
       }}
     >
-      {/* Header bar */}
-      <div className="flex items-center gap-2 px-6 py-2">
-        <span
-          className="text-xs font-medium"
-          style={{
-            color: colors.text.muted,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase'
-          }}
-        >
-          Properties
-        </span>
+      <div className="px-8 pt-4 pb-1" style={{ maxWidth: '48rem', margin: '0 auto' }}>
+        {/* Type badge - outlined neon style */}
+        <div className="flex items-center gap-2 mb-3">
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold uppercase"
+            style={{
+              color: badgeColor,
+              border: `1px solid ${badgeColor}60`,
+              borderRadius: 4,
+              letterSpacing: '0.08em',
+              fontSize: '10px'
+            }}
+          >
+            {artifactType}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="ml-auto text-xs transition-colors focus:outline-none"
+            style={{ color: colors.text.muted, transition: transitions.default }}
+            title={expanded ? 'Collapse properties' : 'Expand properties'}
+          >
+            {expanded ? '\u25B4' : '\u25BE'}
+          </button>
+        </div>
 
         {/* Tag chips in collapsed view */}
         {!expanded && tags.length > 0 && (
-          <div className="flex gap-1 ml-1">
+          <div className="flex gap-1 mb-1">
             {tags.map((tag) => (
               <TagChip key={tag} tag={tag} />
             ))}
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="ml-auto text-xs transition-colors focus:outline-none"
-          style={{ color: colors.text.muted, transition: transitions.default }}
-          title={expanded ? 'Collapse properties' : 'Expand properties'}
-        >
-          {expanded ? '\u25B4' : '\u25BE'}
-        </button>
-      </div>
+        {/* Expanded properties */}
+        {expanded && (
+          <div>
+            {hasProperties &&
+              Object.entries(properties).map(([key, value]) => (
+                <PropertyRow
+                  key={key}
+                  propKey={key}
+                  value={value}
+                  onChangeValue={(v) => handlePropertyChange(key, v)}
+                  onRemove={() => handlePropertyRemove(key)}
+                />
+              ))}
 
-      {/* Expanded properties */}
-      {expanded && (
-        <div className="px-6 pb-3">
-          {hasProperties &&
-            Object.entries(properties).map(([key, value]) => (
-              <PropertyRow
-                key={key}
-                propKey={key}
-                value={value}
-                onChangeValue={(v) => handlePropertyChange(key, v)}
-                onRemove={() => handlePropertyRemove(key)}
-              />
-            ))}
+            {/* Relationship blocks */}
+            {artifact &&
+              (artifact.connections.length > 0 ||
+                artifact.clusters_with.length > 0 ||
+                artifact.tensions_with.length > 0 ||
+                artifact.appears_in.length > 0) && (
+                <div className="space-y-1.5 pt-2 mt-2">
+                  {artifact.connections.length > 0 && (
+                    <RelationshipRow
+                      label="Connections"
+                      ids={artifact.connections}
+                      onNavigate={onNavigate}
+                    />
+                  )}
+                  {artifact.clusters_with.length > 0 && (
+                    <RelationshipRow
+                      label="Clusters with"
+                      ids={artifact.clusters_with}
+                      onNavigate={onNavigate}
+                    />
+                  )}
+                  {artifact.tensions_with.length > 0 && (
+                    <RelationshipRow
+                      label="Tensions with"
+                      ids={artifact.tensions_with}
+                      onNavigate={onNavigate}
+                    />
+                  )}
+                  {artifact.appears_in.length > 0 && (
+                    <RelationshipRow
+                      label="Appears in"
+                      ids={artifact.appears_in}
+                      onNavigate={onNavigate}
+                    />
+                  )}
+                </div>
+              )}
 
-          {/* Relationship blocks (read-only display for explicit graph connections) */}
-          {artifact &&
-            (artifact.connections.length > 0 ||
-              artifact.clusters_with.length > 0 ||
-              artifact.tensions_with.length > 0 ||
-              artifact.appears_in.length > 0) && (
-              <div
-                className="space-y-1.5 pt-2 mt-2 border-t"
-                style={{ borderColor: colors.border.default }}
-              >
-                {artifact.connections.length > 0 && (
-                  <RelationshipRow
-                    label="Connections"
-                    ids={artifact.connections}
-                    onNavigate={onNavigate}
-                  />
-                )}
-                {artifact.clusters_with.length > 0 && (
-                  <RelationshipRow
-                    label="Clusters with"
-                    ids={artifact.clusters_with}
-                    onNavigate={onNavigate}
-                  />
-                )}
-                {artifact.tensions_with.length > 0 && (
-                  <RelationshipRow
-                    label="Tensions with"
-                    ids={artifact.tensions_with}
-                    onNavigate={onNavigate}
-                  />
-                )}
-                {artifact.appears_in.length > 0 && (
-                  <RelationshipRow
-                    label="Appears in"
-                    ids={artifact.appears_in}
-                    onNavigate={onNavigate}
-                  />
-                )}
-              </div>
-            )}
-
-          <div className="mt-2">
-            <AddPropertyButton existingKeys={Object.keys(properties)} onAdd={handleAddProperty} />
+            <div className="mt-2">
+              <AddPropertyButton existingKeys={Object.keys(properties)} onAdd={handleAddProperty} />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -516,7 +517,17 @@ interface RelationshipRowProps {
 function RelationshipRow({ label, ids, onNavigate }: RelationshipRowProps) {
   return (
     <div className="flex items-start gap-3">
-      <span className="text-xs shrink-0 mt-0.5" style={{ color: colors.text.muted, minWidth: 100 }}>
+      <span
+        className="shrink-0 mt-0.5"
+        style={{
+          color: colors.text.muted,
+          minWidth: 80,
+          fontSize: '11px',
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          fontFamily: 'var(--font-mono)'
+        }}
+      >
         {label}
       </span>
       <div className="flex flex-wrap gap-1">

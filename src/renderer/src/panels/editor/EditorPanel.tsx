@@ -166,7 +166,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     onSelectionUpdate: handleSelectionUpdate,
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-full px-8 py-6',
+        class: 'focus:outline-none min-h-full px-8 py-4',
         style: `color: ${colors.text.primary};`
       },
       handleDOMEvents: {
@@ -279,23 +279,22 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
       <EditorToolbar editor={editor} mode={mode} onToggleMode={handleToggleMode} />
 
-      <FrontmatterHeader
-        artifact={artifact}
-        frontmatter={frontmatterData}
-        mode={mode}
-        onNavigate={onNavigate}
-        onFrontmatterChange={(newRaw) => {
-          frontmatterRawRef.current = newRaw
-          // Parse the updated frontmatter for display
-          const parsed = parseFrontmatter(newRaw)
-          setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
-          // Reconstruct full content: new frontmatter + existing body
-          const currentParsed = parseFrontmatter(content ?? '')
-          setContent(newRaw + currentParsed.body)
-        }}
-      />
-
       <div className="flex-1 overflow-y-auto">
+        <FrontmatterHeader
+          artifact={artifact}
+          frontmatter={frontmatterData}
+          mode={mode}
+          onNavigate={onNavigate}
+          onFrontmatterChange={(newRaw) => {
+            frontmatterRawRef.current = newRaw
+            // Parse the updated frontmatter for display
+            const parsed = parseFrontmatter(newRaw)
+            setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
+            // Reconstruct full content: new frontmatter + existing body
+            const currentParsed = parseFrontmatter(content ?? '')
+            setContent(newRaw + currentParsed.body)
+          }}
+        />
         {mode === 'rich' ? (
           <RichEditor editor={editor} />
         ) : (

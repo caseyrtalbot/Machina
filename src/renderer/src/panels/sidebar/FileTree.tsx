@@ -1,3 +1,4 @@
+import { FileText, FolderClosed, FolderOpen } from 'lucide-react'
 import { colors, getArtifactColor } from '../../design/tokens'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode } from './buildFileTree'
@@ -28,23 +29,20 @@ function isVisible(
   let currentParent = node.parentPath
 
   while (currentParent) {
-    // Find the directory node that owns this parentPath
     const parentNode = allNodes.find((n) => n.isDirectory && n.path === currentParent)
     if (!parentNode) break
-
-    if (collapsedPaths.has(parentNode.path)) {
-      return false
-    }
-
+    if (collapsedPaths.has(parentNode.path)) return false
     currentParent = parentNode.parentPath
   }
 
   return true
 }
 
-/** Strip .md extension from file names for cleaner display */
-function displayName(name: string): string {
-  return name.endsWith('.md') ? name.slice(0, -3) : name
+/** Split filename into base name and extension for separate styling */
+function splitName(name: string): { base: string; ext: string } {
+  const dotIdx = name.lastIndexOf('.')
+  if (dotIdx <= 0) return { base: name, ext: '' }
+  return { base: name.slice(0, dotIdx), ext: name.slice(dotIdx) }
 }
 
 /** Inline SVG chevron pointing right, rotated via CSS when expanded */
@@ -165,6 +163,13 @@ function DirectoryRow({
       <span className="mr-1.5 flex items-center" style={{ color: colors.text.muted }}>
         <Chevron isExpanded={!isCollapsed} />
       </span>
+      <span className="mr-1.5 flex items-center" style={{ color: colors.text.muted, opacity: 0.6 }}>
+        {isCollapsed ? (
+          <FolderClosed size={14} strokeWidth={1.5} />
+        ) : (
+          <FolderOpen size={14} strokeWidth={1.5} />
+        )}
+      </span>
       {isRenaming ? (
         <RenameInput
           initialValue={node.name}
@@ -213,19 +218,23 @@ function FileRow({
   onRenameConfirm?: (newName: string) => void
   onRenameCancel?: () => void
 }) {
-  // Files get extra left padding to align past the chevron space of their parent
   const paddingLeft = 8 + node.depth * 16 + 20
+  const { base, ext } = splitName(node.name)
 
-  // Canvas ring: inner gap (surface) + accent ring + soft glow
-  const canvasRingShadow = isOnCanvas
-    ? `0 0 0 2px ${colors.bg.surface}, 0 0 0 3.5px ${colors.accent.default}, 0 0 6px ${colors.accent.muted}`
-    : undefined
+  // Icon color: artifact type color when available, accent when on canvas, muted otherwise
+  const iconColor = artifactType
+    ? getArtifactColor(artifactType)
+    : isOnCanvas
+      ? colors.accent.default
+      : colors.text.muted
+
+  // Canvas glow on the icon
+  const canvasGlow = isOnCanvas ? `drop-shadow(0 0 4px ${colors.accent.default})` : undefined
 
   return (
     <div
       data-active={isActive ? 'true' : 'false'}
       onMouseDown={(e) => {
-        // Only enable drag on left-click to avoid breaking right-click context menu
         if (e.button === 0) {
           e.currentTarget.setAttribute('draggable', 'true')
         }
@@ -260,27 +269,18 @@ function FileRow({
         if (!isActive) e.currentTarget.style.backgroundColor = ''
       }}
     >
-      {artifactType ? (
-        <span
-          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
-          style={{
-            backgroundColor: getArtifactColor(artifactType),
-            boxShadow: canvasRingShadow,
-            transition: 'box-shadow 150ms ease-out'
-          }}
-          title={artifactType}
-        />
-      ) : isOnCanvas ? (
-        <span
-          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
-          style={{
-            backgroundColor: colors.accent.default,
-            boxShadow: canvasRingShadow,
-            transition: 'box-shadow 150ms ease-out'
-          }}
-          title="on canvas"
-        />
-      ) : null}
+      <span
+        className="mr-1.5 flex-shrink-0 flex items-center"
+        style={{
+          color: iconColor,
+          opacity: isOnCanvas ? 1 : 0.6,
+          filter: canvasGlow,
+          transition: 'filter 150ms ease-out, color 150ms ease-out'
+        }}
+        title={isOnCanvas ? 'on canvas' : artifactType ?? undefined}
+      >
+        <FileText size={14} strokeWidth={1.5} />
+      </span>
       {isRenaming ? (
         <RenameInput
           initialValue={node.name}
@@ -288,7 +288,12 @@ function FileRow({
           onCancel={onRenameCancel ?? (() => {})}
         />
       ) : (
-        <span className="truncate flex-1">{displayName(node.name)}</span>
+        <span className="truncate flex-1">
+          {base}
+          {ext && (
+            <span style={{ color: colors.text.muted, opacity: 0.4 }}>{ext}</span>
+          )}
+        </span>
       )}
       {canvasConnectionCount >= 2 && (
         <span

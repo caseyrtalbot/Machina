@@ -8,7 +8,7 @@ interface RichEditorProps {
 
 export function RichEditor({ editor }: RichEditorProps) {
   return (
-    <div className="h-full overflow-y-auto" style={{ backgroundColor: colors.bg.base }}>
+    <div className="h-full">
       <EditorContent editor={editor} />
     </div>
   )

@@ -80,9 +80,9 @@ export const THEMES = {
   midnight: {
     label: 'Midnight',
     colors: {
-      bg: { base: '#0c0e14', surface: '#13151f', elevated: '#1b1e2c' },
-      border: { default: '#262b3a', subtle: 'rgba(255, 255, 255, 0.07)' },
-      text: { primary: '#e8ecf4', secondary: '#6b7a94', muted: '#3d4766' }
+      bg: { base: '#0a0a0c', surface: '#111113', elevated: '#1a1a1d' },
+      border: { default: '#262628', subtle: 'rgba(255, 255, 255, 0.06)' },
+      text: { primary: '#e8eaed', secondary: '#7a7d85', muted: '#43454d' }
     }
   },
   slate: {
@@ -112,9 +112,9 @@ export const THEMES = {
   evergreen: {
     label: 'Evergreen',
     colors: {
-      bg: { base: '#0d1117', surface: '#161b22', elevated: '#21262d' },
-      border: { default: '#30363d', subtle: 'rgba(255, 255, 255, 0.06)' },
-      text: { primary: '#e6edf3', secondary: '#8b949e', muted: '#484f58' }
+      bg: { base: '#0c0c0e', surface: '#131315', elevated: '#1c1c1f' },
+      border: { default: '#2a2a2d', subtle: 'rgba(255, 255, 255, 0.06)' },
+      text: { primary: '#e6e8ec', secondary: '#8b8e96', muted: '#4a4c54' }
     }
   },
   light: {

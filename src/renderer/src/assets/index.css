@@ -30,7 +30,7 @@ html, body, #root {
 }
 
 body {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -64,9 +64,9 @@ body::after {
 }
 
 :root {
-  --font-display: 'DM Sans', 'Inter', system-ui, sans-serif;
+  --font-display: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --radius-card: 8px;
+  --radius-card: 0;
   --text-page-title: 20px;
   --text-section-heading: 15px;
   --text-body: 13px;
@@ -96,8 +96,8 @@ body::after {
   --color-accent-muted: rgba(0, 229, 191, 0.10);
 
   /* ── Visual Language ── */
-  --panel-gap: 4px;
-  --panel-radius: 8px;
+  --panel-gap: 0;
+  --panel-radius: 0;
   --panel-padding: 12px 16px;
   --border-subtle: rgba(255, 255, 255, 0.08);
   --neon-glow: 0 0 8px rgba(0, 229, 191, 0.12);
@@ -144,15 +144,31 @@ body::after {
 }
 .interactive-hover:hover { background-color: var(--color-bg-elevated); }
 
-/* ─── Panel Cards ─── */
+/* ─── Panels ─── */
 
 .panel-card {
   background: var(--color-bg-surface);
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--border-subtle);
   overflow: hidden;
   animation: te-fade-in 0.3s ease-out;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* ─── Panel Divider ─── */
+
+.panel-divider {
+  position: relative;
+  flex-shrink: 0;
+  width: 1px;
+  background: var(--color-border-default);
+  cursor: col-resize;
+}
+
+.panel-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -183,15 +199,13 @@ body::after {
 /* ── Headings ── */
 
 .ProseMirror h1 {
-  font-size: 1.8em;
+  font-size: 3em;
   font-weight: 700;
-  margin-top: 2.2em;
-  margin-bottom: 0.6em;
-  letter-spacing: -0.025em;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  letter-spacing: -0.035em;
   color: var(--color-text-primary);
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 0.35em;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .ProseMirror h2 {
