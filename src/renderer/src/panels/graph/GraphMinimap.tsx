@@ -22,7 +22,6 @@ const VIEWPORT_STROKE = 'rgba(255, 255, 255, 0.5)'
 const VIEWPORT_FILL = 'rgba(255, 255, 255, 0.1)'
 
 const DEFAULT_NOTE_COLOR = '#8a8a9e'
-const DEFAULT_TAG_COLOR = '#e6a237'
 
 const DOT_SIZE_NORMAL = 1.5
 const DOT_SIZE_HIGHLIGHTED = 2.5
@@ -68,7 +67,7 @@ function computeGraphBounds(nodes: readonly SimNode[]): GraphBounds {
 
 function getNodeDotColor(node: SimNode): string {
   if (node._color) return node._color
-  return node.type === 'tag' ? DEFAULT_TAG_COLOR : DEFAULT_NOTE_COLOR
+  return DEFAULT_NOTE_COLOR
 }
 
 export function GraphMinimap({
