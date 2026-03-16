@@ -519,8 +519,8 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         localStorage.setItem('graph-visited', JSON.stringify([...visitedRef.current]))
         draggedNode._visited = true
 
+        setSelectedNode(draggedNode.id)
         highlightHook.handleClick(draggedNode.id)
-        onNodeClick(draggedNode.id)
         if (canvas) canvas.style.cursor = 'grab'
       } else {
         if (draggedNode) {
@@ -534,7 +534,7 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         if (canvas) canvas.style.cursor = 'grab'
       }
     }
-  }, [highlightHook, onNodeClick])
+  }, [highlightHook, setSelectedNode])
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -554,13 +554,13 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
         localStorage.setItem('graph-visited', JSON.stringify([...visitedRef.current]))
         node._visited = true
 
+        setSelectedNode(node.id)
         highlightHook.handleClick(node.id)
-        onNodeClick(node.id)
       } else {
         highlightHook.handleClick(null)
       }
     },
-    [toGraphCoords, highlightHook, onNodeClick, nodeSizeMultiplier]
+    [toGraphCoords, highlightHook, setSelectedNode, nodeSizeMultiplier]
   )
 
   const handleDoubleClick = useCallback(
@@ -575,18 +575,16 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
           nodeSizeMultiplier
         ) ?? null
       if (node) {
+        // Unpin if pinned, then navigate to editor
         if (node.fx !== undefined && node.fx !== null) {
           node.fx = null
           node.fy = null
-          runtimeRef.current?.simulation?.alpha(0.3).restart()
-        } else {
-          highlightHook.handleDoubleClick(node.id)
-          setContentView('editor')
-          onNodeClick(node.id)
         }
+        setContentView('editor')
+        onNodeClick(node.id)
       }
     },
-    [toGraphCoords, highlightHook, setContentView, onNodeClick, nodeSizeMultiplier]
+    [toGraphCoords, setContentView, onNodeClick, nodeSizeMultiplier]
   )
 
   const handleContextMenu = useCallback(
