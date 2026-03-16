@@ -89,7 +89,6 @@ export class GraphRenderRuntime {
           if (Number.isFinite(d.x) && Number.isFinite(d.y)) {
             const hitRadius =
               Math.min(16, Math.max(3, Math.sqrt(Math.max(1, d.connectionCount)) * 3)) *
-                (d.type === 'tag' ? 0.7 : 1) *
                 sizeMultiplier +
               8
             const dx = d.x - x
@@ -104,7 +103,12 @@ export class GraphRenderRuntime {
         }
       }
       // Return true to skip subtree if bounding box is too far
-      return x0 > x + searchRadius || x1 < x - searchRadius || y0 > y + searchRadius || y1 < y - searchRadius
+      return (
+        x0 > x + searchRadius ||
+        x1 < x - searchRadius ||
+        y0 > y + searchRadius ||
+        y1 < y - searchRadius
+      )
     })
 
     return closest
@@ -115,7 +119,11 @@ export class GraphRenderRuntime {
   // ---------------------------------------------------------------------------
 
   getVignetteGradient(ctx: CanvasRenderingContext2D, w: number, h: number): CanvasGradient {
-    if (this._vignetteCache !== null && this._vignetteCache.w === w && this._vignetteCache.h === h) {
+    if (
+      this._vignetteCache !== null &&
+      this._vignetteCache.w === w &&
+      this._vignetteCache.h === h
+    ) {
       return this._vignetteCache.gradient
     }
     const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) / 2)

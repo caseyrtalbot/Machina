@@ -82,8 +82,6 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   const searchQuery = useGraphSettingsStore((s) => s.searchQuery)
   const showOrphans = useGraphSettingsStore((s) => s.showOrphans)
   const showExistingOnly = useGraphSettingsStore((s) => s.showExistingOnly)
-  const showTags = useGraphSettingsStore((s) => s.showTags)
-  const showAttachments = useGraphSettingsStore((s) => s.showAttachments)
   const groupRules = useGraphSettingsStore((s) => s.groupRules)
   const nodeSizeMultiplier = useGraphSettingsStore((s) => s.nodeSizeMultiplier)
   const isAnimating = useGraphSettingsStore((s) => s.isAnimating)
@@ -126,14 +124,12 @@ export function GraphPanel({ onNodeClick }: GraphPanelProps) {
   // Build GraphModel from graph data + filter settings
   const graphModel = useMemo(() => {
     const filters: GraphFilters = {
-      showTags,
-      showAttachments,
       showOrphans,
       showExistingOnly,
       searchQuery: '' // search is handled separately in render
     }
     return buildGlobalGraphModel(graph, filters)
-  }, [graph, showTags, showAttachments, showOrphans, showExistingOnly])
+  }, [graph, showOrphans, showExistingOnly])
 
   // Simulation reheat handler
   const handleSimRestart = useCallback((alpha: number) => {
