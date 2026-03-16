@@ -1,23 +1,25 @@
 import { useEffect, useRef } from 'react'
 import { colors } from '../../design/tokens'
+import { CARD_TYPE_INFO, type CanvasNodeType, type CanvasNode } from '@shared/canvas-types'
 
 interface CanvasContextMenuProps {
   x: number
   y: number
-  onAddCard: () => void
-  onAddNote: () => void
-  onAddTerminal: () => void
+  onAddCard: (
+    type: CanvasNodeType,
+    overrides?: Partial<Pick<CanvasNode, 'content' | 'metadata'>>
+  ) => void
   onClose: () => void
 }
 
-export function CanvasContextMenu({
-  x,
-  y,
-  onAddCard,
-  onAddNote,
-  onAddTerminal,
-  onClose
-}: CanvasContextMenuProps) {
+// Group card types by category for the menu
+const MENU_SECTIONS: { label: string; category: 'content' | 'media' | 'tools' }[] = [
+  { label: 'Content', category: 'content' },
+  { label: 'Media', category: 'media' },
+  { label: 'Tools', category: 'tools' }
+]
+
+export function CanvasContextMenu({ x, y, onAddCard, onClose }: CanvasContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -30,11 +32,22 @@ export function CanvasContextMenu({
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
-  const items = [
-    { label: 'Add card', action: onAddCard },
-    { label: 'Add note from vault', action: onAddNote },
-    { label: 'Add terminal', action: onAddTerminal }
-  ]
+  const handleImageAdd = () => {
+    // Use Electron file dialog to pick an image
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return
+      // file.path is available in Electron's renderer
+      const filePath = (file as File & { path?: string }).path
+      if (filePath) {
+        onAddCard('image', { metadata: { src: filePath, alt: file.name } })
+      }
+    }
+    input.click()
+  }
 
   return (
     <div
@@ -48,22 +61,57 @@ export function CanvasContextMenu({
         minWidth: 180
       }}
     >
-      {items.map(({ label, action }) => (
-        <button
-          key={label}
-          onClick={action}
-          className="w-full text-left px-3 py-1.5 text-sm transition-colors"
-          style={{ color: colors.text.primary }}
-          onMouseEnter={(e) => {
-            ;(e.target as HTMLElement).style.backgroundColor = colors.accent.muted
-          }}
-          onMouseLeave={(e) => {
-            ;(e.target as HTMLElement).style.backgroundColor = 'transparent'
-          }}
-        >
-          {label}
-        </button>
-      ))}
+      {MENU_SECTIONS.map((section) => {
+        const types = (Object.entries(CARD_TYPE_INFO) as [CanvasNodeType, typeof CARD_TYPE_INFO[CanvasNodeType]][])
+          .filter(([, info]) => info.category === section.category)
+
+        if (types.length === 0) return null
+
+        return (
+          <div key={section.category}>
+            <div
+              className="px-3 py-1 text-xs font-medium"
+              style={{ color: colors.text.muted }}
+            >
+              {section.label}
+            </div>
+            {types.map(([type, info]) => (
+              <button
+                key={type}
+                onClick={() => {
+                  if (type === 'image') {
+                    handleImageAdd()
+                  } else {
+                    onAddCard(type)
+                  }
+                }}
+                className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors"
+                style={{ color: colors.text.primary }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+                }}
+              >
+                <span
+                  className="inline-flex items-center justify-center text-xs font-mono"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    backgroundColor: colors.bg.surface,
+                    color: colors.text.secondary
+                  }}
+                >
+                  {info.icon}
+                </span>
+                {info.label}
+              </button>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }

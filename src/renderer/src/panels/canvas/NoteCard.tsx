@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { CardShell } from './CardShell'
+import { getCanvasEditorExtensions } from './shared/tiptap-config'
 import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
@@ -21,6 +23,20 @@ export function NoteCard({ node }: NoteCardProps) {
   const artifactId = fileToId[filePath]
   const artifact = artifacts.find((a) => a.id === artifactId)
   const title = artifact?.title ?? filePath.split('/').pop()?.replace('.md', '') ?? 'Note'
+
+  const extensions = useMemo(() => getCanvasEditorExtensions(), [])
+
+  const editor = useEditor({
+    extensions,
+    content: '',
+    editable: false,
+    editorProps: {
+      attributes: {
+        class: 'focus:outline-none px-3 py-2',
+        style: `color: ${colors.text.primary}; font-size: 13px;`
+      }
+    }
+  })
 
   // Load file content
   useEffect(() => {
@@ -63,15 +79,39 @@ export function NoteCard({ node }: NoteCardProps) {
     }
   }, [filePath])
 
+  // Sync body into Tiptap editor for rich rendering
+  useEffect(() => {
+    if (!editor || !body || loading) return
+    const manager = editor.storage.markdown?.manager
+    if (manager) {
+      const json = manager.parse(body)
+      editor.commands.setContent(json)
+    } else {
+      editor.commands.setContent(body)
+    }
+  }, [editor, body, loading])
+
   return (
     <CardShell node={node} title={title} onClose={() => removeNode(node.id)}>
-      <div className="p-3 text-sm whitespace-pre-wrap" style={{ color: colors.text.primary }}>
+      <div className="h-full overflow-auto" style={{ minHeight: 0 }}>
         {loading ? (
-          <span style={{ color: colors.text.muted }}>Loading...</span>
+          <div className="p-3">
+            <span className="text-sm" style={{ color: colors.text.muted }}>
+              Loading...
+            </span>
+          </div>
+        ) : !body ? (
+          <div className="p-3">
+            <span className="text-sm" style={{ color: colors.text.muted }}>
+              Empty note
+            </span>
+          </div>
         ) : (
-          body || <span style={{ color: colors.text.muted }}>Empty note</span>
+          editor && <EditorContent editor={editor} />
         )}
       </div>
     </CardShell>
   )
 }
+
+export default NoteCard

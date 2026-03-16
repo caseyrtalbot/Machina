@@ -8,9 +8,13 @@ interface SelectionRect {
   endY: number
 }
 
+/** Minimum drag distance (px) before it counts as a selection rectangle vs a click. */
+const MIN_DRAG_DISTANCE = 5
+
 export function useCanvasSelection() {
   const [rect, setRect] = useState<SelectionRect | null>(null)
   const isDragging = useRef(false)
+  const didDragRef = useRef(false)
 
   const onSelectionStart = useCallback((e: React.PointerEvent) => {
     // Only left-click on background, no space (that's panning)
@@ -18,12 +22,19 @@ export function useCanvasSelection() {
     if ((e.target as HTMLElement).closest('[data-canvas-node]')) return
 
     isDragging.current = true
+    didDragRef.current = false
     const startX = e.clientX
     const startY = e.clientY
     setRect({ startX, startY, endX: startX, endY: startY })
 
     const onMove = (me: PointerEvent) => {
       if (!isDragging.current) return
+      // Only count as a drag after minimum distance
+      const dx = me.clientX - startX
+      const dy = me.clientY - startY
+      if (Math.abs(dx) > MIN_DRAG_DISTANCE || Math.abs(dy) > MIN_DRAG_DISTANCE) {
+        didDragRef.current = true
+      }
       setRect((prev) => (prev ? { ...prev, endX: me.clientX, endY: me.clientY } : null))
     }
 
@@ -31,6 +42,12 @@ export function useCanvasSelection() {
       isDragging.current = false
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+
+      // If the user barely moved, treat it as a click (not a selection drag)
+      if (!didDragRef.current) {
+        setRect(null)
+        return
+      }
 
       // Calculate which nodes intersect the rect
       const { nodes, viewport, setSelection } = useCanvasStore.getState()
@@ -73,5 +90,11 @@ export function useCanvasSelection() {
     window.addEventListener('pointerup', onUp)
   }, [])
 
-  return { rect, onSelectionStart }
+  /**
+   * Returns true if the last pointer interaction was a selection drag.
+   * Used by the click handler to suppress clearSelection after drag-to-select.
+   */
+  const wasSelectionDrag = useCallback(() => didDragRef.current, [])
+
+  return { rect, onSelectionStart, wasSelectionDrag }
 }

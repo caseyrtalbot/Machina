@@ -260,3 +260,5 @@ export function TerminalCard({ node }: TerminalCardProps) {
     </CardShell>
   )
 }
+
+export default TerminalCard

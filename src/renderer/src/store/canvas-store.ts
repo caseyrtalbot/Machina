@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { CanvasNode, CanvasEdge, CanvasViewport, CanvasFile } from '@shared/canvas-types'
+import { getDefaultMetadata } from '@shared/canvas-types'
 
 interface CanvasStore {
   // Document state
@@ -27,6 +28,7 @@ interface CanvasStore {
   moveNode: (id: string, position: { x: number; y: number }) => void
   resizeNode: (id: string, size: { width: number; height: number }) => void
   updateNodeContent: (id: string, content: string) => void
+  updateNodeMetadata: (id: string, partial: Partial<Record<string, unknown>>) => void
   updateNodeType: (id: string, type: CanvasNode['type']) => void
 
   // Edge mutations
@@ -119,9 +121,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       isDirty: true
     })),
 
+  updateNodeMetadata: (id, partial) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, metadata: { ...n.metadata, ...partial } } : n
+      ),
+      isDirty: true
+    })),
+
   updateNodeType: (id, type) =>
     set((s) => ({
-      nodes: s.nodes.map((n) => (n.id === id ? { ...n, type, content: '' } : n)),
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, type, content: '', metadata: getDefaultMetadata(type) } : n
+      ),
       isDirty: true
     })),
 

@@ -57,6 +57,58 @@ describe('canvas-store', () => {
       useCanvasStore.getState().updateNodeContent(node.id, '# Hello')
       expect(useCanvasStore.getState().nodes[0].content).toBe('# Hello')
     })
+
+    it('updates node metadata', () => {
+      const node = createCanvasNode('code', { x: 0, y: 0 })
+      useCanvasStore.getState().addNode(node)
+      expect(useCanvasStore.getState().nodes[0].metadata).toEqual({ language: 'typescript' })
+
+      useCanvasStore.getState().updateNodeMetadata(node.id, { language: 'python' })
+      expect(useCanvasStore.getState().nodes[0].metadata).toEqual({ language: 'python' })
+      expect(useCanvasStore.getState().isDirty).toBe(true)
+    })
+
+    it('merges metadata without overwriting other keys', () => {
+      const node = createCanvasNode(
+        'code',
+        { x: 0, y: 0 },
+        {
+          metadata: { language: 'typescript', filename: 'main.ts' }
+        }
+      )
+      useCanvasStore.getState().addNode(node)
+
+      useCanvasStore.getState().updateNodeMetadata(node.id, { language: 'javascript' })
+      const meta = useCanvasStore.getState().nodes[0].metadata
+      expect(meta).toEqual({ language: 'javascript', filename: 'main.ts' })
+    })
+
+    it('resets metadata when changing node type', () => {
+      const node = createCanvasNode('text', { x: 0, y: 0 })
+      useCanvasStore.getState().addNode(node)
+
+      useCanvasStore.getState().updateNodeType(node.id, 'code')
+      const updated = useCanvasStore.getState().nodes[0]
+      expect(updated.type).toBe('code')
+      expect(updated.content).toBe('')
+      expect(updated.metadata).toEqual({ language: 'typescript' })
+    })
+
+    it('sets correct metadata when converting to markdown', () => {
+      const node = createCanvasNode('text', { x: 0, y: 0 })
+      useCanvasStore.getState().addNode(node)
+
+      useCanvasStore.getState().updateNodeType(node.id, 'markdown')
+      expect(useCanvasStore.getState().nodes[0].metadata).toEqual({ viewMode: 'rendered' })
+    })
+
+    it('sets correct metadata when converting to image', () => {
+      const node = createCanvasNode('text', { x: 0, y: 0 })
+      useCanvasStore.getState().addNode(node)
+
+      useCanvasStore.getState().updateNodeType(node.id, 'image')
+      expect(useCanvasStore.getState().nodes[0].metadata).toEqual({ src: '', alt: '' })
+    })
   })
 
   describe('edge operations', () => {

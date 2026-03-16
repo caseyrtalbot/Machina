@@ -47,7 +47,7 @@ export function CanvasSurface({
   const containerRef = useRef<HTMLDivElement>(null)
   const viewport = useCanvasStore((s) => s.viewport)
   const { onWheel, onPointerDown } = useCanvasViewport(containerRef)
-  const { rect, onSelectionStart } = useCanvasSelection()
+  const { rect, onSelectionStart, wasSelectionDrag } = useCanvasSelection()
 
   // Attach wheel listener with { passive: false } to allow preventDefault
   useEffect(() => {
@@ -75,6 +75,9 @@ export function CanvasSurface({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      // Don't clear selection if the user just finished a drag-to-select
+      if (wasSelectionDrag()) return
+
       // Click on background deselects
       if (
         !(e.target as HTMLElement).closest('[data-canvas-node]') &&
@@ -83,7 +86,7 @@ export function CanvasSurface({
         onBackgroundClick()
       }
     },
-    [onBackgroundClick]
+    [onBackgroundClick, wasSelectionDrag]
   )
 
   // Drag-over state for file drops from sidebar

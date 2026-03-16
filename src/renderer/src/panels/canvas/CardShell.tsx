@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
 import { colors, borderRadius } from '../../design/tokens'
@@ -7,13 +7,102 @@ import {
   endConnectionDrag,
   isConnectionDragActive
 } from './ConnectionDragOverlay'
-import type { CanvasNode, CanvasSide } from '@shared/canvas-types'
+import {
+  CARD_TYPE_INFO,
+  type CanvasNode,
+  type CanvasNodeType,
+  type CanvasSide
+} from '@shared/canvas-types'
 
 interface CardShellProps {
   node: CanvasNode
   title: string
   children: React.ReactNode
   onClose: () => void
+}
+
+/** Valid conversion targets for each card type */
+export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]> = {
+  text: ['code', 'markdown', 'terminal'],
+  code: ['text', 'markdown', 'terminal'],
+  markdown: ['text', 'code', 'terminal'],
+  note: ['markdown', 'terminal'],
+  image: ['text', 'terminal'],
+  terminal: ['text']
+} as const
+
+function ConvertMenu({
+  nodeId,
+  nodeType,
+  onClose
+}: {
+  readonly nodeId: string
+  readonly nodeType: CanvasNodeType
+  readonly onClose: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const targets = VALID_CONVERSIONS[nodeType]
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    // Delay attachment to avoid the click that opened the menu from closing it
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handler)
+    }, 0)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handler)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute flex flex-col py-1"
+      style={{
+        top: '100%',
+        right: 0,
+        marginTop: 2,
+        minWidth: 120,
+        backgroundColor: colors.bg.elevated,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: borderRadius.container,
+        zIndex: 50,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {targets.map((target) => {
+        const info = CARD_TYPE_INFO[target]
+        return (
+          <button
+            key={target}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:opacity-80"
+            style={{
+              color: colors.text.secondary,
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              useCanvasStore.getState().updateNodeType(nodeId, target)
+              onClose()
+            }}
+          >
+            <span style={{ color: colors.text.muted, fontFamily: 'monospace', width: 20 }}>
+              {info.icon}
+            </span>
+            {info.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function nearestSide(clientX: number, clientY: number, rect: DOMRect): CanvasSide {
@@ -32,6 +121,7 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
   const [hovered, setHovered] = useState(false)
+  const [convertMenuOpen, setConvertMenuOpen] = useState(false)
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -53,15 +143,6 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
       const rect = e.currentTarget.getBoundingClientRect()
       const side = nearestSide(e.clientX, e.clientY, rect)
       endConnectionDrag(node.id, side)
-    },
-    [node.id]
-  )
-
-  // Convert this card into a terminal
-  const handleConvertToTerminal = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
-      useCanvasStore.getState().updateNodeType(node.id, 'terminal')
     },
     [node.id]
   )
@@ -97,15 +178,18 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
         <span className="text-xs font-medium truncate" style={{ color: colors.text.secondary }}>
           {title}
         </span>
-        <div className="flex items-center gap-1 ml-2 shrink-0">
-          {/* Terminal spawn button (not on terminal cards) */}
-          {node.type !== 'terminal' && (
+        <div className="flex items-center gap-1 ml-2 shrink-0 relative">
+          {/* Convert card type dropdown */}
+          {VALID_CONVERSIONS[node.type].length > 0 && (
             <button
-              onClick={handleConvertToTerminal}
+              onClick={(e) => {
+                e.stopPropagation()
+                setConvertMenuOpen((prev) => !prev)
+              }}
               className="flex items-center justify-center rounded hover:opacity-80"
               style={{ width: 18, height: 18, color: colors.text.muted }}
-              aria-label="Open terminal"
-              title="Open terminal"
+              aria-label="Convert card type"
+              title="Convert card type"
             >
               <svg
                 width={12}
@@ -115,10 +199,16 @@ export function CardShell({ node, title, children, onClose }: CardShellProps) {
                 stroke="currentColor"
                 strokeWidth="1.5"
               >
-                <path d="M2 3l3 3-3 3" />
-                <path d="M7 9h3" />
+                <path d="M1 4h8l-2-2M11 8H3l2 2" />
               </svg>
             </button>
+          )}
+          {convertMenuOpen && (
+            <ConvertMenu
+              nodeId={node.id}
+              nodeType={node.type}
+              onClose={() => setConvertMenuOpen(false)}
+            />
           )}
           <button
             onClick={(e) => {

@@ -1,5 +1,21 @@
-export type CanvasNodeType = 'text' | 'note' | 'terminal'
+export type CanvasNodeType = 'text' | 'note' | 'terminal' | 'code' | 'markdown' | 'image'
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left'
+
+// --- Per-type metadata (discriminated by node.type) ---
+
+export interface CodeNodeMeta {
+  readonly language: string
+  readonly filename?: string
+}
+
+export interface ImageNodeMeta {
+  readonly src: string
+  readonly alt?: string
+}
+
+export interface MarkdownNodeMeta {
+  readonly viewMode: 'rendered' | 'source'
+}
 
 export interface CanvasNode {
   readonly id: string
@@ -35,17 +51,59 @@ export interface CanvasFile {
 const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   text: { width: 200, height: 100 },
   note: { width: 200, height: 100 },
-  terminal: { width: 300, height: 200 }
+  terminal: { width: 300, height: 200 },
+  code: { width: 300, height: 200 },
+  markdown: { width: 250, height: 150 },
+  image: { width: 150, height: 150 }
 }
 
 const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   text: { width: 260, height: 140 },
   note: { width: 280, height: 200 },
-  terminal: { width: 400, height: 280 }
+  terminal: { width: 400, height: 280 },
+  code: { width: 480, height: 320 },
+  markdown: { width: 400, height: 300 },
+  image: { width: 300, height: 300 }
 }
 
 export function getMinSize(type: CanvasNodeType): { width: number; height: number } {
   return MIN_SIZES[type]
+}
+
+export function getDefaultSize(type: CanvasNodeType): { width: number; height: number } {
+  return DEFAULT_SIZES[type]
+}
+
+// --- Card display metadata for menus and UI ---
+
+export interface CardTypeInfo {
+  readonly label: string
+  readonly icon: string
+  readonly category: 'content' | 'media' | 'tools'
+}
+
+export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
+  text: { label: 'Text', icon: 'T', category: 'content' },
+  code: { label: 'Code', icon: '</>', category: 'content' },
+  markdown: { label: 'Markdown', icon: 'M', category: 'content' },
+  note: { label: 'Vault Note', icon: 'N', category: 'content' },
+  image: { label: 'Image', icon: 'I', category: 'media' },
+  terminal: { label: 'Terminal', icon: '>', category: 'tools' }
+}
+
+// --- Default metadata per type ---
+
+export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown> {
+  switch (type) {
+    case 'code':
+      return { language: 'typescript' }
+    case 'markdown':
+      return { viewMode: 'rendered' }
+    case 'image':
+      return { src: '', alt: '' }
+    default:
+      return {}
+  }
 }
 
 // --- Factory helpers ---
@@ -66,7 +124,7 @@ export function createCanvasNode(
     position: { x: position.x, y: position.y },
     size: overrides?.size ?? { ...DEFAULT_SIZES[type] },
     content: overrides?.content ?? '',
-    metadata: overrides?.metadata ?? {}
+    metadata: overrides?.metadata ?? getDefaultMetadata(type)
   }
 }
 

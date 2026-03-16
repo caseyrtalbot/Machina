@@ -69,3 +69,5 @@ export function TextCard({ node }: TextCardProps) {
     </CardShell>
   )
 }
+
+export default TextCard

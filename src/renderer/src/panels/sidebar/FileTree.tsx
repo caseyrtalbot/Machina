@@ -2,6 +2,7 @@ import { colors, getArtifactColor } from '../../design/tokens'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode } from './buildFileTree'
 import { RenameInput } from './FileContextMenu'
+import { TE_FILE_MIME, inferCardType, type DragFileData } from '../canvas/file-drop-utils'
 
 export interface FileTreeProps {
   nodes: FlatTreeNode[]
@@ -208,6 +209,23 @@ function FileRow({
   return (
     <div
       data-active={isActive ? 'true' : 'false'}
+      onMouseDown={(e) => {
+        // Only enable drag on left-click to avoid breaking right-click context menu
+        if (e.button === 0) {
+          e.currentTarget.setAttribute('draggable', 'true')
+        }
+      }}
+      onDragStart={(e) => {
+        const data: DragFileData = { path: node.path, type: inferCardType(node.path) }
+        e.dataTransfer.setData(TE_FILE_MIME, JSON.stringify(data))
+        e.dataTransfer.effectAllowed = 'copy'
+      }}
+      onDragEnd={(e) => {
+        e.currentTarget.setAttribute('draggable', 'false')
+      }}
+      onMouseUp={(e) => {
+        e.currentTarget.setAttribute('draggable', 'false')
+      }}
       onClick={() => onFileSelect(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
       className="flex items-center py-0.5 cursor-pointer rounded transition-colors"
