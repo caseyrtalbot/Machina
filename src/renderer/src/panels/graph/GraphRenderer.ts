@@ -126,8 +126,6 @@ export function computeNodeRadius(node: SimNode, multiplier: number = 1): number
 
 export function resolveNodeColor(node: SimNode): string {
   if (node._color) return node._color
-  if (node.type === 'tag') return GRAPH_PALETTE.defaultTag
-  if (node.type === 'attachment') return GRAPH_PALETTE.defaultAttach
   if (node._visited) return GRAPH_PALETTE.visitedNote
   return GRAPH_PALETTE.defaultNote
 }
@@ -239,38 +237,14 @@ function drawNoteNode(ctx: CanvasRenderingContext2D, x: number, y: number, r: nu
   ctx.arc(x, y, r, 0, Math.PI * 2)
 }
 
-function drawTagNode(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  ctx.beginPath()
-  ctx.moveTo(x, y - r)
-  ctx.lineTo(x + r, y)
-  ctx.lineTo(x, y + r)
-  ctx.lineTo(x - r, y)
-  ctx.closePath()
-}
-
-function drawAttachmentNode(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  const cornerRadius = 2
-  const size = r * 2
-  const left = x - r
-  const top = y - r
-  ctx.beginPath()
-  ctx.roundRect(left, top, size, size, cornerRadius)
-}
-
 function drawNodeShape(
   ctx: CanvasRenderingContext2D,
-  node: SimNode,
+  _node: SimNode,
   x: number,
   y: number,
   r: number
 ): void {
-  if (node.type === 'tag') {
-    drawTagNode(ctx, x, y, r)
-  } else if (node.type === 'attachment') {
-    drawAttachmentNode(ctx, x, y, r)
-  } else {
-    drawNoteNode(ctx, x, y, r)
-  }
+  drawNoteNode(ctx, x, y, r)
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +279,30 @@ function traceArrowhead(
     tipY - uy * ARROW_SIZE + ux * ARROW_SIZE * 0.4
   )
   ctx.lineTo(tipX, tipY)
+}
+
+// ---------------------------------------------------------------------------
+// Curved edge drawing (co-occurrence visual)
+// ---------------------------------------------------------------------------
+
+function drawCurvedEdge(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number
+): void {
+  const mx = (sx + tx) / 2
+  const my = (sy + ty) / 2
+  const dx = tx - sx
+  const dy = ty - sy
+  const len = Math.sqrt(dx * dx + dy * dy)
+  if (len === 0) return
+  const offset = len * 0.08
+  const nx = -dy / len
+  const ny = dx / len
+  ctx.moveTo(sx, sy)
+  ctx.quadraticCurveTo(mx + nx * offset, my + ny * offset, tx, ty)
 }
 
 // ---------------------------------------------------------------------------
@@ -361,8 +359,7 @@ export function renderGraph(
       const target = edge.target as SimNode
       if (!hasValidCoords(source) || !hasValidCoords(target)) continue
       if (!isEdgeConnected(edge, connectedSet)) continue
-      ctx.moveTo(source.x, source.y)
-      ctx.lineTo(target.x, target.y)
+      drawCurvedEdge(ctx, source.x, source.y, target.x, target.y)
     }
     ctx.stroke()
     ctx.restore()
@@ -382,33 +379,35 @@ export function renderGraph(
       ctx.fill()
     }
   } else {
-    // Normal mode: gossamer threads
-    ctx.globalAlpha = 0.04
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 0.5 * linkThickness
+    // Normal mode: edges with varied opacity
     ctx.setLineDash([])
-    ctx.beginPath()
     for (const edge of edges) {
       const source = edge.source as SimNode
       const target = edge.target as SimNode
       if (!hasValidCoords(source) || !hasValidCoords(target)) continue
-      ctx.moveTo(source.x, source.y)
-      ctx.lineTo(target.x, target.y)
-    }
-    ctx.stroke()
-
-    // Arrowheads for normal mode (batched)
-    if (showArrows) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.04)'
+      const isCo = edge.kind === 'co-occurrence'
+      ctx.globalAlpha = isCo ? 0.06 : 0.12
+      ctx.strokeStyle = 'rgba(180, 170, 210, 1)'
+      ctx.lineWidth = (isCo ? 0.5 : 0.8) * linkThickness
       ctx.beginPath()
+      drawCurvedEdge(ctx, source.x, source.y, target.x, target.y)
+      ctx.stroke()
+    }
+
+    // Arrowheads for normal mode (per-edge)
+    if (showArrows) {
       for (const edge of edges) {
         const source = edge.source as SimNode
         const target = edge.target as SimNode
         if (!hasValidCoords(source) || !hasValidCoords(target)) continue
+        const isCo = edge.kind === 'co-occurrence'
+        ctx.globalAlpha = isCo ? 0.06 : 0.12
+        ctx.fillStyle = 'rgba(180, 170, 210, 1)'
+        ctx.beginPath()
         const tr = computeNodeRadius(target, multiplier)
         traceArrowhead(ctx, source.x, source.y, target.x, target.y, tr)
+        ctx.fill()
       }
-      ctx.fill()
     }
   }
   ctx.setLineDash([])
@@ -511,19 +510,21 @@ export function renderGraph(
       ctx.globalAlpha = vn.matchesSearch ? 1 : 0.15
       drawNodeShape(ctx, vn.node, vn.node.x, vn.node.y, vn.r)
       ctx.fill()
-
-      // Tag nodes: colored stroke ring (Quartz-style visual distinction)
-      if (vn.node.type === 'tag') {
-        ctx.strokeStyle = GRAPH_PALETTE.tagStroke
-        ctx.lineWidth = 2
-      }
       ctx.stroke()
+    }
+  }
+  ctx.globalAlpha = 1
 
-      // Reset stroke for next node
-      if (vn.node.type === 'tag') {
-        ctx.strokeStyle = lightenHex(color, 0.2)
-        ctx.lineWidth = 1
-      }
+  // Outer ring for well-connected nodes
+  for (const vn of visibleNodes) {
+    if (vn.isDimmed) continue
+    if (vn.node.connectionCount > 8) {
+      ctx.globalAlpha = 0.15
+      ctx.strokeStyle = vn.color
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.arc(vn.node.x, vn.node.y, vn.r + 3, 0, Math.PI * 2)
+      ctx.stroke()
     }
   }
   ctx.globalAlpha = 1
