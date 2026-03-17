@@ -75,6 +75,34 @@ export function parseClaudeSettings(json: string): ClaudeSettings {
   } as ClaudeSettings
 }
 
+/**
+ * Merge two settings objects for visualization (union of envVars, plugins, permissions).
+ * The `override` settings take precedence for rawJson, but lists are combined.
+ */
+export function mergeClaudeSettings(
+  base: ClaudeSettings,
+  override: ClaudeSettings
+): ClaudeSettings {
+  const envVars = [...new Set([...base.envVars, ...override.envVars])]
+  const plugins = [...new Set([...base.plugins, ...override.plugins])]
+
+  const baseAllow = Array.isArray((base.permissions as Record<string, unknown>).allow)
+    ? ((base.permissions as Record<string, unknown>).allow as string[])
+    : []
+  const overrideAllow = Array.isArray((override.permissions as Record<string, unknown>).allow)
+    ? ((override.permissions as Record<string, unknown>).allow as string[])
+    : []
+  const mergedAllow = [...new Set([...baseAllow, ...overrideAllow])]
+
+  return {
+    permissions: { ...base.permissions, ...override.permissions, allow: mergedAllow },
+    envVars,
+    plugins,
+    rawJson: { ...base.rawJson, ...override.rawJson },
+    allowCount: mergedAllow.length
+  }
+}
+
 export function parseClaudeAgent(content: string, filePath: string): ClaudeAgent {
   let parsed: matter.GrayMatterFile<string>
   try {
@@ -420,25 +448,41 @@ export async function loadClaudeConfig(
   const { settingsFiles, agentFiles, skillDirs, ruleFiles, commandFiles, teamFiles, memoryFiles } =
     categorizeFiles(allFiles, basePath)
 
-  // Parse settings (prefer settings.local.json, fall back to settings.json, then .claude.json)
+  // Parse settings: read both files and merge for a complete visualization
   let settings: ClaudeSettings | null = null
-  const settingsPath =
-    settingsFiles.find((f) => f.endsWith('settings.local.json')) ??
-    settingsFiles.find((f) => f.endsWith('settings.json'))
+  const baseSettingsPath = settingsFiles.find((f) => f.endsWith('settings.json'))
+  const localSettingsPath = settingsFiles.find((f) => f.endsWith('settings.local.json'))
 
-  if (settingsPath) {
+  let baseSettings: ClaudeSettings | null = null
+  let localSettings: ClaudeSettings | null = null
+
+  if (baseSettingsPath) {
     try {
-      const content = await window.api.fs.readFile(settingsPath)
-      settings = parseClaudeSettings(content)
+      baseSettings = parseClaudeSettings(await window.api.fs.readFile(baseSettingsPath))
     } catch {
-      // Settings file unreadable
+      /* unreadable */
     }
+  }
+  if (localSettingsPath) {
+    try {
+      localSettings = parseClaudeSettings(await window.api.fs.readFile(localSettingsPath))
+    } catch {
+      /* unreadable */
+    }
+  }
+
+  if (baseSettings && localSettings) {
+    settings = mergeClaudeSettings(baseSettings, localSettings)
+  } else if (localSettings) {
+    settings = localSettings
+  } else if (baseSettings) {
+    settings = baseSettings
   } else {
+    // Fall back to .claude.json in parent directory
     try {
       const exists = await window.api.fs.fileExists(parentSettingsPath)
       if (exists) {
-        const content = await window.api.fs.readFile(parentSettingsPath)
-        settings = parseClaudeSettings(content)
+        settings = parseClaudeSettings(await window.api.fs.readFile(parentSettingsPath))
       }
     } catch {
       // No settings found

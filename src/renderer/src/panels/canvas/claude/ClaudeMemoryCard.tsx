@@ -26,6 +26,7 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
     linkCount?: number
     description?: string
     contentPreview?: string
+    scope?: string
   }
 
   const name = meta.memoryName || node.content.split('/').pop()?.replace('.md', '') || 'Memory'
@@ -50,13 +51,23 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
       onOpenInEditor={openInEditor}
     >
       <div className="p-3 space-y-2" style={{ color: '#f1f5f9' }}>
-        {/* Memory type badge */}
-        <span
-          className="inline-block px-2 py-0.5 rounded text-xs font-medium"
-          style={{ backgroundColor: typeColor + '22', color: typeColor }}
-        >
-          {memType}
-        </span>
+        {/* Memory type + scope badges */}
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+            style={{ backgroundColor: typeColor + '22', color: typeColor }}
+          >
+            {memType}
+          </span>
+          {meta.scope === 'project' && (
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ backgroundColor: '#3b82f622', color: '#60a5fa' }}
+            >
+              PROJECT
+            </span>
+          )}
+        </div>
 
         {/* Description or content preview */}
         {(meta.description || meta.contentPreview) && (

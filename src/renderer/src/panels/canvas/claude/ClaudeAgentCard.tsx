@@ -57,18 +57,32 @@ export function ClaudeAgentCard({ node }: ClaudeAgentCardProps) {
       onOpenInEditor={openInEditor}
     >
       <div className="p-3 space-y-2" style={{ color: '#f1f5f9' }}>
-        {/* Model badge */}
-        {model && (
-          <span
-            className="inline-block px-2 py-0.5 rounded text-xs font-medium"
-            style={{
-              backgroundColor: modelColor(model) + '22',
-              color: modelColor(model)
-            }}
-          >
-            {model}
-          </span>
-        )}
+        {/* Header: Model + Tool count */}
+        <div className="flex items-center justify-between">
+          {model && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold"
+              style={{
+                backgroundColor: modelColor(model) + '25',
+                color: modelColor(model)
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: modelColor(model) }}
+              />
+              {model}
+            </span>
+          )}
+          {tools.length > 0 && (
+            <span
+              className="text-xs font-medium tabular-nums"
+              style={{ color: '#94a3b8', fontFamily: typography.fontFamily.mono }}
+            >
+              {tools.length} tools
+            </span>
+          )}
+        </div>
 
         {/* Description */}
         {meta.description && (
@@ -77,40 +91,38 @@ export function ClaudeAgentCard({ node }: ClaudeAgentCardProps) {
           </p>
         )}
 
-        {/* Tools */}
+        {/* Tool chips */}
         {tools.length > 0 && (
-          <div>
-            <span className="block mb-1" style={{ ...typography.metadata, color: '#94a3b8' }}>
-              TOOLS
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {tools.slice(0, 8).map((tool) => (
-                <span
-                  key={tool}
-                  className="px-1.5 py-0.5 rounded text-xs"
-                  style={{
-                    backgroundColor: colors.bg.elevated,
-                    color: '#cbd5e1',
-                    fontFamily: typography.fontFamily.mono
-                  }}
-                >
-                  {tool}
-                </span>
-              ))}
-              {tools.length > 8 && (
-                <span className="text-xs" style={{ color: '#94a3b8' }}>
-                  +{tools.length - 8} more
-                </span>
-              )}
-            </div>
+          <div className="flex flex-wrap gap-1">
+            {tools.slice(0, 6).map((tool) => (
+              <span
+                key={tool}
+                className="px-1.5 py-0.5 rounded text-xs"
+                style={{
+                  backgroundColor: '#a78bfa15',
+                  color: '#c4b5fd',
+                  fontFamily: typography.fontFamily.mono
+                }}
+              >
+                {tool}
+              </span>
+            ))}
+            {tools.length > 6 && (
+              <span
+                className="px-1.5 py-0.5 text-xs"
+                style={{ color: '#94a3b8', fontFamily: typography.fontFamily.mono }}
+              >
+                +{tools.length - 6}
+              </span>
+            )}
           </div>
         )}
 
         {/* Instruction preview */}
         {meta.instructionPreview && (
           <p
-            className="text-xs leading-relaxed opacity-60 line-clamp-2"
-            style={{ color: '#94a3b8', fontFamily: typography.fontFamily.mono }}
+            className="text-xs leading-relaxed line-clamp-2"
+            style={{ color: '#64748b', fontFamily: typography.fontFamily.mono }}
           >
             {meta.instructionPreview}
           </p>
