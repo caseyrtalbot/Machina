@@ -17,7 +17,14 @@ const LOD_COLORS: Record<string, string> = {
   note: '#38bdf8',
   image: '#f472b6',
   terminal: '#34d399',
-  pdf: '#ef4444'
+  pdf: '#ef4444',
+  'claude-settings': '#f59e0b',
+  'claude-agent': '#a78bfa',
+  'claude-skill': '#22d3ee',
+  'claude-rule': '#94a3b8',
+  'claude-command': '#34d399',
+  'claude-team': '#f472b6',
+  'claude-memory': '#fb923c'
 }
 
 /**

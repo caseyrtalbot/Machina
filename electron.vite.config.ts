@@ -29,6 +29,7 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     optimizeDeps: {
       include: [
+        'buffer',
         'react-dom/client',
         'zustand',
         'zustand/middleware',

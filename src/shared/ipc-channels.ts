@@ -14,6 +14,7 @@ export interface IpcChannels {
   'fs:create-folder': { request: { defaultPath: string }; response: string | null }
   'fs:mkdir': { request: { path: string }; response: void }
   'fs:read-binary': { request: { path: string }; response: string }
+  'fs:list-all-files': { request: { dir: string }; response: string[] }
 
   // --- Vault ---
   'vault:read-config': { request: { vaultPath: string }; response: VaultConfig }

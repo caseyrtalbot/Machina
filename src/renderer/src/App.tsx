@@ -8,6 +8,7 @@ import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
 import { SkillsPanel } from './panels/skills/SkillsPanel'
 import { CanvasView } from './panels/canvas/CanvasView'
+import { ClaudeConfigPanel } from './panels/claude-config/ClaudeConfigPanel'
 import { ActivityBar } from './components/ActivityBar'
 import { TerminalPanel } from './panels/terminal/TerminalPanel'
 import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
@@ -44,6 +45,7 @@ function ContentArea() {
       {contentView === 'editor' && <EditorPanel onNavigate={handleNavigate} />}
       {contentView === 'canvas' && <CanvasView />}
       {contentView === 'skills' && <SkillsPanel />}
+      {contentView === 'claude-config' && <ClaudeConfigPanel />}
     </div>
   )
 }
@@ -257,7 +259,13 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
   { id: 'cmd:open-settings', label: 'Open Settings', category: 'command' },
   { id: 'cmd:reindex-vault', label: 'Re-index Vault', category: 'command' },
   { id: 'cmd:activate-claude', label: 'Activate Claude', category: 'command' },
-  { id: 'cmd:new-canvas', label: 'New Canvas', category: 'command' }
+  { id: 'cmd:new-canvas', label: 'New Canvas', category: 'command' },
+  {
+    id: 'cmd:toggle-claude-config',
+    label: 'Toggle Claude Config Canvas',
+    category: 'command',
+    shortcut: '\u21E7\u2318C'
+  }
 ]
 
 function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
@@ -272,9 +280,12 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const setMode = useEditorStore((s) => s.setMode)
   const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
 
+  const toggleClaudeConfig = useViewStore((s) => s.toggleClaudeConfig)
+
   const toggleView = useCallback(() => {
     if (contentView === 'editor') setContentView('canvas')
     else if (contentView === 'canvas') setContentView('skills')
+    else if (contentView === 'skills') setContentView('editor')
     else setContentView('editor')
   }, [contentView, setContentView])
 
@@ -313,6 +324,18 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
     onGoForward: goForward,
     onEscape: () => setPaletteOpen(false)
   })
+
+  // Cmd+Shift+C: toggle Claude Config Canvas
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault()
+        toggleClaudeConfig()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [toggleClaudeConfig])
 
   const paletteItems = useMemo<CommandItem[]>(() => {
     const noteItems: CommandItem[] = files.map((f) => ({
@@ -360,9 +383,20 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
             setContentView('canvas')
           }
           break
+        case 'cmd:toggle-claude-config':
+          toggleClaudeConfig()
+          break
       }
     },
-    [setContentView, toggleView, toggleSourceMode, toggleTerminal, setSettingsOpen, vaultPath]
+    [
+      setContentView,
+      toggleView,
+      toggleSourceMode,
+      toggleTerminal,
+      setSettingsOpen,
+      vaultPath,
+      toggleClaudeConfig
+    ]
   )
 
   return (

@@ -1,4 +1,18 @@
-export type CanvasNodeType = 'text' | 'note' | 'terminal' | 'code' | 'markdown' | 'image' | 'pdf'
+export type CanvasNodeType =
+  | 'text'
+  | 'note'
+  | 'terminal'
+  | 'code'
+  | 'markdown'
+  | 'image'
+  | 'pdf'
+  | 'claude-settings'
+  | 'claude-agent'
+  | 'claude-skill'
+  | 'claude-rule'
+  | 'claude-command'
+  | 'claude-team'
+  | 'claude-memory'
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left'
 
 // --- Per-type metadata (discriminated by node.type) ---
@@ -21,6 +35,41 @@ export interface PdfNodeMeta {
   readonly src: string
   readonly pageCount: number
   readonly currentPage: number
+}
+
+export interface ClaudeSettingsNodeMeta {
+  readonly permissionCount: number
+  readonly envVarCount: number
+}
+
+export interface ClaudeAgentNodeMeta {
+  readonly agentName: string
+  readonly model: string
+  readonly tools: readonly string[]
+}
+
+export interface ClaudeSkillNodeMeta {
+  readonly skillName: string
+  readonly refCount: number
+  readonly promptCount: number
+}
+
+export interface ClaudeRuleNodeMeta {
+  readonly category: string
+}
+
+export interface ClaudeCommandNodeMeta {
+  readonly commandName: string
+}
+
+export interface ClaudeTeamNodeMeta {
+  readonly memberCount: number
+  readonly leadAgentId: string | null
+}
+
+export interface ClaudeMemoryNodeMeta {
+  readonly memoryType: string
+  readonly linkCount: number
 }
 
 export interface CanvasNode {
@@ -61,7 +110,14 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   code: { width: 300, height: 200 },
   markdown: { width: 250, height: 150 },
   image: { width: 150, height: 150 },
-  pdf: { width: 300, height: 400 }
+  pdf: { width: 300, height: 400 },
+  'claude-settings': { width: 280, height: 180 },
+  'claude-agent': { width: 260, height: 160 },
+  'claude-skill': { width: 260, height: 160 },
+  'claude-rule': { width: 220, height: 120 },
+  'claude-command': { width: 220, height: 120 },
+  'claude-team': { width: 280, height: 180 },
+  'claude-memory': { width: 240, height: 140 }
 }
 
 const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
@@ -71,7 +127,14 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   code: { width: 480, height: 320 },
   markdown: { width: 400, height: 300 },
   image: { width: 300, height: 300 },
-  pdf: { width: 500, height: 650 }
+  pdf: { width: 500, height: 650 },
+  'claude-settings': { width: 340, height: 240 },
+  'claude-agent': { width: 320, height: 220 },
+  'claude-skill': { width: 320, height: 220 },
+  'claude-rule': { width: 280, height: 160 },
+  'claude-command': { width: 280, height: 160 },
+  'claude-team': { width: 360, height: 260 },
+  'claude-memory': { width: 300, height: 200 }
 }
 
 export function getMinSize(type: CanvasNodeType): { width: number; height: number } {
@@ -87,7 +150,7 @@ export function getDefaultSize(type: CanvasNodeType): { width: number; height: n
 export interface CardTypeInfo {
   readonly label: string
   readonly icon: string
-  readonly category: 'content' | 'media' | 'tools'
+  readonly category: 'content' | 'media' | 'tools' | 'claude'
 }
 
 export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
@@ -97,7 +160,14 @@ export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
   note: { label: 'Vault Note', icon: 'N', category: 'content' },
   image: { label: 'Image', icon: 'I', category: 'media' },
   terminal: { label: 'Terminal', icon: '>', category: 'tools' },
-  pdf: { label: 'PDF', icon: 'P', category: 'media' }
+  pdf: { label: 'PDF', icon: 'P', category: 'media' },
+  'claude-settings': { label: 'Settings', icon: '\u2699', category: 'claude' },
+  'claude-agent': { label: 'Agent', icon: '\u2618', category: 'claude' },
+  'claude-skill': { label: 'Skill', icon: '\u26A1', category: 'claude' },
+  'claude-rule': { label: 'Rule', icon: '\u2696', category: 'claude' },
+  'claude-command': { label: 'Command', icon: '/', category: 'claude' },
+  'claude-team': { label: 'Team', icon: '\u2605', category: 'claude' },
+  'claude-memory': { label: 'Memory', icon: '\u25CB', category: 'claude' }
 }
 
 // --- Default metadata per type ---
@@ -112,6 +182,20 @@ export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown
       return { src: '', alt: '' }
     case 'pdf':
       return { src: '', pageCount: 0, currentPage: 1 }
+    case 'claude-settings':
+      return { permissionCount: 0, envVarCount: 0 }
+    case 'claude-agent':
+      return { agentName: '', model: '', tools: [] }
+    case 'claude-skill':
+      return { skillName: '', refCount: 0, promptCount: 0 }
+    case 'claude-rule':
+      return { category: '' }
+    case 'claude-command':
+      return { commandName: '' }
+    case 'claude-team':
+      return { memberCount: 0, leadAgentId: null }
+    case 'claude-memory':
+      return { memoryType: '', linkCount: 0 }
     default:
       return {}
   }

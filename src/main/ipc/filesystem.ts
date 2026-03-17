@@ -66,6 +66,10 @@ export function registerFilesystemIpc(): void {
     return buffer.toString('base64')
   })
 
+  typedHandle('fs:list-all-files', async (args) => {
+    return fileService.listAllFilesRecursive(args.dir)
+  })
+
   // --- Vault data ---
 
   typedHandle('vault:init', async (args) => {

@@ -14,6 +14,17 @@ import {
   type CanvasSide
 } from '@shared/canvas-types'
 
+/** Type accent colors for the left border strip on cards */
+const TYPE_ACCENT_COLORS: Partial<Record<CanvasNodeType, string>> = {
+  'claude-settings': '#f59e0b',
+  'claude-agent': '#a78bfa',
+  'claude-skill': '#22d3ee',
+  'claude-rule': '#94a3b8',
+  'claude-command': '#34d399',
+  'claude-team': '#f472b6',
+  'claude-memory': '#fb923c'
+}
+
 interface CardShellProps {
   readonly node: CanvasNode
   readonly title: string
@@ -30,7 +41,14 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   note: ['markdown', 'terminal'],
   image: ['text', 'terminal'],
   terminal: ['text'],
-  pdf: ['text', 'terminal']
+  pdf: ['text', 'terminal'],
+  'claude-settings': ['markdown', 'text'],
+  'claude-agent': ['markdown', 'text'],
+  'claude-skill': ['markdown', 'text'],
+  'claude-rule': ['markdown', 'text'],
+  'claude-command': ['markdown', 'text'],
+  'claude-team': ['markdown', 'text'],
+  'claude-memory': ['markdown', 'text']
 } as const
 
 function ConvertMenu({
@@ -161,7 +179,11 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
         backgroundColor: colors.bg.surface,
         borderRadius: borderRadius.card,
         border: `1px solid ${isSelected ? colors.accent.default : colors.border.default}`,
-        boxShadow: isSelected ? `0 0 0 1px ${colors.accent.default}` : 'none'
+        borderLeft: TYPE_ACCENT_COLORS[node.type]
+          ? `3px solid ${TYPE_ACCENT_COLORS[node.type]}`
+          : undefined,
+        boxShadow: isSelected ? `0 0 0 1px ${colors.accent.default}` : 'none',
+        color: node.type.startsWith('claude-') ? '#e2e8f0' : undefined
       }}
       onClick={handleClick}
       onPointerUp={handlePointerUp}
@@ -178,7 +200,10 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
         }}
         onPointerDown={onDragStart}
       >
-        <span className="text-xs font-medium truncate" style={{ color: colors.text.secondary }}>
+        <span
+          className="text-xs font-medium truncate"
+          style={{ color: node.type.startsWith('claude-') ? '#cbd5e1' : colors.text.secondary }}
+        >
           {title}
         </span>
         <div className="flex items-center gap-1 ml-2 shrink-0 relative">

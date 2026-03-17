@@ -1,4 +1,4 @@
-import { readFile, writeFile, unlink, readdir, mkdir, rename } from 'fs/promises'
+import { readFile, writeFile, unlink, readdir, mkdir, rename, stat } from 'fs/promises'
 import { join, extname } from 'path'
 import { existsSync } from 'fs'
 import { teDirPath, teConfigPath, teStatePath } from '../utils/paths'
@@ -36,6 +36,42 @@ export class FileService {
       if (entry.isDirectory()) {
         results.push(...(await this.listFilesRecursive(fullPath)))
       } else if (entry.isFile() && extname(entry.name) === '.md') {
+        results.push(fullPath)
+      }
+    }
+
+    return results
+  }
+
+  async listAllFilesRecursive(dir: string): Promise<string[]> {
+    const results: string[] = []
+    let entries
+    try {
+      entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+      return results
+    }
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name)
+      if (entry.name.startsWith('.') && entry.name !== '.claude') continue
+      if (entry.name === 'node_modules') continue
+
+      // Follow symlinks: resolve the real type via stat()
+      if (entry.isSymbolicLink()) {
+        try {
+          const realStat = await stat(fullPath)
+          if (realStat.isDirectory()) {
+            results.push(...(await this.listAllFilesRecursive(fullPath)))
+          } else if (realStat.isFile()) {
+            results.push(fullPath)
+          }
+        } catch {
+          // Broken symlink, skip
+        }
+      } else if (entry.isDirectory()) {
+        results.push(...(await this.listAllFilesRecursive(fullPath)))
+      } else if (entry.isFile()) {
         results.push(fullPath)
       }
     }
