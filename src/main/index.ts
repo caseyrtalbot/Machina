@@ -14,7 +14,8 @@ const PROD_CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: te-asset:"
+  "img-src 'self' data: te-asset:",
+  "worker-src 'self' blob:"
 ].join('; ')
 
 // Prevent EPIPE from node-pty/shell service from crashing the app

@@ -55,6 +55,7 @@
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.577.0",
     "node-pty": "^1.1.0",
+    "pdfjs-dist": "^5.5.207",
     "xterm": "^5.3.0",
     "zustand": "^5.0.11"
   },

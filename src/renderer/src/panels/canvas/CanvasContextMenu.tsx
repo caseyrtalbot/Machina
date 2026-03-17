@@ -32,18 +32,20 @@ export function CanvasContextMenu({ x, y, onAddCard, onClose }: CanvasContextMen
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
-  const handleImageAdd = () => {
-    // Use Electron file dialog to pick an image
+  const handleFilePickerAdd = (
+    accept: string,
+    type: CanvasNodeType,
+    buildMeta: (path: string, name: string) => Record<string, unknown>
+  ) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = accept
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file) return
-      // file.path is available in Electron's renderer
       const filePath = (file as File & { path?: string }).path
       if (filePath) {
-        onAddCard('image', { metadata: { src: filePath, alt: file.name } })
+        onAddCard(type, { metadata: buildMeta(filePath, file.name) })
       }
     }
     input.click()
@@ -62,17 +64,18 @@ export function CanvasContextMenu({ x, y, onAddCard, onClose }: CanvasContextMen
       }}
     >
       {MENU_SECTIONS.map((section) => {
-        const types = (Object.entries(CARD_TYPE_INFO) as [CanvasNodeType, typeof CARD_TYPE_INFO[CanvasNodeType]][])
-          .filter(([, info]) => info.category === section.category)
+        const types = (
+          Object.entries(CARD_TYPE_INFO) as [
+            CanvasNodeType,
+            (typeof CARD_TYPE_INFO)[CanvasNodeType]
+          ][]
+        ).filter(([, info]) => info.category === section.category)
 
         if (types.length === 0) return null
 
         return (
           <div key={section.category}>
-            <div
-              className="px-3 py-1 text-xs font-medium"
-              style={{ color: colors.text.muted }}
-            >
+            <div className="px-3 py-1 text-xs font-medium" style={{ color: colors.text.muted }}>
               {section.label}
             </div>
             {types.map(([type, info]) => (
@@ -80,7 +83,16 @@ export function CanvasContextMenu({ x, y, onAddCard, onClose }: CanvasContextMen
                 key={type}
                 onClick={() => {
                   if (type === 'image') {
-                    handleImageAdd()
+                    handleFilePickerAdd('image/*', 'image', (path, name) => ({
+                      src: path,
+                      alt: name
+                    }))
+                  } else if (type === 'pdf') {
+                    handleFilePickerAdd('.pdf,application/pdf', 'pdf', (path) => ({
+                      src: path,
+                      pageCount: 0,
+                      currentPage: 1
+                    }))
                   } else {
                     onAddCard(type)
                   }

@@ -9,15 +9,34 @@ export interface DragFileData {
 }
 
 const CODE_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go',
-  '.json', '.html', '.css', '.scss', '.yaml', '.yml',
-  '.toml', '.sh', '.bash', '.zsh', '.lua', '.rb',
-  '.java', '.kt', '.swift', '.c', '.cpp', '.h'
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.py',
+  '.rs',
+  '.go',
+  '.json',
+  '.html',
+  '.css',
+  '.scss',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.lua',
+  '.rb',
+  '.java',
+  '.kt',
+  '.swift',
+  '.c',
+  '.cpp',
+  '.h'
 ])
 
-const IMAGE_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp'
-])
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp'])
 
 /** Infer canvas card type from file extension */
 export function inferCardType(path: string): CanvasNodeType {
@@ -25,6 +44,7 @@ export function inferCardType(path: string): CanvasNodeType {
   if (ext === '.md') return 'note'
   if (CODE_EXTENSIONS.has(ext)) return 'code'
   if (IMAGE_EXTENSIONS.has(ext)) return 'image'
+  if (ext === '.pdf') return 'pdf'
   return 'text'
 }
 

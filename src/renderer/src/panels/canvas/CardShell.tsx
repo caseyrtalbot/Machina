@@ -28,7 +28,8 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   markdown: ['text', 'code', 'terminal'],
   note: ['markdown', 'terminal'],
   image: ['text', 'terminal'],
-  terminal: ['text']
+  terminal: ['text'],
+  pdf: ['text', 'terminal']
 } as const
 
 function ConvertMenu({

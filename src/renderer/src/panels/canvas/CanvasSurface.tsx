@@ -3,7 +3,7 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { useCanvasViewport } from './use-canvas-viewport'
 import { useCanvasSelection } from './use-canvas-selection'
 import { colors } from '../../design/tokens'
-import { TE_FILE_MIME } from './file-drop-utils'
+import { TE_FILE_MIME, inferCardType } from './file-drop-utils'
 
 const GRID_SIZE = 24
 const MAJOR_EVERY = 4
@@ -93,7 +93,9 @@ export function CanvasSurface({
   const [dragOver, setDragOver] = useState(false)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(TE_FILE_MIME)) return
+    const hasTeMime = e.dataTransfer.types.includes(TE_FILE_MIME)
+    const hasFiles = e.dataTransfer.types.includes('Files')
+    if (!hasTeMime && !hasFiles) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
     setDragOver(true)
@@ -108,16 +110,30 @@ export function CanvasSurface({
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       setDragOver(false)
-      const json = e.dataTransfer.getData(TE_FILE_MIME)
-      if (!json || !onFileDrop) return
-      e.preventDefault()
+      if (!onFileDrop) return
 
       const rect = containerRef.current?.getBoundingClientRect()
       if (!rect) return
-
       const canvasX = (e.clientX - rect.left - viewport.x) / viewport.zoom
       const canvasY = (e.clientY - rect.top - viewport.y) / viewport.zoom
-      onFileDrop(canvasX, canvasY, json)
+
+      // Intra-app drag from sidebar
+      const json = e.dataTransfer.getData(TE_FILE_MIME)
+      if (json) {
+        e.preventDefault()
+        onFileDrop(canvasX, canvasY, json)
+        return
+      }
+
+      // OS-level file drop (Finder, desktop, etc.)
+      if (e.dataTransfer.files.length > 0) {
+        e.preventDefault()
+        const dragFiles = Array.from(e.dataTransfer.files).map((file) => ({
+          path: (file as File & { path: string }).path,
+          type: inferCardType((file as File & { path: string }).path)
+        }))
+        onFileDrop(canvasX, canvasY, JSON.stringify(dragFiles))
+      }
     },
     [viewport, onFileDrop]
   )

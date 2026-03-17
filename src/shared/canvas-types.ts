@@ -1,4 +1,4 @@
-export type CanvasNodeType = 'text' | 'note' | 'terminal' | 'code' | 'markdown' | 'image'
+export type CanvasNodeType = 'text' | 'note' | 'terminal' | 'code' | 'markdown' | 'image' | 'pdf'
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left'
 
 // --- Per-type metadata (discriminated by node.type) ---
@@ -15,6 +15,12 @@ export interface ImageNodeMeta {
 
 export interface MarkdownNodeMeta {
   readonly viewMode: 'rendered' | 'source'
+}
+
+export interface PdfNodeMeta {
+  readonly src: string
+  readonly pageCount: number
+  readonly currentPage: number
 }
 
 export interface CanvasNode {
@@ -54,7 +60,8 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   terminal: { width: 300, height: 200 },
   code: { width: 300, height: 200 },
   markdown: { width: 250, height: 150 },
-  image: { width: 150, height: 150 }
+  image: { width: 150, height: 150 },
+  pdf: { width: 300, height: 400 }
 }
 
 const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
@@ -63,7 +70,8 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   terminal: { width: 400, height: 280 },
   code: { width: 480, height: 320 },
   markdown: { width: 400, height: 300 },
-  image: { width: 300, height: 300 }
+  image: { width: 300, height: 300 },
+  pdf: { width: 500, height: 650 }
 }
 
 export function getMinSize(type: CanvasNodeType): { width: number; height: number } {
@@ -88,7 +96,8 @@ export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
   markdown: { label: 'Markdown', icon: 'M', category: 'content' },
   note: { label: 'Vault Note', icon: 'N', category: 'content' },
   image: { label: 'Image', icon: 'I', category: 'media' },
-  terminal: { label: 'Terminal', icon: '>', category: 'tools' }
+  terminal: { label: 'Terminal', icon: '>', category: 'tools' },
+  pdf: { label: 'PDF', icon: 'P', category: 'media' }
 }
 
 // --- Default metadata per type ---
@@ -101,6 +110,8 @@ export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown
       return { viewMode: 'rendered' }
     case 'image':
       return { src: '', alt: '' }
+    case 'pdf':
+      return { src: '', pageCount: 0, currentPage: 1 }
     default:
       return {}
   }

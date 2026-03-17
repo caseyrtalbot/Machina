@@ -132,6 +132,15 @@ export function CanvasView() {
             }
           )
           addNodeWithUndo(node)
+        } else if (file.type === 'pdf') {
+          const node = createCanvasNode(
+            'pdf',
+            { x, y },
+            {
+              metadata: { src: file.path, pageCount: 0, currentPage: 1 }
+            }
+          )
+          addNodeWithUndo(node)
         } else if (file.type === 'code') {
           // Code file: read content, set language
           try {

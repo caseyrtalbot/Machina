@@ -16,7 +16,8 @@ const LOD_COLORS: Record<string, string> = {
   markdown: '#a78bfa',
   note: '#38bdf8',
   image: '#f472b6',
-  terminal: '#34d399'
+  terminal: '#34d399',
+  pdf: '#ef4444'
 }
 
 /**
