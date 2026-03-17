@@ -1,4 +1,4 @@
-import { contextBridge } from 'electron'
+import { contextBridge, webUtils } from 'electron'
 import { typedInvoke, typedOn } from './typed-ipc'
 import type { SessionId, VaultConfig, VaultState } from '../shared/types'
 
@@ -26,7 +26,8 @@ const api = {
       typedInvoke('fs:copy-file', { srcPath, destPath }),
     selectVault: () => typedInvoke('fs:select-vault'),
     createFolder: (defaultPath: string) => typedInvoke('fs:create-folder', { defaultPath }),
-    mkdir: (path: string) => typedInvoke('fs:mkdir', { path })
+    mkdir: (path: string) => typedInvoke('fs:mkdir', { path }),
+    readBinary: (path: string) => typedInvoke('fs:read-binary', { path })
   },
   vault: {
     init: (vaultPath: string) => typedInvoke('vault:init', { vaultPath }),
@@ -56,6 +57,7 @@ const api = {
     kill: (sessionId: SessionId) => typedInvoke('terminal:kill', { sessionId }),
     getProcessName: (sessionId: SessionId) => typedInvoke('terminal:process-name', { sessionId })
   },
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
   on: {
     terminalData: (callback: (data: { sessionId: SessionId; data: string }) => void) =>
       typedOn('terminal:data', callback),

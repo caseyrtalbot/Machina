@@ -97,6 +97,7 @@ export function CanvasSurface({
     const hasFiles = e.dataTransfer.types.includes('Files')
     if (!hasTeMime && !hasFiles) return
     e.preventDefault()
+    e.stopPropagation()
     e.dataTransfer.dropEffect = 'copy'
     setDragOver(true)
   }, [])
@@ -109,6 +110,8 @@ export function CanvasSurface({
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
       setDragOver(false)
       if (!onFileDrop) return
 
@@ -120,18 +123,16 @@ export function CanvasSurface({
       // Intra-app drag from sidebar
       const json = e.dataTransfer.getData(TE_FILE_MIME)
       if (json) {
-        e.preventDefault()
         onFileDrop(canvasX, canvasY, json)
         return
       }
 
       // OS-level file drop (Finder, desktop, etc.)
       if (e.dataTransfer.files.length > 0) {
-        e.preventDefault()
-        const dragFiles = Array.from(e.dataTransfer.files).map((file) => ({
-          path: (file as File & { path: string }).path,
-          type: inferCardType((file as File & { path: string }).path)
-        }))
+        const dragFiles = Array.from(e.dataTransfer.files).map((file) => {
+          const filePath = window.api.getFilePath(file)
+          return { path: filePath, type: inferCardType(filePath) }
+        })
         onFileDrop(canvasX, canvasY, JSON.stringify(dragFiles))
       }
     },

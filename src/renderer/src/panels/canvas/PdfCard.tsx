@@ -32,16 +32,11 @@ export function PdfCard({ node }: PdfCardProps) {
     return segments[segments.length - 1] ?? 'PDF'
   }, [src])
 
-  // Resolve local path via te-asset:// protocol
-  const resolvedSrc = useMemo(() => {
-    if (!src) return ''
-    if (src.startsWith('http://') || src.startsWith('https://')) return src
-    return `te-asset://local${src.startsWith('/') ? '' : '/'}${src}`
-  }, [src])
+  const isRemote = src.startsWith('http://') || src.startsWith('https://')
 
-  // Load PDF document
+  // Load PDF document via IPC binary read (local files) or URL (remote)
   useEffect(() => {
-    if (!resolvedSrc) {
+    if (!src) {
       setLoading(false)
       return
     }
@@ -50,31 +45,41 @@ export function PdfCard({ node }: PdfCardProps) {
     setError(null)
 
     let cancelled = false
-    const loadTask = pdfjs.getDocument(resolvedSrc)
 
-    loadTask.promise
-      .then((doc) => {
-        if (cancelled) {
-          doc.destroy()
-          return
-        }
-        setPdfDoc(doc)
-        setLoading(false)
-        if (doc.numPages !== pageCount) {
-          updateNodeMetadata(node.id, { pageCount: doc.numPages })
-        }
-      })
-      .catch((err) => {
-        if (cancelled) return
-        setError(err?.message ?? 'Failed to load PDF')
-        setLoading(false)
-      })
+    const loadPdf = async (): Promise<void> => {
+      let loadSource: string | { data: Uint8Array }
+
+      if (isRemote) {
+        loadSource = src
+      } else {
+        // Read local file via IPC and pass raw bytes to pdfjs
+        const base64 = await window.api.fs.readBinary(src)
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+        loadSource = { data: bytes }
+      }
+
+      const doc = await pdfjs.getDocument(loadSource).promise
+      if (cancelled) {
+        doc.destroy()
+        return
+      }
+      setPdfDoc(doc)
+      setLoading(false)
+      if (doc.numPages !== pageCount) {
+        updateNodeMetadata(node.id, { pageCount: doc.numPages })
+      }
+    }
+
+    loadPdf().catch((err) => {
+      if (cancelled) return
+      setError(err?.message ?? 'Failed to load PDF')
+      setLoading(false)
+    })
 
     return () => {
       cancelled = true
-      loadTask.destroy()
     }
-  }, [resolvedSrc, node.id, pageCount, updateNodeMetadata])
+  }, [src, isRemote, node.id, pageCount, updateNodeMetadata])
 
   // Render current page
   useEffect(() => {
@@ -182,7 +187,7 @@ export function PdfCard({ node }: PdfCardProps) {
           className="flex-1 overflow-hidden flex items-center justify-center"
           style={{ minHeight: 0 }}
         >
-          {!resolvedSrc ? (
+          {!src ? (
             <div className="text-center" style={{ color: colors.text.muted }}>
               <span className="text-xs">No PDF source</span>
             </div>

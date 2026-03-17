@@ -43,7 +43,7 @@ export function CanvasContextMenu({ x, y, onAddCard, onClose }: CanvasContextMen
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file) return
-      const filePath = (file as File & { path?: string }).path
+      const filePath = window.api.getFilePath(file)
       if (filePath) {
         onAddCard(type, { metadata: buildMeta(filePath, file.name) })
       }

@@ -60,6 +60,12 @@ export function registerFilesystemIpc(): void {
     await mkdir(args.path, { recursive: true })
   })
 
+  typedHandle('fs:read-binary', async (args) => {
+    const { readFile } = await import('node:fs/promises')
+    const buffer = await readFile(args.path)
+    return buffer.toString('base64')
+  })
+
   // --- Vault data ---
 
   typedHandle('vault:init', async (args) => {

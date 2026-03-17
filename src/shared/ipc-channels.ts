@@ -13,6 +13,7 @@ export interface IpcChannels {
   'fs:copy-file': { request: { srcPath: string; destPath: string }; response: void }
   'fs:create-folder': { request: { defaultPath: string }; response: string | null }
   'fs:mkdir': { request: { path: string }; response: void }
+  'fs:read-binary': { request: { path: string }; response: string }
 
   // --- Vault ---
   'vault:read-config': { request: { vaultPath: string }; response: VaultConfig }

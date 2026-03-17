@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
@@ -8,9 +8,27 @@ interface ImageCardProps {
   node: CanvasNode
 }
 
+/** Infer MIME type from file extension */
+function mimeFromPath(path: string): string {
+  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
+  const map: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.bmp': 'image/bmp'
+  }
+  return map[ext] ?? 'image/png'
+}
+
 export function ImageCard({ node }: ImageCardProps) {
   const removeNode = useCanvasStore((s) => s.removeNode)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const meta = node.metadata as unknown as ImageNodeMeta
   const src = meta.src || ''
@@ -22,20 +40,62 @@ export function ImageCard({ node }: ImageCardProps) {
     return segments[segments.length - 1] ?? 'Image'
   }, [src, meta.alt])
 
-  // Resolve local paths via te-asset:// protocol, pass URLs through
-  const resolvedSrc = useMemo(() => {
-    if (!src) return ''
-    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
-      return src
+  // Determine if this is a remote URL or local file
+  const isRemote =
+    src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')
+
+  // Load local files via IPC binary read -> blob URL
+  useEffect(() => {
+    if (!src || isRemote) {
+      setLoading(false)
+      return
     }
-    // Local file path: use te-asset:// custom protocol (CSP-safe)
-    return `te-asset://local${src.startsWith('/') ? '' : '/'}${src}`
-  }, [src])
+
+    let revoked = false
+
+    window.api.fs
+      .readBinary(src)
+      .then((base64) => {
+        if (revoked) return
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+        const blob = new Blob([bytes], { type: mimeFromPath(src) })
+        const url = URL.createObjectURL(blob)
+        setBlobUrl(url)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (revoked) return
+        setError(true)
+        setLoading(false)
+      })
+
+    return () => {
+      revoked = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [src, isRemote])
+
+  // Clean up blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [blobUrl])
+
+  const displaySrc = isRemote ? src : blobUrl
 
   return (
     <CardShell node={node} title={title} onClose={() => removeNode(node.id)}>
       <div className="flex items-center justify-center h-full p-2" style={{ minHeight: 0 }}>
-        {!resolvedSrc ? (
+        {loading ? (
+          <div className="text-center" style={{ color: colors.text.muted }}>
+            <div
+              className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-1"
+              style={{ borderColor: colors.accent.default, borderTopColor: 'transparent' }}
+            />
+            <span className="text-xs">Loading...</span>
+          </div>
+        ) : !displaySrc ? (
           <div className="text-center" style={{ color: colors.text.muted }}>
             <svg
               width={32}
@@ -70,7 +130,7 @@ export function ImageCard({ node }: ImageCardProps) {
           </div>
         ) : (
           <img
-            src={resolvedSrc}
+            src={displaySrc}
             alt={meta.alt ?? ''}
             className="max-w-full max-h-full"
             style={{ objectFit: 'contain' }}
