@@ -27,6 +27,15 @@ function filenameStem(filePath: string): string {
   return base.replace(/\.\w+$/, '')
 }
 
+function inferMemoryType(filePath: string): string {
+  const stem = filenameStem(filePath).toLowerCase()
+  if (stem.startsWith('feedback-') || stem.startsWith('feedback_')) return 'feedback'
+  if (stem.startsWith('project-') || stem.startsWith('project_')) return 'project'
+  if (stem.startsWith('user-') || stem.startsWith('user_')) return 'user'
+  if (stem.startsWith('reference-') || stem.startsWith('reference_')) return 'reference'
+  return 'unknown'
+}
+
 function parentDirName(filePath: string): string {
   const parts = filePath.split('/')
   return parts.length >= 2 ? parts[parts.length - 2] : ''
@@ -156,6 +165,15 @@ export function parseClaudeCommand(content: string, filePath: string): ClaudeCom
     }
   }
 
+  // Final fallback: first non-empty, non-heading line as description
+  if (!description) {
+    const lines = trimmed.split('\n')
+    const firstContent = lines.find((l) => l.trim() && !l.startsWith('#') && !l.startsWith('---'))
+    if (firstContent) {
+      description = truncate(firstContent.trim(), 120)
+    }
+  }
+
   // Body preview: strip frontmatter if present, take first meaningful lines
   let bodyPreview = trimmed
   const fmEnd = trimmed.indexOf('---', trimmed.indexOf('---') + 3)
@@ -239,7 +257,7 @@ export function parseClaudeMemory(content: string, filePath: string): ClaudeMemo
   return {
     name: data?.name ? String(data.name) : filenameStem(filePath),
     description: data?.description ? String(data.description) : '',
-    memoryType: data?.type ? String(data.type) : 'unknown',
+    memoryType: data?.type ? String(data.type) : inferMemoryType(filePath),
     content: truncate(body.trim(), 200),
     filePath,
     links

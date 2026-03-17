@@ -68,7 +68,9 @@ export function extractRelationships(
   // --- Settings → Agents (settings-controls) ---
   if (settingsNode) {
     for (const agentNode of agentNodes) {
-      edges.push(createClaudeEdge(settingsNode.id, agentNode.id, 'left', 'right', 'settings-controls'))
+      edges.push(
+        createClaudeEdge(settingsNode.id, agentNode.id, 'left', 'right', 'settings-controls')
+      )
     }
   }
 
@@ -115,6 +117,31 @@ export function extractRelationships(
     }
   }
 
+  // --- Agents → Skills/Commands (agent-uses-tool) ---
+  // Scan agent instruction previews for references to skill or command names
+  for (const agentNode of agentNodes) {
+    const meta = agentNode.metadata as Record<string, unknown>
+    const preview = ((meta.instructionPreview as string) ?? '').toLowerCase()
+    const agentDesc = ((meta.agentDescription as string) ?? '').toLowerCase()
+    const searchText = preview + ' ' + agentDesc
+
+    if (!searchText.trim()) continue
+
+    for (const skillNode of skillNodes) {
+      const skillName = ((skillNode.metadata as Record<string, unknown>).skillName as string) ?? ''
+      if (skillName.length > 3 && searchText.includes(skillName.toLowerCase())) {
+        edges.push(createClaudeEdge(agentNode.id, skillNode.id, 'right', 'left', 'agent-uses-tool'))
+      }
+    }
+
+    for (const cmdNode of commandNodes) {
+      const cmdName = ((cmdNode.metadata as Record<string, unknown>).commandName as string) ?? ''
+      if (cmdName.length > 3 && searchText.includes(cmdName.toLowerCase())) {
+        edges.push(createClaudeEdge(agentNode.id, cmdNode.id, 'right', 'left', 'agent-uses-tool'))
+      }
+    }
+  }
+
   // --- Skills → Skills (skill-references) ---
   // Scan skill descriptions for references to other skill names
   for (let i = 0; i < config.skills.length; i++) {
@@ -130,7 +157,9 @@ export function extractRelationships(
       if (!otherNode) continue
 
       if (desc.includes(other.name.toLowerCase()) && other.name.length > 3) {
-        edges.push(createClaudeEdge(skillNode.id, otherNode.id, 'right', 'left', 'skill-references'))
+        edges.push(
+          createClaudeEdge(skillNode.id, otherNode.id, 'right', 'left', 'skill-references')
+        )
       }
     }
   }

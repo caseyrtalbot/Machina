@@ -139,10 +139,10 @@ Follow the debugging process.`
       expect(cmd.description).toBe('Generate a commit message')
     })
 
-    it('handles content with no heading', () => {
+    it('uses first non-empty line as description fallback', () => {
       const cmd = parseClaudeCommand('Just instructions', '/commands/test.md')
       expect(cmd.name).toBe('test')
-      expect(cmd.description).toBe('')
+      expect(cmd.description).toBe('Just instructions')
     })
   })
 
