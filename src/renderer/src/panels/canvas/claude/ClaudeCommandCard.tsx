@@ -2,8 +2,9 @@ import { useCallback } from 'react'
 import { useCanvasStore } from '../../../store/canvas-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
+import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
-import { colors, typography } from '../../../design/tokens'
+import { typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface ClaudeCommandCardProps {
@@ -20,10 +21,15 @@ export function ClaudeCommandCard({ node }: ClaudeCommandCardProps) {
 
   const name = meta.commandName || 'command'
 
+  const inspector = useInspector()
   const openInEditor = useCallback(() => {
-    useEditorStore.getState().openTab(node.content, name)
-    useViewStore.getState().setContentView('editor')
-  }, [node.content, name])
+    if (inspector) {
+      inspector(node.content, name)
+    } else {
+      useEditorStore.getState().openTab(node.content, name)
+      useViewStore.getState().setContentView('editor')
+    }
+  }, [node.content, name, inspector])
 
   return (
     <CardShell

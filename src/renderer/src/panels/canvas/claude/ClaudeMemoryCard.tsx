@@ -2,8 +2,9 @@ import { useCallback } from 'react'
 import { useCanvasStore } from '../../../store/canvas-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
+import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
-import { colors, typography } from '../../../design/tokens'
+import { typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface ClaudeMemoryCardProps {
@@ -31,10 +32,15 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
   const memType = meta.memoryType || 'unknown'
   const typeColor = MEMORY_TYPE_COLORS[memType] ?? '#94a3b8'
 
+  const inspector = useInspector()
   const openInEditor = useCallback(() => {
-    useEditorStore.getState().openTab(node.content, name)
-    useViewStore.getState().setContentView('editor')
-  }, [node.content, name])
+    if (inspector) {
+      inspector(node.content, name)
+    } else {
+      useEditorStore.getState().openTab(node.content, name)
+      useViewStore.getState().setContentView('editor')
+    }
+  }, [node.content, name, inspector])
 
   return (
     <CardShell
@@ -43,7 +49,7 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
     >
-      <div className="p-3 space-y-2" style={{ color: "#f1f5f9" }}>
+      <div className="p-3 space-y-2" style={{ color: '#f1f5f9' }}>
         {/* Memory type badge */}
         <span
           className="inline-block px-2 py-0.5 rounded text-xs font-medium"
@@ -54,10 +60,7 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
 
         {/* Description or content preview */}
         {(meta.description || meta.contentPreview) && (
-          <p
-            className="text-xs leading-relaxed line-clamp-3"
-            style={{ color: "#cbd5e1" }}
-          >
+          <p className="text-xs leading-relaxed line-clamp-3" style={{ color: '#cbd5e1' }}>
             {meta.description || meta.contentPreview}
           </p>
         )}
@@ -65,7 +68,7 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
         {/* Link count */}
         {(meta.linkCount ?? 0) > 0 && (
           <div className="flex items-center gap-1">
-            <span className="text-xs" style={{ color: "#94a3b8" }}>
+            <span className="text-xs" style={{ color: '#94a3b8' }}>
               Links:
             </span>
             <span

@@ -2,8 +2,9 @@ import { useCallback } from 'react'
 import { useCanvasStore } from '../../../store/canvas-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
+import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
-import { colors, typography } from '../../../design/tokens'
+import { typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface ClaudeRuleCardProps {
@@ -19,10 +20,15 @@ export function ClaudeRuleCard({ node }: ClaudeRuleCardProps) {
 
   const title = node.content.split('/').pop()?.replace('.md', '') ?? 'Rule'
 
+  const inspector = useInspector()
   const openInEditor = useCallback(() => {
-    useEditorStore.getState().openTab(node.content, title)
-    useViewStore.getState().setContentView('editor')
-  }, [node.content, title])
+    if (inspector) {
+      inspector(node.content, title)
+    } else {
+      useEditorStore.getState().openTab(node.content, title)
+      useViewStore.getState().setContentView('editor')
+    }
+  }, [node.content, title, inspector])
 
   return (
     <CardShell
@@ -31,7 +37,7 @@ export function ClaudeRuleCard({ node }: ClaudeRuleCardProps) {
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
     >
-      <div className="p-3 space-y-2" style={{ color: "#f1f5f9" }}>
+      <div className="p-3 space-y-2" style={{ color: '#f1f5f9' }}>
         {/* Category badge */}
         <span
           className="inline-block px-2 py-0.5 rounded text-xs font-medium"
@@ -44,7 +50,7 @@ export function ClaudeRuleCard({ node }: ClaudeRuleCardProps) {
         {meta.contentPreview && (
           <p
             className="text-xs leading-relaxed line-clamp-3"
-            style={{ color: "#94a3b8", fontFamily: typography.fontFamily.mono }}
+            style={{ color: '#94a3b8', fontFamily: typography.fontFamily.mono }}
           >
             {meta.contentPreview}
           </p>

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useCanvasStore } from '../../../store/canvas-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
+import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
 import { colors, typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
@@ -11,8 +12,14 @@ interface ClaudeTeamCardProps {
 }
 
 const MEMBER_COLORS = [
-  '#a78bfa', '#38bdf8', '#34d399', '#f472b6',
-  '#f59e0b', '#22d3ee', '#ef4444', '#818cf8'
+  '#a78bfa',
+  '#38bdf8',
+  '#34d399',
+  '#f472b6',
+  '#f59e0b',
+  '#22d3ee',
+  '#ef4444',
+  '#818cf8'
 ]
 
 export function ClaudeTeamCard({ node }: ClaudeTeamCardProps) {
@@ -26,10 +33,15 @@ export function ClaudeTeamCard({ node }: ClaudeTeamCardProps) {
 
   const name = meta.teamName || 'Unnamed Team'
 
+  const inspector = useInspector()
   const openInEditor = useCallback(() => {
-    useEditorStore.getState().openTab(node.content, name)
-    useViewStore.getState().setContentView('editor')
-  }, [node.content, name])
+    if (inspector) {
+      inspector(node.content, name)
+    } else {
+      useEditorStore.getState().openTab(node.content, name)
+      useViewStore.getState().setContentView('editor')
+    }
+  }, [node.content, name, inspector])
 
   const members = meta.members ?? []
 
@@ -40,7 +52,7 @@ export function ClaudeTeamCard({ node }: ClaudeTeamCardProps) {
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
     >
-      <div className="p-3 space-y-3" style={{ color: "#f1f5f9" }}>
+      <div className="p-3 space-y-3" style={{ color: '#f1f5f9' }}>
         {/* Team badge */}
         <div className="flex items-center gap-2">
           <span
@@ -49,7 +61,7 @@ export function ClaudeTeamCard({ node }: ClaudeTeamCardProps) {
           >
             TEAM
           </span>
-          <span className="text-xs" style={{ color: "#94a3b8" }}>
+          <span className="text-xs" style={{ color: '#94a3b8' }}>
             {meta.memberCount ?? members.length} members
           </span>
         </div>

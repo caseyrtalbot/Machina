@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useCanvasStore } from '../../../store/canvas-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
+import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
 import { colors, typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
@@ -18,10 +19,15 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
     pluginNames?: string[]
   }
 
+  const inspector = useInspector()
   const openInEditor = useCallback(() => {
-    useEditorStore.getState().openTab(node.content, 'Claude Settings')
-    useViewStore.getState().setContentView('editor')
-  }, [node.content])
+    if (inspector) {
+      inspector(node.content, 'Claude Settings')
+    } else {
+      useEditorStore.getState().openTab(node.content, 'Claude Settings')
+      useViewStore.getState().setContentView('editor')
+    }
+  }, [node.content, inspector])
 
   return (
     <CardShell
@@ -30,7 +36,7 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
     >
-      <div className="p-3 space-y-3" style={{ color: "#f1f5f9" }}>
+      <div className="p-3 space-y-3" style={{ color: '#f1f5f9' }}>
         {/* Hero label */}
         <div className="flex items-center gap-2">
           <span
@@ -54,7 +60,7 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
               className="block mb-1"
               style={{
                 ...typography.metadata,
-                color: "#94a3b8"
+                color: '#94a3b8'
               }}
             >
               MCP SERVERS
@@ -66,7 +72,7 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
                   className="px-1.5 py-0.5 rounded text-xs"
                   style={{
                     backgroundColor: colors.bg.elevated,
-                    color: "#cbd5e1",
+                    color: '#cbd5e1',
                     fontFamily: typography.fontFamily.mono
                   }}
                 >
@@ -81,15 +87,7 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
   )
 }
 
-function StatBadge({
-  label,
-  value,
-  color
-}: {
-  label: string
-  value: number
-  color: string
-}) {
+function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div
       className="flex flex-col items-center p-2 rounded"
@@ -98,7 +96,7 @@ function StatBadge({
       <span className="text-lg font-semibold" style={{ color }}>
         {value}
       </span>
-      <span className="text-xs" style={{ color: "#94a3b8" }}>
+      <span className="text-xs" style={{ color: '#94a3b8' }}>
         {label}
       </span>
     </div>

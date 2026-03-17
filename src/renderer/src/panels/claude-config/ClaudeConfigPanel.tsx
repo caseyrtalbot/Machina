@@ -14,6 +14,8 @@ import { loadClaudeConfig } from '../../engine/claude-config-parser'
 import { useVaultStore } from '../../store/vault-store'
 import { layoutClaudeConfig, type ZoneLabel } from '../canvas/claude/claude-canvas-layout'
 import { saveCanvas, loadCanvas } from '../canvas/canvas-io'
+import { InspectorProvider } from './InspectorContext'
+import { ConfigInspector } from './ConfigInspector'
 import { colors, typography } from '../../design/tokens'
 import type { CanvasFile, CanvasNode } from '@shared/canvas-types'
 import { createCanvasFile } from '@shared/canvas-types'
@@ -205,6 +207,29 @@ export function ClaudeConfigPanel() {
     return () => clearTimeout(timer)
   }, [isDirty, toCanvasFile, markSaved, configPath, setCachedData])
 
+  const [inspectorFile, setInspectorFile] = useState<{ path: string; title: string } | null>(null)
+
+  const handleOpenInInspector = useCallback((path: string, title: string) => {
+    setInspectorFile({ path, title })
+  }, [])
+
+  const handleCloseInspector = useCallback(() => {
+    setInspectorFile(null)
+  }, [])
+
+  // Escape key closes inspector
+  useEffect(() => {
+    if (!inspectorFile) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setInspectorFile(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [inspectorFile])
+
   const visibleNodes = useViewportCulling(nodes, viewport, containerSize)
   const lod = getLodLevel(viewport.zoom)
 
@@ -242,77 +267,105 @@ export function ClaudeConfigPanel() {
   }, [nodes, containerSize])
 
   return (
-    <div ref={containerRef} className="h-full relative">
-      {/* Toolbar */}
-      <div
-        className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded"
-        style={{
-          backgroundColor: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`
-        }}
-      >
-        <span
-          className="text-xs font-medium"
-          style={{ color: colors.text.primary, fontFamily: typography.fontFamily.mono }}
-        >
-          ~/.claude/
-        </span>
-        <div className="w-px h-4" style={{ backgroundColor: colors.border.default }} />
-        <button
-          onClick={handleRefresh}
-          className="text-xs px-2 py-0.5 rounded hover:opacity-80"
-          style={{ color: colors.text.secondary }}
-          title="Refresh config"
-        >
-          {isConfigLoading ? 'Loading...' : 'Refresh'}
-        </button>
-        <button
-          onClick={handleFitAll}
-          className="text-xs px-2 py-0.5 rounded hover:opacity-80"
-          style={{ color: colors.text.secondary }}
-          title="Fit all cards in view"
-        >
-          Fit All
-        </button>
-      </div>
+    <InspectorProvider value={handleOpenInInspector}>
+      <div className="flex h-full w-full overflow-hidden">
+        {/* Canvas panel - always at same DOM position to avoid remount */}
+        <div className="overflow-hidden shrink-0" style={{ width: inspectorFile ? '55%' : '100%' }}>
+          <div ref={containerRef} className="h-full relative">
+            {/* Toolbar */}
+            <div
+              className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded"
+              style={{
+                backgroundColor: colors.bg.elevated,
+                border: `1px solid ${colors.border.default}`
+              }}
+            >
+              <span
+                className="text-xs font-medium"
+                style={{ color: colors.text.primary, fontFamily: typography.fontFamily.mono }}
+              >
+                ~/.claude/
+              </span>
+              <div className="w-px h-4" style={{ backgroundColor: colors.border.default }} />
+              <button
+                onClick={handleRefresh}
+                className="text-xs px-2 py-0.5 rounded hover:opacity-80"
+                style={{ color: colors.text.secondary }}
+                title="Refresh config"
+              >
+                {isConfigLoading ? 'Loading...' : 'Refresh'}
+              </button>
+              <button
+                onClick={handleFitAll}
+                className="text-xs px-2 py-0.5 rounded hover:opacity-80"
+                style={{ color: colors.text.secondary }}
+                title="Fit all cards in view"
+              >
+                Fit All
+              </button>
+            </div>
 
-      <CanvasSurface onDoubleClick={handleDoubleClick} onBackgroundClick={handleBackgroundClick}>
-        <EdgeLayer />
-        {/* Zone labels */}
-        {zoneLabels.map((label) => (
-          <div
-            key={label.text}
-            className="absolute pointer-events-none select-none"
-            style={{
-              left: label.x,
-              top: label.y,
-              color: label.color,
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: typography.fontFamily.display,
-              letterSpacing: '0.03em',
-              opacity: 0.8,
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {label.text}
+            <CanvasSurface
+              onDoubleClick={handleDoubleClick}
+              onBackgroundClick={handleBackgroundClick}
+            >
+              <EdgeLayer />
+              {/* Zone labels */}
+              {zoneLabels.map((label) => (
+                <div
+                  key={label.text}
+                  className="absolute pointer-events-none select-none"
+                  style={{
+                    left: label.x,
+                    top: label.y,
+                    color: label.color,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: typography.fontFamily.display,
+                    letterSpacing: '0.03em',
+                    opacity: 0.8,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {label.text}
+                </div>
+              ))}
+              {visibleNodes.map((node: CanvasNode) => {
+                if (lod === 'dot' || lod === 'preview') {
+                  return <CardLodPreview key={node.id} node={node} lod={lod} />
+                }
+                const Card = LazyCards[node.type]
+                if (!Card) return null
+                return (
+                  <Suspense key={node.id} fallback={<CardShellSkeleton node={node} />}>
+                    <Card node={node} />
+                  </Suspense>
+                )
+              })}
+            </CanvasSurface>
+
+            <CanvasMinimap
+              containerWidth={containerSize.width}
+              containerHeight={containerSize.height}
+            />
           </div>
-        ))}
-        {visibleNodes.map((node: CanvasNode) => {
-          if (lod === 'dot' || lod === 'preview') {
-            return <CardLodPreview key={node.id} node={node} lod={lod} />
-          }
-          const Card = LazyCards[node.type]
-          if (!Card) return null
-          return (
-            <Suspense key={node.id} fallback={<CardShellSkeleton node={node} />}>
-              <Card node={node} />
-            </Suspense>
-          )
-        })}
-      </CanvasSurface>
+        </div>
 
-      <CanvasMinimap containerWidth={containerSize.width} containerHeight={containerSize.height} />
-    </div>
+        {/* Inspector panel - added/removed as sibling, canvas stays stable */}
+        {inspectorFile && (
+          <>
+            <div className="panel-divider" />
+            <div className="flex-1 overflow-hidden min-w-[350px]">
+              <ConfigInspector
+                key={inspectorFile.path}
+                path={inspectorFile.path}
+                title={inspectorFile.title}
+                onClose={handleCloseInspector}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    </InspectorProvider>
   )
 }
