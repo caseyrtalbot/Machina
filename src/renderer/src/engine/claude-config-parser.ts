@@ -135,16 +135,38 @@ export function parseClaudeRule(content: string, filePath: string): ClaudeRule {
 }
 
 export function parseClaudeCommand(content: string, filePath: string): ClaudeCommand {
+  const trimmed = content.trim()
   let description = ''
-  const firstLine = content.trim().split('\n')[0]
-  if (firstLine?.startsWith('#')) {
-    description = firstLine.replace(/^#+\s*/, '')
+
+  // Try frontmatter first (some commands have it)
+  try {
+    const parsed = matter(trimmed)
+    if (parsed.data?.description) {
+      description = String(parsed.data.description)
+    }
+  } catch {
+    // Frontmatter parse failed
+  }
+
+  // Fall back to H1 heading if no description from frontmatter
+  if (!description) {
+    const firstLine = trimmed.split('\n')[0]
+    if (firstLine?.startsWith('#')) {
+      description = firstLine.replace(/^#+\s*/, '')
+    }
+  }
+
+  // Body preview: strip frontmatter if present, take first meaningful lines
+  let bodyPreview = trimmed
+  const fmEnd = trimmed.indexOf('---', trimmed.indexOf('---') + 3)
+  if (trimmed.startsWith('---') && fmEnd > 0) {
+    bodyPreview = trimmed.slice(fmEnd + 3).trim()
   }
 
   return {
     name: filenameStem(filePath),
     description,
-    content: truncate(content.trim(), 200),
+    content: truncate(bodyPreview, 200),
     filePath
   }
 }
@@ -273,10 +295,105 @@ function categorizeFiles(allFiles: readonly string[], basePath: string) {
 }
 
 /**
- * Load and parse the full Claude configuration from a base path.
- * Uses IPC to read files from the main process.
+ * Encode a project path the way Claude Code does: /Users/casey → -Users-casey
  */
-export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> {
+function encodeProjectPath(projectPath: string): string {
+  return projectPath.replace(/\//g, '-')
+}
+
+/**
+ * Load project-scoped rules and memory from ~/.claude/projects/{encoded}/
+ * and from the project's own CLAUDE.md and .claude/ directory.
+ */
+async function loadProjectConfig(
+  basePath: string,
+  projectPath: string
+): Promise<{ rules: ClaudeRule[]; commands: ClaudeCommand[]; memories: ClaudeMemory[] }> {
+  const rules: ClaudeRule[] = []
+  const commands: ClaudeCommand[] = []
+  const memories: ClaudeMemory[] = []
+
+  // 1. Project-scoped memory from ~/.claude/projects/{encoded}/memory/
+  const encoded = encodeProjectPath(projectPath)
+  const projectDir = `${basePath}/projects/${encoded}`
+
+  try {
+    const exists = await window.api.fs.fileExists(projectDir)
+    if (exists) {
+      const projectFiles = await window.api.fs.listAllFiles(projectDir)
+      for (const file of projectFiles) {
+        if (file.includes('memory/') && file.endsWith('.md') && !file.endsWith('MEMORY.md')) {
+          try {
+            const content = await window.api.fs.readFile(file)
+            memories.push({ ...parseClaudeMemory(content, file), scope: 'project' })
+          } catch {
+            /* skip */
+          }
+        }
+      }
+    }
+  } catch {
+    /* no project dir */
+  }
+
+  // 2. Project-root CLAUDE.md as a rule
+  const claudeMdPath = `${projectPath}/CLAUDE.md`
+  try {
+    const exists = await window.api.fs.fileExists(claudeMdPath)
+    if (exists) {
+      const content = await window.api.fs.readFile(claudeMdPath)
+      rules.push({
+        name: 'CLAUDE.md',
+        category: 'project',
+        content: truncate(content.trim(), 200),
+        filePath: claudeMdPath,
+        scope: 'project'
+      })
+    }
+  } catch {
+    /* no CLAUDE.md */
+  }
+
+  // 3. Project-scoped rules from {project}/.claude/rules/
+  const projectClaudeDir = `${projectPath}/.claude`
+  try {
+    const exists = await window.api.fs.fileExists(projectClaudeDir)
+    if (exists) {
+      const projFiles = await window.api.fs.listAllFiles(projectClaudeDir)
+      for (const file of projFiles) {
+        const rel = file.slice(projectClaudeDir.length + 1)
+        if (rel.startsWith('rules/') && rel.endsWith('.md')) {
+          try {
+            const content = await window.api.fs.readFile(file)
+            rules.push({ ...parseClaudeRule(content, file), scope: 'project' })
+          } catch {
+            /* skip */
+          }
+        } else if (rel.startsWith('commands/') && rel.endsWith('.md')) {
+          try {
+            const content = await window.api.fs.readFile(file)
+            commands.push({ ...parseClaudeCommand(content, file), scope: 'project' })
+          } catch {
+            /* skip */
+          }
+        }
+      }
+    }
+  } catch {
+    /* no project .claude dir */
+  }
+
+  return { rules, commands, memories }
+}
+
+/**
+ * Load and parse the full Claude configuration from a base path.
+ * Optionally merges project-scoped config when projectPath is provided.
+ */
+export async function loadClaudeConfig(
+  basePath: string,
+  projectPath?: string
+): Promise<ClaudeConfig> {
   // Also check for .claude.json in parent directory
   const parentSettingsPath = basePath.replace(/\/.claude$/, '/.claude.json')
 
@@ -315,7 +432,7 @@ export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> 
   for (const file of agentFiles) {
     try {
       const content = await window.api.fs.readFile(file)
-      agents.push(parseClaudeAgent(content, file))
+      agents.push({ ...parseClaudeAgent(content, file), scope: 'global' as const })
     } catch {
       // Skip unreadable agents
     }
@@ -328,7 +445,7 @@ export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> 
     if (skillMd) {
       try {
         const content = await window.api.fs.readFile(skillMd)
-        skills.push(parseClaudeSkill(content, skillMd, files))
+        skills.push({ ...parseClaudeSkill(content, skillMd, files), scope: 'global' as const })
       } catch {
         // Skip unreadable skills
       }
@@ -340,7 +457,7 @@ export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> 
   for (const file of ruleFiles) {
     try {
       const content = await window.api.fs.readFile(file)
-      rules.push(parseClaudeRule(content, file))
+      rules.push({ ...parseClaudeRule(content, file), scope: 'global' as const })
     } catch {
       // Skip unreadable rules
     }
@@ -351,7 +468,7 @@ export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> 
   for (const file of commandFiles) {
     try {
       const content = await window.api.fs.readFile(file)
-      commands.push(parseClaudeCommand(content, file))
+      commands.push({ ...parseClaudeCommand(content, file), scope: 'global' as const })
     } catch {
       // Skip unreadable commands
     }
@@ -362,7 +479,7 @@ export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> 
   for (const file of teamFiles) {
     try {
       const content = await window.api.fs.readFile(file)
-      teams.push(parseClaudeTeam(content, file))
+      teams.push({ ...parseClaudeTeam(content, file), scope: 'global' as const })
     } catch {
       // Skip unreadable teams
     }
@@ -373,14 +490,23 @@ export async function loadClaudeConfig(basePath: string): Promise<ClaudeConfig> 
   for (const file of memoryFiles) {
     try {
       const content = await window.api.fs.readFile(file)
-      memories.push(parseClaudeMemory(content, file))
+      memories.push({ ...parseClaudeMemory(content, file), scope: 'global' as const })
     } catch {
       // Skip unreadable memories
     }
   }
 
+  // Merge project-scoped config if a project path was provided
+  if (projectPath) {
+    const project = await loadProjectConfig(basePath, projectPath)
+    rules.push(...project.rules)
+    commands.push(...project.commands)
+    memories.push(...project.memories)
+  }
+
   return {
     basePath,
+    projectPath: projectPath ?? null,
     settings,
     agents,
     skills,

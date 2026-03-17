@@ -11,6 +11,7 @@ import { CanvasMinimap } from '../canvas/CanvasMinimap'
 import { useViewportCulling } from '../canvas/use-canvas-culling'
 import { getLodLevel } from '../canvas/use-canvas-lod'
 import { loadClaudeConfig } from '../../engine/claude-config-parser'
+import { useVaultStore } from '../../store/vault-store'
 import { layoutClaudeConfig, type ZoneLabel } from '../canvas/claude/claude-canvas-layout'
 import { saveCanvas, loadCanvas } from '../canvas/canvas-io'
 import { colors, typography } from '../../design/tokens'
@@ -72,6 +73,7 @@ export function ClaudeConfigPanel() {
   const setConfigLoading = useClaudeConfigStore((s) => s.setLoading)
   const setCachedData = useClaudeCanvasStore((s) => s.setCachedData)
   const cachedData = useClaudeCanvasStore((s) => s.cachedData)
+  const vaultPath = useVaultStore((s) => s.vaultPath)
 
   // Resolve the real home path once on mount (preload has access to os.homedir())
   const configPath =
@@ -148,7 +150,7 @@ export function ClaudeConfigPanel() {
       // Always parse fresh config and generate layout from real data
       let canvasData: CanvasFile
       try {
-        const config = await loadClaudeConfig(configPath)
+        const config = await loadClaudeConfig(configPath, vaultPath ?? undefined)
         if (!isMounted.current) return
         setConfig(config)
 
@@ -220,7 +222,7 @@ export function ClaudeConfigPanel() {
   const handleRefresh = useCallback(async () => {
     setConfigLoading(true)
     try {
-      const config = await loadClaudeConfig(configPath)
+      const config = await loadClaudeConfig(configPath, vaultPath ?? undefined)
       setConfig(config)
       const { nodes, edges, labels } = layoutClaudeConfig(config)
       setZoneLabels(labels)

@@ -206,6 +206,14 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
         >
           {title}
         </span>
+        {node.metadata?.scope === 'project' && (
+          <span
+            className="px-1 py-0.5 rounded text-xs shrink-0"
+            style={{ backgroundColor: '#6366f122', color: '#818cf8', fontSize: 9 }}
+          >
+            PROJECT
+          </span>
+        )}
         <div className="flex items-center gap-1 ml-2 shrink-0 relative">
           {/* Convert card type dropdown */}
           {VALID_CONVERSIONS[node.type].length > 0 && (

@@ -4,7 +4,7 @@ import { GOOGLE_FONTS, buildGoogleFontUrl, buildFontFamilyValue } from '../desig
 
 const MONO_FONT = GOOGLE_FONTS.find((f) => f.name === 'JetBrains Mono')!
 const MONO_FONT_URL = buildGoogleFontUrl(MONO_FONT)!
-const BODY_FONT = GOOGLE_FONTS.find((f) => f.name === 'DM Sans')!
+const BODY_FONT = GOOGLE_FONTS.find((f) => f.name === 'Inter')!
 const BODY_FONT_URL = buildGoogleFontUrl(BODY_FONT)!
 
 /**

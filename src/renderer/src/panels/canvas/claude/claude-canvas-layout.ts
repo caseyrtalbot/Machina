@@ -1,6 +1,7 @@
 import type { ClaudeConfig } from '@shared/claude-config-types'
 import type { CanvasNode, CanvasEdge } from '@shared/canvas-types'
-import { createCanvasNode, createCanvasEdge } from '@shared/canvas-types'
+import { createCanvasNode } from '@shared/canvas-types'
+import { extractRelationships } from '../../../engine/claude-relationship-extractor'
 
 // Compact card sizes (content-fitted, not default oversized)
 const CARD_W = 260
@@ -93,7 +94,7 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const ruleItems: LayoutItem[] = config.rules.map((r) => ({
     type: 'claude-rule' as const,
     content: r.filePath,
-    metadata: { category: r.category, contentPreview: r.content },
+    metadata: { category: r.category, contentPreview: r.content, scope: r.scope },
     cardH: CARD_H_SMALL
   }))
 
@@ -125,8 +126,8 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
       description: a.description,
       instructionPreview: a.instructionPreview
     },
-    cardW: CARD_W,
-    cardH: CARD_H_MEDIUM
+    cardW: CARD_W + 20,
+    cardH: CARD_H_LARGE
   }))
 
   const agentCols = 2
@@ -194,8 +195,13 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const cmdItems: LayoutItem[] = config.commands.map((c) => ({
     type: 'claude-command' as const,
     content: c.filePath,
-    metadata: { commandName: c.name, description: c.description },
-    cardH: CARD_H_SMALL
+    metadata: {
+      commandName: c.name,
+      description: c.description,
+      contentPreview: c.content,
+      scope: c.scope
+    },
+    cardH: CARD_H_MEDIUM
   }))
 
   if (cmdItems.length > 0) {
@@ -247,7 +253,8 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
       linkCount: m.links.length,
       memoryName: m.name,
       description: m.description,
-      contentPreview: m.content
+      contentPreview: m.content,
+      scope: m.scope
     },
     cardH: CARD_H_MEDIUM
   }))
@@ -264,30 +271,9 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const mems = layoutZoneGrid(memItems, memX, row3Y, memCols)
   allNodes.push(...mems.nodes)
 
-  // --- Edges: Settings -> Agents ---
-  const settingsNode = allNodes.find((n) => n.type === 'claude-settings')
-  const agentNodes = agents.nodes
-  if (settingsNode) {
-    for (const agentNode of agentNodes) {
-      edges.push(createCanvasEdge(settingsNode.id, agentNode.id, 'left', 'right'))
-    }
-  }
-
-  // --- Edges: Teams -> matching Agents ---
-  const teamNodes = teams.nodes
-  for (let i = 0; i < config.teams.length; i++) {
-    const team = config.teams[i]
-    const teamNode = teamNodes[i]
-    if (!teamNode) continue
-    for (const memberName of team.members) {
-      const agentIdx = config.agents.findIndex(
-        (a) => a.name.toLowerCase() === memberName.toLowerCase()
-      )
-      if (agentIdx >= 0 && agentNodes[agentIdx]) {
-        edges.push(createCanvasEdge(teamNode.id, agentNodes[agentIdx].id, 'top', 'bottom'))
-      }
-    }
-  }
+  // --- Extract all relationships via the relationship extractor ---
+  const extractedEdges = extractRelationships(config, allNodes)
+  edges.push(...extractedEdges)
 
   return { nodes: allNodes, edges, labels }
 }

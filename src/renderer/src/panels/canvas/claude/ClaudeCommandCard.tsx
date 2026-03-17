@@ -15,6 +15,7 @@ export function ClaudeCommandCard({ node }: ClaudeCommandCardProps) {
   const meta = node.metadata as {
     commandName?: string
     description?: string
+    contentPreview?: string
   }
 
   const name = meta.commandName || 'command'
@@ -31,7 +32,7 @@ export function ClaudeCommandCard({ node }: ClaudeCommandCardProps) {
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
     >
-      <div className="p-3 space-y-2" style={{ color: "#f1f5f9" }}>
+      <div className="p-3 space-y-2" style={{ color: '#f1f5f9' }}>
         {/* Slash command visual */}
         <div
           className="inline-block px-2 py-1 rounded text-sm font-medium"
@@ -44,10 +45,10 @@ export function ClaudeCommandCard({ node }: ClaudeCommandCardProps) {
           /{name}
         </div>
 
-        {/* Description */}
-        {meta.description && (
-          <p className="text-xs leading-relaxed" style={{ color: "#cbd5e1" }}>
-            {meta.description}
+        {/* Description or body preview */}
+        {(meta.description || meta.contentPreview) && (
+          <p className="text-xs leading-relaxed line-clamp-3" style={{ color: '#cbd5e1' }}>
+            {meta.description || meta.contentPreview}
           </p>
         )}
       </div>

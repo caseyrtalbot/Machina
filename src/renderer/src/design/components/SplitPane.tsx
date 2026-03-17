@@ -33,7 +33,7 @@ export function SplitPane({
     const observer = new ResizeObserver(() => {
       if (dragging.current) return
       const totalWidth = el.clientWidth
-      const dividerWidth = 4
+      const dividerWidth = 1
       const maxLeft = totalWidth - dividerWidth - minRightWidth
       setLeftWidth((prev) => {
         if (prev > maxLeft) {
@@ -94,11 +94,7 @@ export function SplitPane({
       <div style={{ width: leftWidth, flexShrink: 0 }} className="overflow-hidden">
         {left}
       </div>
-      <div
-        onMouseDown={handleMouseDown}
-        className="cursor-col-resize flex-shrink-0"
-        style={{ width: 'var(--panel-gap, 4px)' }}
-      />
+      <div onMouseDown={handleMouseDown} className="panel-divider" />
       <div className="flex-1 overflow-hidden">{right}</div>
     </div>
   )

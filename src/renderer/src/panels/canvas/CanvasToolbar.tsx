@@ -1,4 +1,5 @@
 import { useCanvasStore } from '../../store/canvas-store'
+import { useViewStore } from '../../store/view-store'
 import { colors, borderRadius } from '../../design/tokens'
 
 interface CanvasToolbarProps {
@@ -20,6 +21,7 @@ export function CanvasToolbar({
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
+  const toggleClaudeConfig = useViewStore((s) => s.toggleClaudeConfig)
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -136,6 +138,26 @@ export function CanvasToolbar({
           <polyline points="11 7 8 4" />
           <polyline points="11 7 8 10" />
           <path d="M8 7H4a2 2 0 0 0 0 4h2" />
+        </svg>
+      </button>
+
+      <div style={{ height: 1, backgroundColor: colors.border.subtle, margin: '2px 0' }} />
+
+      <button
+        onClick={toggleClaudeConfig}
+        style={{ ...btnStyle, color: '#f59e0b' }}
+        title="Claude Config Canvas"
+      >
+        <svg
+          width={14}
+          height={14}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
         </svg>
       </button>
     </div>
