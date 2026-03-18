@@ -12,16 +12,6 @@ interface ClaudeConfigStore {
   reset: () => void
 }
 
-// Resolved lazily via window.api.getHomePath() in the renderer
-let resolvedConfigPath: string | null = null
-
-function getDefaultConfigPath(): string {
-  if (!resolvedConfigPath) {
-    resolvedConfigPath = window.api.getHomePath() + '/.claude'
-  }
-  return resolvedConfigPath
-}
-
 export const useClaudeConfigStore = create<ClaudeConfigStore>((set) => ({
   config: null,
   configPath: '',

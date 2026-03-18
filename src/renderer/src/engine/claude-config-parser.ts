@@ -114,6 +114,7 @@ export function parseClaudeAgent(content: string, filePath: string): ClaudeAgent
       model: '',
       tools: [],
       filePath,
+      scope: 'global' as const,
       instructionPreview: truncate(content, 120)
     }
   }
@@ -126,6 +127,7 @@ export function parseClaudeAgent(content: string, filePath: string): ClaudeAgent
     model: data?.model ? String(data.model) : '',
     tools: toStringArray(data?.tools),
     filePath,
+    scope: 'global' as const,
     instructionPreview: truncate(body.trim(), 120)
   }
 }
@@ -143,6 +145,7 @@ export function parseClaudeSkill(
       name: parentDirName(filePath) || filenameStem(filePath),
       description: '',
       filePath,
+      scope: 'global' as const,
       promptFiles: [],
       referenceFiles: []
     }
@@ -156,6 +159,7 @@ export function parseClaudeSkill(
     name: data?.name ? String(data.name) : parentDirName(filePath),
     description: data?.description ? String(data.description) : '',
     filePath,
+    scope: 'global' as const,
     promptFiles,
     referenceFiles
   }
@@ -167,7 +171,8 @@ export function parseClaudeRule(content: string, filePath: string): ClaudeRule {
     name: filenameStem(filePath),
     category: category || 'global',
     content: truncate(content.trim(), 200),
-    filePath
+    filePath,
+    scope: 'global' as const
   }
 }
 
@@ -213,7 +218,8 @@ export function parseClaudeCommand(content: string, filePath: string): ClaudeCom
     name: filenameStem(filePath),
     description,
     content: truncate(bodyPreview, 200),
-    filePath
+    filePath,
+    scope: 'global' as const
   }
 }
 
@@ -252,6 +258,7 @@ export function parseClaudeTeam(json: string, filePath: string): ClaudeTeam {
     members,
     lead,
     filePath,
+    scope: 'global' as const,
     rawConfig: raw
   }
 }
@@ -267,6 +274,7 @@ export function parseClaudeMemory(content: string, filePath: string): ClaudeMemo
       memoryType: 'unknown',
       content: truncate(content.trim(), 200),
       filePath,
+      scope: 'global' as const,
       links: []
     }
   }
@@ -288,6 +296,7 @@ export function parseClaudeMemory(content: string, filePath: string): ClaudeMemo
     memoryType: data?.type ? String(data.type) : inferMemoryType(filePath),
     content: truncate(body.trim(), 200),
     filePath,
+    scope: 'global' as const,
     links
   }
 }
