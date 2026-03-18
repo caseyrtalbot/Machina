@@ -62,6 +62,42 @@ describe('creation-templates', () => {
       const result = generateRuleTemplate('no-console')
       expect(result).toContain('# No Console')
     })
+
+    it('command template includes best-practice guidance', () => {
+      const result = generateCommandTemplate('deploy')
+      expect(result).toContain('## Steps')
+      expect(result).toContain('## Constraints')
+    })
+
+    it('agent template includes responsibilities scaffold', () => {
+      const result = generateAgentTemplate('test', 'Test agent', 'sonnet', ['Read'])
+      expect(result).toContain('## Responsibilities')
+      expect(result).toContain('## Guidelines')
+    })
+
+    it('skill template includes process and checklist', () => {
+      const result = generateSkillTemplate('test', 'Test skill')
+      expect(result).toContain('## When to Use')
+      expect(result).toContain('## Process')
+      expect(result).toContain('## Quality Checklist')
+    })
+
+    it('memory feedback template includes structured Why/How format', () => {
+      const result = generateMemoryTemplate('test', 'Test', 'feedback')
+      expect(result).toContain('**Why:**')
+      expect(result).toContain('**How to apply:**')
+    })
+
+    it('memory reference template includes location field', () => {
+      const result = generateMemoryTemplate('test', 'Test', 'reference')
+      expect(result).toContain('**Location:**')
+      expect(result).toContain('**When to check:**')
+    })
+
+    it('rule template includes rationale field', () => {
+      const result = generateRuleTemplate('no-console')
+      expect(result).toContain('**Rationale:**')
+    })
   })
 
   describe('getTargetPath', () => {
