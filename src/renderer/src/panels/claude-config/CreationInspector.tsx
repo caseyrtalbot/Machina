@@ -60,12 +60,18 @@ export function CreationInspector({
   const templateContent = useMemo(() => {
     if (!slug) return ''
     switch (configType) {
-      case 'command': return generateCommandTemplate(slug)
-      case 'agent': return generateAgentTemplate(slug, description, model, tools)
-      case 'skill': return generateSkillTemplate(slug, description)
-      case 'memory': return generateMemoryTemplate(`${memoryType}-${slug}`, description, memoryType)
-      case 'rule': return generateRuleTemplate(slug)
-      default: return ''
+      case 'command':
+        return generateCommandTemplate(slug)
+      case 'agent':
+        return generateAgentTemplate(slug, description, model, tools)
+      case 'skill':
+        return generateSkillTemplate(slug, description)
+      case 'memory':
+        return generateMemoryTemplate(`${memoryType}-${slug}`, description, memoryType)
+      case 'rule':
+        return generateRuleTemplate(slug)
+      default:
+        return ''
     }
   }, [configType, slug, description, model, tools, memoryType])
 
@@ -90,15 +96,12 @@ export function CreationInspector({
   }, [onClose])
 
   const toggleTool = useCallback((tool: string) => {
-    setTools((prev) =>
-      prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool]
-    )
+    setTools((prev) => (prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool]))
   }, [])
 
+  // Tracks user edits in the editor. Reset when editor remounts (via key prop).
+  // Form field changes regenerate the template and remount the editor (one-way sync).
   const editorContentRef = useRef(templateContent)
-  useEffect(() => {
-    editorContentRef.current = templateContent
-  }, [templateContent])
 
   const handleEditorChange = useCallback((content: string) => {
     editorContentRef.current = content
@@ -107,6 +110,10 @@ export function CreationInspector({
   const handleCreate = useCallback(async () => {
     if (!slug) {
       setError('Name is required')
+      return
+    }
+    if (configType === 'memory' && !projectPath) {
+      setError('Memory requires an active project')
       return
     }
     setError(null)
@@ -120,13 +127,9 @@ export function CreationInspector({
         return
       }
 
-      if (configType === 'skill') {
-        const dirPath = targetPath.replace('/SKILL.md', '')
-        await window.api.fs.mkdir(dirPath)
-      } else if (configType === 'rule') {
-        const dirPath = targetPath.split('/').slice(0, -1).join('/')
-        await window.api.fs.mkdir(dirPath)
-      }
+      // Ensure parent directory exists for all types (recursive mkdir is safe for existing dirs)
+      const dirPath = targetPath.split('/').slice(0, -1).join('/')
+      await window.api.fs.mkdir(dirPath)
 
       const content = editorContentRef.current || templateContent
       await window.api.fs.writeFile(targetPath, content)
