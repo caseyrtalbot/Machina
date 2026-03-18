@@ -17,6 +17,7 @@ import { layoutClaudeConfig, type ZoneLabel } from '../canvas/claude/claude-canv
 import { saveCanvas, loadCanvas } from '../canvas/canvas-io'
 import { InspectorProvider } from './InspectorContext'
 import { ConfigInspector } from './ConfigInspector'
+import { CreationInspector } from './CreationInspector'
 import { colors, typography } from '../../design/tokens'
 import type { CanvasFile, CanvasNode } from '@shared/canvas-types'
 import { createCanvasFile } from '@shared/canvas-types'
@@ -210,6 +211,8 @@ export function ClaudeConfigPanel() {
 
   const inspectorFile = useInspectorStore((s) => s.inspectorFile)
   const closeInspector = useInspectorStore((s) => s.closeInspector)
+  const creationMode = useInspectorStore((s) => s.creationMode)
+  const cancelCreation = useInspectorStore((s) => s.cancelCreation)
 
   // Clear inspector when this panel unmounts
   useEffect(
@@ -255,11 +258,22 @@ export function ClaudeConfigPanel() {
     useCanvasStore.getState().setViewport(vp)
   }, [nodes, containerSize])
 
+  const handleCreated = useCallback(
+    async (filePath: string, title: string) => {
+      await handleRefresh()
+      useInspectorStore.getState().openInspector(filePath, title)
+    },
+    [handleRefresh]
+  )
+
   return (
     <InspectorProvider value={useInspectorStore.getState().openInspector}>
       <div className="flex h-full w-full overflow-hidden">
         {/* Canvas panel - always at same DOM position to avoid remount */}
-        <div className="overflow-hidden shrink-0" style={{ width: inspectorFile ? '55%' : '100%' }}>
+        <div
+          className="overflow-hidden shrink-0"
+          style={{ width: inspectorFile || creationMode ? '55%' : '100%' }}
+        >
           <div ref={containerRef} className="h-full relative">
             {/* Toolbar */}
             <div
@@ -384,16 +398,26 @@ export function ClaudeConfigPanel() {
         </div>
 
         {/* Inspector panel - added/removed as sibling, canvas stays stable */}
-        {inspectorFile && (
+        {(inspectorFile || creationMode) && (
           <>
             <div className="panel-divider" />
             <div className="flex-1 overflow-hidden min-w-[350px]">
-              <ConfigInspector
-                key={inspectorFile.path}
-                path={inspectorFile.path}
-                title={inspectorFile.title}
-                onClose={closeInspector}
-              />
+              {creationMode ? (
+                <CreationInspector
+                  configType={creationMode.configType}
+                  configPath={configPath}
+                  projectPath={vaultPath ?? null}
+                  onCreated={handleCreated}
+                  onClose={cancelCreation}
+                />
+              ) : inspectorFile ? (
+                <ConfigInspector
+                  key={inspectorFile.path}
+                  path={inspectorFile.path}
+                  title={inspectorFile.title}
+                  onClose={closeInspector}
+                />
+              ) : null}
             </div>
           </>
         )}
