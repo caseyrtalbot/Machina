@@ -86,21 +86,18 @@ export const GOOGLE_FONTS: readonly GoogleFontEntry[] = [
   { name: 'Abril Fatface', category: 'display', weights: [400] },
   { name: 'Passion One', category: 'display', weights: [400, 700] },
   { name: 'Russo One', category: 'display', weights: [400] },
-  { name: 'Cinzel', category: 'display', weights: [400, 500, 600, 700] },
+  { name: 'Cinzel', category: 'display', weights: [400, 500, 600, 700] }
 ] as const
 
 /** The built-in system font option (not from Google Fonts) */
 export const SYSTEM_FONT_ENTRY: GoogleFontEntry = {
   name: 'System',
   category: 'sans-serif',
-  weights: [400, 500, 600, 700],
+  weights: [400, 500, 600, 700]
 }
 
 /** All font options including the system font */
-export const ALL_FONT_OPTIONS: readonly GoogleFontEntry[] = [
-  SYSTEM_FONT_ENTRY,
-  ...GOOGLE_FONTS,
-]
+export const ALL_FONT_OPTIONS: readonly GoogleFontEntry[] = [SYSTEM_FONT_ENTRY, ...GOOGLE_FONTS]
 
 /**
  * Build a Google Fonts CSS2 API URL for a given font entry.

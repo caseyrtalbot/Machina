@@ -9,8 +9,8 @@ vi.mock('../parser', () => ({
 }))
 
 vi.mock('../graph-builder', () => ({
-  buildGraph: vi.fn((artifacts: any[]) => ({
-    nodes: artifacts.map((a: any) => ({ id: a.id })),
+  buildGraph: vi.fn((artifacts: Record<string, unknown>[]) => ({
+    nodes: artifacts.map((a: Record<string, unknown>) => ({ id: a.id })),
     edges: []
   }))
 }))

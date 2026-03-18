@@ -158,6 +158,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     }
   })
 
+  // eslint-disable-next-line react-hooks/immutability -- editorRef is a useRef; assigning during render keeps callbacks in sync
   editorRef.current = editor
 
   // Load file content from disk when active note path changes

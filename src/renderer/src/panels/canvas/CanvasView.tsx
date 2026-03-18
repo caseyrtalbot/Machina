@@ -225,6 +225,7 @@ export function CanvasView(): React.ReactElement {
 
   return (
     <div ref={containerRef} className="h-full relative">
+      {/* eslint-disable react-hooks/refs -- commandStack is a stable ref that doesn't change between renders */}
       <CanvasToolbar
         canUndo={commandStack.current.canUndo()}
         canRedo={commandStack.current.canRedo()}
@@ -240,6 +241,7 @@ export function CanvasView(): React.ReactElement {
         }}
         onOpenImport={() => setImportOpen(true)}
       />
+      {/* eslint-enable react-hooks/refs */}
       <CanvasSurface
         onDoubleClick={handleDoubleClick}
         onBackgroundClick={handleBackgroundClick}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildFileTree, type FlatTreeNode } from '../../src/renderer/src/panels/sidebar/buildFileTree'
+import { buildFileTree } from '../../src/renderer/src/panels/sidebar/buildFileTree'
 
 describe('buildFileTree', () => {
   it('creates flat nodes from root-level files', () => {

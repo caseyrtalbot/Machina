@@ -37,6 +37,7 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
   // Load PDF document via IPC binary read (local files) or URL (remote)
   useEffect(() => {
     if (!src) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- early exit when no src
       setLoading(false)
       return
     }

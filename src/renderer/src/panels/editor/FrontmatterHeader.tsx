@@ -10,6 +10,7 @@ export interface MetadataEntry {
   readonly value: string
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function buildMetadataEntries(artifact: Artifact): readonly MetadataEntry[] {
   const entries: MetadataEntry[] = [
     { label: 'ID', value: artifact.id },

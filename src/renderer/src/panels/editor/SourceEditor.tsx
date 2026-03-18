@@ -46,30 +46,34 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
     const isConceptNode = surrounding.includes(`<node>${selectedText}</node>`)
 
     const actions: ContextMenuAction[] = isConceptNode
-      ? [{
-          label: 'Unlink concept',
-          onClick: () => {
-            const v = viewRef.current
-            if (!v) return
-            // Find and remove surrounding <node>...</node> tags
-            const nodeStart = from - 6
-            const nodeEnd = to + 7
-            const full = v.state.sliceDoc(nodeStart, nodeEnd)
-            if (full === `<node>${selectedText}</node>`) {
-              v.dispatch({ changes: { from: nodeStart, to: nodeEnd, insert: selectedText } })
+      ? [
+          {
+            label: 'Unlink concept',
+            onClick: () => {
+              const v = viewRef.current
+              if (!v) return
+              // Find and remove surrounding <node>...</node> tags
+              const nodeStart = from - 6
+              const nodeEnd = to + 7
+              const full = v.state.sliceDoc(nodeStart, nodeEnd)
+              if (full === `<node>${selectedText}</node>`) {
+                v.dispatch({ changes: { from: nodeStart, to: nodeEnd, insert: selectedText } })
+              }
             }
           }
-        }]
-      : [{
-          label: 'Link as concept',
-          onClick: () => {
-            const v = viewRef.current
-            if (!v) return
-            v.dispatch({
-              changes: { from, to, insert: `<node>${selectedText}</node>` }
-            })
+        ]
+      : [
+          {
+            label: 'Link as concept',
+            onClick: () => {
+              const v = viewRef.current
+              if (!v) return
+              v.dispatch({
+                changes: { from, to, insert: `<node>${selectedText}</node>` }
+              })
+            }
           }
-        }]
+        ]
 
     setContextMenu({ x: e.clientX, y: e.clientY, actions })
   }, [])

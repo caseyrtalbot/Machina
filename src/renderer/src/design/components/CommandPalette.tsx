@@ -23,6 +23,7 @@ const CATEGORY_LABELS: Record<CommandItem['category'], string> = {
   command: 'Commands'
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function fuzzyMatch(
   text: string,
   query: string
@@ -60,6 +61,7 @@ export function fuzzyMatch(
     : { match: false, score: 0, indices: [] }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function filterItems(
   items: ReadonlyArray<CommandItem>,
   query: string

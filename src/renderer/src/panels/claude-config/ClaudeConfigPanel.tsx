@@ -251,7 +251,7 @@ export function ClaudeConfigPanel() {
       // Parse failed
     }
     setConfigLoading(false)
-  }, [configPath, setConfig, setConfigLoading, setCachedData, containerSize])
+  }, [configPath, setConfig, setConfigLoading, setCachedData, containerSize, vaultPath])
 
   const handleFitAll = useCallback(() => {
     const vp = fitViewportToNodes(nodes, containerSize)

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { CommandStack, type Command } from
-  '../../src/renderer/src/panels/canvas/canvas-commands'
+import { CommandStack, type Command } from '../../src/renderer/src/panels/canvas/canvas-commands'
 
 describe('CommandStack', () => {
   let stack: CommandStack
@@ -17,8 +16,12 @@ describe('CommandStack', () => {
   it('executes and undoes a command', () => {
     let value = 0
     const cmd: Command = {
-      execute: () => { value = 1 },
-      undo: () => { value = 0 }
+      execute: () => {
+        value = 1
+      },
+      undo: () => {
+        value = 0
+      }
     }
 
     stack.execute(cmd)
@@ -33,8 +36,12 @@ describe('CommandStack', () => {
   it('redoes after undo', () => {
     let value = 0
     const cmd: Command = {
-      execute: () => { value = 1 },
-      undo: () => { value = 0 }
+      execute: () => {
+        value = 1
+      },
+      undo: () => {
+        value = 0
+      }
     }
 
     stack.execute(cmd)
@@ -48,12 +55,20 @@ describe('CommandStack', () => {
   it('clears redo stack on new execute', () => {
     let value = 0
     const cmd1: Command = {
-      execute: () => { value = 1 },
-      undo: () => { value = 0 }
+      execute: () => {
+        value = 1
+      },
+      undo: () => {
+        value = 0
+      }
     }
     const cmd2: Command = {
-      execute: () => { value = 2 },
-      undo: () => { value = 1 }
+      execute: () => {
+        value = 2
+      },
+      undo: () => {
+        value = 1
+      }
     }
 
     stack.execute(cmd1)
@@ -70,7 +85,10 @@ describe('CommandStack', () => {
     }
     // Only 3 undos available
     let undos = 0
-    while (stack.canUndo()) { stack.undo(); undos++ }
+    while (stack.canUndo()) {
+      stack.undo()
+      undos++
+    }
     expect(undos).toBe(3)
   })
 })

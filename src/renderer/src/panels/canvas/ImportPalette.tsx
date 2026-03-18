@@ -41,6 +41,7 @@ export function ImportPalette({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset state when palette opens
       setSearchQuery('')
       setNeighborhoodExpanded(false)
       requestAnimationFrame(() => inputRef.current?.focus())
@@ -85,10 +86,7 @@ export function ImportPalette({
     return tags.filter((t) => t.tag.toLowerCase().includes(q))
   }, [tags, searchQuery])
 
-  const hubCount = useMemo(
-    () => Math.min(graph.nodes.length, HUB_COUNT),
-    [graph.nodes]
-  )
+  const hubCount = useMemo(() => Math.min(graph.nodes.length, HUB_COUNT), [graph.nodes])
 
   const handleImport = useCallback(
     (mode: ImportMode) => {

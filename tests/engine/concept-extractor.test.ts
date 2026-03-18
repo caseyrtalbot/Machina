@@ -39,7 +39,7 @@ And <node>Note C</node> too.`
   it('handles special characters in terms', () => {
     expect(
       extractConceptNodes("See <node>C++ Patterns</node> and <node>O'Brien Notes</node>")
-    ).toEqual(["C++ Patterns", "O'Brien Notes"])
+    ).toEqual(['C++ Patterns', "O'Brien Notes"])
   })
 
   it('ignores concept nodes with empty terms', () => {

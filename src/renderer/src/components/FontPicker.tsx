@@ -6,7 +6,7 @@ import {
   buildGoogleFontUrl,
   buildFontFamilyValue,
   type FontCategory,
-  type GoogleFontEntry,
+  type GoogleFontEntry
 } from '../design/google-fonts'
 
 interface FontPickerProps {
@@ -58,19 +58,18 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
         selected?.scrollIntoView({ block: 'center' })
       })
     } else {
+      // Reset state when picker closes — cascading render is acceptable here
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearch('')
       setCategory('all')
     }
   }, [isOpen])
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false)
-      }
-    },
-    []
-  )
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false)
+    }
+  }, [])
 
   // Load a font for preview on hover
   const handleHover = useCallback((font: GoogleFontEntry) => {
@@ -100,7 +99,7 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
           backgroundColor: colors.bg.elevated,
           color: colors.text.primary,
           border: `1px solid ${colors.border.default}`,
-          fontFamily: buildFontFamilyValue(value),
+          fontFamily: buildFontFamilyValue(value)
         }}
       >
         <span className="truncate">{value}</span>
@@ -123,7 +122,7 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
             width: 280,
             backgroundColor: colors.bg.elevated,
             border: `1px solid ${colors.border.default}`,
-            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5)'
           }}
         >
           {/* Search input */}
@@ -138,7 +137,7 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
               style={{
                 backgroundColor: colors.bg.base,
                 color: colors.text.primary,
-                border: `1px solid ${colors.border.default}`,
+                border: `1px solid ${colors.border.default}`
               }}
             />
           </div>
@@ -156,7 +155,7 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
                 className="text-[10px] px-1.5 py-0.5 rounded capitalize transition-colors"
                 style={{
                   backgroundColor: category === cat ? colors.accent.muted : 'transparent',
-                  color: category === cat ? colors.accent.default : colors.text.muted,
+                  color: category === cat ? colors.accent.default : colors.text.muted
                 }}
               >
                 {cat === 'all' ? 'All' : cat}
@@ -167,11 +166,8 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
           {/* Font list */}
           <div ref={listRef} className="max-h-[240px] overflow-y-auto">
             {filteredFonts.length === 0 ? (
-              <div
-                className="px-3 py-4 text-xs text-center"
-                style={{ color: colors.text.muted }}
-              >
-                No fonts match "{search}"
+              <div className="px-3 py-4 text-xs text-center" style={{ color: colors.text.muted }}>
+                No fonts match &ldquo;{search}&rdquo;
               </div>
             ) : (
               filteredFonts.map((font) => {
@@ -196,7 +192,8 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
                           ? colors.bg.surface
                           : 'transparent',
                       color: isSelected ? colors.accent.default : colors.text.primary,
-                      fontFamily: isHovered || isSelected ? buildFontFamilyValue(font.name) : undefined,
+                      fontFamily:
+                        isHovered || isSelected ? buildFontFamilyValue(font.name) : undefined
                     }}
                   >
                     <span className="truncate">{font.name}</span>

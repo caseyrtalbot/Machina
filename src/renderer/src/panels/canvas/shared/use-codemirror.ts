@@ -70,7 +70,8 @@ export function useCodeMirrorEditor(opts: UseCodeMirrorOptions): {
       view.destroy()
       viewRef.current = null
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
+  // eslint-disable-next-line react-hooks/refs -- viewRef is read during render to expose EditorView to consumers
   return { containerRef, view: viewRef.current }
 }

@@ -138,7 +138,7 @@ export function CreationInspector({
       setError(`Failed to create: ${String(err)}`)
     }
     setIsCreating(false)
-  }, [slug, targetPath, configType, templateContent, onCreated])
+  }, [slug, targetPath, configType, templateContent, onCreated, projectPath])
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: colors.bg.base }}>

@@ -49,8 +49,24 @@ describe('claude-canvas-layout', () => {
     const result = layoutClaudeConfig(
       makeConfig({
         agents: [
-          { name: 'reviewer', description: 'Reviews code', model: 'opus', tools: ['Read'], filePath: '/agents/reviewer.md', instructionPreview: 'Review code', scope: 'global' },
-          { name: 'writer', description: 'Writes code', model: 'sonnet', tools: ['Write'], filePath: '/agents/writer.md', instructionPreview: 'Write code', scope: 'global' }
+          {
+            name: 'reviewer',
+            description: 'Reviews code',
+            model: 'opus',
+            tools: ['Read'],
+            filePath: '/agents/reviewer.md',
+            instructionPreview: 'Review code',
+            scope: 'global'
+          },
+          {
+            name: 'writer',
+            description: 'Writes code',
+            model: 'sonnet',
+            tools: ['Write'],
+            filePath: '/agents/writer.md',
+            instructionPreview: 'Write code',
+            scope: 'global'
+          }
         ]
       })
     )
@@ -62,7 +78,14 @@ describe('claude-canvas-layout', () => {
     const result = layoutClaudeConfig(
       makeConfig({
         skills: [
-          { name: 'debugging', description: 'Debug workflow', filePath: '/skills/debugging/SKILL.md', promptFiles: [], referenceFiles: [], scope: 'global' }
+          {
+            name: 'debugging',
+            description: 'Debug workflow',
+            filePath: '/skills/debugging/SKILL.md',
+            promptFiles: [],
+            referenceFiles: [],
+            scope: 'global'
+          }
         ]
       })
     )
@@ -76,7 +99,15 @@ describe('claude-canvas-layout', () => {
       makeConfig({
         settings: { permissions: {}, envVars: [], plugins: [], allowCount: 0, rawJson: {} },
         agents: [
-          { name: 'reviewer', description: '', model: '', tools: [], filePath: '/agents/reviewer.md', instructionPreview: '', scope: 'global' }
+          {
+            name: 'reviewer',
+            description: '',
+            model: '',
+            tools: [],
+            filePath: '/agents/reviewer.md',
+            instructionPreview: '',
+            scope: 'global'
+          }
         ]
       })
     )
@@ -87,12 +118,50 @@ describe('claude-canvas-layout', () => {
     const result = layoutClaudeConfig(
       makeConfig({
         settings: { permissions: {}, envVars: [], plugins: [], allowCount: 0, rawJson: {} },
-        agents: [{ name: 'a', description: '', model: '', tools: [], filePath: '/a.md', instructionPreview: '', scope: 'global' }],
-        skills: [{ name: 's', description: '', filePath: '/s.md', promptFiles: [], referenceFiles: [], scope: 'global' }],
+        agents: [
+          {
+            name: 'a',
+            description: '',
+            model: '',
+            tools: [],
+            filePath: '/a.md',
+            instructionPreview: '',
+            scope: 'global'
+          }
+        ],
+        skills: [
+          {
+            name: 's',
+            description: '',
+            filePath: '/s.md',
+            promptFiles: [],
+            referenceFiles: [],
+            scope: 'global'
+          }
+        ],
         rules: [{ name: 'r', category: 'common', content: '', filePath: '/r.md', scope: 'global' }],
         commands: [{ name: 'c', description: '', content: '', filePath: '/c.md', scope: 'global' }],
-        teams: [{ name: 't', members: [], lead: null, filePath: '/t.json', rawConfig: {}, scope: 'global' }],
-        memories: [{ name: 'm', description: '', memoryType: 'user', content: '', filePath: '/m.md', links: [], scope: 'global' }]
+        teams: [
+          {
+            name: 't',
+            members: [],
+            lead: null,
+            filePath: '/t.json',
+            rawConfig: {},
+            scope: 'global'
+          }
+        ],
+        memories: [
+          {
+            name: 'm',
+            description: '',
+            memoryType: 'user',
+            content: '',
+            filePath: '/m.md',
+            links: [],
+            scope: 'global'
+          }
+        ]
       })
     )
     expect(result.nodes).toHaveLength(7)
@@ -117,8 +186,27 @@ describe('claude-canvas-layout', () => {
     const result = layoutClaudeConfig(
       makeConfig({
         settings: { permissions: {}, envVars: [], plugins: [], allowCount: 0, rawJson: {} },
-        agents: [{ name: 'a', description: '', model: '', tools: [], filePath: '/a.md', instructionPreview: '', scope: 'global' }],
-        skills: [{ name: 's', description: '', filePath: '/s.md', promptFiles: [], referenceFiles: [], scope: 'global' }],
+        agents: [
+          {
+            name: 'a',
+            description: '',
+            model: '',
+            tools: [],
+            filePath: '/a.md',
+            instructionPreview: '',
+            scope: 'global'
+          }
+        ],
+        skills: [
+          {
+            name: 's',
+            description: '',
+            filePath: '/s.md',
+            promptFiles: [],
+            referenceFiles: [],
+            scope: 'global'
+          }
+        ],
         rules: [{ name: 'r', category: 'common', content: '', filePath: '/r.md', scope: 'global' }]
       })
     )

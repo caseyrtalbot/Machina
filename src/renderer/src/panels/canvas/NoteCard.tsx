@@ -43,6 +43,7 @@ export function NoteCard({ node }: NoteCardProps) {
   // Load file content
   useEffect(() => {
     if (!filePath) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- early exit when no file to load
       setLoading(false)
       return
     }

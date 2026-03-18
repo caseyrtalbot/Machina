@@ -13,15 +13,11 @@ export const useInspectorStore = create<InspectorStore>((set) => ({
   inspectorFile: null,
   creationMode: null,
 
-  openInspector: (path, title) =>
-    set({ inspectorFile: { path, title }, creationMode: null }),
+  openInspector: (path, title) => set({ inspectorFile: { path, title }, creationMode: null }),
 
-  closeInspector: () =>
-    set({ inspectorFile: null, creationMode: null }),
+  closeInspector: () => set({ inspectorFile: null, creationMode: null }),
 
-  startCreation: (configType) =>
-    set({ creationMode: { configType }, inspectorFile: null }),
+  startCreation: (configType) => set({ creationMode: { configType }, inspectorFile: null }),
 
-  cancelCreation: () =>
-    set({ creationMode: null })
+  cancelCreation: () => set({ creationMode: null })
 }))

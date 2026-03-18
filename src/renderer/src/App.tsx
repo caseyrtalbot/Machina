@@ -614,7 +614,7 @@ export default function App() {
       }
     })
     return unsub
-  }, [updateFile, removeFile])
+  }, [updateFile, removeFile, setFiles])
 
   function renderContent() {
     if (isLoading) return <LoadingSkeleton />

@@ -92,6 +92,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
 
   // Reset focus when menu opens
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on open
     setFocusedIndex(-1)
   }, [state])
 
@@ -165,6 +166,7 @@ function useAdjustedPosition(
       setPos({ x: Math.max(0, x), y: Math.max(0, y) })
     })
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial position before rAF adjusts
     setPos({ x, y })
   }, [state, menuRef])
 

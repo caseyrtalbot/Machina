@@ -23,10 +23,7 @@ function makeNode(
 
 describe('deriveCanvasFilePaths', () => {
   it('extracts paths from note-type nodes', () => {
-    const nodes = [
-      makeNode('note', '/vault/alpha.md'),
-      makeNode('note', '/vault/beta.md')
-    ]
+    const nodes = [makeNode('note', '/vault/alpha.md'), makeNode('note', '/vault/beta.md')]
     const result = deriveCanvasFilePaths(nodes)
     expect(result).toEqual(new Set(['/vault/alpha.md', '/vault/beta.md']))
   })
@@ -48,10 +45,7 @@ describe('deriveCanvasFilePaths', () => {
   })
 
   it('deduplicates paths from multiple nodes referencing same file', () => {
-    const nodes = [
-      makeNode('note', '/vault/alpha.md'),
-      makeNode('note', '/vault/alpha.md')
-    ]
+    const nodes = [makeNode('note', '/vault/alpha.md'), makeNode('note', '/vault/alpha.md')]
     const result = deriveCanvasFilePaths(nodes)
     expect(result.size).toBe(1)
     expect(result.has('/vault/alpha.md')).toBe(true)

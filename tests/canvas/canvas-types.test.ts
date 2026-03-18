@@ -66,16 +66,24 @@ describe('canvas-types', () => {
     })
 
     it('allows overriding metadata for code nodes', () => {
-      const node = createCanvasNode('code', { x: 0, y: 0 }, {
-        metadata: { language: 'python', filename: 'script.py' }
-      })
+      const node = createCanvasNode(
+        'code',
+        { x: 0, y: 0 },
+        {
+          metadata: { language: 'python', filename: 'script.py' }
+        }
+      )
       expect(node.metadata).toEqual({ language: 'python', filename: 'script.py' })
     })
 
     it('allows overriding metadata for image nodes', () => {
-      const node = createCanvasNode('image', { x: 0, y: 0 }, {
-        metadata: { src: '/path/to/img.png', alt: 'Screenshot' }
-      })
+      const node = createCanvasNode(
+        'image',
+        { x: 0, y: 0 },
+        {
+          metadata: { src: '/path/to/img.png', alt: 'Screenshot' }
+        }
+      )
       expect(node.metadata).toEqual({ src: '/path/to/img.png', alt: 'Screenshot' })
     })
   })

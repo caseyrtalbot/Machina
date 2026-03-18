@@ -169,7 +169,6 @@ test.describe('Workspace with Test Vault', () => {
 
   test('terminal panel is present with tab bar', async () => {
     // Terminal tabs should be visible
-    const shellTab = page.locator('text=Shell 1')
     // May take time for terminal to init
     await page.waitForSelector('[data-testid="terminal-tabs"]', { timeout: 5000 })
 

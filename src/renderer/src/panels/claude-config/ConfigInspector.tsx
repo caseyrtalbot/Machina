@@ -33,6 +33,7 @@ export function ConfigInspector({ path, title, onClose }: ConfigInspectorProps) 
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when path changes
     setContent(null)
     setError(null)
     setSaveStatus('saved')

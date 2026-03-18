@@ -108,7 +108,7 @@ export function computeImportNodes(
   mode: ImportMode
 ): { readonly nodes: readonly GraphNode[]; readonly edges: readonly GraphEdge[] } {
   let candidates: readonly GraphNode[]
-  let sourceEdges: readonly GraphEdge[] = graph.edges
+  const sourceEdges: readonly GraphEdge[] = graph.edges
 
   switch (mode.mode) {
     case 'neighborhood': {
@@ -122,9 +122,7 @@ export function computeImportNodes(
       break
     }
     case 'tag': {
-      const taggedIds = new Set(
-        artifacts.filter((a) => a.tags.includes(mode.tag)).map((a) => a.id)
-      )
+      const taggedIds = new Set(artifacts.filter((a) => a.tags.includes(mode.tag)).map((a) => a.id))
       candidates = graph.nodes.filter((n) => taggedIds.has(n.id))
       break
     }

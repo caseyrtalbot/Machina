@@ -7,6 +7,7 @@ import { getArtifactColor, colors, transitions } from '../../design/tokens'
  * and returns a 100-character window centered around the match.
  * Returns an empty string when not found.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function extractContext(body: string, targetId: string, targetTitle?: string): string {
   let matchIndex = body.indexOf(targetId)
   let matchLength = targetId.length

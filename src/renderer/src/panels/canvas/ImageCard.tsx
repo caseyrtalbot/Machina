@@ -47,6 +47,7 @@ export function ImageCard({ node }: ImageCardProps): React.ReactElement {
   // Load local files via IPC binary read -> blob URL
   useEffect(() => {
     if (!src || isRemote) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- early exit when no local file to load
       setLoading(false)
       return
     }

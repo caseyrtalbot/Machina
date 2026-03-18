@@ -9,9 +9,8 @@ interface TitlebarProps {
 
 export function Titlebar({ vaultName, activeFilePath, vaultPath, onOpenSettings }: TitlebarProps) {
   // Compute relative path from vault root
-  const displayPath = activeFilePath && vaultPath
-    ? activeFilePath.replace(vaultPath + '/', '')
-    : null
+  const displayPath =
+    activeFilePath && vaultPath ? activeFilePath.replace(vaultPath + '/', '') : null
 
   return (
     <div
@@ -37,9 +36,7 @@ export function Titlebar({ vaultName, activeFilePath, vaultPath, onOpenSettings 
           } as React.CSSProperties
         }
       >
-        <span className="truncate max-w-[400px]">
-          {displayPath ?? vaultName}
-        </span>
+        <span className="truncate max-w-[400px]">{displayPath ?? vaultName}</span>
       </div>
       <div className="flex-1" />
       {/* Settings gear */}

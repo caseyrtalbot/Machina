@@ -1,5 +1,11 @@
 import { ipcRenderer } from 'electron'
-import type { IpcChannel, IpcRequest, IpcResponse, IpcEvent, IpcEventData } from '../shared/ipc-channels'
+import type {
+  IpcChannel,
+  IpcRequest,
+  IpcResponse,
+  IpcEvent,
+  IpcEventData
+} from '../shared/ipc-channels'
 
 export function typedInvoke<C extends IpcChannel>(
   channel: C,

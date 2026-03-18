@@ -6,6 +6,7 @@ export interface BreadcrumbSegment {
   readonly isFile: boolean
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function parseBreadcrumb(filePath: string, vaultPath: string): readonly BreadcrumbSegment[] {
   const relative = filePath.startsWith(vaultPath)
     ? filePath.slice(vaultPath.length).replace(/^\//, '')

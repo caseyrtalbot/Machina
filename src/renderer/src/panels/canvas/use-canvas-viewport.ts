@@ -68,39 +68,36 @@ export function useCanvasViewport(
     [containerRef]
   )
 
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      // Middle-click or Space+left-click to pan
-      const shouldPan = e.button === 1 || (e.button === 0 && spaceHeld.current)
-      if (!shouldPan) return
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    // Middle-click or Space+left-click to pan
+    const shouldPan = e.button === 1 || (e.button === 0 && spaceHeld.current)
+    if (!shouldPan) return
 
-      e.preventDefault()
-      isPanning.current = true
-      const { viewport } = useCanvasStore.getState()
-      panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
+    e.preventDefault()
+    isPanning.current = true
+    const { viewport } = useCanvasStore.getState()
+    panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
 
-      const onMove = (me: PointerEvent) => {
-        if (!isPanning.current) return
-        const dx = me.clientX - panStart.current.x
-        const dy = me.clientY - panStart.current.y
-        useCanvasStore.getState().setViewport({
-          x: panStart.current.vx + dx,
-          y: panStart.current.vy + dy,
-          zoom: useCanvasStore.getState().viewport.zoom
-        })
-      }
+    const onMove = (me: PointerEvent) => {
+      if (!isPanning.current) return
+      const dx = me.clientX - panStart.current.x
+      const dy = me.clientY - panStart.current.y
+      useCanvasStore.getState().setViewport({
+        x: panStart.current.vx + dx,
+        y: panStart.current.vy + dy,
+        zoom: useCanvasStore.getState().viewport.zoom
+      })
+    }
 
-      const onUp = () => {
-        isPanning.current = false
-        window.removeEventListener('pointermove', onMove)
-        window.removeEventListener('pointerup', onUp)
-      }
+    const onUp = () => {
+      isPanning.current = false
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
 
-      window.addEventListener('pointermove', onMove)
-      window.addEventListener('pointerup', onUp)
-    },
-    []
-  )
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }, [])
 
   return { onWheel, onPointerDown }
 }

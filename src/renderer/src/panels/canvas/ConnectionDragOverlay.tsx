@@ -20,10 +20,12 @@ const dragRef: { current: DragState | null } = { current: null }
 let setDragFn: ((state: DragState | null) => void) | null = null
 let addEdgeFn: ((edge: ReturnType<typeof createCanvasEdge>) => void) | null = null
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function isConnectionDragActive(): boolean {
   return dragRef.current !== null
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function startConnectionDrag(
   fromNodeId: string,
   fromSide: CanvasSide,
@@ -35,6 +37,7 @@ export function startConnectionDrag(
   setDragFn?.(state)
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function endConnectionDrag(toNodeId: string, toSide: CanvasSide): void {
   const drag = dragRef.current
   if (!drag) return
@@ -127,7 +130,9 @@ export function ConnectionDragOverlay() {
   const addEdge = useCanvasStore((s) => s.addEdge)
 
   // Keep the module-level refs in sync
+  // eslint-disable-next-line react-hooks/globals -- module-level event bus pattern for cross-component drag
   setDragFn = setDrag
+  // eslint-disable-next-line react-hooks/globals
   addEdgeFn = addEdge
 
   useEffect(() => {

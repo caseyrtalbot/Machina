@@ -33,6 +33,8 @@ function getControlOffset(side: CanvasSide, distance: number): { dx: number; dy:
 }
 
 function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNode[] }) {
+  const isSelected = useCanvasStore((s) => s.selectedEdgeId === edge.id)
+
   const from_node = nodes.find((n) => n.id === edge.fromNode)
   const to_node = nodes.find((n) => n.id === edge.toNode)
   if (!from_node || !to_node) return null
@@ -45,8 +47,6 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
   const cp2 = getControlOffset(edge.toSide, dist)
 
   const d = `M ${from.x} ${from.y} C ${from.x + cp1.dx} ${from.y + cp1.dy}, ${to.x + cp2.dx} ${to.y + cp2.dy}, ${to.x} ${to.y}`
-
-  const isSelected = useCanvasStore((s) => s.selectedEdgeId === edge.id)
 
   return (
     <g data-canvas-edge>

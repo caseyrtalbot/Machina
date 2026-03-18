@@ -1,5 +1,11 @@
 import { ipcMain, type BrowserWindow } from 'electron'
-import type { IpcChannel, IpcRequest, IpcResponse, IpcEvent, IpcEventData } from '@shared/ipc-channels'
+import type {
+  IpcChannel,
+  IpcRequest,
+  IpcResponse,
+  IpcEvent,
+  IpcEventData
+} from '@shared/ipc-channels'
 
 export function typedHandle<C extends IpcChannel>(
   channel: C,

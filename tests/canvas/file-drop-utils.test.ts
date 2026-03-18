@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { inferCardType, inferLanguage, TE_FILE_MIME } from '../../src/renderer/src/panels/canvas/file-drop-utils'
+import {
+  inferCardType,
+  inferLanguage,
+  TE_FILE_MIME
+} from '../../src/renderer/src/panels/canvas/file-drop-utils'
 
 describe('file-drop-utils', () => {
   describe('inferCardType', () => {
