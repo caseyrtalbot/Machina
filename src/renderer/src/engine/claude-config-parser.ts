@@ -1,4 +1,13 @@
 import matter from 'gray-matter'
+
+// Disable gray-matter's built-in JavaScript engine which uses eval().
+// Without this, a crafted file with ---js frontmatter could execute arbitrary code.
+const SAFE_MATTER_OPTIONS = {
+  engines: {
+    javascript: { parse: (): Record<string, unknown> => ({}), stringify: (): string => '' }
+  }
+}
+
 import type {
   ClaudeConfig,
   ClaudeSettings,
@@ -106,7 +115,7 @@ export function mergeClaudeSettings(
 export function parseClaudeAgent(content: string, filePath: string): ClaudeAgent {
   let parsed: matter.GrayMatterFile<string>
   try {
-    parsed = matter(content)
+    parsed = matter(content, SAFE_MATTER_OPTIONS)
   } catch {
     return {
       name: filenameStem(filePath),
@@ -139,7 +148,7 @@ export function parseClaudeSkill(
 ): ClaudeSkill {
   let parsed: matter.GrayMatterFile<string>
   try {
-    parsed = matter(content)
+    parsed = matter(content, SAFE_MATTER_OPTIONS)
   } catch {
     return {
       name: parentDirName(filePath) || filenameStem(filePath),
@@ -182,7 +191,7 @@ export function parseClaudeCommand(content: string, filePath: string): ClaudeCom
 
   // Try frontmatter first (some commands have it)
   try {
-    const parsed = matter(trimmed)
+    const parsed = matter(trimmed, SAFE_MATTER_OPTIONS)
     if (parsed.data?.description) {
       description = String(parsed.data.description)
     }
@@ -266,7 +275,7 @@ export function parseClaudeTeam(json: string, filePath: string): ClaudeTeam {
 export function parseClaudeMemory(content: string, filePath: string): ClaudeMemory {
   let parsed: matter.GrayMatterFile<string>
   try {
-    parsed = matter(content)
+    parsed = matter(content, SAFE_MATTER_OPTIONS)
   } catch {
     return {
       name: filenameStem(filePath),

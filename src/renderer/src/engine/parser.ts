@@ -1,5 +1,12 @@
 import matter from 'gray-matter'
 import type { Artifact, Signal } from '@shared/types'
+
+// Disable gray-matter's JavaScript engine (uses eval) to prevent code injection
+const SAFE_MATTER_OPTIONS = {
+  engines: {
+    javascript: { parse: (): Record<string, unknown> => ({}), stringify: (): string => '' }
+  }
+}
 import type { Result } from './types'
 import { extractConceptNodes } from './concept-extractor'
 
@@ -38,7 +45,7 @@ function extractTitleFromBody(body: string): string | null {
 export function parseArtifact(content: string, filename: string): Result<Artifact> {
   let parsed: matter.GrayMatterFile<string>
   try {
-    parsed = matter(content)
+    parsed = matter(content, SAFE_MATTER_OPTIONS)
   } catch {
     return { ok: false, error: `Failed to parse frontmatter in ${filename}` }
   }
