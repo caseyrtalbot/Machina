@@ -58,6 +58,20 @@ export function CanvasView(): React.ReactElement {
     return () => observer.disconnect()
   }, [])
 
+  // Keep content centered when the container resizes (window resize, sidebar toggle)
+  const prevSizeRef = useRef(containerSize)
+  useEffect(() => {
+    const prev = prevSizeRef.current
+    prevSizeRef.current = containerSize
+    // Skip the initial mount (before we have real dimensions)
+    if (prev.width === 1920 && prev.height === 1080) return
+    const dw = containerSize.width - prev.width
+    const dh = containerSize.height - prev.height
+    if (dw === 0 && dh === 0) return
+    const { x, y, zoom } = useCanvasStore.getState().viewport
+    setViewport({ x: x + dw / 2, y: y + dh / 2, zoom })
+  }, [containerSize, setViewport])
+
   // Auto-center viewport when a canvas first loads
   useEffect(() => {
     if (!filePath) return
