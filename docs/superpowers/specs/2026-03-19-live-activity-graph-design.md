@@ -241,16 +241,36 @@ The session hub is the visual center of the radial layout. It is **not an intera
 
 ## Radial Layout Algorithm
 
-Pure function: `layoutActivityNodes(nodes, hubCenter, containerSize) -> ActivityNode[]` (with positions set)
+Pure function: `layoutActivityNodes(nodes, hubCenter, availableSize) -> ActivityNode[]` (with positions set)
+
+`availableSize` is the canvas area after subtracting the feed panel width. All radii and sizes are computed proportionally from this.
+
+### Dynamic Ring Assignment
+
+The number of rings scales with node count to prevent angular crowding:
+
+- **1-8 nodes**: 1 ring (all nodes, regardless of state)
+- **9-20 nodes**: 2 rings (active = inner, recent/historical = outer)
+- **21+ nodes**: 3 rings (active = ring 1, recent = ring 2, historical = ring 3)
+
+Ring radii are computed proportionally from available space:
+
+```
+minDimension = min(availableSize.width, availableSize.height)
+usableRadius = minDimension * 0.42  // leave margin for node sizes and labels
+ringGap = usableRadius / ringCount
+ringRadius(i) = (i + 1) * ringGap   // ring 0 is innermost
+```
+
+This ensures the layout adapts to both node density and window size. On a 1200px-wide canvas, 2 rings land at roughly 150px and 300px. On a 800px canvas, they compress to 100px and 200px.
 
 ### Slot Assignment
 
-1. Partition nodes by state: active, recent, historical
-2. **Inner ring** (radius = 150px from hub center): active nodes, evenly distributed around 360 degrees
-3. **Outer ring** (radius = 260px from hub center): recent and historical nodes
-4. Within each ring, nodes are placed at evenly-spaced angular positions starting from 12 o'clock (top), proceeding clockwise
-5. When a node transitions from active to recent, it animates from its inner ring slot to the next available outer ring slot
-6. **Subagent clustering**: Nodes sharing a teamId are assigned to adjacent angular slots. The team occupies a contiguous arc.
+1. Partition nodes into rings per the dynamic assignment above
+2. Within each ring, nodes are placed at evenly-spaced angular positions starting from 12 o'clock (top), proceeding clockwise
+3. **Minimum angular gap**: 25 degrees between slot centers. If a ring has more nodes than fit at 25-degree spacing, overflow nodes wrap to the next ring outward. This guarantees labels never overlap.
+4. When a node transitions between states, it animates from its current slot to its new ring position
+5. **Subagent clustering**: Nodes sharing a teamId are assigned to adjacent angular slots. The team occupies a contiguous arc.
 
 ### Slot Sizing (derived from state at render time)
 
@@ -274,9 +294,31 @@ These sizes are used by ActivityNodeCard at render time based on `node.state`. T
 
 | State | Trigger | Visual | Ring |
 |-------|---------|--------|------|
-| Active | Event received for this element | Glowing border, full opacity, type color | Inner |
-| Recent | No event for 30 seconds | Dimmed, border becomes gray, type color on left border only | Outer |
-| Historical | No event for 2 minutes | Faint, gray borders, reduced size | Outer |
+| Active | Event received for this element | Glowing border, full opacity, type color | Innermost |
+| Recent | Stale relative to session activity | Dimmed, border becomes gray, type color on left border only | Middle/outer |
+| Historical | Stale for extended period | Faint, gray borders, reduced size | Outermost |
+
+**Staleness model**: Thresholds are defined as tunable constants (not hardcoded). Defaults are starting points to be validated against real session JSONL data before shipping:
+
+```typescript
+const ACTIVE_TO_RECENT_MS = 45_000    // 45 seconds (default)
+const RECENT_TO_HISTORICAL_MS = 180_000 // 3 minutes (default)
+```
+
+These defaults account for the real cadence of Claude sessions: Claude often spends 60-90 seconds writing code between tool invocations. A node should not feel stale during a normal pause. The transition considers **relative activity**, not just absolute time: if other nodes are receiving events while this one is quiet, it transitions faster. If the entire session is quiet (Claude is thinking), all nodes hold their current state.
+
+```typescript
+function shouldTransition(node: ActivityNode, allNodes: ActivityNode[], now: number): ActivityNodeState {
+  const elapsed = now - node.lastEventTimestamp
+  const sessionIsQuiet = allNodes.every(n => now - n.lastEventTimestamp > 10_000)
+
+  if (sessionIsQuiet) return node.state  // hold state during thinking pauses
+
+  if (elapsed > RECENT_TO_HISTORICAL_MS) return 'historical'
+  if (elapsed > ACTIVE_TO_RECENT_MS) return 'recent'
+  return 'active'
+}
+```
 
 ### Session States
 
@@ -285,11 +327,23 @@ These sizes are used by ActivityNodeCard at render time based on `node.state`. T
 | No session | No active JSONL file | Empty state: invitation message at center |
 | Backfilling | Active file detected, reading existing content | Nodes appear without animation, batch render |
 | Live | Tailing active file | Nodes animate in, edges pulse, feed scrolls |
-| Idle | No events for 60 seconds | Live indicator dims, "Session may have ended" label |
+| Idle | No file writes for 5+ minutes | Live indicator dims, "Session may have ended" label |
+
+**Idle detection**: Based on JSONL file modification time, not event gaps. Claude's JSONL file is written to continuously during a session (including during long reasoning with no tool_use blocks). A 5-minute gap in file writes is a strong signal the session has ended. The 60-second gap in the original design was too aggressive: Claude routinely pauses 60+ seconds during complex reasoning, and false idle indicators would erode trust in the live status. The file watcher already tracks modification times, so this is a simple check.
 
 ## Activity Feed
 
-Scrolling panel (180px wide, right side of canvas). Shows events in reverse chronological order (newest at top).
+Scrolling panel on the right side of canvas. Shows events in reverse chronological order (newest at top).
+
+### Feed Sizing
+
+- **Default width**: 220px (enough for ~28 characters per line before wrapping)
+- **Minimum width**: 180px (on windows < 900px wide)
+- **Collapse**: On windows < 700px wide, the feed collapses to a 40px icon strip. Click to expand as an overlay.
+- **Width computation**: `max(180, min(220, containerWidth * 0.18))`
+- **Text truncation**: Element names truncate at 30 characters with ellipsis. Full text shown on hover via tooltip. Context lines truncate at 40 characters.
+
+Real-world names that must fit: `superpowers:brainstorming` (26 chars, fits), `everything-claude-code:continuous-learning-v2` (46 chars, truncates to `everything-claude-code:con...`).
 
 ### Feed Entry Format
 
@@ -371,6 +425,32 @@ Centered vertically, subtle text, matching the app's design language. No hub vis
 - Malformed JSONL lines are skipped (same pattern as ProjectSessionParser).
 - If the watched file is deleted mid-session, the parser emits `session-idle` and waits for the next file.
 - If the project session directory doesn't exist, `watch-start` creates the watcher anyway (chokidar handles missing directories gracefully). The watcher fires when the directory is created.
+
+## Responsive Layout
+
+All layout dimensions are proportional to container size, not fixed pixel values. The layout function receives `containerSize` and computes everything from it.
+
+### Breakpoints
+
+| Container Width | Behavior |
+|----------------|----------|
+| >= 1200px | Full layout: graph + 220px feed panel |
+| 900-1199px | Compressed: graph + 180px feed panel, ring radii scale down |
+| 700-899px | Compact: graph only, feed collapsed to icon strip (40px), expand on click |
+| < 700px | Minimal: hub + inner ring only, no outer ring, feed as overlay |
+
+### What Scales
+
+- **Ring radii**: Proportional to `min(width, height) * 0.42` (see Radial Layout section)
+- **Hub size**: Scales from 160x90 (large) to 120x70 (compact)
+- **Feed width**: `max(180, min(220, width * 0.18))`
+- **Node sizes**: Fixed pixel sizes (130x55 etc.) since they contain text that needs minimum readable width. On very small containers, nodes may overflow the viewport, handled by existing pan/zoom.
+
+### Window Resize
+
+- Layout recomputes on `ResizeObserver` callback (debounced 150ms, same pattern as TerminalCard)
+- Node positions animate to new slots (CSS transition, 300ms ease-out)
+- Feed panel width adjusts immediately (no animation)
 
 ## Keyboard Shortcut
 
