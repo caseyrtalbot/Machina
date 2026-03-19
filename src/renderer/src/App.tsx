@@ -10,6 +10,7 @@ import { EditorPanel } from './panels/editor/EditorPanel'
 import { SkillsPanel } from './panels/skills/SkillsPanel'
 import { CanvasView } from './panels/canvas/CanvasView'
 import { ClaudeConfigPanel } from './panels/claude-config/ClaudeConfigPanel'
+import { ProjectCanvasPanel } from './panels/project-canvas/ProjectCanvasPanel'
 import { ActivityBar } from './components/ActivityBar'
 import { TerminalPanel } from './panels/terminal/TerminalPanel'
 import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
@@ -47,6 +48,7 @@ function ContentArea() {
       {contentView === 'canvas' && <CanvasView />}
       {contentView === 'skills' && <SkillsPanel />}
       {contentView === 'claude-config' && <ClaudeConfigPanel />}
+      {contentView === 'project-canvas' && <ProjectCanvasPanel />}
     </div>
   )
 }
@@ -314,6 +316,12 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
     label: 'Toggle Claude Config Canvas',
     category: 'command',
     shortcut: '\u21E7\u2318C'
+  },
+  {
+    id: 'cmd:toggle-project-canvas',
+    label: 'Toggle Project Canvas',
+    category: 'command',
+    shortcut: '\u21E7\u2318P'
   }
 ]
 
@@ -330,6 +338,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
 
   const toggleClaudeConfig = useViewStore((s) => s.toggleClaudeConfig)
+  const toggleProjectCanvas = useViewStore((s) => s.toggleProjectCanvas)
 
   const toggleView = useCallback(() => {
     if (contentView === 'editor') setContentView('canvas')
@@ -375,16 +384,21 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   })
 
   // Cmd+Shift+C: toggle Claude Config Canvas
+  // Cmd+Shift+P: toggle Project Canvas
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'c') {
         e.preventDefault()
         toggleClaudeConfig()
       }
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        toggleProjectCanvas()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [toggleClaudeConfig])
+  }, [toggleClaudeConfig, toggleProjectCanvas])
 
   const paletteItems = useMemo<CommandItem[]>(() => {
     const noteItems: CommandItem[] = files.map((f) => ({
@@ -435,6 +449,9 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         case 'cmd:toggle-claude-config':
           toggleClaudeConfig()
           break
+        case 'cmd:toggle-project-canvas':
+          toggleProjectCanvas()
+          break
       }
     },
     [
@@ -444,7 +461,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       toggleTerminal,
       setSettingsOpen,
       vaultPath,
-      toggleClaudeConfig
+      toggleClaudeConfig,
+      toggleProjectCanvas
     ]
   )
 

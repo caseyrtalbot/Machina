@@ -13,6 +13,7 @@ export type CanvasNodeType =
   | 'claude-command'
   | 'claude-team'
   | 'claude-memory'
+  | 'project-file'
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left'
 
 // --- Per-type metadata (discriminated by node.type) ---
@@ -72,6 +73,13 @@ export interface ClaudeMemoryNodeMeta {
   readonly linkCount: number
 }
 
+export interface ProjectFileNodeMeta {
+  readonly relativePath: string
+  readonly language: string
+  readonly touchCount: number
+  readonly lastTouchedBy: string | null
+}
+
 export interface CanvasNode {
   readonly id: string
   readonly type: CanvasNodeType
@@ -117,7 +125,8 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   'claude-rule': { width: 220, height: 120 },
   'claude-command': { width: 220, height: 120 },
   'claude-team': { width: 280, height: 180 },
-  'claude-memory': { width: 240, height: 140 }
+  'claude-memory': { width: 240, height: 140 },
+  'project-file': { width: 200, height: 60 }
 }
 
 const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
@@ -134,7 +143,8 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   'claude-rule': { width: 280, height: 160 },
   'claude-command': { width: 280, height: 160 },
   'claude-team': { width: 360, height: 260 },
-  'claude-memory': { width: 300, height: 200 }
+  'claude-memory': { width: 300, height: 200 },
+  'project-file': { width: 240, height: 80 }
 }
 
 export function getMinSize(type: CanvasNodeType): { width: number; height: number } {
@@ -167,7 +177,8 @@ export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
   'claude-rule': { label: 'Rule', icon: '\u2696', category: 'claude' },
   'claude-command': { label: 'Command', icon: '/', category: 'claude' },
   'claude-team': { label: 'Team', icon: '\u2605', category: 'claude' },
-  'claude-memory': { label: 'Memory', icon: '\u25CB', category: 'claude' }
+  'claude-memory': { label: 'Memory', icon: '\u25CB', category: 'claude' },
+  'project-file': { label: 'File', icon: '\u25A0', category: 'tools' }
 }
 
 // --- Default metadata per type ---
@@ -196,6 +207,8 @@ export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown
       return { memberCount: 0, leadAgentId: null }
     case 'claude-memory':
       return { memoryType: '', linkCount: 0 }
+    case 'project-file':
+      return { relativePath: '', language: '', touchCount: 0, lastTouchedBy: null }
     default:
       return {}
   }

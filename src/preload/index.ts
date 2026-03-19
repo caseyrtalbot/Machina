@@ -3,6 +3,7 @@ import { homedir } from 'os'
 import { typedInvoke, typedOn } from './typed-ipc'
 import type { SessionId, VaultConfig, VaultState } from '../shared/types'
 import type { ClaudeActivityEvent } from '../shared/ipc-channels'
+import type { ProjectFileChangedEvent } from '../shared/project-canvas-types'
 
 const api = {
   window: {
@@ -55,6 +56,12 @@ const api = {
     watchStart: (configPath: string) => typedInvoke('claude:watch-start', { configPath }),
     watchStop: () => typedInvoke('claude:watch-stop')
   },
+  project: {
+    watchStart: (projectPath: string) => typedInvoke('project:watch-start', { projectPath }),
+    watchStop: () => typedInvoke('project:watch-stop'),
+    parseSessions: (projectPath: string) => typedInvoke('project:parse-sessions', { projectPath }),
+    listFiles: (projectPath: string) => typedInvoke('project:list-files', { projectPath })
+  },
   terminal: {
     create: (cwd: string, shell?: string) => typedInvoke('terminal:create', { cwd, shell }),
     write: (sessionId: SessionId, data: string) =>
@@ -74,7 +81,9 @@ const api = {
     fileChanged: (callback: (data: { path: string; event: 'add' | 'change' | 'unlink' }) => void) =>
       typedOn('vault:file-changed', callback),
     claudeActivity: (callback: (data: ClaudeActivityEvent) => void) =>
-      typedOn('claude:activity', callback)
+      typedOn('claude:activity', callback),
+    projectFileChanged: (callback: (data: ProjectFileChangedEvent) => void) =>
+      typedOn('project:file-changed', callback)
   }
 }
 

@@ -49,7 +49,8 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   'claude-rule': ['markdown', 'text'],
   'claude-command': ['markdown', 'text'],
   'claude-team': ['markdown', 'text'],
-  'claude-memory': ['markdown', 'text']
+  'claude-memory': ['markdown', 'text'],
+  'project-file': ['text']
 } as const
 
 function ConvertMenu({
