@@ -1,6 +1,5 @@
 import { getArtifactColor } from '@renderer/design/tokens'
 import type { ArtifactType, RelationshipKind } from '@shared/types'
-import type { GraphThemeColors } from './graph-types'
 
 /** Convert a hex color string to a PixiJS-compatible integer. */
 export function hexToPixi(hex: string): number {
@@ -55,35 +54,10 @@ export function edgeOpacity(kind: RelationshipKind): number {
     case 'connection':
     case 'cluster':
     case 'tension':
-      return 0.7
+      return 0.85
     case 'appears_in':
-      return 0.5
+      return 0.65
     case 'co-occurrence':
-      return 0.35
-  }
-}
-
-/**
- * Read resolved CSS colors from the DOM.
- * Call once on mount and on theme change.
- */
-export function readThemeColors(): GraphThemeColors {
-  const root = document.documentElement
-  const style = getComputedStyle(root)
-  const bg = style.getPropertyValue('--color-bg-base').trim()
-  const text = style.getPropertyValue('--color-text-primary').trim()
-  const textDim = style.getPropertyValue('--color-text-muted').trim()
-  const accent = style.getPropertyValue('--color-accent-default').trim()
-
-  return {
-    background: bg ? cssColorToPixi(bg) : 0x141414,
-    nodeFill: 0x94a3b8,
-    nodeFillFocused: accent ? cssColorToPixi(accent) : 0x00e5bf,
-    nodeFillGhost: 0x334155,
-    nodeStroke: 0x475569,
-    edge: DEFAULT_EDGE_COLOR,
-    edgeHighlight: accent ? cssColorToPixi(accent) : 0x00e5bf,
-    labelText: text ? cssColorToPixi(text) : 0xe2e8f0,
-    labelTextDim: textDim ? cssColorToPixi(textDim) : 0x64748b
+      return 0.5
   }
 }

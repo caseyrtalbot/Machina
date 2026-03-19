@@ -87,8 +87,8 @@ export class LabelLayer {
         nodes[i].title.length > 30 ? nodes[i].title.slice(0, 30) + '\u2026' : nodes[i].title
 
       ctx.globalAlpha = alpha
-      ctx.strokeStyle = 'rgba(20, 20, 20, 0.8)'
-      ctx.lineWidth = 3
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)'
+      ctx.lineWidth = 4
       ctx.strokeText(label, sx, sy + yOffset)
       ctx.fillStyle = '#e2e8f0'
       ctx.fillText(label, sx, sy + yOffset)
