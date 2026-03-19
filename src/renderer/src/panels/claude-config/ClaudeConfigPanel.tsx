@@ -116,7 +116,20 @@ export function ClaudeConfigPanel() {
   // Track container for viewport culling
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
+  const prevSizeRef = useRef(containerSize)
   const [_zoneLabels, setZoneLabels] = useState<readonly ZoneLabel[]>([])
+
+  // Keep content centered when the container resizes
+  useEffect(() => {
+    const prev = prevSizeRef.current
+    prevSizeRef.current = containerSize
+    if (prev.width === 1920 && prev.height === 1080) return
+    const dw = containerSize.width - prev.width
+    const dh = containerSize.height - prev.height
+    if (dw === 0 && dh === 0) return
+    const { x, y, zoom } = useCanvasStore.getState().viewport
+    useCanvasStore.getState().setViewport({ x: x + dw / 2, y: y + dh / 2, zoom })
+  }, [containerSize])
 
   // Store the previous canvas state for restoration
   const savedCanvasState = useRef<{ filePath: string | null; data: CanvasFile } | null>(null)
