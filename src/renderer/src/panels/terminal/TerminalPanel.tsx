@@ -3,6 +3,7 @@ import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { SearchAddon } from '@xterm/addon-search'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { useTerminalStore } from '../../store/terminal-store'
 import { useVaultStore } from '../../store/vault-store'
 import { TerminalTabs } from './TerminalTabs'
@@ -53,8 +54,12 @@ export function TerminalPanel() {
     addSession({ id: sessionId, title })
 
     const term = new Terminal({
-      fontFamily: '"JetBrains Mono", monospace',
+      fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, monospace',
       fontSize: termFontSize,
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      fontWeight: '400',
+      fontWeightBold: '600',
       theme: {
         background: colors.bg.base,
         foreground: colors.text.primary,
@@ -62,7 +67,9 @@ export function TerminalPanel() {
         selectionBackground: colors.accent.muted
       },
       scrollback: 10000,
-      cursorBlink: true
+      cursorBlink: true,
+      drawBoldTextInBrightColors: true,
+      minimumContrastRatio: 1
     })
 
     const fitAddon = new FitAddon()
@@ -134,6 +141,15 @@ export function TerminalPanel() {
     // Clear previous content
     container.innerHTML = ''
     instance.terminal.open(container)
+
+    // Load WebGL addon for GPU-accelerated rendering (crisper text, like modern terminals).
+    // Falls back silently to Canvas 2D if WebGL is unavailable in this context.
+    try {
+      instance.terminal.loadAddon(new WebglAddon())
+    } catch {
+      // WebGL unavailable — Canvas 2D renderer remains active
+    }
+
     instance.fitAddon.fit()
   }, [activeSessionId])
 

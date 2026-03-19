@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { CardShell } from './CardShell'
@@ -76,7 +77,9 @@ export function TerminalCard({ node }: TerminalCardProps) {
       cursorStyle: 'bar',
       cursorWidth: 2,
       allowProposedApi: true,
-      smoothScrollDuration: 100
+      smoothScrollDuration: 100,
+      drawBoldTextInBrightColors: true,
+      minimumContrastRatio: 1
     })
     termRef.current = term
 
@@ -87,6 +90,14 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
     if (termContainerRef.current) {
       term.open(termContainerRef.current)
+
+      // Load WebGL addon for GPU-accelerated rendering (crisper text, like modern terminals).
+      // Falls back silently to Canvas 2D if WebGL is unavailable in this context.
+      try {
+        term.loadAddon(new WebglAddon())
+      } catch {
+        // WebGL unavailable — Canvas 2D renderer remains active
+      }
 
       // Force xterm viewport to fill the container
       const xtermEl = termContainerRef.current.querySelector('.xterm') as HTMLElement | null
