@@ -1561,6 +1561,7 @@ interface SessionHubProps {
   readonly sessionState: SessionState
   readonly sessionStartTime: number | null
   readonly sessionFile: string | null
+  readonly size: { width: number; height: number }
 }
 
 const BORDER_COLORS: Record<SessionState, string> = {
@@ -1570,7 +1571,7 @@ const BORDER_COLORS: Record<SessionState, string> = {
   idle: '#475569',
 }
 
-export function SessionHub({ sessionState, sessionStartTime, sessionFile }: SessionHubProps) {
+export function SessionHub({ sessionState, sessionStartTime, sessionFile, size }: SessionHubProps) {
   // Re-render every second to keep duration display live
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -1591,8 +1592,8 @@ export function SessionHub({ sessionState, sessionStartTime, sessionFile }: Sess
     <div
       className="absolute flex flex-col items-center justify-center rounded-xl px-4 py-3"
       style={{
-        width: 160,
-        height: 90,
+        width: size.width,
+        height: size.height,
         background: '#0c0c0c',
         border: `2px solid ${BORDER_COLORS[sessionState]}`,
         left: '50%',
@@ -2076,6 +2077,7 @@ export function ActivityGraphPanel() {
         sessionState={sessionState}
         sessionStartTime={sessionStartTime}
         sessionFile={sessionFile}
+        size={hubSize}
       />
 
       {/* Nodes */}
@@ -2104,8 +2106,7 @@ export function ActivityGraphPanel() {
 
 function getTypeColor(type: string): string {
   const colors: Record<string, string> = {
-    agent: '#a78bfa',
-    subagent: '#c084fc',
+    subagent: '#a78bfa',
     skill: '#22d3ee',
     mcp: '#f59e0b',
   }
