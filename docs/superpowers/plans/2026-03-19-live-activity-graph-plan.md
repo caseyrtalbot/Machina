@@ -1413,22 +1413,21 @@ export function useActivityStream(
 
       // Add feed entry — aggregate team dispatches
       if (elemEvent.teamId) {
-        const existing = useActivityGraphStore.getState().feedEntries
-        const teamEntry = existing.find(
-          (e) => e.kind === elemEvent.kind && e.teamSize !== null
-            && existing.indexOf(e) === 0, // only aggregate with the most recent team entry
-        )
-        // If the last feed entry is from the same team dispatch, update its count
-        if (existing[0]?.kind === 'subagent-spawned' && existing[0].teamSize !== null) {
-          // Team entry already at top — increment count (mutate via fresh array)
-          const updated = [...existing]
-          updated[0] = {
-            ...updated[0],
-            teamSize: (updated[0].teamSize ?? 1) + 1,
-            name: `${(updated[0].teamSize ?? 1) + 1} agents dispatched`,
-            detail: `${updated[0].detail}, ${elemEvent.name}`.slice(0, 80),
+        const { feedEntries } = useActivityGraphStore.getState()
+        const topEntry = feedEntries[0]
+        // If the most recent feed entry is from the same team dispatch, update count
+        if (topEntry?.kind === 'subagent-spawned' && topEntry.teamSize !== null) {
+          const newCount = (topEntry.teamSize ?? 1) + 1
+          const updatedEntry: ActivityFeedEntry = {
+            ...topEntry,
+            teamSize: newCount,
+            name: `${newCount} agents dispatched`,
+            detail: `${topEntry.detail}, ${elemEvent.name}`.slice(0, 80),
           }
-          // Directly set via store internals — this is a feed-only concern
+          // Replace top entry with updated team entry
+          const updatedEntries = [updatedEntry, ...feedEntries.slice(1)]
+          // Use store setState directly for feed-only update
+          useActivityGraphStore.setState({ feedEntries: updatedEntries.slice(0, 50) })
         } else {
           // First agent in a new team dispatch
           const feedEntry: ActivityFeedEntry = {
@@ -1719,7 +1718,7 @@ import type { ActivityFeedEntry, ActivityNodeType } from '@shared/activity-types
 interface ActivityFeedProps {
   readonly entries: readonly ActivityFeedEntry[]
   readonly width: number
-  readonly onEntryClick: (id: string) => void
+  readonly onEntryClick: (name: string) => void
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -1773,7 +1772,7 @@ export function ActivityFeed({ entries, width, onEntryClick }: ActivityFeedProps
             key={entry.id}
             className={`mb-1.5 pb-1.5 cursor-pointer hover:opacity-80 ${i === 0 ? 'activity-feed-enter' : ''}`}
             style={{ borderBottom: '1px solid #1e293b22' }}
-            onClick={() => onEntryClick(entry.id)}
+            onClick={() => onEntryClick(entry.name)}
           >
             <div className="font-medium" style={{ fontSize: 11, color }}>
               &#9679; {truncate(entry.name, 30)} {verb}
@@ -1840,7 +1839,9 @@ export function ActivityGraphPanel() {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1000, height: 600 })
-  const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  const [highlightedName, setHighlightedName] = useState<string | null>(null)
+  // Viewport state for pan/zoom
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 })
 
   const {
     nodes,
@@ -1869,12 +1870,12 @@ export function ActivityGraphPanel() {
     return () => observer.disconnect()
   }, [])
 
-  // Compute feed width
-  const feedWidth = Math.max(
-    containerSize.width < 700 ? 0 : FEED_MIN,
-    Math.min(FEED_MAX, containerSize.width * FEED_WIDTH_FACTOR),
-  )
-  const showFeed = containerSize.width >= 700
+  // Responsive feed width + hub size
+  const isCompact = containerSize.width < 900
+  const isMinimal = containerSize.width < 700
+  const feedWidth = isMinimal ? 0 : Math.max(FEED_MIN, Math.min(FEED_MAX, containerSize.width * FEED_WIDTH_FACTOR))
+  const showFeed = !isMinimal
+  const hubSize = isCompact ? { width: 120, height: 70 } : { width: 160, height: 90 }
 
   // Compute layout
   const availableSize = {
@@ -1907,9 +1908,43 @@ export function ActivityGraphPanel() {
     state: node.state,
   }))
 
-  const handleFeedClick = useCallback((id: string) => {
-    setHighlightedId(id)
-    setTimeout(() => setHighlightedId(null), 2000)
+  // Highlight by element name (not id) so feed entries match deduplicated nodes
+  const handleFeedClick = useCallback((name: string) => {
+    setHighlightedName(name)
+    setTimeout(() => setHighlightedName(null), 2000)
+  }, [])
+
+  // Pan/zoom handlers
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const zoomDelta = e.deltaY > 0 ? 0.95 : 1.05
+    setViewport((v) => ({
+      ...v,
+      zoom: Math.max(0.3, Math.min(3, v.zoom * zoomDelta)),
+    }))
+  }, [])
+
+  const isDragging = useRef(false)
+  const dragStart = useRef({ x: 0, y: 0 })
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.target !== e.currentTarget) return // only on background
+    isDragging.current = true
+    dragStart.current = { x: e.clientX - viewport.x, y: e.clientY - viewport.y }
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }, [viewport.x, viewport.y])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging.current) return
+    setViewport((v) => ({
+      ...v,
+      x: e.clientX - dragStart.current.x,
+      y: e.clientY - dragStart.current.y,
+    }))
+  }, [])
+
+  const handlePointerUp = useCallback(() => {
+    isDragging.current = false
   }, [])
 
   const handleClear = useCallback(() => {
@@ -1979,6 +2014,23 @@ export function ActivityGraphPanel() {
         </button>
       </div>
 
+      {/* Viewport-transformed graph area (pan/zoom) */}
+      <div
+        className="absolute inset-0"
+        style={{ overflow: 'hidden', cursor: isDragging.current ? 'grabbing' : 'grab' }}
+        onWheel={handleWheel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+          transformOrigin: '0 0',
+        }}
+      >
+
       {/* Ring guides */}
       <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
         <circle
@@ -2031,9 +2083,12 @@ export function ActivityGraphPanel() {
         <ActivityNodeCard
           key={node.id}
           node={node}
-          highlighted={highlightedId === node.id}
+          highlighted={highlightedName === node.name}
         />
       ))}
+
+      </div>{/* end viewport transform */}
+      </div>{/* end viewport container */}
 
       {/* Feed */}
       {showFeed && (
