@@ -260,6 +260,13 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
     })
   }, [sidebarOpenTab])
 
+  const handleRemoveFromHistory = useCallback(async (pathToRemove: string) => {
+    const history = (await window.api.config.read('app', 'vaultHistory')) as string[] | null
+    const updated = (history ?? []).filter((p) => p !== pathToRemove)
+    await window.api.config.write('app', 'vaultHistory', updated)
+    setVaultHistory(updated)
+  }, [])
+
   const handleFileAction = useCallback(
     async (action: { actionId: string; path: string; isDirectory: boolean }) => {
       switch (action.actionId) {
@@ -324,6 +331,7 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
         onSelectVault={handleSelectVault}
         onOpenVaultPicker={handleOpenVaultPicker}
         onSelectClaudeConfig={handleSelectClaudeConfig}
+        onRemoveFromHistory={handleRemoveFromHistory}
       />
     )
   }
@@ -351,6 +359,7 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
       onSelectVault={handleSelectVault}
       onSelectClaudeConfig={handleSelectClaudeConfig}
       onOpenVaultPicker={handleOpenVaultPicker}
+      onRemoveFromHistory={handleRemoveFromHistory}
     />
   )
 }

@@ -11,6 +11,7 @@ interface ClaudeConfigSidebarProps {
   readonly onSelectVault: (path: string) => void
   readonly onOpenVaultPicker: () => void
   readonly onSelectClaudeConfig: () => void
+  readonly onRemoveFromHistory?: (path: string) => void
 }
 
 interface ConfigFileItem {
@@ -118,7 +119,8 @@ export function ClaudeConfigSidebar({
   vaultHistory,
   onSelectVault,
   onOpenVaultPicker,
-  onSelectClaudeConfig
+  onSelectClaudeConfig,
+  onRemoveFromHistory
 }: ClaudeConfigSidebarProps) {
   const config = useClaudeConfigStore((s) => s.config)
   const inspectorFile = useInspectorStore((s) => s.inspectorFile)
@@ -203,6 +205,7 @@ export function ClaudeConfigSidebar({
             onSelectVault={onSelectVault}
             onOpenPicker={onOpenVaultPicker}
             onSelectClaudeConfig={onSelectClaudeConfig}
+            onRemoveFromHistory={onRemoveFromHistory}
           />
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -230,6 +233,7 @@ export function ClaudeConfigSidebar({
           onSelectVault={onSelectVault}
           onOpenPicker={onOpenVaultPicker}
           onSelectClaudeConfig={onSelectClaudeConfig}
+          onRemoveFromHistory={onRemoveFromHistory}
         />
       </div>
       <div className="p-2 pt-0">

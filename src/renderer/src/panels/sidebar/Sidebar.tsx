@@ -40,6 +40,7 @@ interface SidebarProps {
   onSelectVault?: (path: string) => void
   onSelectClaudeConfig?: () => void
   onOpenVaultPicker?: () => void
+  onRemoveFromHistory?: (path: string) => void
 }
 
 function ActionBar({
@@ -50,7 +51,8 @@ function ActionBar({
   onSortChange,
   onSelectVault,
   onSelectClaudeConfig,
-  onOpenVaultPicker
+  onOpenVaultPicker,
+  onRemoveFromHistory
 }: {
   sortMode?: SortMode
   vaultName?: string
@@ -60,6 +62,7 @@ function ActionBar({
   onSelectVault?: (path: string) => void
   onSelectClaudeConfig?: () => void
   onOpenVaultPicker?: () => void
+  onRemoveFromHistory?: (path: string) => void
 }) {
   return (
     <div className="flex flex-col gap-1 px-2 py-1">
@@ -70,6 +73,7 @@ function ActionBar({
           onSelectVault={onSelectVault}
           onOpenPicker={onOpenVaultPicker}
           onSelectClaudeConfig={onSelectClaudeConfig}
+          onRemoveFromHistory={onRemoveFromHistory}
         />
       )}
       <div className="flex items-center gap-1 text-xs" style={{ color: colors.text.muted }}>
@@ -117,7 +121,8 @@ export function Sidebar({
   onFileAction,
   onSelectVault,
   onSelectClaudeConfig,
-  onOpenVaultPicker
+  onOpenVaultPicker,
+  onRemoveFromHistory
 }: SidebarProps) {
   const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
@@ -173,6 +178,7 @@ export function Sidebar({
         onSelectVault={onSelectVault}
         onSelectClaudeConfig={onSelectClaudeConfig}
         onOpenVaultPicker={onOpenVaultPicker}
+        onRemoveFromHistory={onRemoveFromHistory}
       />
       {workspaces.length > 0 && (
         <WorkspaceFilter

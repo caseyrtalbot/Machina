@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { colors, typography } from '../../design/tokens'
 
+interface ContextMenuState {
+  readonly x: number
+  readonly y: number
+  readonly path: string
+}
+
 interface VaultSelectorProps {
   readonly currentName: string
   readonly isClaudeConfig?: boolean
@@ -8,6 +14,7 @@ interface VaultSelectorProps {
   readonly onSelectVault: (path: string) => void
   readonly onOpenPicker: () => void
   readonly onSelectClaudeConfig: () => void
+  readonly onRemoveFromHistory?: (path: string) => void
 }
 
 function vaultDisplayName(path: string): string {
@@ -20,10 +27,13 @@ export function VaultSelector({
   history,
   onSelectVault,
   onOpenPicker,
-  onSelectClaudeConfig
+  onSelectClaudeConfig,
+  onRemoveFromHistory
 }: VaultSelectorProps) {
   const [open, setOpen] = useState(false)
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const ctxMenuRef = useRef<HTMLDivElement>(null)
 
   const toggle = useCallback(() => setOpen((prev) => !prev), [])
 
@@ -48,6 +58,25 @@ export function VaultSelector({
       document.removeEventListener('keydown', handleEscape)
     }
   }, [open])
+
+  // Close right-click context menu on outside click or escape
+  useEffect(() => {
+    if (!ctxMenu) return
+    const handleClick = (e: MouseEvent) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
+        setCtxMenu(null)
+      }
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCtxMenu(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [ctxMenu])
 
   // Recent vaults, excluding ~/.claude and current vault name if it matches
   const recentVaults = history.filter((p) => {
@@ -169,6 +198,13 @@ export function VaultSelector({
                       setOpen(false)
                       onSelectVault(path)
                     }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (onRemoveFromHistory) {
+                        setCtxMenu({ x: e.clientX, y: e.clientY, path })
+                      }
+                    }}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:opacity-80"
                     style={{
                       color: isCurrent ? colors.text.primary : colors.text.secondary,
@@ -212,6 +248,33 @@ export function VaultSelector({
             style={{ color: colors.text.muted }}
           >
             <span>Open Different Vault...</span>
+          </button>
+        </div>
+      )}
+
+      {/* Right-click context menu for removing vaults from history */}
+      {ctxMenu && (
+        <div
+          ref={ctxMenuRef}
+          className="fixed z-[100] py-1"
+          style={{
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            backgroundColor: colors.bg.elevated,
+            border: `1px solid ${colors.border.default}`,
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+        >
+          <button
+            onClick={() => {
+              onRemoveFromHistory?.(ctxMenu.path)
+              setCtxMenu(null)
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:opacity-80 w-full"
+            style={{ color: colors.text.secondary }}
+          >
+            Remove from History
           </button>
         </div>
       )}
