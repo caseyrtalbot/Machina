@@ -25,7 +25,7 @@ import { useVaultStore } from './store/vault-store'
 import { useEditorStore, flushPendingSave } from './store/editor-store'
 import { useViewStore } from './store/view-store'
 import { colors } from './design/tokens'
-import { Titlebar } from './components/Titlebar'
+// Titlebar removed — drag region and settings gear merged into ViewTabBar
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
 import { StatusBar } from './components/StatusBar'
@@ -50,7 +50,7 @@ function KeepAliveSlot({
   )
 }
 
-function ContentArea() {
+function ContentArea({ onOpenSettings }: { readonly onOpenSettings?: () => void }) {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
   const activeTab = tabs.find((t) => t.id === activeTabId)
@@ -69,7 +69,7 @@ function ContentArea() {
 
   return (
     <div className="h-full flex flex-col">
-      <ViewTabBar />
+      <ViewTabBar onOpenSettings={onOpenSettings} />
       <div className="flex-1 overflow-hidden panel-card">
         {openTypes.has('editor') && (
           <KeepAliveSlot active={activeType === 'editor'}>
@@ -418,8 +418,6 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const setContentView = useViewStore((s) => s.setContentView)
   const mode = useEditorStore((s) => s.mode)
   const setMode = useEditorStore((s) => s.setMode)
-  const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
-
   const openTab = useTabStore((s) => s.openTab)
   const closeTab = useTabStore((s) => s.closeTab)
   const activeTabId = useTabStore((s) => s.activeTabId)
@@ -466,7 +464,6 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
   const goBack = useEditorStore((s) => s.goBack)
   const goForward = useEditorStore((s) => s.goForward)
-  const activeNotePath = useEditorStore((s) => s.activeNotePath)
 
   useKeyboard({
     onCommandPalette: () => setPaletteOpen(true),
@@ -571,12 +568,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       className="h-screen w-screen flex flex-col"
       style={{ backgroundColor: colors.bg.base, color: colors.text.primary }}
     >
-      <Titlebar
-        vaultName={vaultName}
-        activeFilePath={activeNotePath}
-        vaultPath={vaultPath ?? ''}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+      {/* Titlebar removed — drag region and settings gear merged into ViewTabBar */}
       <div className="flex-1 overflow-hidden flex">
         <ActivityBar />
         <SplitPane
@@ -592,7 +584,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
               <SplitPane
                 left={
                   <PanelErrorBoundary name="Content">
-                    <ContentArea />
+                    <ContentArea onOpenSettings={() => setSettingsOpen(true)} />
                   </PanelErrorBoundary>
                 }
                 right={
@@ -608,7 +600,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
               />
             ) : (
               <PanelErrorBoundary name="Content">
-                <ContentArea />
+                <ContentArea onOpenSettings={() => setSettingsOpen(true)} />
               </PanelErrorBoundary>
             )
           }

@@ -3,6 +3,10 @@ import { useTabStore, TAB_DEFINITIONS } from '../store/tab-store'
 import type { ViewTab, TabType } from '../store/tab-store'
 import { colors, transitions } from '../design/tokens'
 
+interface ViewTabBarProps {
+  readonly onOpenSettings?: () => void
+}
+
 const TAB_ICONS: Record<string, React.ReactNode> = {
   editor: <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />,
   canvas: (
@@ -146,7 +150,7 @@ function AddTabButton() {
   )
 }
 
-export function ViewTabBar() {
+export function ViewTabBar({ onOpenSettings }: ViewTabBarProps) {
   const tabs = useTabStore((s) => s.tabs)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const activateTab = useTabStore((s) => s.activateTab)
@@ -165,11 +169,15 @@ export function ViewTabBar() {
   return (
     <div
       className="flex items-center shrink-0 overflow-x-auto gap-1"
-      style={{
-        height: 36,
-        padding: '2px 8px',
-        borderBottom: `1px solid ${colors.border.subtle}`
-      }}
+      style={
+        {
+          height: 38,
+          padding: '2px 8px',
+          paddingLeft: 78,
+          borderBottom: `1px solid ${colors.border.subtle}`,
+          WebkitAppRegion: 'drag'
+        } as React.CSSProperties
+      }
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId
@@ -178,18 +186,21 @@ export function ViewTabBar() {
           <div
             key={tab.id}
             className="flex items-center group shrink-0 cursor-pointer"
-            style={{
-              padding: '3px 10px',
-              fontSize: 12,
-              borderRadius: 6,
-              border: isActive
-                ? '1px solid rgba(0, 229, 191, 0.3)'
-                : '1px solid rgba(255, 255, 255, 0.06)',
-              backgroundColor: isActive ? 'rgba(0, 229, 191, 0.06)' : 'transparent',
-              boxShadow: isActive ? '0 0 8px rgba(0, 229, 191, 0.08)' : 'none',
-              color: isActive ? colors.text.primary : colors.text.secondary,
-              transition: transitions.default
-            }}
+            style={
+              {
+                padding: '3px 10px',
+                fontSize: 12,
+                borderRadius: 6,
+                border: isActive
+                  ? '1px solid rgba(0, 229, 191, 0.3)'
+                  : '1px solid rgba(255, 255, 255, 0.06)',
+                backgroundColor: isActive ? 'rgba(0, 229, 191, 0.06)' : 'transparent',
+                boxShadow: isActive ? '0 0 8px rgba(0, 229, 191, 0.08)' : 'none',
+                color: isActive ? colors.text.primary : colors.text.secondary,
+                transition: transitions.default,
+                WebkitAppRegion: 'no-drag'
+              } as React.CSSProperties
+            }
             onClick={() => activateTab(tab.id)}
             onMouseDown={(e) => handleMiddleClick(e, tab)}
           >
@@ -218,6 +229,36 @@ export function ViewTabBar() {
         )
       })}
       <AddTabButton />
+      {/* Spacer — fills remaining titlebar drag area */}
+      <div className="flex-1" />
+      {/* Settings gear (migrated from Titlebar) */}
+      {onOpenSettings && (
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="p-1.5 rounded shrink-0 cursor-pointer"
+          style={
+            {
+              color: colors.text.secondary,
+              opacity: 0.6,
+              transition: transitions.default,
+              WebkitAppRegion: 'no-drag'
+            } as React.CSSProperties
+          }
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '1'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '0.6'
+          }}
+          title="Settings"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 4.754a3.246 3.246 0 100 6.492 3.246 3.246 0 000-6.492zM5.754 8a2.246 2.246 0 114.492 0 2.246 2.246 0 01-4.492 0z" />
+            <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 01-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 01-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 01.52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 011.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 011.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 01.52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 01-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 01-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 002.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 001.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 00-1.115 2.693l.16.291c.415.764-.421 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 00-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 00-2.692-1.115l-.292.16c-.764.415-1.6-.421-1.184-1.185l.159-.291A1.873 1.873 0 001.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 003.06 4.377l-.16-.292c-.415-.764.421-1.6 1.185-1.184l.292.159a1.873 1.873 0 002.692-1.115l.094-.319z" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
