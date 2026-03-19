@@ -232,6 +232,9 @@ export function GraphPanel() {
   const showOrphanNodes = useGraphViewStore((s) => s.showOrphanNodes)
   const nodeScale = useGraphViewStore((s) => s.nodeScale)
 
+  const showLabels = useGraphViewStore((s) => s.showLabels)
+  const labelScale = useGraphViewStore((s) => s.labelScale)
+
   useEffect(() => {
     rendererRef.current?.setDisplayOptions({
       showEdges,
@@ -239,7 +242,35 @@ export function GraphPanel() {
       showOrphanNodes,
       nodeScale
     })
-  }, [showEdges, showGhostNodes, showOrphanNodes, nodeScale])
+
+    // Re-render labels immediately when display settings change
+    const ll = labelLayerRef.current
+    if (ll && positionsRef.current.length > 0) {
+      const vp = useGraphViewStore.getState().viewport
+      const lod = getGraphLod(vp.scale)
+      const hoveredId = useGraphViewStore.getState().hoveredNodeId
+      const hoveredIdx = hoveredId ? (nodeIndexMapRef.current.get(hoveredId) ?? null) : null
+      const ns = hoveredIdx !== null ? getNeighborSet(hoveredIdx) : null
+      ll.render(
+        simNodesRef.current,
+        positionsRef.current,
+        vp,
+        lod,
+        hoveredIdx,
+        ns,
+        showLabels,
+        labelScale
+      )
+    }
+  }, [
+    showEdges,
+    showGhostNodes,
+    showOrphanNodes,
+    nodeScale,
+    showLabels,
+    labelScale,
+    getNeighborSet
+  ])
 
   // Settings panel toggle
   const [showSettings, setShowSettings] = useState(false)
