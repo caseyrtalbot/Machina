@@ -187,6 +187,20 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
 
   const handleFileSelect = useCallback(
     (path: string) => {
+      // When on a canvas view, single-clicks should not navigate away.
+      // The user must double-click to open in editor (double-click also fires this).
+      const view = useViewStore.getState().contentView
+      if (view === 'canvas' || view === 'project-canvas') return
+
+      const file = files.find((f) => f.path === path)
+      openTab(path, file?.title)
+      setContentView('editor')
+    },
+    [files, openTab, setContentView]
+  )
+
+  const handleFileDoubleClick = useCallback(
+    (path: string) => {
       const file = files.find((f) => f.path === path)
       openTab(path, file?.title)
       setContentView('editor')
@@ -352,6 +366,7 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
       onSearch={setSearchQuery}
       onWorkspaceSelect={setActiveWorkspace}
       onFileSelect={handleFileSelect}
+      onFileDoubleClick={handleFileDoubleClick}
       onToggleDirectory={handleToggleDirectory}
       onNewFile={handleNewFile}
       onSortChange={setSortMode}

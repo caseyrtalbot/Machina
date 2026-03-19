@@ -33,6 +33,7 @@ interface SidebarProps {
   onSearch: (query: string) => void
   onWorkspaceSelect: (workspace: string | null) => void
   onFileSelect: (path: string) => void
+  onFileDoubleClick?: (path: string) => void
   onToggleDirectory: (path: string) => void
   onNewFile?: () => void
   onSortChange?: (mode: SortMode) => void
@@ -115,6 +116,7 @@ export function Sidebar({
   onSearch,
   onWorkspaceSelect,
   onFileSelect,
+  onFileDoubleClick,
   onToggleDirectory,
   onNewFile,
   onSortChange,
@@ -196,6 +198,7 @@ export function Sidebar({
           onCanvasPaths={onCanvasPaths}
           canvasConnectionCounts={canvasConnectionCounts}
           onFileSelect={onFileSelect}
+          onFileDoubleClick={onFileDoubleClick}
           onToggleDirectory={onToggleDirectory}
           onContextMenu={handleContextMenu}
           renamingPath={renamingPath}

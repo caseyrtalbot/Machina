@@ -131,7 +131,7 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
 
 const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   text: { width: 260, height: 140 },
-  note: { width: 280, height: 200 },
+  note: { width: 450, height: 550 },
   terminal: { width: 400, height: 280 },
   code: { width: 480, height: 320 },
   markdown: { width: 400, height: 300 },

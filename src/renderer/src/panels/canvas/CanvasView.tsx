@@ -1,7 +1,12 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { CanvasSurface } from './CanvasSurface'
 import { useCanvasStore } from '../../store/canvas-store'
-import { createCanvasNode, type CanvasNode, type CanvasNodeType } from '@shared/canvas-types'
+import {
+  createCanvasNode,
+  getDefaultSize,
+  type CanvasNode,
+  type CanvasNodeType
+} from '@shared/canvas-types'
 import { CanvasContextMenu } from './CanvasContextMenu'
 import { LazyCards } from './card-registry'
 import { CardShellSkeleton } from './CardShellSkeleton'
@@ -158,12 +163,17 @@ export function CanvasView(): React.ReactElement {
         return
       }
 
-      const STACK_OFFSET = 20
+      // Grid layout: arrange cards in rows to avoid overlap
+      const GAP = 24
+      const COLS = Math.min(files.length, 3)
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const x = canvasX + i * STACK_OFFSET
-        const y = canvasY + i * STACK_OFFSET
+        const col = i % COLS
+        const row = Math.floor(i / COLS)
+        const size = getDefaultSize(file.type)
+        const x = canvasX + col * (size.width + GAP)
+        const y = canvasY + row * (size.height + GAP)
         const pos = { x, y }
 
         switch (file.type) {

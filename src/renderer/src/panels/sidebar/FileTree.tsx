@@ -12,6 +12,7 @@ export interface FileTreeProps {
   onCanvasPaths?: ReadonlySet<string>
   canvasConnectionCounts?: ReadonlyMap<string, number>
   onFileSelect: (path: string) => void
+  onFileDoubleClick?: (path: string) => void
   onToggleDirectory: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string, isDirectory: boolean) => void
   renamingPath?: string | null
@@ -89,6 +90,7 @@ export function FileTree({
   onCanvasPaths,
   canvasConnectionCounts,
   onFileSelect,
+  onFileDoubleClick,
   onToggleDirectory,
   onContextMenu,
   renamingPath,
@@ -121,6 +123,7 @@ export function FileTree({
             isOnCanvas={onCanvasPaths?.has(node.path) ?? false}
             canvasConnectionCount={canvasConnectionCounts?.get(node.path) ?? 0}
             onFileSelect={onFileSelect}
+            onFileDoubleClick={onFileDoubleClick}
             onContextMenu={onContextMenu}
             isRenaming={renamingPath === node.path}
             onRenameConfirm={onRenameConfirm}
@@ -208,6 +211,7 @@ function FileRow({
   isOnCanvas: _isOnCanvas,
   canvasConnectionCount,
   onFileSelect,
+  onFileDoubleClick,
   onContextMenu,
   isRenaming,
   onRenameConfirm,
@@ -219,6 +223,7 @@ function FileRow({
   isOnCanvas: boolean
   canvasConnectionCount: number
   onFileSelect: (path: string) => void
+  onFileDoubleClick?: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string, isDirectory: boolean) => void
   isRenaming?: boolean
   onRenameConfirm?: (newName: string) => void
@@ -247,6 +252,7 @@ function FileRow({
         e.currentTarget.setAttribute('draggable', 'false')
       }}
       onClick={() => onFileSelect(node.path)}
+      onDoubleClick={() => (onFileDoubleClick ?? onFileSelect)(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
       className="flex items-center py-0.5 cursor-pointer rounded transition-colors"
       style={{
