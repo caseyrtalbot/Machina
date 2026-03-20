@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, mkdir, writeFile, appendFile, rm, stat } from 'fs/promises'
+import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir, homedir } from 'os'
-import { randomUUID } from 'crypto'
 
 // Mock typedSend before importing the module under test
 const mockTypedSend = vi.fn()

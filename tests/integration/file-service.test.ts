@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, existsSync } from 'fs'
+import { mkdtempSync, rmSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { FileService } from '../../src/main/services/file-service'
@@ -46,6 +46,22 @@ describe('FileService', () => {
     await svc.writeFile(join(dir, 'c.txt'), 'c')
     const files = await svc.listFiles(dir, '*.md')
     expect(files).toHaveLength(2)
+  })
+
+  it('skips hidden and build directories when listing all files recursively', async () => {
+    mkdirSync(join(dir, '.hidden'), { recursive: true })
+    mkdirSync(join(dir, 'node_modules', 'pkg'), { recursive: true })
+    mkdirSync(join(dir, 'build'), { recursive: true })
+    mkdirSync(join(dir, 'src'), { recursive: true })
+
+    await svc.writeFile(join(dir, '.hidden', 'secret.ts'), 'secret')
+    await svc.writeFile(join(dir, 'node_modules', 'pkg', 'index.js'), 'pkg')
+    await svc.writeFile(join(dir, 'build', 'generated.js'), 'generated')
+    await svc.writeFile(join(dir, 'src', 'index.ts'), 'export {}')
+
+    const files = await svc.listAllFilesRecursive(dir)
+
+    expect(files).toEqual([join(dir, 'src', 'index.ts')])
   })
 
   it('initializes vault directory', async () => {

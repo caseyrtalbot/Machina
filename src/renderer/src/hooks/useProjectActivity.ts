@@ -17,6 +17,7 @@ export function useProjectActivity(enabled: boolean, projectPath: string | null)
   useEffect(() => {
     if (!enabled || !projectPath) return
     if (typeof window.api?.on?.projectFileChanged !== 'function') return
+    const timers = timersRef.current
 
     const unsub = window.api.on.projectFileChanged((event) => {
       if (event.event === 'unlink') return
@@ -38,15 +39,15 @@ export function useProjectActivity(enabled: boolean, projectPath: string | null)
         })
 
         // Clear existing timer and set new deactivation
-        const existing = timersRef.current.get(matchedNode.id)
+        const existing = timers.get(matchedNode.id)
         if (existing) clearTimeout(existing)
 
         const timer = setTimeout(() => {
           useCanvasStore.getState().updateNodeMetadata(matchedNode.id, { isActive: false })
-          timersRef.current.delete(matchedNode.id)
+          timers.delete(matchedNode.id)
         }, GLOW_DURATION_MS)
 
-        timersRef.current.set(matchedNode.id, timer)
+        timers.set(matchedNode.id, timer)
       } else {
         // Find a good position for the new card (after existing project-file nodes)
         const projectFileNodes = nodes.filter((n) => n.type === 'project-file')
@@ -85,19 +86,19 @@ export function useProjectActivity(enabled: boolean, projectPath: string | null)
 
         const timer = setTimeout(() => {
           useCanvasStore.getState().updateNodeMetadata(newNode.id, { isActive: false })
-          timersRef.current.delete(newNode.id)
+          timers.delete(newNode.id)
         }, GLOW_DURATION_MS)
 
-        timersRef.current.set(newNode.id, timer)
+        timers.set(newNode.id, timer)
       }
     })
 
     return () => {
       unsub()
-      for (const timer of timersRef.current.values()) {
+      for (const timer of timers.values()) {
         clearTimeout(timer)
       }
-      timersRef.current.clear()
+      timers.clear()
 
       // Deactivate all project-file nodes
       const nodes = useCanvasStore.getState().nodes

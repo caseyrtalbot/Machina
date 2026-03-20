@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { EventBatcher, type BatchedEvent } from '../../src/main/services/event-batcher'
+import { EventBatcher } from '../../src/main/services/event-batcher'
 
 describe('EventBatcher', () => {
   beforeEach(() => {

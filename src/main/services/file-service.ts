@@ -1,8 +1,10 @@
-import { readFile, writeFile, unlink, readdir, mkdir, rename, stat } from 'fs/promises'
+import { readFile, writeFile, unlink, readdir, mkdir, rename, stat, realpath } from 'fs/promises'
 import { join, extname } from 'path'
 import { existsSync } from 'fs'
 import { teDirPath, teConfigPath, teStatePath } from '../utils/paths'
 import type { VaultConfig, VaultState } from '../../shared/types'
+
+const IGNORED_PROJECT_DIRS = new Set(['node_modules', 'out', 'dist', 'build'])
 
 export class FileService {
   async readFile(path: string): Promise<string> {
@@ -45,40 +47,58 @@ export class FileService {
 
   async listAllFilesRecursive(dir: string): Promise<string[]> {
     const results: string[] = []
-    let entries
-    try {
-      entries = await readdir(dir, { withFileTypes: true })
-    } catch {
-      return results
-    }
+    const pendingDirs = [dir]
+    const seenDirs = new Set<string>()
 
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name)
-      if (entry.name.startsWith('.') && entry.name !== '.claude') continue
-      if (
-        entry.name === 'node_modules' ||
-        entry.name === 'out' ||
-        entry.name === 'dist' ||
-        entry.name === 'build'
-      )
+    while (pendingDirs.length > 0) {
+      const currentDir = pendingDirs.pop()
+      if (!currentDir) continue
+
+      try {
+        const resolvedCurrentDir = await realpath(currentDir)
+        if (seenDirs.has(resolvedCurrentDir)) continue
+        seenDirs.add(resolvedCurrentDir)
+      } catch {
+        // If the directory disappears or cannot be resolved, skip it.
+      }
+
+      let entries
+      try {
+        entries = await readdir(currentDir, { withFileTypes: true })
+      } catch {
         continue
+      }
 
-      // Follow symlinks: resolve the real type via stat()
-      if (entry.isSymbolicLink()) {
+      for (const entry of entries) {
+        const fullPath = join(currentDir, entry.name)
+        if (entry.name.startsWith('.')) continue
+        if (IGNORED_PROJECT_DIRS.has(entry.name)) continue
+
+        if (entry.isFile()) {
+          results.push(fullPath)
+          continue
+        }
+
+        if (entry.isDirectory()) {
+          pendingDirs.push(fullPath)
+          continue
+        }
+
+        if (!entry.isSymbolicLink()) continue
+
         try {
+          const resolvedPath = await realpath(fullPath)
           const realStat = await stat(fullPath)
           if (realStat.isDirectory()) {
-            results.push(...(await this.listAllFilesRecursive(fullPath)))
+            if (!seenDirs.has(resolvedPath)) {
+              pendingDirs.push(fullPath)
+            }
           } else if (realStat.isFile()) {
             results.push(fullPath)
           }
         } catch {
           // Broken symlink, skip
         }
-      } else if (entry.isDirectory()) {
-        results.push(...(await this.listAllFilesRecursive(fullPath)))
-      } else if (entry.isFile()) {
-        results.push(fullPath)
       }
     }
 

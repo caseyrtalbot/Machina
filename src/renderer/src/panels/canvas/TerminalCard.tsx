@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { Terminal } from 'xterm'
+import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
@@ -9,7 +9,7 @@ import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import { type SessionId, sessionId as toSessionId } from '@shared/types'
-import 'xterm/css/xterm.css'
+import '@xterm/xterm/css/xterm.css'
 
 interface TerminalCardProps {
   node: CanvasNode
@@ -27,6 +27,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
   const setFocusedTerminal = useCanvasStore((s) => s.setFocusedTerminal)
   const vaultPath = useVaultStore((s) => s.vaultPath)
+  const initialCwd = typeof node.metadata?.initialCwd === 'string' ? node.metadata.initialCwd : null
 
   // Create xterm + PTY session on mount.
   // IMPORTANT: xterm must be mounted BEFORE the PTY is created so the
@@ -36,7 +37,6 @@ export function TerminalCard({ node }: TerminalCardProps) {
     let cancelled = false
 
     // Support metadata-driven cwd and initial command
-    const metaCwd = typeof node.metadata?.initialCwd === 'string' ? node.metadata.initialCwd : null
     const initialCommand =
       typeof node.metadata?.initialCommand === 'string' ? node.metadata.initialCommand : null
 
@@ -123,7 +123,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
     // the terminalData listener is ready, so no output will be dropped.
     async function createSession() {
       if (!sessionId) {
-        const cwd = metaCwd || vaultPath || '/'
+        const cwd = initialCwd || vaultPath || '/'
         sessionId = await window.api.terminal.create(cwd)
         if (cancelled) return
         sessionIdRef.current = sessionId
@@ -253,13 +253,12 @@ export function TerminalCard({ node }: TerminalCardProps) {
     removeNode(node.id)
   }, [node.id, removeNode])
 
-  const handleRestart = useCallback(async () => {
+  const handleRestart = async () => {
     const oldSession = sessionIdRef.current
     if (oldSession) {
       window.api.terminal.kill(oldSession)
     }
-    const metaCwd = typeof node.metadata?.initialCwd === 'string' ? node.metadata.initialCwd : null
-    const cwd = metaCwd || vaultPath || '/'
+    const cwd = initialCwd || vaultPath || '/'
     const newSessionId = await window.api.terminal.create(cwd)
     sessionIdRef.current = newSessionId
     updateContent(node.id, newSessionId)
@@ -273,7 +272,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
       const { cols, rows } = termRef.current
       window.api.terminal.resize(newSessionId, cols, rows)
     }
-  }, [node.id, vaultPath, updateContent])
+  }
 
   return (
     <CardShell

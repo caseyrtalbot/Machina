@@ -19,6 +19,8 @@ export function useClaudeActivity(enabled: boolean): void {
     // Guard: preload may not have the claudeActivity listener yet (e.g. during HMR)
     if (typeof window.api?.on?.claudeActivity !== 'function') return
 
+    const timers = timersRef.current
+
     const unsub = window.api.on.claudeActivity((event) => {
       const nodes = useCanvasStore.getState().nodes
       const matched = useClaudeActivityStore.getState().processEvent(event, nodes)
@@ -28,27 +30,27 @@ export function useClaudeActivity(enabled: boolean): void {
         useCanvasStore.getState().updateNodeMetadata(nodeId, { isActive: true })
 
         // Clear existing timer for this node (reset the glow duration)
-        const existing = timersRef.current.get(nodeId)
+        const existing = timers.get(nodeId)
         if (existing) clearTimeout(existing)
 
         // Set deactivation timer
         const timer = setTimeout(() => {
           useCanvasStore.getState().updateNodeMetadata(nodeId, { isActive: false })
           useClaudeActivityStore.getState().deactivateNode(nodeId)
-          timersRef.current.delete(nodeId)
+          timers.delete(nodeId)
         }, GLOW_DURATION_MS)
 
-        timersRef.current.set(nodeId, timer)
+        timers.set(nodeId, timer)
       }
     })
 
     return () => {
       unsub()
       // Clear all timers on unmount
-      for (const timer of timersRef.current.values()) {
+      for (const timer of timers.values()) {
         clearTimeout(timer)
       }
-      timersRef.current.clear()
+      timers.clear()
 
       // Deactivate all nodes
       const activeIds = useClaudeActivityStore.getState().activeNodeIds

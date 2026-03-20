@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { createPhysicsEngine } from '@engine/graph-physics-worker'
 import type { SimNode } from '@renderer/panels/graph/graph-types'
 

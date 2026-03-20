@@ -42,7 +42,11 @@ export class ProjectWatcher {
         '**/build/**',
         '**/.next/**',
         '**/out/**',
-        '**/.thought-engine/**'
+        '**/.thought-engine/**',
+        '**/*.png',
+        '**/*.jpg',
+        '**/*.jpeg',
+        '**/*.ico'
       ]
     })
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { lazy, startTransition, Suspense, useState, useCallback, useMemo, useEffect } from 'react'
 import { useVaultWorker } from './engine/useVaultWorker'
 import type { WorkerResult } from './engine/types'
 import { ThemeProvider } from './design/Theme'
@@ -7,16 +7,9 @@ import { Sidebar } from './panels/sidebar/Sidebar'
 import { ClaudeConfigSidebar } from './panels/sidebar/ClaudeConfigSidebar'
 import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
-import { SkillsPanel } from './panels/skills/SkillsPanel'
-import { CanvasView } from './panels/canvas/CanvasView'
-import { ClaudeConfigPanel } from './panels/claude-config/ClaudeConfigPanel'
-import { ProjectCanvasPanel } from './panels/project-canvas/ProjectCanvasPanel'
-import { GraphPanel } from './panels/graph/GraphPanel'
 import { ActivityBar } from './components/ActivityBar'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
 import type { TabType } from './store/tab-store'
-import { TerminalPanel } from './panels/terminal/TerminalPanel'
-import { WelcomeScreen } from './panels/onboarding/WelcomeScreen'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from './hooks/useCanvasAwareness'
@@ -31,6 +24,34 @@ import type { ArtifactType } from '@shared/types'
 import { useCanvasStore } from './store/canvas-store'
 import { saveCanvas, defaultCanvasFilename } from './panels/canvas/canvas-io'
 import { createCanvasFile } from '@shared/canvas-types'
+
+const LazyCanvasView = lazy(() =>
+  import('./panels/canvas/CanvasView').then((module) => ({ default: module.CanvasView }))
+)
+const LazySkillsPanel = lazy(() =>
+  import('./panels/skills/SkillsPanel').then((module) => ({ default: module.SkillsPanel }))
+)
+const LazyClaudeConfigPanel = lazy(() =>
+  import('./panels/claude-config/ClaudeConfigPanel').then((module) => ({
+    default: module.ClaudeConfigPanel
+  }))
+)
+const LazyProjectCanvasPanel = lazy(() =>
+  import('./panels/project-canvas/ProjectCanvasPanel').then((module) => ({
+    default: module.ProjectCanvasPanel
+  }))
+)
+const LazyGraphPanel = lazy(() =>
+  import('./panels/graph/GraphPanel').then((module) => ({ default: module.GraphPanel }))
+)
+const LazyTerminalPanel = lazy(() =>
+  import('./panels/terminal/TerminalPanel').then((module) => ({ default: module.TerminalPanel }))
+)
+const LazyWelcomeScreen = lazy(() =>
+  import('./panels/onboarding/WelcomeScreen').then((module) => ({
+    default: module.WelcomeScreen
+  }))
+)
 
 /** Wrapper that keeps its children mounted but hidden when inactive. */
 function KeepAliveSlot({
@@ -47,6 +68,17 @@ function KeepAliveSlot({
   )
 }
 
+function PanelLoadingFallback({ label }: { readonly label: string }) {
+  return (
+    <div
+      className="h-full w-full flex items-center justify-center"
+      style={{ color: colors.text.muted }}
+    >
+      <span className="text-sm">{label}</span>
+    </div>
+  )
+}
+
 function ContentArea() {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
@@ -54,8 +86,21 @@ function ContentArea() {
   const activeType = activeTab?.type ?? 'editor'
   const setActiveNote = useEditorStore((s) => s.setActiveNote)
 
-  // Track which panel types have been opened (ever) so they stay mounted
   const openTypes = useMemo(() => new Set(tabs.map((t) => t.type)), [tabs])
+  const [mountedTypes, setMountedTypes] = useState<ReadonlySet<TabType>>(
+    () => new Set([activeType])
+  )
+
+  useEffect(() => {
+    startTransition(() => {
+      setMountedTypes((prev) => {
+        if (prev.has(activeType)) return prev
+        const next = new Set(prev)
+        next.add(activeType)
+        return next
+      })
+    })
+  }, [activeType])
 
   const handleNavigate = useCallback(
     (id: string) => {
@@ -71,29 +116,39 @@ function ContentArea() {
           <EditorPanel onNavigate={handleNavigate} />
         </KeepAliveSlot>
       )}
-      {openTypes.has('canvas') && (
+      {openTypes.has('canvas') && mountedTypes.has('canvas') && (
         <KeepAliveSlot active={activeType === 'canvas'}>
-          <CanvasView />
+          <Suspense fallback={<PanelLoadingFallback label="Loading vault canvas..." />}>
+            <LazyCanvasView />
+          </Suspense>
         </KeepAliveSlot>
       )}
-      {openTypes.has('skills') && (
+      {openTypes.has('skills') && mountedTypes.has('skills') && (
         <KeepAliveSlot active={activeType === 'skills'}>
-          <SkillsPanel />
+          <Suspense fallback={<PanelLoadingFallback label="Loading skills..." />}>
+            <LazySkillsPanel />
+          </Suspense>
         </KeepAliveSlot>
       )}
-      {openTypes.has('claude-config') && (
+      {openTypes.has('claude-config') && mountedTypes.has('claude-config') && (
         <KeepAliveSlot active={activeType === 'claude-config'}>
-          <ClaudeConfigPanel />
+          <Suspense fallback={<PanelLoadingFallback label="Loading Claude config..." />}>
+            <LazyClaudeConfigPanel />
+          </Suspense>
         </KeepAliveSlot>
       )}
-      {openTypes.has('project-canvas') && (
+      {openTypes.has('project-canvas') && mountedTypes.has('project-canvas') && (
         <KeepAliveSlot active={activeType === 'project-canvas'}>
-          <ProjectCanvasPanel />
+          <Suspense fallback={<PanelLoadingFallback label="Loading project canvas..." />}>
+            <LazyProjectCanvasPanel />
+          </Suspense>
         </KeepAliveSlot>
       )}
-      {openTypes.has('graph') && (
+      {openTypes.has('graph') && mountedTypes.has('graph') && (
         <KeepAliveSlot active={activeType === 'graph'}>
-          <GraphPanel />
+          <Suspense fallback={<PanelLoadingFallback label="Loading graph..." />}>
+            <LazyGraphPanel />
+          </Suspense>
         </KeepAliveSlot>
       )}
     </div>
@@ -141,6 +196,10 @@ function ConnectedSidebar({
     const paths = files.map((f) => f.path)
     return buildFileTree(paths, vaultPath ?? '')
   }, [files, vaultPath])
+  const allTreeNodeByPath = useMemo(
+    () => new Map(allTreeNodes.map((node) => [node.path, node])),
+    [allTreeNodes]
+  )
 
   const treeNodes = useMemo(() => {
     if (!searchQuery.trim()) return allTreeNodes
@@ -160,13 +219,13 @@ function ConnectedSidebar({
         while (parent) {
           if (requiredDirs.has(parent)) break
           requiredDirs.add(parent)
-          const parentNode = allTreeNodes.find((n) => n.path === parent)
+          const parentNode = allTreeNodeByPath.get(parent)
           parent = parentNode?.parentPath
         }
       }
     }
     return allTreeNodes.filter((n) => matchingFiles.has(n.path) || requiredDirs.has(n.path))
-  }, [allTreeNodes, searchQuery])
+  }, [allTreeNodeByPath, allTreeNodes, searchQuery])
 
   const artifactTypes = useMemo(() => {
     const artifactById = new Map(artifacts.map((a) => [a.id, a]))
@@ -602,7 +661,9 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
               right={
                 <div className="panel-card h-full">
                   <PanelErrorBoundary name="Terminal">
-                    <TerminalPanel />
+                    <Suspense fallback={<PanelLoadingFallback label="Loading terminal..." />}>
+                      <LazyTerminalPanel />
+                    </Suspense>
                   </PanelErrorBoundary>
                 </div>
               }
@@ -780,7 +841,11 @@ export default function App() {
   function renderContent() {
     if (isLoading) return <LoadingSkeleton />
     if (vaultPath) return <WorkspaceShell onLoadVault={orchestrateLoad} />
-    return <WelcomeScreen onVaultSelected={orchestrateLoad} />
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <LazyWelcomeScreen onVaultSelected={orchestrateLoad} />
+      </Suspense>
+    )
   }
 
   return (

@@ -51,7 +51,7 @@ export default defineConfig({
         '@codemirror/theme-one-dark',
         '@codemirror/commands',
         '@codemirror/search',
-        'xterm',
+        '@xterm/xterm',
         '@xterm/addon-fit',
         '@xterm/addon-web-links',
         '@xterm/addon-search'

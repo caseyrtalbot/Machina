@@ -16,7 +16,7 @@ export interface SessionThreadState {
 export function useSessionThread(projectPath: string | null, enabled: boolean): SessionThreadState {
   const [milestones, setMilestones] = useState<readonly SessionMilestone[]>([])
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set())
-  const [isLive, setIsLive] = useState(false)
+  const [liveState, setLiveState] = useState(false)
   const lastEventTimeRef = useRef(0)
   const pendingRef = useRef<SessionMilestone[]>([])
   const rafRef = useRef<number | null>(null)
@@ -24,9 +24,6 @@ export function useSessionThread(projectPath: string | null, enabled: boolean): 
   // Start/stop tailing based on enabled flag
   useEffect(() => {
     if (!enabled || !projectPath) {
-      // Retain last N milestones for continuity across tab switches
-      setMilestones((prev) => prev.slice(0, RETAINED_MILESTONES))
-      setIsLive(false)
       window.api.project.tailStop().catch(() => {})
       return
     }
@@ -35,7 +32,7 @@ export function useSessionThread(projectPath: string | null, enabled: boolean): 
 
     const unsubMilestone = window.api.on.sessionMilestone((milestone) => {
       lastEventTimeRef.current = Date.now()
-      setIsLive(true)
+      setLiveState(true)
 
       // Batch with rAF to avoid jank from rapid arrivals
       pendingRef.current.push(milestone)
@@ -64,7 +61,7 @@ export function useSessionThread(projectPath: string | null, enabled: boolean): 
     if (!enabled) return
     const interval = setInterval(() => {
       if (Date.now() - lastEventTimeRef.current > IDLE_TIMEOUT_MS) {
-        setIsLive(false)
+        setLiveState(false)
       }
     }, 5000)
     return () => clearInterval(interval)
@@ -87,5 +84,14 @@ export function useSessionThread(projectPath: string | null, enabled: boolean): 
     setExpandedIds(new Set())
   }, [])
 
-  return { milestones, expandedIds, isLive, toggle, clear }
+  const visibleMilestones =
+    enabled && projectPath ? milestones : milestones.slice(0, RETAINED_MILESTONES)
+
+  return {
+    milestones: visibleMilestones,
+    expandedIds,
+    isLive: enabled && projectPath ? liveState : false,
+    toggle,
+    clear
+  }
 }

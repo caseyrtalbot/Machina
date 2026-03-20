@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Terminal } from 'xterm'
+import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { SearchAddon } from '@xterm/addon-search'
@@ -10,7 +10,7 @@ import { TerminalTabs } from './TerminalTabs'
 import { generateClaudeMd } from '../../engine/claude-md-template'
 import { colors } from '../../design/tokens'
 import type { SessionId } from '@shared/types'
-import 'xterm/css/xterm.css'
+import '@xterm/xterm/css/xterm.css'
 
 const FONT_SIZE_DEFAULT = 12
 const FONT_SIZE_MIN = 8

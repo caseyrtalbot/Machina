@@ -352,22 +352,6 @@ test.describe('Canvas Interaction', () => {
     const surface = page.locator('[data-canvas-surface]')
     await expect(surface).toBeVisible({ timeout: 8000 })
 
-    // Read the viewport from the canvas store state via JavaScript
-    const getViewport = async (): Promise<{ x: number; y: number; zoom: number }> => {
-      return page.evaluate(() => {
-        // Try to find the transform layer inside the canvas surface
-        const el = document.querySelector('[data-canvas-surface]') as HTMLElement | null
-        if (!el) return { x: 0, y: 0, zoom: 1 }
-        const layer = el.querySelector('[style*="translate"]') as HTMLElement | null
-        if (!layer) return { x: 0, y: 0, zoom: 1 }
-        return { x: 0, y: 0, zoom: 1, transform: layer.style.transform } as unknown as {
-          x: number
-          y: number
-          zoom: number
-        }
-      })
-    }
-
     const surfaceBox = await surface.boundingBox()
     if (!surfaceBox) return
 
@@ -577,8 +561,6 @@ test.describe('Canvas Cards', () => {
     await closeBtn.click()
     await page.waitForTimeout(300)
 
-    const cardsAfterClose = await page.locator('[data-canvas-node]').count()
-
     // Undo with Cmd+Z
     await page.keyboard.press('Meta+z')
     await page.waitForTimeout(500)
@@ -640,7 +622,6 @@ test.describe('Canvas Cards', () => {
       }
     }
 
-    const cardsBefore = await page.locator('[data-canvas-node]').count()
     const surface = page.locator('[data-canvas-surface]')
     const surfaceBox = await surface.boundingBox()
     if (!surfaceBox) return

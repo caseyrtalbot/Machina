@@ -110,9 +110,18 @@ export function ProjectCanvasPanel() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [threadOpen, setThreadOpen] = useState(false)
-  const [projectPath, setProjectPath] = useState<string | null>(null)
+  const [resolvedProjectPath, setResolvedProjectPath] = useState<{
+    readonly vaultPath: string
+    readonly projectPath: string
+  } | null>(null)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const isActiveTab = activeTabId === 'project-canvas'
+  const projectPath =
+    vaultPath == null
+      ? null
+      : resolvedProjectPath?.vaultPath === vaultPath
+        ? resolvedProjectPath.projectPath
+        : vaultPath
   const threadState = useSessionThread(projectPath, isActiveTab)
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -145,13 +154,16 @@ export function ProjectCanvasPanel() {
 
   // Auto-detect project root on vault change
   useEffect(() => {
-    if (!vaultPath) {
-      setProjectPath(null)
-      return
-    }
+    if (!vaultPath) return
+    let cancelled = false
     detectProjectRoot(vaultPath).then((root) => {
-      setProjectPath(root)
+      if (!cancelled) {
+        setResolvedProjectPath({ vaultPath, projectPath: root })
+      }
     })
+    return () => {
+      cancelled = true
+    }
   }, [vaultPath])
 
   // Activity monitoring: glow cards when files change

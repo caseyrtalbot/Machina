@@ -116,10 +116,15 @@ export class SessionTailer {
 
     this.watcher = watch(filePath, {
       persistent: true,
-      awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 }
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 25 },
+      usePolling: true,
+      interval: 100
     })
 
-    this.watcher.on('change', () => this.readNewContent())
+    this.watcher.on('change', () => {
+      void this.readNewContent()
+    })
   }
 
   private async readNewContent(): Promise<void> {
