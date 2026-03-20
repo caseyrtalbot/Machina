@@ -34,10 +34,18 @@ function getControlOffset(side: CanvasSide, distance: number): { dx: number; dy:
 
 function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNode[] }) {
   const isSelected = useCanvasStore((s) => s.selectedEdgeId === edge.id)
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
+  const hoveredNodeId = useCanvasStore((s) => s.hoveredNodeId)
 
   const from_node = nodes.find((n) => n.id === edge.fromNode)
   const to_node = nodes.find((n) => n.id === edge.toNode)
   if (!from_node || !to_node) return null
+
+  if (edge.hidden) {
+    const endpointHovered = hoveredNodeId === edge.fromNode || hoveredNodeId === edge.toNode
+    const endpointSelected = selectedNodeIds.has(edge.fromNode) || selectedNodeIds.has(edge.toNode)
+    if (!endpointHovered && !endpointSelected) return null
+  }
 
   const kindColor = edge.kind ? EDGE_KIND_COLORS[edge.kind] : undefined
   const endpointActive =

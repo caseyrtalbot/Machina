@@ -19,9 +19,14 @@ function createClaudeEdge(
   toNode: string,
   fromSide: CanvasEdge['fromSide'],
   toSide: CanvasEdge['toSide'],
-  kind: ClaudeRelationshipKind
+  kind: ClaudeRelationshipKind,
+  hidden?: boolean
 ): ClaudeEdge {
-  return { ...createCanvasEdge(fromNode, toNode, fromSide, toSide), kind }
+  return {
+    ...createCanvasEdge(fromNode, toNode, fromSide, toSide),
+    kind,
+    ...(hidden ? { hidden } : {})
+  }
 }
 
 /**
@@ -89,7 +94,7 @@ export function extractRelationships(
   if (settingsNode) {
     for (const agentNode of agentNodes) {
       edges.push(
-        createClaudeEdge(settingsNode.id, agentNode.id, 'left', 'right', 'settings-controls')
+        createClaudeEdge(settingsNode.id, agentNode.id, 'left', 'right', 'settings-controls', true)
       )
     }
   }

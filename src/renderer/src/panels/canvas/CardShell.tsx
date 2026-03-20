@@ -178,6 +178,7 @@ export function CardShell({
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
+  const setHoveredNode = useCanvasStore((s) => s.setHoveredNode)
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
   const [hovered, setHovered] = useState(false)
@@ -240,8 +241,14 @@ export function CardShell({
       onClick={handleClick}
       onContextMenu={onContextMenu}
       onPointerUp={handlePointerUp}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => {
+        setHovered(true)
+        setHoveredNode(node.id)
+      }}
+      onMouseLeave={() => {
+        setHovered(false)
+        setHoveredNode(null)
+      }}
     >
       {/* Title bar */}
       <div

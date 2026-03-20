@@ -99,6 +99,7 @@ export interface CanvasEdge {
   readonly toSide: CanvasSide
   readonly kind?: CanvasEdgeKind | (string & {})
   readonly label?: string
+  readonly hidden?: boolean
 }
 
 export interface CanvasViewport {
