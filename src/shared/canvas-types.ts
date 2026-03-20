@@ -124,13 +124,13 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   markdown: { width: 250, height: 150 },
   image: { width: 150, height: 150 },
   pdf: { width: 300, height: 400 },
-  'claude-settings': { width: 280, height: 180 },
+  'claude-settings': { width: 220, height: 60 },
   'claude-agent': { width: 260, height: 160 },
   'claude-skill': { width: 260, height: 160 },
   'claude-rule': { width: 220, height: 120 },
   'claude-command': { width: 220, height: 120 },
   'claude-team': { width: 280, height: 180 },
-  'claude-memory': { width: 240, height: 140 },
+  'claude-memory': { width: 200, height: 80 },
   'project-file': { width: 200, height: 60 }
 }
 
@@ -142,13 +142,13 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   markdown: { width: 400, height: 300 },
   image: { width: 300, height: 300 },
   pdf: { width: 500, height: 650 },
-  'claude-settings': { width: 340, height: 240 },
+  'claude-settings': { width: 260, height: 80 },
   'claude-agent': { width: 320, height: 220 },
   'claude-skill': { width: 320, height: 220 },
   'claude-rule': { width: 280, height: 160 },
   'claude-command': { width: 280, height: 160 },
   'claude-team': { width: 360, height: 260 },
-  'claude-memory': { width: 300, height: 200 },
+  'claude-memory': { width: 260, height: 120 },
   'project-file': { width: 240, height: 80 }
 }
 

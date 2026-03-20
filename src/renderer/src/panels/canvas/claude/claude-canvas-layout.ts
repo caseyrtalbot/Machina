@@ -8,8 +8,8 @@ const CARD_W = 260
 const CARD_H_SMALL = 120
 const CARD_H_MEDIUM = 160
 const CARD_H_LARGE = 200
-const SETTINGS_W = 340
-const SETTINGS_H = 200
+const SETTINGS_W = 260
+const SETTINGS_H = 80
 const GAP_X = 20
 const GAP_Y = 20
 const ZONE_GAP = 60
@@ -80,8 +80,8 @@ function layoutZoneGrid(
  * No overlap, no fixed offsets from center.
  *
  * Row 1: Rules (horizontal)
- * Row 2: Agents | Settings | Skills
- * Row 3: Commands | Teams | Memory
+ * Row 2: Agents | Skills (authoring workspace)
+ * Row 3: Commands | Teams | Settings | Memory (compact strip)
  */
 export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const allNodes: CanvasNode[] = []
@@ -114,7 +114,7 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
     cursorY = ruleBottom + ZONE_GAP
   }
 
-  // --- Row 2: Agents | Settings | Skills (three columns) ---
+  // --- Row 2: Agents | Skills (authoring workspace) ---
   const row2Y = cursorY
 
   // Agents (left column)
@@ -146,33 +146,8 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
     })
   }
 
-  // Settings (center column, after agents)
-  const settingsX = agents.right + ZONE_GAP
-  let settingsBottom = row2Y
-  let settingsRight = settingsX
-
-  if (config.settings) {
-    labels.push({ text: 'Settings', x: settingsX, y: row2Y + LABEL_OFFSET, color: '#f59e0b' })
-    const settingsNode = createCanvasNode(
-      'claude-settings',
-      { x: settingsX, y: row2Y },
-      {
-        content: config.basePath + '/settings.json',
-        metadata: {
-          permissionCount: config.settings.allowCount,
-          envVarCount: config.settings.envVars.length,
-          pluginNames: config.settings.plugins
-        },
-        size: { width: SETTINGS_W, height: SETTINGS_H }
-      }
-    )
-    allNodes.push(settingsNode)
-    settingsBottom = row2Y + SETTINGS_H
-    settingsRight = settingsX + SETTINGS_W
-  }
-
-  // Skills (right column, after settings)
-  const skillX = settingsRight + ZONE_GAP
+  // Skills (right column, after agents)
+  const skillX = agents.right + ZONE_GAP
   const skillItems: LayoutItem[] = config.skills.map((s) => ({
     type: 'claude-skill' as const,
     content: s.filePath,
@@ -198,10 +173,10 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const skills = layoutZoneGrid(skillItems, skillX, row2Y, skillCols)
   allNodes.push(...skills.nodes)
 
-  const row2Bottom = Math.max(agents.bottom, settingsBottom, skills.bottom)
+  const row2Bottom = Math.max(agents.bottom, skills.bottom)
   cursorY = row2Bottom + ZONE_GAP
 
-  // --- Row 3: Commands | Teams | Memory ---
+  // --- Row 3: Commands | Teams | Settings | Memory (compact strip) ---
   const row3Y = cursorY
 
   // Commands (left)
@@ -257,8 +232,31 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const teams = layoutZoneGrid(teamItems, teamX, row3Y, teamCols)
   allNodes.push(...teams.nodes)
 
-  // Memory (right, after teams)
-  const memX = teams.right + ZONE_GAP
+  // Settings (compact, after teams)
+  const settingsX = teams.right + ZONE_GAP
+  let settingsRight = settingsX
+
+  if (config.settings) {
+    labels.push({ text: 'Settings', x: settingsX, y: row3Y + LABEL_OFFSET, color: '#f59e0b' })
+    const settingsNode = createCanvasNode(
+      'claude-settings',
+      { x: settingsX, y: row3Y },
+      {
+        content: config.basePath + '/settings.json',
+        metadata: {
+          permissionCount: config.settings.allowCount,
+          envVarCount: config.settings.envVars.length,
+          pluginNames: config.settings.plugins
+        },
+        size: { width: SETTINGS_W, height: SETTINGS_H }
+      }
+    )
+    allNodes.push(settingsNode)
+    settingsRight = settingsX + SETTINGS_W
+  }
+
+  // Memory (right, after settings)
+  const memX = settingsRight + ZONE_GAP
   const memItems: LayoutItem[] = config.memories.map((m) => ({
     type: 'claude-memory' as const,
     content: m.filePath,
@@ -270,7 +268,7 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
       contentPreview: m.content,
       scope: m.scope
     },
-    cardH: CARD_H_MEDIUM
+    cardH: CARD_H_SMALL
   }))
 
   if (memItems.length > 0) {

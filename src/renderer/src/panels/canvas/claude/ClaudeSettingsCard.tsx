@@ -4,7 +4,6 @@ import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
 import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
-import { colors, typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface ClaudeSettingsCardProps {
@@ -29,6 +28,8 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
     }
   }, [node.content, inspector])
 
+  const pluginCount = meta.pluginNames?.length ?? 0
+
   return (
     <CardShell
       node={node}
@@ -36,70 +37,43 @@ export function ClaudeSettingsCard({ node }: ClaudeSettingsCardProps) {
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
     >
-      <div className="p-3 space-y-3" style={{ color: '#f1f5f9' }}>
-        {/* Hero label */}
-        <div className="flex items-center gap-2">
-          <span
-            className="px-2 py-0.5 rounded text-xs font-medium"
-            style={{ backgroundColor: '#f59e0b22', color: '#f59e0b' }}
-          >
-            settings.json
+      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ color: '#f1f5f9' }}>
+        <span
+          className="px-2 py-0.5 rounded text-xs font-medium"
+          style={{ backgroundColor: '#f59e0b22', color: '#f59e0b' }}
+        >
+          settings.json
+        </span>
+        <span className="text-xs" style={{ color: '#94a3b8' }}>
+          Permissions:{' '}
+          <span className="font-medium" style={{ color: '#f59e0b' }}>
+            {meta.permissionCount ?? 0}
           </span>
-        </div>
-
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-2">
-          <StatBadge label="Permissions" value={meta.permissionCount ?? 0} color="#f59e0b" />
-          <StatBadge label="Env Vars" value={meta.envVarCount ?? 0} color="#3b82f6" />
-        </div>
-
-        {/* Plugins */}
-        {meta.pluginNames && meta.pluginNames.length > 0 && (
-          <div>
-            <span
-              className="block mb-1"
-              style={{
-                ...typography.metadata,
-                color: '#94a3b8'
-              }}
-            >
-              MCP SERVERS
+        </span>
+        <span className="text-xs" style={{ color: '#64748b' }}>
+          ·
+        </span>
+        <span className="text-xs" style={{ color: '#94a3b8' }}>
+          Env Vars:{' '}
+          <span className="font-medium" style={{ color: '#3b82f6' }}>
+            {meta.envVarCount ?? 0}
+          </span>
+        </span>
+        {pluginCount > 0 && (
+          <>
+            <span className="text-xs" style={{ color: '#64748b' }}>
+              ·
             </span>
-            <div className="flex flex-wrap gap-1">
-              {meta.pluginNames.map((name) => (
-                <span
-                  key={name}
-                  className="px-1.5 py-0.5 rounded text-xs"
-                  style={{
-                    backgroundColor: colors.bg.elevated,
-                    color: '#cbd5e1',
-                    fontFamily: typography.fontFamily.mono
-                  }}
-                >
-                  {name}
-                </span>
-              ))}
-            </div>
-          </div>
+            <span className="text-xs" style={{ color: '#94a3b8' }}>
+              MCP:{' '}
+              <span className="font-medium" style={{ color: '#22d3ee' }}>
+                {pluginCount}
+              </span>
+            </span>
+          </>
         )}
       </div>
     </CardShell>
-  )
-}
-
-function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div
-      className="flex flex-col items-center p-2 rounded"
-      style={{ backgroundColor: color + '11' }}
-    >
-      <span className="text-lg font-semibold" style={{ color }}>
-        {value}
-      </span>
-      <span className="text-xs" style={{ color: '#94a3b8' }}>
-        {label}
-      </span>
-    </div>
   )
 }
 

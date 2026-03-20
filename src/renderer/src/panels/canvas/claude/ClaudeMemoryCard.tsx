@@ -4,7 +4,6 @@ import { useEditorStore } from '../../../store/editor-store'
 import { useViewStore } from '../../../store/view-store'
 import { useInspector } from '../../claude-config/InspectorContext'
 import { CardShell } from '../CardShell'
-import { typography } from '../../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface ClaudeMemoryCardProps {
@@ -71,24 +70,9 @@ export function ClaudeMemoryCard({ node }: ClaudeMemoryCardProps) {
 
         {/* Description or content preview */}
         {(meta.description || meta.contentPreview) && (
-          <p className="text-xs leading-relaxed line-clamp-3" style={{ color: '#cbd5e1' }}>
+          <p className="text-xs leading-relaxed line-clamp-2" style={{ color: '#cbd5e1' }}>
             {meta.description || meta.contentPreview}
           </p>
-        )}
-
-        {/* Link count */}
-        {(meta.linkCount ?? 0) > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-xs" style={{ color: '#94a3b8' }}>
-              Links:
-            </span>
-            <span
-              className="text-xs font-medium"
-              style={{ color: typeColor, fontFamily: typography.fontFamily.mono }}
-            >
-              {meta.linkCount}
-            </span>
-          </div>
         )}
       </div>
     </CardShell>
