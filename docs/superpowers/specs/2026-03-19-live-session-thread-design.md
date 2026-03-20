@@ -233,7 +233,7 @@ Expanded (on click):
 
 **Changes to `ProjectCanvasPanel.tsx`:**
 
-1. Import and call `useSessionThread(projectPath)`
+1. Import and call `useSessionThread(projectPath, enabled)` where `enabled = threadToggle && isActiveTab`
 2. Add toggle state and `⚡` button to toolbar
 3. Conditionally render `SessionThreadPanel` when toggled on
 4. Pass milestone click handler for file navigation (reuses `useEditorStore.getState().setActiveNote()` + `useTabStore.getState().activateTab('editor')`)
