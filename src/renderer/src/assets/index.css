@@ -547,13 +547,44 @@ body {
 
 /* ─── Canvas Card Design System ─── */
 
-/* Hide scrollbars inside canvas cards — content still scrolls */
+/* Canvas card scrollbars: hidden by default, fade in on card hover */
 .canvas-card-content {
   overflow: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 200ms ease-out;
 }
+
+.canvas-card:hover .canvas-card-content {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* WebKit scrollbar: thin, styled, fade in on card hover */
 .canvas-card-content::-webkit-scrollbar {
-  display: none;
+  width: 5px;
+  height: 5px;
+}
+
+.canvas-card-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvas-card-content::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background 200ms ease-out;
+}
+
+.canvas-card:hover .canvas-card-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.canvas-card:hover .canvas-card-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.30);
+}
+
+.canvas-card-content::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Canvas card link color override */
