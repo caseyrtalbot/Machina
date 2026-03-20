@@ -92,7 +92,7 @@ The Claude directory key is derived from the project path with slashes replaced 
 
 | Pattern | Milestone type | Summary |
 |---------|---------------|---------|
-| Consecutive Read/Grep/Glob events | `research` | "Researching — {n} files" |
+| Consecutive Read/Grep events | `research` | "Researching — {n} operations" |
 | Single Write event | `create` | "Created {filename}" |
 | Single or consecutive Edit events on same file | `edit` | "Edited {filename} — {n} edits" |
 | Edit events across different files | Separate `edit` milestones | One per file |
@@ -101,7 +101,7 @@ The Claude directory key is derived from the project path with slashes replaced 
 
 **Consecutive** means events with no intervening event of a different category. A Read followed by an Edit breaks the Read group.
 
-**Summary extraction:** For Edit events, extract a brief description from the tool input (first 200 chars of the description or diff). For Bash commands, extract the command text (first 100 chars). Truncation prevents oversized milestones.
+**Summary extraction (truncation owner):** The grouper owns all truncation. For Edit events, it extracts a brief description from the tool input (first 200 chars of the description or diff). For Bash commands, it extracts the command text (first 100 chars). The tailer passes raw events; the grouper produces bounded summaries.
 
 ### 3. Types
 
@@ -110,7 +110,7 @@ The Claude directory key is derived from the project path with slashes replaced 
 ```typescript
 interface SessionMilestone {
   readonly id: string
-  readonly type: 'edit' | 'create' | 'command' | 'research' | 'error'
+  readonly type: 'edit' | 'create' | 'command' | 'research' | 'error' | 'session-switched'
   readonly timestamp: number
   readonly summary: string
   readonly files: readonly string[]
@@ -118,7 +118,7 @@ interface SessionMilestone {
 }
 
 interface SessionToolEvent {
-  readonly tool: 'Read' | 'Write' | 'Edit' | 'Bash' | 'Grep' | 'Glob'
+  readonly tool: 'Read' | 'Write' | 'Edit' | 'Bash' | 'Grep'
   readonly timestamp: number
   readonly filePath?: string
   readonly detail?: string
@@ -129,12 +129,25 @@ interface SessionToolEvent {
 
 **File:** `src/shared/ipc-channels.ts` (additions)
 
-New channels:
-- `session:tail-start` — `{ projectPath: string }` -> `void`
-- `session:tail-stop` — `void` -> `void`
+New handle/invoke channels (added to `IpcChannels`):
+```typescript
+'session:tail-start': { request: { projectPath: string }; response: void }
+'session:tail-stop': { request: void; response: void }
+```
 
-New event:
-- `session:milestone` — pushes `SessionMilestone` to renderer
+New push event (added to `IpcEvents`):
+```typescript
+'session:milestone': SessionMilestone
+```
+
+**Preload addition** (`src/preload/index.ts`):
+```typescript
+// Added to window.api.on:
+sessionMilestone: (callback: (data: SessionMilestone) => void) =>
+  typedOn('session:milestone', callback)
+```
+
+**BrowserWindow access:** `SessionTailer` receives `BrowserWindow` at construction time, matching the pattern used by `registerProjectIpc`. The IPC handler in `project.ts` passes the window when creating the tailer instance.
 
 ### 5. useSessionThread hook
 
@@ -153,20 +166,23 @@ interface SessionThreadState {
   readonly clear: () => void
 }
 
-function useSessionThread(projectPath: string | null): SessionThreadState
+function useSessionThread(projectPath: string | null, enabled: boolean): SessionThreadState
 ```
 
 **Behavior:**
 
-- On mount with a non-null projectPath: calls `session:tail-start` via IPC, subscribes to `session:milestone` events
+- Accepts an `enabled` flag that controls tailing independently of mount/unmount. This is necessary because `ProjectCanvasPanel` uses a keep-alive pattern (stays mounted across tab switches, does not unmount).
+- When `enabled` transitions to `true`: calls `session:tail-start` via `window.api.session.tailStart(projectPath)`, subscribes to `window.api.on.sessionMilestone` events
+- When `enabled` transitions to `false`: calls `session:tail-stop`, removes IPC listener, clears milestones
+- `enabled` is driven by the thread panel toggle AND the active tab state. If the user toggles the thread on but switches to another tab, `enabled` becomes false. When they return, `enabled` becomes true again.
 - Maintains milestones array, most recent first, capped at 50
 - Tracks `isLive`: true when events received in last 10 seconds, false otherwise
 - `toggle(id)`: adds/removes milestone ID from `expandedIds` set
 - `clear()`: empties the milestones array
-- On unmount: calls `session:tail-stop`, removes IPC listener
+- On unmount (component actually removed from DOM): calls `session:tail-stop` as a safety net
 - Batches incoming events with `requestAnimationFrame` to avoid jank from rapid arrivals
 
-**Why a hook, not a store:** The session thread is local to the Project Canvas panel. It doesn't need to survive tab switches (the thread resets on leave and resumes tailing on return). A hook scoped to `ProjectCanvasPanel` keeps the lifecycle tight and avoids polluting global state.
+**Why a hook, not a store:** The session thread is local to the Project Canvas panel. It doesn't need to survive tab switches. A hook scoped to `ProjectCanvasPanel` keeps the lifecycle tight and avoids polluting global state.
 
 ### 6. SessionThreadPanel component
 
@@ -189,7 +205,8 @@ function useSessionThread(projectPath: string | null): SessionThreadState
 **Milestone rendering:**
 
 Collapsed (default, one line per milestone):
-- Type icon: `✎` edit, `▶` command, `◉` research, `✚` create, `✕` error
+- Type icon: `✎` edit, `▶` command, `◉` research, `✚` create, `✕` error, `↻` session-switched
+- `session-switched` renders as a horizontal separator with "New session detected" text, not expandable
 - Summary text
 - Relative timestamp ("3s ago", "1m ago")
 
@@ -210,7 +227,7 @@ Expanded (on click):
 - Font: `typography.fontFamily.mono` for file paths, system font for summaries
 - Relative timestamps update every 5 seconds via `setInterval`
 
-**Toggle button:** Lightning bolt icon (`⚡`) added to the Project Canvas toolbar, next to the existing settings gear. When the thread is live, the icon pulses subtly via CSS animation.
+**Toggle button:** Lightning bolt icon (`⚡`) added to the Project Canvas toolbar, after the existing Refresh/Fit All/+ Terminal buttons. When the thread is live, the icon pulses subtly via CSS animation.
 
 ### 7. Integration with ProjectCanvasPanel
 
@@ -223,10 +240,13 @@ Expanded (on click):
 
 **Lifecycle:**
 
+Note: `ProjectCanvasPanel` uses keep-alive (stays mounted across tab switches). The hook's `enabled` flag, not mount/unmount, controls tailing.
+
 - User opens Project Canvas -> thread toggle visible (off by default)
-- User clicks `⚡` -> panel mounts, hook calls `session:tail-start`, tailing begins
-- User switches away -> cleanup fires `session:tail-stop`, state discarded
-- User returns -> fresh mount, tailing resumes from current position
+- User clicks `⚡` -> toggle state = true, `enabled` = true (active tab + toggle on), tailing begins
+- User switches to another tab -> panel stays mounted, but `enabled` becomes false (inactive tab), tailing stops, milestones cleared
+- User returns to Project Canvas -> `enabled` becomes true again, tailing resumes from current file position with fresh milestones
+- User clicks `⚡` again -> toggle state = false, `enabled` = false, tailing stops
 
 **What is NOT changed:**
 - `CanvasSurface` — no modifications
@@ -249,6 +269,7 @@ Expanded (on click):
 | Relative timestamps go stale | "3s ago" never updates | `setInterval` every 5 seconds recalculates visible timestamps. |
 | Panel covers canvas cards on narrow screens | Blocked interaction | Dismissible via toggle button. 280px is narrow enough for most screens. |
 | New session starts mid-tailing | Events from old session, then silence | Check for newer JSONL every 5 seconds. Auto-switch and emit `session-switched` milestone. |
+| JSONL file replaced instead of appended | `fs.watch` handle goes stale | The 5-second session-switch check also validates the watched file still exists. If gone, re-scan for the current file. |
 
 ## Testing
 
