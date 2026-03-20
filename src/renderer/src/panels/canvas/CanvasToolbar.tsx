@@ -59,7 +59,7 @@ export function CanvasToolbar({
         padding: 4
       }}
     >
-      <button onClick={onAddCard} style={btnStyle} title="Add card">
+      <button onClick={onAddCard} style={btnStyle} title="Add card" data-testid="canvas-add-card">
         <svg
           width={14}
           height={14}
@@ -72,7 +72,12 @@ export function CanvasToolbar({
           <line x1="2" y1="7" x2="12" y2="7" />
         </svg>
       </button>
-      <button onClick={onOpenImport} style={btnStyle} title="Import notes (Cmd+G)">
+      <button
+        onClick={onOpenImport}
+        style={btnStyle}
+        title="Import notes (Cmd+G)"
+        data-testid="canvas-import"
+      >
         <svg
           width={14}
           height={14}
@@ -108,7 +113,12 @@ export function CanvasToolbar({
 
       <div style={{ height: 1, backgroundColor: colors.border.subtle, margin: '2px 0' }} />
 
-      <button onClick={onUndo} style={canUndo ? btnStyle : disabledStyle} title="Undo (Cmd+Z)">
+      <button
+        onClick={onUndo}
+        style={canUndo ? btnStyle : disabledStyle}
+        title="Undo (Cmd+Z)"
+        data-testid="canvas-undo"
+      >
         <svg
           width={14}
           height={14}
@@ -126,6 +136,7 @@ export function CanvasToolbar({
         onClick={onRedo}
         style={canRedo ? btnStyle : disabledStyle}
         title="Redo (Cmd+Shift+Z)"
+        data-testid="canvas-redo"
       >
         <svg
           width={14}

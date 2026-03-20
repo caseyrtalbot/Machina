@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    {
+      "id": "test-node-1",
+      "type": "note",
+      "position": { "x": 100, "y": 100 },
+      "size": { "width": 450, "height": 550 },
+      "content": "category-creation.md",
+      "metadata": {}
+    },
+    {
+      "id": "test-node-2",
+      "type": "text",
+      "position": { "x": 620, "y": 100 },
+      "size": { "width": 260, "height": 140 },
+      "content": "Hello canvas test",
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "test-edge-1",
+      "fromNode": "test-node-1",
+      "toNode": "test-node-2",
+      "fromSide": "right",
+      "toSide": "left",
+      "kind": "connection"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

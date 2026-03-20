@@ -59,6 +59,7 @@ export function CanvasContextMenu({
   return (
     <div
       ref={ref}
+      data-testid="canvas-context-menu"
       className="fixed rounded-lg border shadow-lg py-1 z-50"
       style={{
         left: x,

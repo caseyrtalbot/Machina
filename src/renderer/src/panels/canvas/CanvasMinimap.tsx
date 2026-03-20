@@ -168,6 +168,7 @@ export function CanvasMinimap({
   return (
     <div
       ref={minimapRef}
+      data-testid="canvas-minimap"
       className="absolute pointer-events-auto"
       style={{
         bottom: 12,
