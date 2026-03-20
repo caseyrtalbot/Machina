@@ -25,6 +25,26 @@ function createClaudeEdge(
 }
 
 /**
+ * Returns true if text contains an explicit reference to name.
+ * Requires a slash-prefixed invocation (/name) or a whole-word match that is
+ * not a simple substring of a longer word (word-boundary via regex).
+ * Names of 4 characters or fewer are skipped to avoid noise.
+ * The slash-prefix check is always authoritative; the word-boundary fallback
+ * only applies when the name itself contains a hyphen (compound skill names).
+ */
+function mentionsName(text: string, name: string): boolean {
+  if (name.length <= 4) return false
+  const lower = text.toLowerCase()
+  const target = name.toLowerCase()
+  if (lower.includes(`/${target}`)) return true
+  // Only use word-boundary matching for hyphenated names (e.g. "research-team")
+  // to avoid false positives from common words used as prose.
+  if (!target.includes('-')) return false
+  const regex = new RegExp(`\\b${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+  return regex.test(text)
+}
+
+/**
  * Build a lookup map from component name (lowercase) to node ID.
  */
 function buildNameIndex(nodes: readonly CanvasNode[]): Map<string, string> {
@@ -129,14 +149,14 @@ export function extractRelationships(
 
     for (const skillNode of skillNodes) {
       const skillName = ((skillNode.metadata as Record<string, unknown>).skillName as string) ?? ''
-      if (skillName.length > 3 && searchText.includes(skillName.toLowerCase())) {
+      if (mentionsName(searchText, skillName)) {
         edges.push(createClaudeEdge(agentNode.id, skillNode.id, 'right', 'left', 'agent-uses-tool'))
       }
     }
 
     for (const cmdNode of commandNodes) {
       const cmdName = ((cmdNode.metadata as Record<string, unknown>).commandName as string) ?? ''
-      if (cmdName.length > 3 && searchText.includes(cmdName.toLowerCase())) {
+      if (mentionsName(searchText, cmdName)) {
         edges.push(createClaudeEdge(agentNode.id, cmdNode.id, 'right', 'left', 'agent-uses-tool'))
       }
     }
@@ -149,14 +169,13 @@ export function extractRelationships(
     const skillNode = skillNodes[i]
     if (!skillNode) continue
 
-    const desc = skill.description.toLowerCase()
     for (let j = 0; j < config.skills.length; j++) {
       if (i === j) continue
       const other = config.skills[j]
       const otherNode = skillNodes[j]
       if (!otherNode) continue
 
-      if (desc.includes(other.name.toLowerCase()) && other.name.length > 3) {
+      if (mentionsName(skill.description, other.name)) {
         edges.push(
           createClaudeEdge(skillNode.id, otherNode.id, 'right', 'left', 'skill-references')
         )
