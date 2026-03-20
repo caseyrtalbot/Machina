@@ -55,7 +55,13 @@ export class FileService {
     for (const entry of entries) {
       const fullPath = join(dir, entry.name)
       if (entry.name.startsWith('.') && entry.name !== '.claude') continue
-      if (entry.name === 'node_modules') continue
+      if (
+        entry.name === 'node_modules' ||
+        entry.name === 'out' ||
+        entry.name === 'dist' ||
+        entry.name === 'build'
+      )
+        continue
 
       // Follow symlinks: resolve the real type via stat()
       if (entry.isSymbolicLink()) {

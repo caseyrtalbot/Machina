@@ -85,6 +85,9 @@ export interface IpcEvents {
   'terminal:data': { sessionId: SessionId; data: string }
   'terminal:exit': { sessionId: SessionId; code: number }
   'vault:file-changed': { path: string; event: 'add' | 'change' | 'unlink' }
+  'vault:files-changed-batch': {
+    events: readonly { path: string; event: 'add' | 'change' | 'unlink' }[]
+  }
   'claude:activity': ClaudeActivityEvent
   'project:file-changed': ProjectFileChangedEvent
   'session:milestone': SessionMilestone

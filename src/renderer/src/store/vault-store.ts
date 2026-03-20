@@ -54,15 +54,19 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   loadVault: async (vaultPath: string) => {
     set({ isLoading: true })
     try {
-      const config = await window.api.vault.readConfig(vaultPath)
-      const state = await window.api.vault.readState(vaultPath)
-      const filePaths = await window.api.fs.listFilesRecursive(vaultPath)
+      const [config, state, filePaths] = await Promise.all([
+        window.api.vault.readConfig(vaultPath),
+        window.api.vault.readState(vaultPath),
+        window.api.fs.listAllFiles(vaultPath)
+      ])
       const files: VaultFile[] = filePaths.map((filePath: string) => {
         const filename = filePath.split('/').pop() ?? filePath
+        const dotIdx = filename.lastIndexOf('.')
+        const title = dotIdx > 0 ? filename.slice(0, dotIdx) : filename
         return {
           path: filePath,
           filename,
-          title: filename.replace(/\.md$/, ''),
+          title,
           modified: new Date().toISOString().split('T')[0]
         }
       })

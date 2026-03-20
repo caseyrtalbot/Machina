@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import { TE_FILE_MIME, inferCardType, type DragFileData } from '../canvas/file-drop-utils'
 import { colors } from '../../design/tokens'
 import { RenameInput } from './FileContextMenu'
@@ -82,7 +83,7 @@ function Chevron({ isExpanded }: { isExpanded: boolean }) {
   )
 }
 
-export function FileTree({
+export const FileTree = memo(function FileTree({
   nodes,
   activeFilePath,
   collapsedPaths,
@@ -97,8 +98,11 @@ export function FileTree({
   onRenameConfirm,
   onRenameCancel
 }: FileTreeProps) {
-  const dirIndex = buildDirIndex(nodes)
-  const visibleNodes = nodes.filter((n) => isVisible(n, collapsedPaths, dirIndex))
+  const dirIndex = useMemo(() => buildDirIndex(nodes), [nodes])
+  const visibleNodes = useMemo(
+    () => nodes.filter((n) => isVisible(n, collapsedPaths, dirIndex)),
+    [nodes, collapsedPaths, dirIndex]
+  )
 
   return (
     <div data-testid="file-tree" className="text-sm select-none px-1 py-1">
@@ -133,7 +137,7 @@ export function FileTree({
       )}
     </div>
   )
-}
+})
 
 function DirectoryRow({
   node,

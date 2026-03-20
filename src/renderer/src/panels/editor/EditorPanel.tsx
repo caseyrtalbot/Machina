@@ -12,6 +12,7 @@ import { FrontmatterHeader } from './FrontmatterHeader'
 import { BacklinksPanel } from './BacklinksPanel'
 import { RichEditor } from './RichEditor'
 import { SourceEditor } from './SourceEditor'
+import { CodeFileEditor } from './CodeFileEditor'
 import { parseFrontmatter, migrateLegacyWikilinks } from './markdown-utils'
 import { ConceptNodeMark } from './extensions/concept-node-mark'
 import { MermaidCodeBlock } from './extensions/mermaid-code-block'
@@ -234,11 +235,16 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     return (
       <div className="h-full flex items-center justify-center" style={{ color: colors.text.muted }}>
         <div className="text-center">
-          <p className="text-lg mb-2">No note selected</p>
-          <p className="text-sm">Select a note from the sidebar or press Cmd+N to create one</p>
+          <p className="text-lg mb-2">No file selected</p>
+          <p className="text-sm">Select a file from the sidebar or press Cmd+N to create one</p>
         </div>
       </div>
     )
+  }
+
+  // Non-markdown files get a code editor with syntax highlighting
+  if (!activeNotePath.endsWith('.md')) {
+    return <CodeFileEditor filePath={activeNotePath} />
   }
 
   return (

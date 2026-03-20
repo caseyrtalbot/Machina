@@ -85,6 +85,11 @@ const api = {
       typedOn('terminal:exit', callback),
     fileChanged: (callback: (data: { path: string; event: 'add' | 'change' | 'unlink' }) => void) =>
       typedOn('vault:file-changed', callback),
+    filesChangedBatch: (
+      callback: (data: {
+        events: readonly { path: string; event: 'add' | 'change' | 'unlink' }[]
+      }) => void
+    ) => typedOn('vault:files-changed-batch', callback),
     claudeActivity: (callback: (data: ClaudeActivityEvent) => void) =>
       typedOn('claude:activity', callback),
     projectFileChanged: (callback: (data: ProjectFileChangedEvent) => void) =>

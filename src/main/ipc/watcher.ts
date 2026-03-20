@@ -20,8 +20,8 @@ export function registerWatcherIpc(mainWindow: BrowserWindow): void {
 
     await watcher.start(
       args.vaultPath,
-      (path, event) => {
-        typedSend(mainWindow, 'vault:file-changed', { path, event })
+      (events) => {
+        typedSend(mainWindow, 'vault:files-changed-batch', { events })
       },
       customPatterns
     )

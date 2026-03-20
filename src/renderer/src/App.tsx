@@ -168,10 +168,10 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
   }, [allTreeNodes, searchQuery])
 
   const artifactTypes = useMemo(() => {
+    const artifactById = new Map(artifacts.map((a) => [a.id, a]))
     const map = new Map<string, ArtifactType>()
-    // Invert fileToId: path -> artifactId, then look up each artifact's type
     for (const [filePath, artifactId] of Object.entries(fileToId)) {
-      const artifact = artifacts.find((a) => a.id === artifactId)
+      const artifact = artifactById.get(artifactId)
       if (artifact) {
         map.set(filePath, artifact.type)
       }
@@ -656,22 +656,28 @@ export default function App() {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const isLoading = useVaultStore((s) => s.isLoading)
   const loadVault = useVaultStore((s) => s.loadVault)
-  const setWorkerResult = useVaultStore((s) => s.setWorkerResult)
   const setFiles = useVaultStore((s) => s.setFiles)
 
-  const onWorkerResult = useCallback(
-    (result: WorkerResult) => {
-      setWorkerResult(result)
-      const files = useVaultStore.getState().files
-      const updatedFiles = files.map((f) => {
-        const id = result.fileToId[f.path]
-        const artifact = id ? result.artifacts.find((a) => a.id === id) : undefined
-        return artifact ? { ...f, title: artifact.title, modified: artifact.modified } : f
-      })
-      setFiles(updatedFiles)
-    },
-    [setWorkerResult, setFiles]
-  )
+  const onWorkerResult = useCallback((result: WorkerResult) => {
+    // Merge worker result + file updates into a single Zustand set() to avoid two render cycles
+    const files = useVaultStore.getState().files
+    const discoveredTypes = [...new Set(result.artifacts.map((a) => a.type))].sort()
+    const artifactById = new Map(result.artifacts.map((a) => [a.id, a]))
+    const updatedFiles = files.map((f) => {
+      if (!f.path.endsWith('.md')) return f
+      const id = result.fileToId[f.path]
+      const artifact = id ? artifactById.get(id) : undefined
+      return artifact ? { ...f, title: artifact.title, modified: artifact.modified } : f
+    })
+    useVaultStore.setState({
+      artifacts: result.artifacts,
+      graph: result.graph,
+      parseErrors: result.errors,
+      fileToId: result.fileToId,
+      discoveredTypes,
+      files: updatedFiles
+    })
+  }, [])
 
   const { loadFiles, updateFile, removeFile } = useVaultWorker(onWorkerResult)
 
@@ -698,9 +704,13 @@ export default function App() {
       await window.api.config.write('app', 'vaultHistory', updated)
 
       await window.api.vault.watchStart(path)
-      const filePaths = useVaultStore.getState().files.map((f) => f.path)
+      // Only send .md files to the vault worker (knowledge engine only parses markdown)
+      const mdPaths = useVaultStore
+        .getState()
+        .files.filter((f) => f.path.endsWith('.md'))
+        .map((f) => f.path)
       const filesWithContent = await Promise.all(
-        filePaths.map(async (p) => ({ path: p, content: await window.api.fs.readFile(p) }))
+        mdPaths.map(async (p) => ({ path: p, content: await window.api.fs.readFile(p) }))
       )
       loadFiles(filesWithContent)
     },
@@ -722,13 +732,44 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const unsub = window.api.on.fileChanged(async (data) => {
-      if (data.event === 'unlink') {
-        removeFile(data.path)
-        const currentFiles = useVaultStore.getState().files
-        setFiles(currentFiles.filter((f) => f.path !== data.path))
-      } else {
-        updateFile(data.path, await window.api.fs.readFile(data.path))
+    const unsub = window.api.on.filesChangedBatch(async (data) => {
+      // Process all events in one pass using a Map to avoid state accumulation race
+      const currentFiles = useVaultStore.getState().files
+      const fileMap = new Map(currentFiles.map((f) => [f.path, f]))
+      const mdToUpdate: string[] = []
+      const mdToRemove: string[] = []
+
+      for (const { path, event } of data.events) {
+        const isMd = path.endsWith('.md')
+
+        if (event === 'unlink') {
+          fileMap.delete(path)
+          if (isMd) mdToRemove.push(path)
+        } else if (event === 'add') {
+          if (!fileMap.has(path)) {
+            const filename = path.split('/').pop() ?? path
+            const dotIdx = filename.lastIndexOf('.')
+            const title = dotIdx > 0 ? filename.slice(0, dotIdx) : filename
+            fileMap.set(path, {
+              path,
+              filename,
+              title,
+              modified: new Date().toISOString().split('T')[0]
+            })
+          }
+          if (isMd) mdToUpdate.push(path)
+        } else {
+          if (isMd) mdToUpdate.push(path)
+        }
+      }
+
+      // Single state update for all file list changes
+      setFiles(Array.from(fileMap.values()))
+
+      // Batch vault worker updates
+      for (const path of mdToRemove) removeFile(path)
+      for (const path of mdToUpdate) {
+        updateFile(path, await window.api.fs.readFile(path))
       }
     })
     return unsub
