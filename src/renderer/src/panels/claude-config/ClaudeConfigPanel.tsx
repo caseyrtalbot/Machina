@@ -117,6 +117,8 @@ export function ClaudeConfigPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
   const prevSizeRef = useRef(containerSize)
+  const terminalNodeRef = useRef<CanvasNode | null>(null)
+  const hasCenteredRef = useRef(false)
   const [_zoneLabels, setZoneLabels] = useState<readonly ZoneLabel[]>([])
 
   // Keep content centered when the container resizes
@@ -129,6 +131,15 @@ export function ClaudeConfigPanel() {
     if (dw === 0 && dh === 0) return
     const { x, y, zoom } = useCanvasStore.getState().viewport
     useCanvasStore.getState().setViewport({ x: x + dw / 2, y: y + dh / 2, zoom })
+  }, [containerSize])
+
+  // Center on terminal node once real container dimensions are known
+  useEffect(() => {
+    if (!terminalNodeRef.current || hasCenteredRef.current) return
+    if (containerSize.width === 1920 && containerSize.height === 1080) return
+    const vp = centerOnNode(terminalNodeRef.current, containerSize)
+    useCanvasStore.getState().setViewport(vp)
+    hasCenteredRef.current = true
   }, [containerSize])
 
   // Store the previous canvas state for restoration
@@ -203,9 +214,9 @@ export function ClaudeConfigPanel() {
         }
         const allNodes = [...allConfigNodes, terminalNode]
 
-        // Always center on the terminal card so users land on the live terminal
-        const viewport = centerOnNode(terminalNode, containerSize)
-        canvasData = { nodes: allNodes, edges, viewport }
+        terminalNodeRef.current = terminalNode
+        hasCenteredRef.current = false
+        canvasData = { nodes: allNodes, edges, viewport: { x: 0, y: 0, zoom: 1 } }
         setCachedData(canvasData)
       } catch (err) {
         console.error('[ClaudeConfigPanel] Failed to load config:', err)
