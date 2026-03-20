@@ -126,6 +126,12 @@ export const visualLanguage = {
   borderSubtle: 'rgba(255, 255, 255, 0.08)'
 } as const
 
+export const EDGE_KIND_COLORS: Record<string, string> = {
+  connection: '#64748b',
+  cluster: '#34d399',
+  tension: '#f59e0b'
+} as const
+
 export const canvasTokens = {
   surface: 'var(--canvas-surface-bg)',
   card: 'var(--canvas-card-bg)',

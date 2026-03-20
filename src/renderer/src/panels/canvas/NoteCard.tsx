@@ -110,12 +110,27 @@ export function NoteCard({ node }: NoteCardProps) {
     useViewStore.getState().setContentView('editor')
   }, [filePath, title])
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      useCanvasStore.getState().setCardContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        nodeId: node.id
+      })
+    },
+    [node.id]
+  )
+
   return (
     <CardShell
       node={node}
-      title={filePath}
+      title={title}
+      filePath={filePath}
       onClose={() => removeNode(node.id)}
       onOpenInEditor={openInEditor}
+      onContextMenu={handleContextMenu}
     >
       <div className="h-full overflow-auto canvas-card-content" style={{ minHeight: 0 }}>
         {loading ? (

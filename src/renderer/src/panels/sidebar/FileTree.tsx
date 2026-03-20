@@ -263,7 +263,8 @@ function FileRow({
         paddingLeft,
         paddingRight: 8,
         marginBottom: 1,
-        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : undefined,
+        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.10)' : undefined,
+        borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
         fontWeight: 400,
         fontSize: 12
       }}

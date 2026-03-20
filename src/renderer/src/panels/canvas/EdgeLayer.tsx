@@ -1,5 +1,5 @@
 import { useCanvasStore } from '../../store/canvas-store'
-import { colors } from '../../design/tokens'
+import { colors, EDGE_KIND_COLORS } from '../../design/tokens'
 import type { CanvasEdge, CanvasNode, CanvasSide } from '@shared/canvas-types'
 
 function getAnchorPoint(node: CanvasNode, side: CanvasSide): { x: number; y: number } {
@@ -39,6 +39,7 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
   const to_node = nodes.find((n) => n.id === edge.toNode)
   if (!from_node || !to_node) return null
 
+  const kindColor = edge.kind ? EDGE_KIND_COLORS[edge.kind] : undefined
   const endpointActive =
     from_node.metadata?.isActive === true || to_node.metadata?.isActive === true
 
@@ -69,7 +70,7 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
       <path
         d={d}
         fill="none"
-        stroke={isSelected ? colors.accent.default : colors.text.secondary}
+        stroke={isSelected ? colors.accent.default : (kindColor ?? colors.text.secondary)}
         strokeWidth={isSelected ? 2.5 : 1.5}
         markerEnd="url(#arrowhead)"
         opacity={endpointActive ? 1 : isSelected ? 1 : 0.6}

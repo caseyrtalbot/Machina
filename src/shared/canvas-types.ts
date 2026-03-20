@@ -89,12 +89,16 @@ export interface CanvasNode {
   readonly metadata: Readonly<Record<string, unknown>>
 }
 
+export type CanvasEdgeKind = 'connection' | 'cluster' | 'tension'
+
 export interface CanvasEdge {
   readonly id: string
   readonly fromNode: string
   readonly toNode: string
   readonly fromSide: CanvasSide
   readonly toSide: CanvasSide
+  readonly kind?: CanvasEdgeKind | (string & {})
+  readonly label?: string
 }
 
 export interface CanvasViewport {
@@ -240,9 +244,11 @@ export function createCanvasEdge(
   fromNode: string,
   toNode: string,
   fromSide: CanvasSide,
-  toSide: CanvasSide
+  toSide: CanvasSide,
+  kind?: CanvasEdgeKind,
+  label?: string
 ): CanvasEdge {
-  return { id: uid(), fromNode, toNode, fromSide, toSide }
+  return { id: uid(), fromNode, toNode, fromSide, toSide, kind, label }
 }
 
 export function createCanvasFile(): CanvasFile {

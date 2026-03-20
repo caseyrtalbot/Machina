@@ -17,6 +17,11 @@ interface CanvasStore {
   // Interaction state
   readonly hoveredNodeId: string | null
   readonly focusedTerminalId: string | null
+  readonly cardContextMenu: {
+    readonly x: number
+    readonly y: number
+    readonly nodeId: string
+  } | null
 
   // Document lifecycle
   loadCanvas: (filePath: string, data: CanvasFile) => void
@@ -31,6 +36,9 @@ interface CanvasStore {
   updateNodeContent: (id: string, content: string) => void
   updateNodeMetadata: (id: string, partial: Partial<Record<string, unknown>>) => void
   updateNodeType: (id: string, type: CanvasNode['type']) => void
+
+  // Batch mutations
+  addNodesAndEdges: (nodes: readonly CanvasNode[], edges: readonly CanvasEdge[]) => void
 
   // Edge mutations
   addEdge: (edge: CanvasEdge) => void
@@ -51,6 +59,9 @@ interface CanvasStore {
   // Terminal focus
   setFocusedTerminal: (id: string | null) => void
 
+  // Card context menu
+  setCardContextMenu: (menu: { x: number; y: number; nodeId: string } | null) => void
+
   // Snapshot for persistence
   toCanvasFile: () => CanvasFile
 }
@@ -67,6 +78,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   selectedEdgeId: null,
   hoveredNodeId: null,
   focusedTerminalId: null,
+  cardContextMenu: null,
 
   loadCanvas: (filePath, data) =>
     set({
@@ -78,7 +90,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       selectedNodeIds: new Set(),
       selectedEdgeId: null,
       hoveredNodeId: null,
-      focusedTerminalId: null
+      focusedTerminalId: null,
+      cardContextMenu: null
     }),
 
   closeCanvas: () =>
@@ -91,6 +104,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       selectedNodeIds: new Set(),
       selectedEdgeId: null,
       hoveredNodeId: null,
+      cardContextMenu: null,
       focusedTerminalId: null
     }),
 
@@ -149,6 +163,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       isDirty: true
     })),
 
+  addNodesAndEdges: (nodes, edges) =>
+    set((s) => ({
+      nodes: [...s.nodes, ...nodes],
+      edges: [...s.edges, ...edges],
+      isDirty: true
+    })),
+
   addEdge: (edge) => set((s) => ({ edges: [...s.edges, edge], isDirty: true })),
 
   removeEdge: (id) =>
@@ -174,6 +195,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setHoveredNode: (id) => set({ hoveredNodeId: id }),
 
   setFocusedTerminal: (id) => set({ focusedTerminalId: id }),
+
+  setCardContextMenu: (menu) => set({ cardContextMenu: menu }),
 
   toCanvasFile: () => {
     const { nodes, edges, viewport } = get()

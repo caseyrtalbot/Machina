@@ -29,9 +29,11 @@ const TYPE_ACCENT_COLORS: Partial<Record<CanvasNodeType, string>> = {
 interface CardShellProps {
   readonly node: CanvasNode
   readonly title: string
+  readonly filePath?: string
   readonly children: React.ReactNode
   readonly onClose: () => void
   readonly onOpenInEditor?: () => void
+  readonly onContextMenu?: (e: React.MouseEvent) => void
 }
 
 /** Valid conversion targets for each card type */
@@ -163,7 +165,16 @@ function TitleBarButton({
   )
 }
 
-export function CardShell({ node, title, children, onClose, onOpenInEditor }: CardShellProps) {
+export function CardShell({
+  node,
+  title,
+  filePath,
+  children,
+  onClose,
+  onOpenInEditor,
+  onContextMenu
+}: CardShellProps) {
+  const copyText = filePath ?? title
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
@@ -227,6 +238,7 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
           : {})
       }}
       onClick={handleClick}
+      onContextMenu={onContextMenu}
       onPointerUp={handlePointerUp}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -265,7 +277,7 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
               textAlign: 'left',
               unicodeBidi: 'plaintext'
             }}
-            title={title}
+            title={copyText}
           >
             {title}
           </span>
@@ -282,7 +294,7 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
           <TitleBarButton
             onClick={(e) => {
               e.stopPropagation()
-              navigator.clipboard.writeText(title)
+              navigator.clipboard.writeText(copyText)
             }}
             label="Copy path"
           >

@@ -8,6 +8,11 @@ import {
   type CanvasNodeType
 } from '@shared/canvas-types'
 import { CanvasContextMenu } from './CanvasContextMenu'
+import { CardContextMenu } from './CardContextMenu'
+import { computeShowConnections } from './show-connections'
+import { useVaultStore } from '../../store/vault-store'
+import { useEditorStore } from '../../store/editor-store'
+import { useViewStore } from '../../store/view-store'
 import { LazyCards } from './card-registry'
 import { CardShellSkeleton } from './CardShellSkeleton'
 import { CardLodPreview } from './CardLodPreview'
@@ -32,6 +37,9 @@ export function CanvasView(): React.ReactElement {
   const isDirty = useCanvasStore((s) => s.isDirty)
   const toCanvasFile = useCanvasStore((s) => s.toCanvasFile)
   const markSaved = useCanvasStore((s) => s.markSaved)
+  const addNodesAndEdges = useCanvasStore((s) => s.addNodesAndEdges)
+  const cardContextMenu = useCanvasStore((s) => s.cardContextMenu)
+  const setCardContextMenu = useCanvasStore((s) => s.setCardContextMenu)
   const commandStack = useRef(new CommandStack())
 
   // Track container size for viewport culling
@@ -151,7 +159,8 @@ export function CanvasView(): React.ReactElement {
   const handleBackgroundClick = useCallback(() => {
     clearSelection()
     setContextMenu(null)
-  }, [clearSelection])
+    setCardContextMenu(null)
+  }, [clearSelection, setCardContextMenu])
 
   const handleAddCard = useCallback(
     (type: CanvasNodeType, overrides?: Partial<Pick<CanvasNode, 'content' | 'metadata'>>) => {
@@ -355,6 +364,59 @@ export function CanvasView(): React.ReactElement {
           onClose={() => setContextMenu(null)}
         />
       )}
+
+      {cardContextMenu &&
+        (() => {
+          const menuNode = nodes.find((n) => n.id === cardContextMenu.nodeId)
+          if (!menuNode || menuNode.type !== 'note') return null
+          const menuFilePath = menuNode.content
+          const { graph, fileToId, artifacts } = useVaultStore.getState()
+          const menuArtifactId = fileToId[menuFilePath]
+          const menuArtifact = artifacts.find((a) => a.id === menuArtifactId)
+          const menuTitle =
+            menuArtifact?.title ?? menuFilePath.split('/').pop()?.replace('.md', '') ?? 'Note'
+
+          return (
+            <CardContextMenu
+              x={cardContextMenu.x}
+              y={cardContextMenu.y}
+              onShowConnections={() => {
+                const { newNodes, newEdges } = computeShowConnections(
+                  menuNode,
+                  nodes,
+                  graph,
+                  fileToId
+                )
+                if (newNodes.length > 0 || newEdges.length > 0) {
+                  commandStack.current.execute({
+                    execute: () => addNodesAndEdges(newNodes, newEdges),
+                    undo: () => {
+                      const store = useCanvasStore.getState()
+                      const nodeIds = new Set(newNodes.map((n) => n.id))
+                      const edgeIds = new Set(newEdges.map((e) => e.id))
+                      useCanvasStore.setState({
+                        nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
+                        edges: store.edges.filter((e) => !edgeIds.has(e.id)),
+                        isDirty: true
+                      })
+                    }
+                  })
+                }
+                setCardContextMenu(null)
+              }}
+              onOpenInEditor={() => {
+                useEditorStore.getState().openTab(menuFilePath, menuTitle)
+                useViewStore.getState().setContentView('editor')
+                setCardContextMenu(null)
+              }}
+              onCopyPath={() => {
+                navigator.clipboard.writeText(menuFilePath)
+                setCardContextMenu(null)
+              }}
+              onClose={() => setCardContextMenu(null)}
+            />
+          )
+        })()}
     </div>
   )
 }
