@@ -103,10 +103,10 @@ body {
   --color-accent-subtle: rgba(0, 229, 191, 0.15);
 
   /* ── Canvas Card Defaults (overridden per theme by ThemeProvider) ── */
-  --canvas-surface-bg: #1e1e1e;
-  --canvas-card-bg: #2b2d2f;
-  --canvas-card-title-bg: #252728;
-  --canvas-card-border: rgba(255, 255, 255, 0.06);
+  --canvas-surface-bg: #2a2a2e;
+  --canvas-card-bg: #1e1e22;
+  --canvas-card-title-bg: #1a1a1e;
+  --canvas-card-border: rgba(255, 255, 255, 0.08);
   --canvas-text-heading: #e8e8e8;
   --canvas-blockquote-bar: #4a4a4a;
   --canvas-link-cyan: #5cb8c4;

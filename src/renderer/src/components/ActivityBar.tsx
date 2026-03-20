@@ -97,10 +97,11 @@ export function ActivityBar() {
 
   return (
     <div
-      className="flex flex-col items-center shrink-0 py-3 gap-1"
+      className="flex flex-col items-center shrink-0 pt-8 gap-0.5"
       style={{
-        width: 48,
-        backgroundColor: colors.bg.base
+        width: 40,
+        backgroundColor: colors.bg.base,
+        borderRight: `1px solid rgba(255, 255, 255, 0.04)`
       }}
     >
       {ITEMS.map(({ view, label, icon }) => {
@@ -112,18 +113,21 @@ export function ActivityBar() {
             onClick={() =>
               openTab({ id: view, type: view, label: def.label, closeable: view !== 'editor' })
             }
-            className="relative flex items-center justify-center transition-opacity"
+            className="relative flex items-center justify-center transition-opacity cursor-pointer"
             style={{
-              width: 36,
-              height: 36,
-              opacity: isActive ? 1 : 0.5,
-              color: colors.text.primary
+              width: 32,
+              height: 32,
+              opacity: isActive ? 1 : 0.4,
+              color: colors.text.primary,
+              borderRadius: 6
             }}
             onMouseEnter={(e) => {
-              if (!isActive) e.currentTarget.style.opacity = '0.85'
+              if (!isActive) e.currentTarget.style.opacity = '0.8'
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
             }}
             onMouseLeave={(e) => {
-              if (!isActive) e.currentTarget.style.opacity = '0.5'
+              if (!isActive) e.currentTarget.style.opacity = isActive ? '1' : '0.4'
+              e.currentTarget.style.backgroundColor = 'transparent'
             }}
             title={label}
             aria-label={`Switch to ${label} view`}
@@ -132,8 +136,8 @@ export function ActivityBar() {
               <span
                 className="absolute left-0 rounded-r"
                 style={{
-                  width: 3,
-                  height: 20,
+                  width: 2,
+                  height: 16,
                   backgroundColor: colors.accent.default
                 }}
               />

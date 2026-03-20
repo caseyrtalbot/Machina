@@ -119,28 +119,38 @@ export function NoteCard({ node }: NoteCardProps) {
     >
       <div className="h-full overflow-auto canvas-card-content" style={{ minHeight: 0 }}>
         {loading ? (
-          <div style={{ padding: canvasTokens.contentPadding }}>
+          <div style={{ padding: 28 }}>
             <span className="text-sm" style={{ color: colors.text.muted }}>
               Loading...
             </span>
           </div>
         ) : !body ? (
-          <div style={{ padding: canvasTokens.contentPadding }}>
+          <div style={{ padding: 28 }}>
             <span className="text-sm" style={{ color: colors.text.muted }}>
               Empty note
             </span>
           </div>
         ) : (
-          <div style={{ padding: canvasTokens.contentPadding }}>
-            {/* Type badge */}
-            <div style={{ marginBottom: 16 }}>
+          <div style={{ padding: '28px 28px 24px' }}>
+            <div style={{ marginBottom: 20 }}>
               <CardBadge label={badgeLabel} />
             </div>
 
-            {/* Metadata grid */}
             {metadataEntries.length > 0 && <MetadataGrid entries={metadataEntries} />}
 
-            {/* Rendered markdown body */}
+            <h1
+              style={{
+                fontSize: 28,
+                fontWeight: 700,
+                lineHeight: 1.2,
+                color: canvasTokens.textHeading,
+                marginBottom: 16,
+                letterSpacing: '-0.01em'
+              }}
+            >
+              {title}
+            </h1>
+
             <div className="canvas-prose">{editor && <EditorContent editor={editor} />}</div>
           </div>
         )}

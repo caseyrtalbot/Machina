@@ -13,7 +13,6 @@ import { ClaudeConfigPanel } from './panels/claude-config/ClaudeConfigPanel'
 import { ProjectCanvasPanel } from './panels/project-canvas/ProjectCanvasPanel'
 import { GraphPanel } from './panels/graph/GraphPanel'
 import { ActivityBar } from './components/ActivityBar'
-import { ViewTabBar } from './components/ViewTabBar'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
 import type { TabType } from './store/tab-store'
 import { TerminalPanel } from './panels/terminal/TerminalPanel'
@@ -27,7 +26,6 @@ import { useViewStore } from './store/view-store'
 import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
-import { StatusBar } from './components/StatusBar'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { ArtifactType } from '@shared/types'
 import { useCanvasStore } from './store/canvas-store'
@@ -49,7 +47,7 @@ function KeepAliveSlot({
   )
 }
 
-function ContentArea({ onOpenSettings }: { readonly onOpenSettings?: () => void }) {
+function ContentArea() {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
   const activeTab = tabs.find((t) => t.id === activeTabId)
@@ -67,47 +65,50 @@ function ContentArea({ onOpenSettings }: { readonly onOpenSettings?: () => void 
   )
 
   return (
-    <div className="h-full flex flex-col">
-      <ViewTabBar onOpenSettings={onOpenSettings} />
-      <div className="flex-1 overflow-hidden panel-card">
-        {openTypes.has('editor') && (
-          <KeepAliveSlot active={activeType === 'editor'}>
-            <EditorPanel onNavigate={handleNavigate} />
-          </KeepAliveSlot>
-        )}
-        {openTypes.has('canvas') && (
-          <KeepAliveSlot active={activeType === 'canvas'}>
-            <CanvasView />
-          </KeepAliveSlot>
-        )}
-        {openTypes.has('skills') && (
-          <KeepAliveSlot active={activeType === 'skills'}>
-            <SkillsPanel />
-          </KeepAliveSlot>
-        )}
-        {openTypes.has('claude-config') && (
-          <KeepAliveSlot active={activeType === 'claude-config'}>
-            <ClaudeConfigPanel />
-          </KeepAliveSlot>
-        )}
-        {openTypes.has('project-canvas') && (
-          <KeepAliveSlot active={activeType === 'project-canvas'}>
-            <ProjectCanvasPanel />
-          </KeepAliveSlot>
-        )}
-        {openTypes.has('graph') && (
-          <KeepAliveSlot active={activeType === 'graph'}>
-            <GraphPanel />
-          </KeepAliveSlot>
-        )}
-      </div>
+    <div className="h-full overflow-hidden">
+      {openTypes.has('editor') && (
+        <KeepAliveSlot active={activeType === 'editor'}>
+          <EditorPanel onNavigate={handleNavigate} />
+        </KeepAliveSlot>
+      )}
+      {openTypes.has('canvas') && (
+        <KeepAliveSlot active={activeType === 'canvas'}>
+          <CanvasView />
+        </KeepAliveSlot>
+      )}
+      {openTypes.has('skills') && (
+        <KeepAliveSlot active={activeType === 'skills'}>
+          <SkillsPanel />
+        </KeepAliveSlot>
+      )}
+      {openTypes.has('claude-config') && (
+        <KeepAliveSlot active={activeType === 'claude-config'}>
+          <ClaudeConfigPanel />
+        </KeepAliveSlot>
+      )}
+      {openTypes.has('project-canvas') && (
+        <KeepAliveSlot active={activeType === 'project-canvas'}>
+          <ProjectCanvasPanel />
+        </KeepAliveSlot>
+      )}
+      {openTypes.has('graph') && (
+        <KeepAliveSlot active={activeType === 'graph'}>
+          <GraphPanel />
+        </KeepAliveSlot>
+      )}
     </div>
   )
 }
 
 const EMPTY_SET = new Set<string>()
 
-function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
+function ConnectedSidebar({
+  onLoadVault,
+  onOpenSettings
+}: {
+  onLoadVault: (path: string) => Promise<void>
+  onOpenSettings?: () => void
+}) {
   const contentView = useViewStore((s) => s.contentView)
   const sidebarOpenTab = useTabStore((s) => s.openTab)
   const files = useVaultStore((s) => s.files)
@@ -374,6 +375,7 @@ function ConnectedSidebar({ onLoadVault }: { onLoadVault: (path: string) => Prom
       onSelectClaudeConfig={handleSelectClaudeConfig}
       onOpenVaultPicker={handleOpenVaultPicker}
       onRemoveFromHistory={handleRemoveFromHistory}
+      onOpenSettings={onOpenSettings}
     />
   )
 }
@@ -564,12 +566,12 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
   return (
     <div
-      className="h-screen w-screen flex flex-col"
+      className="h-screen w-screen relative flex"
       style={{ backgroundColor: colors.bg.base, color: colors.text.primary }}
     >
-      {/* Titlebar drag region — strip for macOS traffic lights */}
+      {/* Titlebar drag region — transparent overlay for macOS traffic lights */}
       <div
-        className="shrink-0"
+        className="absolute top-0 left-0 right-0 z-50 pointer-events-none"
         style={
           {
             height: 28,
@@ -577,47 +579,47 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           } as React.CSSProperties
         }
       />
-      <div className="flex-1 overflow-hidden flex">
-        <ActivityBar />
-        <SplitPane
-          left={
-            <div className="panel-card h-full">
-              <PanelErrorBoundary name="Sidebar">
-                <ConnectedSidebar onLoadVault={onLoadVault} />
-              </PanelErrorBoundary>
-            </div>
-          }
-          right={
-            showTerminal ? (
-              <SplitPane
-                left={
-                  <PanelErrorBoundary name="Content">
-                    <ContentArea onOpenSettings={() => setSettingsOpen(true)} />
-                  </PanelErrorBoundary>
-                }
-                right={
-                  <div className="panel-card h-full">
-                    <PanelErrorBoundary name="Terminal">
-                      <TerminalPanel />
-                    </PanelErrorBoundary>
-                  </div>
-                }
-                initialLeftWidth={480}
-                minLeftWidth={280}
-                minRightWidth={300}
+      <ActivityBar />
+      <SplitPane
+        left={
+          <div className="panel-card h-full pt-7">
+            <PanelErrorBoundary name="Sidebar">
+              <ConnectedSidebar
+                onLoadVault={onLoadVault}
+                onOpenSettings={() => setSettingsOpen(true)}
               />
-            ) : (
-              <PanelErrorBoundary name="Content">
-                <ContentArea onOpenSettings={() => setSettingsOpen(true)} />
-              </PanelErrorBoundary>
-            )
-          }
-          initialLeftWidth={220}
-          minLeftWidth={220}
-          minRightWidth={showTerminal ? 580 : 280}
-        />
-      </div>
-      <StatusBar />
+            </PanelErrorBoundary>
+          </div>
+        }
+        right={
+          showTerminal ? (
+            <SplitPane
+              left={
+                <PanelErrorBoundary name="Content">
+                  <ContentArea />
+                </PanelErrorBoundary>
+              }
+              right={
+                <div className="panel-card h-full">
+                  <PanelErrorBoundary name="Terminal">
+                    <TerminalPanel />
+                  </PanelErrorBoundary>
+                </div>
+              }
+              initialLeftWidth={480}
+              minLeftWidth={280}
+              minRightWidth={300}
+            />
+          ) : (
+            <PanelErrorBoundary name="Content">
+              <ContentArea />
+            </PanelErrorBoundary>
+          )
+        }
+        initialLeftWidth={220}
+        minLeftWidth={220}
+        minRightWidth={showTerminal ? 580 : 280}
+      />
       <CommandPalette
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}

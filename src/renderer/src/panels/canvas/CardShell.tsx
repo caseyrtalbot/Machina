@@ -214,7 +214,9 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
           ? `1px solid ${colors.accent.default}`
           : `1px solid ${canvasTokens.cardBorder}`,
         borderLeft: isClaudeType && accentColor ? `3px solid ${accentColor}` : undefined,
-        boxShadow: isSelected ? `0 0 0 1px ${colors.accent.default}` : '0 2px 8px rgba(0,0,0,0.15)',
+        boxShadow: isSelected
+          ? `0 0 0 1px ${colors.accent.default}, 0 4px 20px rgba(0,0,0,0.35)`
+          : '0 2px 12px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)',
         color: isClaudeType ? '#e2e8f0' : undefined,
         overflow: 'hidden',
         ...(isActive
@@ -257,9 +259,13 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
             className="truncate"
             style={{
               fontFamily: typography.fontFamily.mono,
-              fontSize: 12,
-              color: isClaudeType ? '#cbd5e1' : colors.text.secondary
+              fontSize: 11,
+              color: isClaudeType ? '#cbd5e1' : colors.text.muted,
+              direction: 'rtl',
+              textAlign: 'left',
+              unicodeBidi: 'plaintext'
             }}
+            title={title}
           >
             {title}
           </span>
@@ -273,6 +279,27 @@ export function CardShell({ node, title, children, onClose, onOpenInEditor }: Ca
           </span>
         )}
         <div className="flex items-center gap-0.5 ml-2 shrink-0 relative">
+          <TitleBarButton
+            onClick={(e) => {
+              e.stopPropagation()
+              navigator.clipboard.writeText(title)
+            }}
+            label="Copy path"
+          >
+            <svg
+              width={12}
+              height={12}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </TitleBarButton>
           {VALID_CONVERSIONS[node.type].length > 0 && (
             <TitleBarButton
               onClick={(e) => {

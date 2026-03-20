@@ -5,22 +5,21 @@ import { useCanvasSelection } from './use-canvas-selection'
 import { colors, canvasTokens } from '../../design/tokens'
 import { TE_FILE_MIME, inferCardType } from './file-drop-utils'
 
-const GRID_SIZE = 24
-const MAJOR_EVERY = 4
-const PATTERN_SIZE = GRID_SIZE * MAJOR_EVERY
+const DOT_SPACING = 24
+const CELLS_PER_SQUARE = 5
+const PATTERN_SIZE = DOT_SPACING * CELLS_PER_SQUARE
 
 function buildGridSvg(minorColor: string, majorColor: string): string {
   const dots: string[] = []
-  for (let row = 0; row < MAJOR_EVERY; row++) {
-    for (let col = 0; col < MAJOR_EVERY; col++) {
-      const x = col * GRID_SIZE
-      const y = row * GRID_SIZE
-      const isMajor = row === 0 && col === 0
-      if (isMajor) {
-        dots.push(`<circle cx="${x}" cy="${y}" r="1.5" fill="${majorColor}"/>`)
-      } else {
-        dots.push(`<circle cx="${x}" cy="${y}" r="0.75" fill="${minorColor}"/>`)
-      }
+  for (let row = 0; row < CELLS_PER_SQUARE; row++) {
+    for (let col = 0; col < CELLS_PER_SQUARE; col++) {
+      const x = col * DOT_SPACING
+      const y = row * DOT_SPACING
+      const isCorner =
+        (row === 0 || row === CELLS_PER_SQUARE - 1) && (col === 0 || col === CELLS_PER_SQUARE - 1)
+      const color = isCorner ? majorColor : minorColor
+      const r = isCorner ? 0.9 : 0.7
+      dots.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${color}"/>`)
     }
   }
   return (
@@ -144,10 +143,8 @@ export function CanvasSurface({
     [viewport, onFileDrop]
   )
 
-  // Two-tier dot grid: minor dots every 24px, major dots every 4th interval (96px)
-  const gridOpacity = Math.min(1, Math.max(0.1, viewport.zoom))
-
-  const gridSvg = buildGridSvg('rgba(148, 163, 184, 0.25)', 'rgba(148, 163, 184, 0.5)')
+  // 5x5 square pattern: 25 dots per square, corner dots brighter
+  const gridSvg = buildGridSvg('rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.22)')
   const svgDataUri = `url("data:image/svg+xml,${encodeURIComponent(gridSvg)}")`
 
   return (
@@ -157,9 +154,9 @@ export function CanvasSurface({
       className="relative w-full h-full overflow-hidden"
       style={{
         backgroundColor: canvasTokens.surface,
-        backgroundImage: svgDataUri,
-        backgroundSize: `${PATTERN_SIZE * viewport.zoom}px ${PATTERN_SIZE * viewport.zoom}px`,
-        backgroundPosition: `${viewport.x % (PATTERN_SIZE * viewport.zoom)}px ${viewport.y % (PATTERN_SIZE * viewport.zoom)}px`,
+        backgroundImage: `radial-gradient(ellipse at 40% 40%, rgba(255,255,255,0.03) 0%, transparent 70%), ${svgDataUri}`,
+        backgroundSize: `100% 100%, ${PATTERN_SIZE * viewport.zoom}px ${PATTERN_SIZE * viewport.zoom}px`,
+        backgroundPosition: `0 0, ${viewport.x % (PATTERN_SIZE * viewport.zoom)}px ${viewport.y % (PATTERN_SIZE * viewport.zoom)}px`,
         cursor: 'default'
       }}
       onPointerDown={(e) => {
@@ -172,9 +169,6 @@ export function CanvasSurface({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Dot grid opacity overlay */}
-      <div className="absolute inset-0 pointer-events-none" style={{ opacity: gridOpacity }} />
-
       {/* Viewport transform layer */}
       <div
         className="absolute origin-top-left"

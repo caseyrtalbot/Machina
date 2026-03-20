@@ -1,7 +1,7 @@
 import type { MetadataEntry } from './MetadataGrid'
 
 /** Keys that are internal to the engine and should not appear in the metadata grid. */
-const HIDDEN_KEYS = new Set(['id', 'title', 'body', 'concepts', 'signal'])
+const HIDDEN_KEYS = new Set(['id', 'title', 'body', 'concepts'])
 
 /** Preferred display order for known keys. Keys not listed appear after these. */
 const KEY_ORDER: readonly string[] = [
