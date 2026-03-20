@@ -142,7 +142,7 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   markdown: { width: 400, height: 300 },
   image: { width: 300, height: 300 },
   pdf: { width: 500, height: 650 },
-  'claude-settings': { width: 260, height: 80 },
+  'claude-settings': { width: 260, height: 100 },
   'claude-agent': { width: 320, height: 220 },
   'claude-skill': { width: 320, height: 220 },
   'claude-rule': { width: 280, height: 160 },

@@ -29,21 +29,6 @@ function getCanvasPath(configPath: string): string {
   return configPath + CLAUDE_CANVAS_PATH_SUFFIX
 }
 
-/** Calculate a viewport centered on a specific node at a comfortable zoom. */
-function centerOnNode(
-  node: CanvasNode,
-  container: { width: number; height: number },
-  zoom = 1
-): { x: number; y: number; zoom: number } {
-  const cx = node.position.x + node.size.width / 2
-  const cy = node.position.y + node.size.height / 2
-  return {
-    x: container.width / 2 - cx * zoom,
-    y: container.height / 2 - cy * zoom,
-    zoom
-  }
-}
-
 /** Calculate a viewport that fits all nodes with padding. */
 function fitViewportToNodes(
   nodes: readonly CanvasNode[],
@@ -76,6 +61,22 @@ function fitViewportToNodes(
   const y = container.height / 2 - cy * zoom
 
   return { x, y, zoom }
+}
+
+/** Position viewport so terminal sits in the lower third of the screen. */
+function viewportWithTerminalVisible(
+  terminal: CanvasNode,
+  allNodes: readonly CanvasNode[],
+  container: { width: number; height: number }
+): { x: number; y: number; zoom: number } {
+  const { zoom } = fitViewportToNodes(allNodes, container)
+  const cx = terminal.position.x + terminal.size.width / 2
+  const termBottom = terminal.position.y + terminal.size.height
+  return {
+    x: container.width / 2 - cx * zoom,
+    y: container.height - termBottom * zoom - 40,
+    zoom
+  }
 }
 
 /**
@@ -117,7 +118,7 @@ export function ClaudeConfigPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
   const prevSizeRef = useRef(containerSize)
-  const terminalNodeRef = useRef<CanvasNode | null>(null)
+  const [terminalNode, setTerminalNode] = useState<CanvasNode | null>(null)
   const hasCenteredRef = useRef(false)
   const [_zoneLabels, setZoneLabels] = useState<readonly ZoneLabel[]>([])
 
@@ -133,14 +134,17 @@ export function ClaudeConfigPanel() {
     useCanvasStore.getState().setViewport({ x: x + dw / 2, y: y + dh / 2, zoom })
   }, [containerSize])
 
-  // Center on terminal node once real container dimensions are known
+  // Center on terminal at fit-all zoom once real container dimensions are known
   useEffect(() => {
-    if (!terminalNodeRef.current || hasCenteredRef.current) return
+    if (hasCenteredRef.current) return
     if (containerSize.width === 1920 && containerSize.height === 1080) return
-    const vp = centerOnNode(terminalNodeRef.current, containerSize)
+    if (!terminalNode) return
+    const { nodes } = useCanvasStore.getState()
+    if (nodes.length === 0) return
+    const vp = viewportWithTerminalVisible(terminalNode, nodes, containerSize)
     useCanvasStore.getState().setViewport(vp)
     hasCenteredRef.current = true
-  }, [containerSize])
+  }, [containerSize, terminalNode])
 
   // Store the previous canvas state for restoration
   const savedCanvasState = useRef<{ filePath: string | null; data: CanvasFile } | null>(null)
@@ -204,7 +208,7 @@ export function ClaudeConfigPanel() {
         const termX = allConfigNodes.length > 0 ? (minX + maxX) / 2 - termW / 2 : 0
         const termY = allConfigNodes.length > 0 ? maxBottom + 60 : 0
         const homePath = window.api.getHomePath()
-        const terminalNode: CanvasNode = {
+        const termNode: CanvasNode = {
           id: 'claude-live-terminal',
           type: 'terminal',
           position: { x: termX, y: termY },
@@ -212,9 +216,9 @@ export function ClaudeConfigPanel() {
           content: '',
           metadata: { initialCwd: homePath, initialCommand: 'claude' }
         }
-        const allNodes = [...allConfigNodes, terminalNode]
+        const allNodes = [...allConfigNodes, termNode]
 
-        terminalNodeRef.current = terminalNode
+        setTerminalNode(termNode)
         hasCenteredRef.current = false
         canvasData = { nodes: allNodes, edges, viewport: { x: 0, y: 0, zoom: 1 } }
         setCachedData(canvasData)
@@ -316,7 +320,7 @@ export function ClaudeConfigPanel() {
       const termX = nodes.length > 0 ? (minX + maxX) / 2 - termW / 2 : 0
       const termY = nodes.length > 0 ? maxBottom + 60 : 0
       const homePath = window.api.getHomePath()
-      const terminalNode: CanvasNode = {
+      const termNode: CanvasNode = {
         id: 'claude-live-terminal',
         type: 'terminal',
         position: { x: termX, y: termY },
@@ -324,7 +328,7 @@ export function ClaudeConfigPanel() {
         content: '',
         metadata: { initialCwd: homePath, initialCommand: 'claude' }
       }
-      const allNodes = [...nodes, terminalNode]
+      const allNodes = [...nodes, termNode]
 
       const viewport = fitViewportToNodes(allNodes, containerSize)
       const canvasData: CanvasFile = { nodes: allNodes, edges, viewport }
