@@ -32,6 +32,7 @@ import {
   placeArtifactOnWorkbench,
   enrichPlacedArtifact
 } from './panels/workbench/workbench-artifact-placement'
+import { useTerminalActionStore } from './store/terminal-actions-store'
 
 const LazyCanvasView = lazy(() =>
   import('./panels/canvas/CanvasView').then((module) => ({ default: module.CanvasView }))
@@ -544,6 +545,12 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
     description: 'Create a new freeform vault canvas document.'
   },
   {
+    id: 'cmd:activate-claude',
+    label: 'Activate Claude',
+    category: 'command',
+    description: 'Open a terminal with Claude CLI in the current vault.'
+  },
+  {
     id: 'cmd:toggle-claude-config',
     label: 'Toggle Claude Config Canvas',
     category: 'command',
@@ -858,6 +865,10 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           break
         case 'cmd:reindex-vault':
           if (vaultPath) await onLoadVault(vaultPath)
+          break
+        case 'cmd:activate-claude':
+          setShowTerminal(true)
+          useTerminalActionStore.getState().requestActivateClaude()
           break
         case 'cmd:new-canvas':
           if (vaultPath) {

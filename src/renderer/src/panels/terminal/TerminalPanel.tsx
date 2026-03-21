@@ -5,6 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { SearchAddon } from '@xterm/addon-search'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { useTerminalStore } from '../../store/terminal-store'
+import { useTerminalActionStore } from '../../store/terminal-actions-store'
 import { useVaultStore } from '../../store/vault-store'
 import { TerminalTabs } from './TerminalTabs'
 import { generateClaudeMd } from '../../engine/claude-md-template'
@@ -129,6 +130,22 @@ export function TerminalPanel() {
       window.api.terminal.write(sessionId, 'claude\n')
     }, 50)
   }, [vaultPath, sessions, createTerminalInstance])
+
+  // Register activate-claude handler in the action store
+  useEffect(() => {
+    useTerminalActionStore.getState().setHandler(handleActivateClaude)
+    return () => useTerminalActionStore.getState().reset()
+  }, [handleActivateClaude])
+
+  // Fulfill pending activation requests (from palette before terminal mounted)
+  useEffect(() => {
+    const pending = useTerminalActionStore.getState().pendingActivation
+    if (!pending) return
+    useTerminalActionStore.getState().clearRequest()
+    // Defer to next microtask to avoid synchronous setState within effect
+    const timer = setTimeout(() => handleActivateClaude(), 0)
+    return () => clearTimeout(timer)
+  }, [handleActivateClaude])
 
   // Mount/unmount terminal DOM when active session changes
   useEffect(() => {
