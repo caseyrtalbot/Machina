@@ -132,7 +132,8 @@ export const visualLanguage = {
 export const EDGE_KIND_COLORS: Record<string, string> = {
   connection: '#64748b',
   cluster: '#34d399',
-  tension: '#f59e0b'
+  tension: '#f59e0b',
+  related: '#a78bfa'
 } as const
 
 export const canvasTokens = {

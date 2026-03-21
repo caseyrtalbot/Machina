@@ -3,6 +3,24 @@ import type { Artifact } from '@shared/types'
 import { getArtifactColor, colors, transitions } from '../../design/tokens'
 
 /**
+ * Strip markdown formatting from a snippet so it reads as clean prose.
+ * Removes headers, bold/italic markers, `<node>` tags, and normalizes whitespace.
+ */
+function cleanSnippet(raw: string): string {
+  return raw
+    .replace(/<node>(.*?)<\/node>/gi, '$1') // <node>X</node> → X
+    .replace(/#{1,6}\s*/g, '') // ## Heading → Heading
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1') // **bold** / *italic* → text
+    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1') // __bold__ / _italic_ → text
+    .replace(/`([^`]+)`/g, '$1') // `code` → code
+    .replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, '$1') // [[link]] → link
+    .replace(/\|[^\]]*\]\]/g, '') // orphaned |display]] fragments
+    .replace(/&[a-z]+;/gi, ' ') // &nbsp; and other HTML entities
+    .replace(/\s+/g, ' ') // collapse whitespace
+    .trim()
+}
+
+/**
  * Finds the line containing targetId (or a `<node>targetTitle</node>` concept tag) in body
  * and returns a 100-character window centered around the match.
  * Returns an empty string when not found.
@@ -38,7 +56,7 @@ export function extractContext(body: string, targetId: string, targetTitle?: str
 
   const prefix = start > 0 ? '\u2026' : ''
   const suffix = end < body.length ? '\u2026' : ''
-  return `${prefix}${snippet}${suffix}`
+  return cleanSnippet(`${prefix}${snippet}${suffix}`)
 }
 
 interface BacklinkItemProps {

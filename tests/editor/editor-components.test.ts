@@ -54,6 +54,7 @@ describe('buildMetadataEntries', () => {
       clusters_with: [],
       tensions_with: [],
       appears_in: [],
+      related: [],
       body: 'test body'
     }
     const entries = buildMetadataEntries(artifact)
@@ -79,6 +80,7 @@ describe('buildMetadataEntries', () => {
       clusters_with: [],
       tensions_with: [],
       appears_in: [],
+      related: [],
       body: ''
     }
     const entries = buildMetadataEntries(artifact)
@@ -111,6 +113,8 @@ describe('extractContext', () => {
     const { extractContext } = await import('../../src/renderer/src/panels/editor/BacklinksPanel')
     const body = 'Some text about <node>strategy</node> and more'
     const result = extractContext(body, 'nonexistent-id', 'strategy')
-    expect(result).toContain('<node>strategy</node>')
+    // cleanSnippet strips <node> tags, so output should contain the plain text
+    expect(result).toContain('strategy')
+    expect(result).not.toContain('<node>')
   })
 })

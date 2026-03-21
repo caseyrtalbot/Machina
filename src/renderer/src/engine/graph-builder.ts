@@ -70,7 +70,7 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
   function hasExplicitEdge(source: string, target: string): boolean {
     const sorted = [source, target].sort()
     const pairKey = sorted.join('<->')
-    for (const kind of ['connection', 'cluster', 'tension', 'appears_in'] as const) {
+    for (const kind of ['connection', 'cluster', 'tension', 'appears_in', 'related'] as const) {
       const key = kind === 'appears_in' ? `${source}->${target}:${kind}` : `${pairKey}:${kind}`
       if (edgeSet.has(key)) return true
       if (kind === 'appears_in') {
@@ -86,6 +86,7 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
     for (const id of a.clusters_with) addEdge(a.id, id, 'cluster')
     for (const id of a.tensions_with) addEdge(a.id, id, 'tension')
     for (const id of a.appears_in) addEdge(a.id, id, 'appears_in')
+    for (const id of a.related) addEdge(a.id, id, 'related')
   }
 
   // Phase 2: Co-occurrence edges from shared terms

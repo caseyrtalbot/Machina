@@ -75,6 +75,7 @@ export interface Artifact {
   clusters_with: string[]
   tensions_with: string[]
   appears_in: string[]
+  related: string[]
   concepts: readonly string[]
   body: string
   /** Raw frontmatter key-value pairs for metadata display (e.g. AUTHOR, CATEGORY). */
@@ -86,6 +87,7 @@ export const RELATIONSHIP_KINDS = [
   'cluster',
   'tension',
   'appears_in',
+  'related',
   'co-occurrence'
 ] as const
 export type RelationshipKind = (typeof RELATIONSHIP_KINDS)[number]

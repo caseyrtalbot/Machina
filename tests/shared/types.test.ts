@@ -17,6 +17,7 @@ describe('shared types', () => {
       clusters_with: [],
       tensions_with: [],
       appears_in: [],
+      related: [],
       body: 'Test body content'
     }
     expect(artifact.id).toBe('g1')

@@ -205,6 +205,79 @@ AI as Scheduled Capacity.`
   })
 })
 
+describe('related field with wikilink stripping', () => {
+  it('strips [[brackets]] from related values', () => {
+    const md = `---
+id: atmamun
+title: Atmamun
+related:
+  - "[[Fooled by Randomness]]"
+  - "[[Antifragile]]"
+  - "[[Skin in the Game]]"
+---
+
+A book about the mind.`
+
+    const result = parseArtifact(md, 'Atmamun.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.related).toEqual([
+      'Fooled by Randomness',
+      'Antifragile',
+      'Skin in the Game'
+    ])
+  })
+
+  it('strips [[target|display]] pipe syntax, keeping target', () => {
+    const md = `---
+id: test
+title: Test
+related:
+  - "[[The Black Swan|Black Swan]]"
+---
+
+Body.`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.related).toEqual(['The Black Swan'])
+  })
+
+  it('defaults to empty array when related is absent', () => {
+    const md = `---
+id: no-rel
+title: No Related
+---
+
+Body.`
+
+    const result = parseArtifact(md, 'no-rel.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.related).toEqual([])
+  })
+
+  it('parses related and connections independently', () => {
+    const md = `---
+id: both
+title: Both Fields
+connections:
+  - g13
+related:
+  - "[[Antifragile]]"
+---
+
+Body.`
+
+    const result = parseArtifact(md, 'both.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.connections).toEqual(['g13'])
+    expect(result.value.related).toEqual(['Antifragile'])
+  })
+})
+
 describe('serializeArtifact', () => {
   it('round-trips a valid artifact', () => {
     const parsed = parseArtifact(VALID_MD, 'test.md')

@@ -18,6 +18,11 @@ function toStringArray(val: unknown): string[] {
   return []
 }
 
+/** Strip [[brackets]] from wikilink values: "[[Foo]]" → "Foo", "[[Foo|Bar]]" → "Foo" */
+function stripWikilinks(values: string[]): string[] {
+  return values.map((v) => v.replace(/^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$/, '$1').trim())
+}
+
 function toDateString(val: unknown): string {
   if (val instanceof Date) return val.toISOString().split('T')[0]
   if (typeof val === 'string') return val
@@ -77,6 +82,7 @@ export function parseArtifact(content: string, filename: string): Result<Artifac
       clusters_with: toStringArray(data?.clusters_with),
       tensions_with: toStringArray(data?.tensions_with),
       appears_in: toStringArray(data?.appears_in),
+      related: stripWikilinks(toStringArray(data?.related)),
       concepts: extractConceptNodes(body),
       body: body.trim(),
       frontmatter: data ?? {}
@@ -101,6 +107,7 @@ export function serializeArtifact(artifact: Artifact): string {
   if (artifact.clusters_with.length > 0) frontmatter.clusters_with = artifact.clusters_with
   if (artifact.tensions_with.length > 0) frontmatter.tensions_with = artifact.tensions_with
   if (artifact.appears_in.length > 0) frontmatter.appears_in = artifact.appears_in
+  if (artifact.related.length > 0) frontmatter.related = artifact.related
 
   return matter.stringify(artifact.body, frontmatter)
 }

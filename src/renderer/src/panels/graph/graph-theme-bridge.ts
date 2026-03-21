@@ -21,6 +21,7 @@ const TENSION_COLOR = 0xf59e0b
 const DEFAULT_EDGE_COLOR = 0x64748b
 const COOCCURRENCE_COLOR = 0x475569
 const APPEARS_IN_COLOR = 0x64748b
+const RELATED_COLOR = 0xa78bfa
 
 /** Get the PixiJS color for an edge based on its relationship kind. */
 export function buildEdgeColor(kind: RelationshipKind): number {
@@ -33,6 +34,8 @@ export function buildEdgeColor(kind: RelationshipKind): number {
       return DEFAULT_EDGE_COLOR
     case 'appears_in':
       return APPEARS_IN_COLOR
+    case 'related':
+      return RELATED_COLOR
     case 'co-occurrence':
       return COOCCURRENCE_COLOR
   }
@@ -47,6 +50,8 @@ export function edgeOpacity(kind: RelationshipKind): number {
       return 0.85
     case 'appears_in':
       return 0.75
+    case 'related':
+      return 0.8
     case 'co-occurrence':
       return 0.6
   }

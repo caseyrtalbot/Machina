@@ -151,14 +151,22 @@ function TagEditor({ tags, onChange }: TagEditorProps) {
   )
 }
 
+// ── Wikilink display helper ──
+
+/** Strip [[brackets]] from display text while preserving raw value for editing */
+function stripWikilinks(text: string): string {
+  return text.replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, '$1')
+}
+
 // ── Editable Property Value ──
 
 interface EditableValueProps {
   value: string
+  displayValue?: string
   onChange: (value: string) => void
 }
 
-function EditableValue({ value, onChange }: EditableValueProps) {
+function EditableValue({ value, displayValue, onChange }: EditableValueProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -202,7 +210,7 @@ function EditableValue({ value, onChange }: EditableValueProps) {
       }}
       style={{ color: colors.text.secondary, cursor: 'text' }}
     >
-      {value || '\u00A0'}
+      {(displayValue ?? value) || '\u00A0'}
     </span>
   )
 }
@@ -353,8 +361,16 @@ export function FrontmatterHeader({
   const artifactType = (properties['type'] as string) ?? artifact?.type ?? 'note'
   const typeColor = getArtifactColor(artifactType)
 
-  // Skip title from display (it's the H1)
-  const displayKeys = Object.keys(properties).filter((k) => k.toLowerCase() !== 'title')
+  // Skip title and relationship fields from generic display (handled by RelationshipSection)
+  const RELATIONSHIP_KEYS = new Set([
+    'title',
+    'connections',
+    'clusters_with',
+    'tensions_with',
+    'appears_in',
+    'related'
+  ])
+  const displayKeys = Object.keys(properties).filter((k) => !RELATIONSHIP_KEYS.has(k.toLowerCase()))
 
   return (
     <div
@@ -420,13 +436,15 @@ export function FrontmatterHeader({
           )
         }
 
+        const rawValue = Array.isArray(value) ? value.join(', ') : String(value)
         return (
           <div key={key}>
             <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {key.padEnd(12)}
             </span>
             <EditableValue
-              value={Array.isArray(value) ? value.join(', ') : String(value)}
+              value={rawValue}
+              displayValue={stripWikilinks(rawValue)}
               onChange={(v) => handlePropertyChange(key, v)}
             />
           </div>
@@ -450,7 +468,8 @@ const RELATIONSHIP_FIELDS = [
   { key: 'connections', label: 'Connections' },
   { key: 'clusters_with', label: 'Clusters with' },
   { key: 'tensions_with', label: 'Tensions with' },
-  { key: 'appears_in', label: 'Appears in' }
+  { key: 'appears_in', label: 'Appears in' },
+  { key: 'related', label: 'Related' }
 ] as const
 
 interface RelationshipSectionProps {
