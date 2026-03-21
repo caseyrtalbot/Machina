@@ -7,6 +7,26 @@ import { RenameInput } from './FileContextMenu'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode } from './buildFileTree'
 
+/** Vertical indent guide lines connecting parent directories to children. */
+function TreeGuides({ depth }: { readonly depth: number }) {
+  if (depth === 0) return null
+  return (
+    <>
+      {Array.from({ length: depth }, (_, i) => (
+        <span
+          key={i}
+          className="absolute top-0 bottom-0 pointer-events-none"
+          style={{
+            left: 8 + i * 16 + 7,
+            width: 1,
+            backgroundColor: 'rgba(255, 255, 255, 0.06)'
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
 export interface FileTreeProps {
   nodes: FlatTreeNode[]
   activeFilePath: string | null
@@ -353,7 +373,7 @@ function DirectoryRow({
     <div
       onClick={() => onToggleDirectory(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, true)}
-      className="flex items-center py-0.5 cursor-pointer rounded transition-colors"
+      className="relative flex items-center py-0.5 cursor-pointer rounded transition-colors"
       style={{
         paddingLeft,
         paddingRight: 8,
@@ -372,6 +392,7 @@ function DirectoryRow({
         e.currentTarget.style.backgroundColor = ''
       }}
     >
+      <TreeGuides depth={node.depth} />
       <span className="mr-1.5 flex items-center" style={{ color: colors.text.muted }}>
         <Chevron isExpanded={!isCollapsed} />
       </span>
@@ -454,7 +475,7 @@ function FileRow({
       onClick={() => onFileSelect(node.path)}
       onDoubleClick={() => (onFileDoubleClick ?? onFileSelect)(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
-      className="flex items-center py-0.5 cursor-pointer rounded transition-colors"
+      className="relative flex items-center py-0.5 cursor-pointer rounded transition-colors"
       style={{
         paddingLeft,
         paddingRight: 8,
@@ -472,6 +493,7 @@ function FileRow({
         if (!isActive) e.currentTarget.style.backgroundColor = ''
       }}
     >
+      <TreeGuides depth={node.depth} />
       <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
         <FileIcon filename={node.name} />
       </span>
