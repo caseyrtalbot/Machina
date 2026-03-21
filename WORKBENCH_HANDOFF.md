@@ -1,6 +1,6 @@
 # Workbench Handoff
 
-Date: 2026-03-20
+Date: 2026-03-20 (updated 2026-03-21)
 
 ## Context
 
@@ -8,24 +8,44 @@ This implementation continued the direction started in:
 
 - `27a74f7` `feat: add system artifact substrate`
 - `d03dd78` `feat: add workbench artifact workflows`
-
-The latest follow-up commit is:
-
 - `5bd4151` `feat: rename workbench surface and polish palette`
 
-## What Landed
+Follow-up commits from this session:
 
-- Renamed the renderer surface from `project-canvas` to `workbench`.
-- Moved renderer files from `src/renderer/src/panels/project-canvas/` to `src/renderer/src/panels/workbench/`.
-- Renamed shared types from `project-canvas-types` to `workbench-types`.
-- Added persisted tab migration so old saved `project-canvas` tabs normalize to `workbench`.
-- Added `useWorkbenchActionStore` so workbench toolbar actions can be invoked from the command palette.
-- Polished the command palette:
-  - richer note metadata
-  - workbench actions exposed in the palette
-  - disabled/unavailable actions called out instead of silently failing
-  - `New Note` now actually creates a note
-- Polished the workbench toolbar with status pills and clearer actions.
+- `382d6d9` `feat: add workbench file migration and expand test coverage`
+- `03873c6` `refactor: rename project:* IPC namespace to workbench:*`
+- `9e5b284` `feat: add system artifact cards to workbench canvas`
+
+## What Landed (This Session)
+
+### 1. Workbench file migration (382d6d9)
+
+- `workbench-migration.ts`: renames `.thought-engine-project-canvas.json` to `.thought-engine-workbench.json` on first load
+- Dependency-injected `WorkbenchFs` interface for testability
+- 4 migration tests, 6 new tab-store tests, 3 new actions-store tests
+
+### 2. IPC namespace rename (03873c6)
+
+- Renamed all `project:*` IPC channels to `workbench:*`
+- Renamed `window.api.project` to `window.api.workbench` in the preload layer
+- Renamed `src/main/ipc/project.ts` to `workbench.ts`
+- All renderer callers updated
+
+### 4. Palette actions cleanup (landed in 9e5b284 via App.tsx)
+
+- Toggle Sidebar: implemented with `showSidebar` state, wired to Cmd+B
+- Re-index Vault: wired to `onLoadVault(vaultPath)`
+- Activate Claude: removed from palette (needs bigger refactor to lift from TerminalPanel)
+
+### 5. System artifact visualization (9e5b284)
+
+- Added `system-artifact` canvas node type with typed `SystemArtifactNodeMeta`
+- `SystemArtifactCard.tsx`: renders session/pattern/tension artifacts with kind badge, status pill, summary/question, stat chips (file count, commands, snapshot indicator)
+- `workbench-artifact-placement.ts`: places artifact cards on workbench canvas when sidebar items are clicked (with dedup check)
+- Wired in App.tsx `onSystemArtifactSelect` handler
+- `canvas-types.test.ts`: 21 registration completeness tests
+- `workbench-artifact-placement.test.ts`: 4 placement tests
+- Full suite: 46 files, 467 tests
 
 ## Important Local State To Preserve
 
@@ -42,110 +62,84 @@ Primary implementation files:
 - `src/renderer/src/panels/workbench/WorkbenchPanel.tsx`
 - `src/renderer/src/panels/workbench/workbench-layout.ts`
 - `src/renderer/src/panels/workbench/workbench-artifacts.ts`
+- `src/renderer/src/panels/workbench/workbench-migration.ts`
+- `src/renderer/src/panels/workbench/workbench-artifact-placement.ts`
+- `src/renderer/src/panels/workbench/SystemArtifactCard.tsx`
 - `src/renderer/src/store/workbench-store.ts`
 - `src/renderer/src/store/workbench-actions-store.ts`
-- `src/renderer/src/panels/workbench/workbench-migration.ts`
 - `src/renderer/src/design/components/CommandPalette.tsx`
 - `src/renderer/src/App.tsx`
 - `src/renderer/src/store/tab-store.ts`
 - `src/shared/workbench-types.ts`
-
-## Completed Since Last Handoff
-
-### 1. Workbench file migration (done)
-
-Added `workbench-migration.ts` with `migrateWorkbenchFile()`. On workbench load, if
-`.thought-engine-workbench.json` doesn't exist but `.thought-engine-project-canvas.json` does,
-renames the legacy file. Uses dependency-injected `WorkbenchFs` interface for testability.
-
-Files:
-
-- `src/renderer/src/panels/workbench/workbench-migration.ts` (new)
-- `src/renderer/src/panels/workbench/workbench-migration.test.ts` (new, 4 cases)
-- `src/renderer/src/panels/workbench/WorkbenchPanel.tsx` (wired migration into loadWorkbench)
-
-### 3. Expanded test coverage (done)
-
-- `src/renderer/src/store/__tests__/tab-store.test.ts`: 6 new cases (unknown types, dedup, editor enforcement, null snapshot, missing active tab)
-- `src/renderer/src/store/__tests__/workbench-actions-store.test.ts` (new, 3 cases: initial state, registration, reset)
-
-Full suite: 44 files, 398 tests passing.
+- `src/shared/canvas-types.ts`
+- `src/main/ipc/workbench.ts`
 
 ## Known Gaps / Best Next Steps
 
-### 2. Decide whether to keep or rename `project:*` IPC/service naming
+### 1. Wire artifact edges from relationship fields
 
-The user-facing surface is now `workbench`, but IPC/service namespaces still use `project:*`.
-
-This is not broken, but it is inconsistent.
+System artifacts have `connections`, `tensions_with`, `tension_refs`, and `pattern_refs` fields. When multiple artifacts are on the canvas, edges should be drawn between them using the existing `CanvasEdgeKind` system (connection, cluster, tension).
 
 Next step:
 
-- Either keep `project:*` as an implementation detail and document that choice, or
-- rename the IPC/service layer to `workbench:*` end-to-end
+- When placing an artifact, check if any existing canvas nodes match its relationship IDs
+- Create edges with appropriate kinds
+- Update edges when new artifacts are placed
 
 Likely files:
 
-- `src/shared/ipc-channels.ts`
-- `src/preload/index.ts`
-- `src/main/**/*`
-- renderer callers using `window.api.project.*`
+- `src/renderer/src/panels/workbench/workbench-artifact-placement.ts`
+- `src/renderer/src/store/canvas-store.ts`
 
-### 3. Add real workbench interaction coverage
+### 2. Enrich artifact cards with full frontmatter
 
-Current coverage is good at the unit level, but not at the app-flow level.
+Currently `placeArtifactOnWorkbench` only uses `SystemArtifactListItem` fields (id, title, type, status, path). The full frontmatter (summary, file_refs, question, command_count, etc.) is available via `vault:read-system-artifact` IPC.
 
 Next step:
 
-- Add tests for:
-  - persisted tab migration
-  - opening workbench from palette
-  - toolbar actions registering into the palette only when workbench is active
-  - legacy workbench file migration
-  - creating tension/pattern/session artifacts from the workbench
+- Read and parse full frontmatter when placing an artifact
+- Populate all `SystemArtifactNodeMeta` fields
 
 Likely files:
 
-- `src/renderer/src/store/__tests__/tab-store.test.ts`
-- `src/renderer/src/panels/workbench/workbench-artifacts.test.ts`
-- `e2e/**/*`
+- `src/renderer/src/panels/workbench/workbench-artifact-placement.ts`
 
-### 4. Clean up disabled palette actions
+### 3. Pattern snapshot restore
 
-The palette now correctly marks these as unavailable:
+Pattern artifacts store a `canvas_snapshot` path pointing to a `.canvas.json` file. The workbench could offer a "Restore Snapshot" action to load a pattern's saved card layout.
 
-- `Toggle Sidebar`
-- `Re-index Vault`
-- `Activate Claude`
+Likely files:
 
-Next step:
+- `src/renderer/src/panels/workbench/SystemArtifactCard.tsx` (add action button)
+- `src/renderer/src/panels/canvas/canvas-io.ts` (loadCanvas already works)
 
-- either implement them
-- or remove them from the built-in command list if they are intentionally out of scope
+### 4. Implement Activate Claude palette command
 
-Likely file:
+Currently removed because the activation logic lives inside lazily-mounted TerminalPanel. Needs either:
 
+- An action store pattern (like `useWorkbenchActionStore`) to expose terminal actions
+- Or lifting `handleActivateClaude` into a shared module
+
+Likely files:
+
+- `src/renderer/src/panels/terminal/TerminalPanel.tsx`
+- `src/renderer/src/store/` (new action store)
 - `src/renderer/src/App.tsx`
 
-### 5. Evaluate whether the workbench should load system artifacts directly
+### 5. Remaining test coverage
 
-Right now the sidebar exposes system artifacts cleanly, and the workbench can create them.
-There may be a useful next step where the workbench also visualizes linked session/pattern/tension artifacts directly.
-
-Possible directions:
-
-- overlay artifact references on related workbench cards
-- open saved pattern snapshots back into the workbench
-- show “created from workbench selection/session” backlinks in the panel
+- Opening workbench from palette
+- Toolbar actions registering into the palette only when workbench tab is active
+- Creating tension/pattern/session artifacts from the workbench (integration level)
 
 ## Verification Commands
 
-These pass after the migration + test expansion:
+These pass after all commits:
 
 ```bash
 npm run typecheck
 npm run lint
-npm test   # 44 files, 398 tests
+npm test   # 46 files, 467 tests
 ```
 
 Targeted run:
@@ -154,8 +148,10 @@ Targeted run:
 npx vitest run \
   src/renderer/src/panels/workbench/workbench-migration.test.ts \
   src/renderer/src/panels/workbench/workbench-artifacts.test.ts \
+  src/renderer/src/panels/workbench/workbench-artifact-placement.test.ts \
   src/renderer/src/store/__tests__/tab-store.test.ts \
   src/renderer/src/store/__tests__/workbench-actions-store.test.ts \
+  src/shared/__tests__/canvas-types.test.ts \
   src/renderer/src/design/components/__tests__/CommandPalette.test.ts \
   tests/services/session-milestone-grouper.test.ts
 ```
@@ -165,5 +161,5 @@ npx vitest run \
 Use this to resume quickly in the next context window:
 
 ```text
-Continue in /Users/caseytalbot/Projects/thought-engine. Read WORKBENCH_HANDOFF.md and continue the workbench implementation. Preserve the existing uncommitted e2e/fixtures/test-vault/category-creation.md, .claude/, and .thought-engine/. Next up: decide on project:* IPC rename (#2), clean up disabled palette actions (#4), or start artifact visualization in the workbench (#5).
+Continue in /Users/caseytalbot/Projects/thought-engine. Read WORKBENCH_HANDOFF.md and continue the workbench implementation. Preserve the existing uncommitted e2e/fixtures/test-vault/category-creation.md, .claude/, and .thought-engine/. Next priorities: wire artifact relationship edges (#1), enrich cards with full frontmatter (#2), or add pattern snapshot restore (#3).
 ```
