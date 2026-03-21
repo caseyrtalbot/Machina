@@ -11,6 +11,8 @@ import type { CanvasNode } from '@shared/canvas-types'
 import { type SessionId, sessionId as toSessionId } from '@shared/types'
 import '@xterm/xterm/css/xterm.css'
 
+const BASE_FONT_SIZE = 13
+
 interface TerminalCardProps {
   node: CanvasNode
 }
@@ -19,6 +21,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const termContainerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const webglRef = useRef<WebglAddon | null>(null)
   const sessionIdRef = useRef<SessionId | null>(node.content ? toSessionId(node.content) : null)
   const [sessionDead, setSessionDead] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -26,6 +29,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const removeNode = useCanvasStore((s) => s.removeNode)
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
   const setFocusedTerminal = useCanvasStore((s) => s.setFocusedTerminal)
+  const zoom = useCanvasStore((s) => s.viewport.zoom)
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const initialCwd = typeof node.metadata?.initialCwd === 'string' ? node.metadata.initialCwd : null
 
@@ -43,7 +47,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
     // Step 1: Create and mount xterm synchronously
     const term = new Terminal({
       fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, monospace',
-      fontSize: 13,
+      fontSize: BASE_FONT_SIZE * useCanvasStore.getState().viewport.zoom,
       lineHeight: 1.2,
       letterSpacing: 0,
       fontWeight: '400',
@@ -94,7 +98,13 @@ export function TerminalCard({ node }: TerminalCardProps) {
       // Load WebGL addon for GPU-accelerated rendering (crisper text, like modern terminals).
       // Falls back silently to Canvas 2D if WebGL is unavailable in this context.
       try {
-        term.loadAddon(new WebglAddon())
+        const webgl = new WebglAddon()
+        webgl.onContextLoss(() => {
+          webgl.dispose()
+          webglRef.current = null
+        })
+        term.loadAddon(webgl)
+        webglRef.current = webgl
       } catch {
         // WebGL unavailable — Canvas 2D renderer remains active
       }
@@ -159,7 +169,19 @@ export function TerminalCard({ node }: TerminalCardProps) {
       if (sid) {
         window.api.terminal.kill(sid)
       }
-      term.dispose()
+      // Dispose WebGL addon explicitly before terminal to avoid
+      // _isDisposed crash when DOM is removed before xterm cleanup
+      try {
+        webglRef.current?.dispose()
+      } catch {
+        // WebGL context already lost
+      }
+      webglRef.current = null
+      try {
+        term.dispose()
+      } catch {
+        // Terminal already partially disposed
+      }
       termRef.current = null
       fitRef.current = null
     }
@@ -190,7 +212,21 @@ export function TerminalCard({ node }: TerminalCardProps) {
     }
   }, [])
 
-  // Auto-fit on card resize (debounced, ignores canvas zoom changes)
+  // Sync font size with canvas zoom so column count stays consistent.
+  // Counter-scale shrinks the container; scaling the font by the same
+  // factor keeps the same number of columns while rendering at 1:1 pixels.
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    const targetSize = BASE_FONT_SIZE * zoom
+    if (Math.abs(term.options.fontSize! - targetSize) > 0.01) {
+      term.options.fontSize = targetSize
+    }
+  }, [zoom])
+
+  // Auto-fit on card resize and zoom changes (debounced).
+  // The counter-scale wrapper sizes the container to zoom*100% of the card,
+  // so zoom changes alter clientWidth/Height and trigger re-fit automatically.
   useEffect(() => {
     const container = termContainerRef.current
     if (!container) return
@@ -213,9 +249,6 @@ export function TerminalCard({ node }: TerminalCardProps) {
       const entry = entries[0]
       if (!entry) return
 
-      // Only refit when the actual element dimensions change (card resize),
-      // not when CSS transform changes (canvas zoom). Canvas zoom changes
-      // the visual size via transform but not clientWidth/clientHeight.
       const w = entry.target.clientWidth
       const h = entry.target.clientHeight
       if (w === lastWidth && h === lastHeight) return
@@ -300,11 +333,24 @@ export function TerminalCard({ node }: TerminalCardProps) {
           outlineOffset: -1
         }}
       >
+        {/* Counter-scale wrapper: render xterm at screen pixel resolution.
+            Parent CanvasSurface applies scale(zoom), so we apply scale(1/zoom)
+            on a container sized to zoom*100%. The two transforms cancel out,
+            giving xterm a 1:1 pixel mapping to the screen. */}
         <div
-          ref={termContainerRef}
-          className="w-full h-full"
-          style={{ padding: '4px 0 0 4px', minHeight: 0 }}
-        />
+          style={{
+            width: `${zoom * 100}%`,
+            height: `${zoom * 100}%`,
+            transform: `scale(${1 / zoom})`,
+            transformOrigin: '0 0'
+          }}
+        >
+          <div
+            ref={termContainerRef}
+            className="w-full h-full"
+            style={{ padding: '4px 0 0 4px', minHeight: 0 }}
+          />
+        </div>
         {sessionDead && (
           <div
             className="absolute inset-0 flex items-center justify-center"
