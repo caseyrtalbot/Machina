@@ -16,51 +16,26 @@ interface GridParams {
   readonly majorRadius: number
 }
 
-/** Zoom breakpoints for grid visual zones */
-const GRID_ZONES: readonly { zoom: number; params: GridParams }[] = [
-  { zoom: 0.1, params: { minorOpacity: 0, majorOpacity: 0.1, minorRadius: 0, majorRadius: 0.5 } },
-  {
-    zoom: 0.15,
-    params: { minorOpacity: 0, majorOpacity: 0.1, minorRadius: 0, majorRadius: 0.5 }
-  },
-  {
-    zoom: 0.4,
-    params: { minorOpacity: 0.05, majorOpacity: 0.16, minorRadius: 0.6, majorRadius: 0.85 }
-  },
-  {
-    zoom: 1.5,
-    params: { minorOpacity: 0.12, majorOpacity: 0.22, minorRadius: 0.7, majorRadius: 0.9 }
-  },
-  {
-    zoom: 3.0,
-    params: { minorOpacity: 0.18, majorOpacity: 0.28, minorRadius: 0.8, majorRadius: 1.1 }
-  }
-]
+// Constant dot brightness — does not vary with zoom
+const MINOR_OPACITY = 0.14
+const MAJOR_OPACITY = 0.24
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t
-}
+// Target screen-space radius in CSS pixels (what the user sees)
+const TARGET_SCREEN_RADIUS = 0.85
+// Cap SVG-space radius so dots don't merge at extreme zoom-out
+const MAX_SVG_RADIUS = 3.5
 
-/** Compute grid dot params with smooth interpolation across zoom zones */
+/** Compute grid dot params with constant brightness and counter-scaled radius.
+ *  Dots maintain ~0.85px screen-space size across all zoom levels. */
 function computeGridParams(zoom: number): GridParams {
-  if (zoom <= GRID_ZONES[0].zoom) return GRID_ZONES[0].params
-  const last = GRID_ZONES[GRID_ZONES.length - 1]
-  if (zoom >= last.zoom) return last.params
-
-  for (let i = 0; i < GRID_ZONES.length - 1; i++) {
-    const lo = GRID_ZONES[i]
-    const hi = GRID_ZONES[i + 1]
-    if (zoom >= lo.zoom && zoom <= hi.zoom) {
-      const t = (zoom - lo.zoom) / (hi.zoom - lo.zoom)
-      return {
-        minorOpacity: lerp(lo.params.minorOpacity, hi.params.minorOpacity, t),
-        majorOpacity: lerp(lo.params.majorOpacity, hi.params.majorOpacity, t),
-        minorRadius: lerp(lo.params.minorRadius, hi.params.minorRadius, t),
-        majorRadius: lerp(lo.params.majorRadius, hi.params.majorRadius, t)
-      }
-    }
+  // Counter-scale: radius in SVG-space = target screen px / zoom
+  const baseR = Math.min(TARGET_SCREEN_RADIUS / zoom, MAX_SVG_RADIUS)
+  return {
+    minorOpacity: MINOR_OPACITY,
+    majorOpacity: MAJOR_OPACITY,
+    minorRadius: baseR,
+    majorRadius: baseR * 1.15
   }
-  return last.params
 }
 
 function buildGridSvg(params: GridParams): string {
@@ -222,18 +197,23 @@ export function CanvasSurface({
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
   }, [viewport.zoom])
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    const el = spotlightRef.current
-    if (!el) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const grad = `radial-gradient(circle 160px at ${x}px ${y}px, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 40%, transparent 70%)`
-    el.style.maskImage = grad
-    el.style.webkitMaskImage = grad
-    el.style.opacity = '1'
-  }, [])
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const el = spotlightRef.current
+      if (!el) return
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      // Shrink spotlight when zoomed out so it feels proportional to content
+      const radius = Math.round(Math.min(Math.max(100 * viewport.zoom, 60), 160))
+      const grad = `radial-gradient(circle ${radius}px at ${x}px ${y}px, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 40%, transparent 70%)`
+      el.style.maskImage = grad
+      el.style.webkitMaskImage = grad
+      el.style.opacity = '1'
+    },
+    [viewport.zoom]
+  )
 
   const handleMouseLeave = useCallback(() => {
     const el = spotlightRef.current
