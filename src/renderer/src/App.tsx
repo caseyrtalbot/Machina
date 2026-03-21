@@ -32,6 +32,7 @@ import {
 } from './panels/workbench/workbench-artifact-placement'
 import { useTerminalActionStore } from './store/terminal-actions-store'
 import { CanvasFloatingSidebar } from './panels/canvas/CanvasFloatingSidebar'
+import { getCanvasNodeTitle } from './panels/canvas/card-title'
 
 const LazyCanvasView = lazy(() =>
   import('./panels/canvas/CanvasView').then((module) => ({ default: module.CanvasView }))
@@ -546,6 +547,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const openTab = useTabStore((s) => s.openTab)
   const closeTab = useTabStore((s) => s.closeTab)
   const activeTabId = useTabStore((s) => s.activeTabId)
+  const canvasNodeCount = useCanvasStore((s) => s.nodes.length)
   const workbenchRefresh = useWorkbenchActionStore((s) => s.refresh)
   const workbenchFitAll = useWorkbenchActionStore((s) => s.fitAll)
   const workbenchAddTerminal = useWorkbenchActionStore((s) => s.addTerminal)
@@ -769,9 +771,19 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       }
     ]
 
-    return [...BUILT_IN_COMMANDS, ...workbenchCommands, ...noteItems]
+    const canvasNodes = useCanvasStore.getState().nodes
+    const cardItems: CommandItem[] = canvasNodes.map((node) => ({
+      id: `card:${node.id}`,
+      label: getCanvasNodeTitle(node, artifacts, fileToId),
+      category: 'card' as const,
+      description: node.type
+    }))
+
+    return [...BUILT_IN_COMMANDS, ...workbenchCommands, ...cardItems, ...noteItems]
   }, [
+    artifacts,
     artifactById,
+    canvasNodeCount,
     fileToId,
     milestoneCount,
     paletteFiles,
@@ -790,6 +802,15 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
   const handlePaletteSelect = useCallback(
     async (item: CommandItem) => {
+      if (item.id.startsWith('card:')) {
+        const nodeId = item.id.slice(5)
+        setContentView('canvas')
+        setTimeout(() => {
+          useCanvasStore.getState().centerOnNode?.(nodeId)
+        }, 100)
+        return
+      }
+
       if (item.id.startsWith('note:')) {
         const path = item.id.slice(5)
         const file = paletteFiles.find((entry) => entry.path === path)

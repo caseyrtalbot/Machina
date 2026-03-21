@@ -88,6 +88,7 @@ export interface CanvasFile {
   readonly nodes: readonly CanvasNode[]
   readonly edges: readonly CanvasEdge[]
   readonly viewport: CanvasViewport
+  readonly focusFrames?: Readonly<Record<string, CanvasViewport>>
 }
 
 // --- Min sizes per node type ---

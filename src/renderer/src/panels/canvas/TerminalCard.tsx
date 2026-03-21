@@ -40,6 +40,32 @@ export function TerminalCard({ node }: TerminalCardProps) {
     let sessionId = sessionIdRef.current
     let cancelled = false
 
+    // Validate persisted session ID — it may be stale from a previous app run.
+    // If the PTY no longer exists, clear the ref so createSession() spawns a fresh one.
+    if (sessionId) {
+      try {
+        const processName = window.api.terminal.getProcessName(sessionId)
+        // getProcessName returns a Promise; handle both sync-null and async-null
+        if (processName instanceof Promise) {
+          processName
+            .then((name) => {
+              if (!name && !cancelled) {
+                sessionIdRef.current = null
+              }
+            })
+            .catch(() => {
+              if (!cancelled) sessionIdRef.current = null
+            })
+        } else if (!processName) {
+          sessionIdRef.current = null
+          sessionId = null
+        }
+      } catch {
+        sessionIdRef.current = null
+        sessionId = null
+      }
+    }
+
     // Support metadata-driven cwd and initial command
     const initialCommand =
       typeof node.metadata?.initialCommand === 'string' ? node.metadata.initialCommand : null

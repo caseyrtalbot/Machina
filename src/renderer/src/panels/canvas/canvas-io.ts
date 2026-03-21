@@ -15,7 +15,13 @@ export function deserializeCanvas(json: string): CanvasFile {
         x: typeof parsed.viewport?.x === 'number' ? parsed.viewport.x : 0,
         y: typeof parsed.viewport?.y === 'number' ? parsed.viewport.y : 0,
         zoom: typeof parsed.viewport?.zoom === 'number' ? parsed.viewport.zoom : 1
-      }
+      },
+      focusFrames:
+        parsed.focusFrames &&
+        typeof parsed.focusFrames === 'object' &&
+        !Array.isArray(parsed.focusFrames)
+          ? parsed.focusFrames
+          : {}
     }
   } catch {
     return createCanvasFile()

@@ -4,7 +4,7 @@ import { colors, getArtifactColor, typography } from '../tokens'
 export interface CommandItem {
   id: string
   label: string
-  category: 'note' | 'command'
+  category: 'note' | 'command' | 'card'
   description?: string
   keywords?: readonly string[]
   disabled?: boolean
@@ -23,7 +23,8 @@ interface CommandPaletteProps {
 
 const CATEGORY_LABELS: Record<CommandItem['category'], string> = {
   note: 'Notes',
-  command: 'Actions'
+  command: 'Actions',
+  card: 'Canvas Cards'
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -109,7 +110,7 @@ export function filterItems(
 function groupByCategory(
   items: ReadonlyArray<CommandItem>
 ): ReadonlyArray<{ category: CommandItem['category']; items: ReadonlyArray<CommandItem> }> {
-  const categoryOrder: readonly CommandItem['category'][] = ['command', 'note']
+  const categoryOrder: readonly CommandItem['category'][] = ['command', 'card', 'note']
   return categoryOrder
     .map((category) => ({
       category,

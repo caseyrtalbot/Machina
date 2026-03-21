@@ -268,6 +268,17 @@ export function CanvasView(): React.ReactElement {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Focus Frames: Cmd+1-5 jump, Cmd+Shift+1-5 save
+      if (e.metaKey && e.key >= '1' && e.key <= '5') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          useCanvasStore.getState().saveFocusFrame(e.key)
+        } else {
+          useCanvasStore.getState().jumpToFocusFrame(e.key)
+        }
+        return
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const { selectedEdgeId, removeEdge, selectedNodeIds, removeNode, focusedTerminalId } =
           useCanvasStore.getState()
@@ -312,6 +323,25 @@ export function CanvasView(): React.ReactElement {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  // Register centerOnNode bridge so external callers (e.g. command palette) can
+  // focus a specific card by ID with smooth viewport centering.
+  useEffect(() => {
+    useCanvasStore.getState().setCenterOnNode((nodeId) => {
+      const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId)
+      if (!node) return
+      const cx = node.position.x + node.size.width / 2
+      const cy = node.position.y + node.size.height / 2
+      const zoom = useCanvasStore.getState().viewport.zoom
+      useCanvasStore.getState().setViewport({
+        x: containerSize.width / 2 - cx * zoom,
+        y: containerSize.height / 2 - cy * zoom,
+        zoom
+      })
+      useCanvasStore.getState().setSelection(new Set([nodeId]))
+    })
+    return () => useCanvasStore.getState().setCenterOnNode(null)
+  }, [containerSize])
 
   // Auto-save debounce
   useEffect(() => {

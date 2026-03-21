@@ -23,6 +23,7 @@ export function CanvasToolbar({
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
+  const focusFrames = useCanvasStore((s) => s.focusFrames)
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -193,6 +194,30 @@ export function CanvasToolbar({
           <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
         </svg>
       </button>
+
+      <div style={{ height: 1, backgroundColor: colors.border.subtle, margin: '2px 0' }} />
+
+      <div className="flex flex-col items-center gap-1" style={{ padding: '2px 0' }}>
+        {[1, 2, 3, 4, 5].map((slot) => {
+          const filled = String(slot) in focusFrames
+          return (
+            <button
+              key={slot}
+              onClick={() => useCanvasStore.getState().jumpToFocusFrame(String(slot))}
+              title={`Focus Frame ${slot} (Cmd+${slot})`}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                border: `1.5px solid ${colors.text.muted}`,
+                backgroundColor: filled ? colors.text.muted : 'transparent',
+                cursor: 'pointer',
+                padding: 0
+              }}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
