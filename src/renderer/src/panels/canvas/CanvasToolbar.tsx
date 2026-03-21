@@ -1,6 +1,6 @@
 import { useCanvasStore } from '../../store/canvas-store'
 import { useTabStore, TAB_DEFINITIONS } from '../../store/tab-store'
-import { colors, borderRadius } from '../../design/tokens'
+import { colors, borderRadius, floatingPanel } from '../../design/tokens'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -54,9 +54,10 @@ export function CanvasToolbar({
       className="absolute top-3 right-3 flex flex-col gap-1 z-30"
       style={{
         backgroundColor: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.card,
-        padding: 4
+        borderRadius: floatingPanel.borderRadius,
+        boxShadow: floatingPanel.shadowCompact,
+        backdropFilter: floatingPanel.blur.compact,
+        padding: 6
       }}
     >
       <button onClick={onAddCard} style={btnStyle} title="Add card" data-testid="canvas-add-card">

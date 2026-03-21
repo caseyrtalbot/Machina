@@ -17,7 +17,7 @@ import { useSessionThread } from '../../hooks/useSessionThread'
 import { useTabStore } from '../../store/tab-store'
 import { useWorkbenchActionStore } from '../../store/workbench-actions-store'
 import { SessionThreadPanel } from './SessionThreadPanel'
-import { colors, getArtifactColor, typography } from '../../design/tokens'
+import { colors, getArtifactColor, typography, floatingPanel } from '../../design/tokens'
 import type { CanvasFile, CanvasNode } from '@shared/canvas-types'
 import { createCanvasFile, createCanvasNode } from '@shared/canvas-types'
 import {
@@ -544,10 +544,13 @@ export function WorkbenchPanel() {
     <div ref={containerRef} className="h-full relative">
       {/* Toolbar */}
       <div
-        className="absolute top-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-xl px-3 py-2"
+        className="absolute top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 px-3 py-2"
         style={{
+          left: 'calc(50% - 200px)',
           backgroundColor: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`
+          borderRadius: floatingPanel.borderRadius,
+          boxShadow: floatingPanel.shadowCompact,
+          backdropFilter: floatingPanel.blur.compact
         }}
       >
         <span

@@ -1,6 +1,6 @@
 import { useTabStore, TAB_DEFINITIONS } from '../store/tab-store'
 import type { TabType } from '../store/tab-store'
-import { colors } from '../design/tokens'
+import { colors, floatingPanel } from '../design/tokens'
 
 interface ActivityItem {
   view: TabType
@@ -91,18 +91,36 @@ const ITEMS: ActivityItem[] = [
   { view: 'skills', label: 'Skills', icon: SkillsIcon }
 ]
 
-export function ActivityBar() {
+export function ActivityBar({ floating }: { readonly floating?: boolean }) {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const openTab = useTabStore((s) => s.openTab)
 
   return (
     <div
-      className="flex flex-col items-center shrink-0 pt-8 gap-0.5"
-      style={{
-        width: 40,
-        backgroundColor: colors.bg.base,
-        borderRight: `1px solid rgba(255, 255, 255, 0.04)`
-      }}
+      className={
+        floating
+          ? 'absolute flex flex-col items-center gap-0.5'
+          : 'flex flex-col items-center shrink-0 pt-8 gap-0.5'
+      }
+      style={
+        floating
+          ? {
+              top: 40,
+              left: 12,
+              width: 40,
+              zIndex: 40,
+              padding: '6px 0',
+              borderRadius: floatingPanel.borderRadius,
+              boxShadow: floatingPanel.shadowCompact,
+              backdropFilter: floatingPanel.blur.compact,
+              backgroundColor: colors.bg.elevated
+            }
+          : {
+              width: 40,
+              backgroundColor: colors.bg.base,
+              borderRight: '1px solid rgba(255, 255, 255, 0.04)'
+            }
+      }
     >
       {ITEMS.map(({ view, label, icon }) => {
         const isActive = activeTabId === view

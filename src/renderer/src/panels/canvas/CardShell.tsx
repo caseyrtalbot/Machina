@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
-import { colors, canvasTokens, typography } from '../../design/tokens'
+import { colors, canvasTokens, typography, floatingPanel } from '../../design/tokens'
 import {
   startConnectionDrag,
   endConnectionDrag,
@@ -223,13 +223,8 @@ export function CardShell({
         height: node.size.height,
         backgroundColor: canvasTokens.card,
         borderRadius: canvasTokens.cardRadius,
-        border: isSelected
-          ? `1px solid ${colors.accent.default}`
-          : `1px solid ${canvasTokens.cardBorder}`,
         borderLeft: isClaudeType && accentColor ? `3px solid ${accentColor}` : undefined,
-        boxShadow: isSelected
-          ? `0 0 0 1px ${colors.accent.default}, 0 4px 20px rgba(0,0,0,0.35)`
-          : '0 2px 12px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)',
+        boxShadow: isSelected ? floatingPanel.shadowCardSelected : floatingPanel.shadowCard,
         color: isClaudeType ? '#e2e8f0' : undefined,
         overflow: 'hidden',
         ...(isActive

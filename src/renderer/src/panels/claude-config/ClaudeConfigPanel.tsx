@@ -19,7 +19,7 @@ import { InspectorProvider } from './InspectorContext'
 import { ConfigInspector } from './ConfigInspector'
 import { CreationInspector } from './CreationInspector'
 import { useClaudeActivity } from '../../hooks/useClaudeActivity'
-import { colors, typography } from '../../design/tokens'
+import { colors, typography, floatingPanel } from '../../design/tokens'
 import type { CanvasFile, CanvasNode } from '@shared/canvas-types'
 import { createCanvasFile } from '@shared/canvas-types'
 
@@ -345,10 +345,13 @@ export function ClaudeConfigPanel() {
           <div ref={containerRef} className="h-full relative">
             {/* Toolbar */}
             <div
-              className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded"
+              className="absolute top-3 z-10 flex items-center gap-2 px-3 py-1.5"
               style={{
+                left: 'calc(50% - 100px)',
                 backgroundColor: colors.bg.elevated,
-                border: `1px solid ${colors.border.default}`
+                borderRadius: floatingPanel.borderRadius,
+                boxShadow: floatingPanel.shadowCompact,
+                backdropFilter: floatingPanel.blur.compact
               }}
             >
               <span

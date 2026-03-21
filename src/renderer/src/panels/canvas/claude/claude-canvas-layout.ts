@@ -90,7 +90,7 @@ export function layoutClaudeConfig(config: ClaudeConfig): LayoutResult {
   const labels: ZoneLabel[] = []
   const LABEL_OFFSET = -28
 
-  let cursorY = 0
+  let cursorY = 60
 
   // --- Row 1: Rules (full width, horizontal) ---
   const ruleItems: LayoutItem[] = config.rules.map((r) => ({

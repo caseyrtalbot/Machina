@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
-import { colors, borderRadius } from '../../design/tokens'
+import { colors, floatingPanel } from '../../design/tokens'
 import type { CanvasNode, CanvasViewport } from '@shared/canvas-types'
 
 /** Type-based colors for minimap rectangles (mirrors CardLodPreview) */
@@ -176,9 +176,9 @@ export function CanvasMinimap({
         width: MINIMAP_WIDTH,
         height: MINIMAP_HEIGHT,
         backgroundColor: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.container,
-        opacity: 0.9,
+        borderRadius: floatingPanel.borderRadius,
+        boxShadow: floatingPanel.shadowCompact,
+        backdropFilter: floatingPanel.blur.compact,
         zIndex: 20,
         overflow: 'hidden',
         cursor: 'crosshair'

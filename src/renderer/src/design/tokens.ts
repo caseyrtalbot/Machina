@@ -150,6 +150,21 @@ export const canvasTokens = {
   linkCyan: '#5cb8c4'
 } as const
 
+export const floatingPanel = {
+  borderRadius: 8,
+  shadow:
+    '0 4px 24px rgba(0,0,0,0.4), 0 1px 6px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.07)',
+  shadowCompact:
+    '0 4px 16px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.07)',
+  shadowCard:
+    '0 4px 20px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.06)',
+  shadowCardSelected: '0 0 0 1.5px var(--color-accent-default), 0 4px 24px rgba(0,0,0,0.4)',
+  blur: {
+    sidebar: 'blur(12px)',
+    compact: 'blur(4px)'
+  }
+} as const
+
 export const animations = {
   spatialTransition: '250ms ease-out'
 } as const

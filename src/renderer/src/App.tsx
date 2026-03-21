@@ -33,6 +33,7 @@ import {
   enrichPlacedArtifact
 } from './panels/workbench/workbench-artifact-placement'
 import { useTerminalActionStore } from './store/terminal-actions-store'
+import { CanvasFloatingSidebar } from './panels/canvas/CanvasFloatingSidebar'
 
 const LazyCanvasView = lazy(() =>
   import('./panels/canvas/CanvasView').then((module) => ({ default: module.CanvasView }))
@@ -606,6 +607,12 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const workbenchThreadOpen = useWorkbenchActionStore((s) => s.threadOpen)
   const workbenchIsLive = useWorkbenchActionStore((s) => s.isLive)
 
+  // Canvas-style views use floating chrome instead of the SplitPane panel layout
+  const isCanvasActive =
+    activeTabId === 'canvas' || activeTabId === 'claude-config' || activeTabId === 'workbench'
+  const showSidebarPanel = showSidebar && !isCanvasActive
+  const showFloatingSidebar = showSidebar && isCanvasActive
+
   const toggleTabView = useCallback(
     (type: TabType) => {
       const def = TAB_DEFINITIONS[type]
@@ -953,8 +960,9 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           } as React.CSSProperties
         }
       />
-      <ActivityBar />
-      {showSidebar ? (
+      <ActivityBar floating={isCanvasActive} />
+      {/* When canvas is active, sidebar floats over the canvas instead of taking SplitPane space */}
+      {showSidebarPanel ? (
         <SplitPane
           left={
             <div className="panel-card h-full pt-7">
@@ -1018,9 +1026,22 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           minRightWidth={300}
         />
       ) : (
-        <PanelErrorBoundary name="Content">
-          <ContentArea />
-        </PanelErrorBoundary>
+        <div className="flex-1 overflow-hidden">
+          <PanelErrorBoundary name="Content">
+            <ContentArea />
+          </PanelErrorBoundary>
+        </div>
+      )}
+      {/* Floating sidebar overlay when canvas is the active view */}
+      {showFloatingSidebar && (
+        <CanvasFloatingSidebar>
+          <PanelErrorBoundary name="Sidebar">
+            <ConnectedSidebar
+              onLoadVault={onLoadVault}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          </PanelErrorBoundary>
+        </CanvasFloatingSidebar>
       )}
       <CommandPalette
         isOpen={paletteOpen}
