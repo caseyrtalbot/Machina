@@ -68,5 +68,25 @@ describe('FileService', () => {
     await svc.initVault(dir)
     expect(existsSync(join(dir, '.thought-engine', 'config.json'))).toBe(true)
     expect(existsSync(join(dir, '.thought-engine', 'state.json'))).toBe(true)
+    expect(existsSync(join(dir, '.thought-engine', 'artifacts', 'sessions'))).toBe(true)
+    expect(existsSync(join(dir, '.thought-engine', 'artifacts', 'patterns'))).toBe(true)
+    expect(existsSync(join(dir, '.thought-engine', 'artifacts', 'tensions'))).toBe(true)
+  })
+
+  it('creates, lists, and updates system artifacts', async () => {
+    await svc.initVault(dir)
+
+    const path = await svc.createSystemArtifact(dir, 'session', 'debug-session', '# Debug Session')
+    expect(path).toBe(join(dir, '.thought-engine', 'artifacts', 'sessions', 'debug-session.md'))
+
+    let artifacts = await svc.listSystemArtifactFiles(dir)
+    expect(artifacts).toEqual([path])
+
+    artifacts = await svc.listSystemArtifactFiles(dir, 'session')
+    expect(artifacts).toEqual([path])
+
+    await svc.updateSystemArtifact(path, '# Updated Session')
+    const content = await svc.readFile(path)
+    expect(content).toBe('# Updated Session')
   })
 })

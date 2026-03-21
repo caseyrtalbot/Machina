@@ -5,6 +5,7 @@ import type {
   SessionMilestone,
   SessionDetectedEvent
 } from './project-canvas-types'
+import type { SystemArtifactKind } from './system-artifacts'
 
 export type ClaudeActivityKind = 'prompt' | 'session-start' | 'session-end' | 'config-changed'
 
@@ -40,6 +41,27 @@ export interface IpcChannels {
   'vault:init': { request: { vaultPath: string }; response: void }
   'vault:list-commands': { request: { dirPath: string }; response: string[] }
   'vault:read-file': { request: { filePath: string }; response: string }
+  'vault:list-system-artifacts': {
+    request: { vaultPath: string; kind?: SystemArtifactKind }
+    response: string[]
+  }
+  'vault:read-system-artifact': {
+    request: { vaultPath: string; path: string }
+    response: string
+  }
+  'vault:create-system-artifact': {
+    request: {
+      vaultPath: string
+      kind: SystemArtifactKind
+      filename: string
+      content: string
+    }
+    response: string
+  }
+  'vault:update-system-artifact': {
+    request: { vaultPath: string; path: string; content: string }
+    response: void
+  }
   'vault:watch-start': { request: { vaultPath: string }; response: void }
   'vault:watch-stop': { request: void; response: void }
 

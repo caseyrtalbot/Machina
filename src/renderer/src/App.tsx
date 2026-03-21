@@ -724,21 +724,35 @@ export default function App() {
   const onWorkerResult = useCallback((result: WorkerResult) => {
     // Merge worker result + file updates into a single Zustand set() to avoid two render cycles
     const files = useVaultStore.getState().files
+    const systemFiles = useVaultStore.getState().systemFiles
     const discoveredTypes = [...new Set(result.artifacts.map((a) => a.type))].sort()
     const artifactById = new Map(result.artifacts.map((a) => [a.id, a]))
-    const updatedFiles = files.map((f) => {
-      if (!f.path.endsWith('.md')) return f
-      const id = result.fileToId[f.path]
-      const artifact = id ? artifactById.get(id) : undefined
-      return artifact ? { ...f, title: artifact.title, modified: artifact.modified } : f
-    })
+
+    const updateTitles = <
+      T extends {
+        readonly path: string
+        readonly title: string
+        readonly modified: string
+      }
+    >(
+      entries: readonly T[]
+    ): T[] =>
+      entries.map((entry) => {
+        if (!entry.path.endsWith('.md')) return entry
+        const id = result.fileToId[entry.path]
+        const artifact = id ? artifactById.get(id) : undefined
+        return artifact ? { ...entry, title: artifact.title, modified: artifact.modified } : entry
+      })
+
     useVaultStore.setState({
       artifacts: result.artifacts,
       graph: result.graph,
       parseErrors: result.errors,
       fileToId: result.fileToId,
+      artifactPathById: result.artifactPathById,
       discoveredTypes,
-      files: updatedFiles
+      files: updateTitles(files),
+      systemFiles: updateTitles(systemFiles)
     })
   }, [])
 
@@ -768,10 +782,10 @@ export default function App() {
 
       await window.api.vault.watchStart(path)
       // Only send .md files to the vault worker (knowledge engine only parses markdown)
-      const mdPaths = useVaultStore
-        .getState()
-        .files.filter((f) => f.path.endsWith('.md'))
-        .map((f) => f.path)
+      const { files, systemFiles } = useVaultStore.getState()
+      const mdPaths = [...files, ...systemFiles]
+        .filter((file) => file.path.endsWith('.md'))
+        .map((file) => file.path)
       const filesWithContent = await Promise.all(
         mdPaths.map(async (p) => ({ path: p, content: await window.api.fs.readFile(p) }))
       )
@@ -817,7 +831,8 @@ export default function App() {
               path,
               filename,
               title,
-              modified: new Date().toISOString().split('T')[0]
+              modified: new Date().toISOString().split('T')[0],
+              source: 'vault'
             })
           }
           if (isMd) mdToUpdate.push(path)

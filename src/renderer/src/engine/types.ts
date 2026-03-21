@@ -12,4 +12,5 @@ export interface WorkerResult {
   readonly graph: KnowledgeGraph
   readonly errors: readonly ParseError[]
   readonly fileToId: Readonly<Record<string, string>>
+  readonly artifactPathById: Readonly<Record<string, string>>
 }

@@ -21,7 +21,17 @@ export function sessionId(id: string): SessionId {
 
 // ---------------------------------------------------------------------------
 
-export const ARTIFACT_TYPES = ['gene', 'constraint', 'research', 'output', 'note', 'index'] as const
+export const ARTIFACT_TYPES = [
+  'gene',
+  'constraint',
+  'research',
+  'output',
+  'note',
+  'index',
+  'session',
+  'pattern',
+  'tension'
+] as const
 export type BuiltInArtifactType = (typeof ARTIFACT_TYPES)[number]
 export type ArtifactType = string
 
@@ -38,7 +48,10 @@ export const TYPE_PREFIXES = {
   research: 'r',
   output: 'o',
   note: 'n',
-  index: 'i'
+  index: 'i',
+  session: 's',
+  pattern: 'p',
+  tension: 't'
 } as const satisfies Record<BuiltInArtifactType, string>
 
 export const SIGNAL_OPACITY = {

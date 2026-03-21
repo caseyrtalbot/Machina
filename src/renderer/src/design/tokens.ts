@@ -32,7 +32,10 @@ export const ARTIFACT_COLORS = {
   research: '#a78bfa',
   output: '#f472b6',
   note: '#94a3b8',
-  index: '#38bdf8'
+  index: '#38bdf8',
+  session: '#10b981',
+  pattern: '#f59e0b',
+  tension: '#fb7185'
 } as const satisfies Record<BuiltInArtifactType, string>
 
 // Palette excludes colors already used by built-in types

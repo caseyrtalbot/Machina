@@ -1,8 +1,20 @@
 import { readFile, writeFile, unlink, readdir, mkdir, rename, stat, realpath } from 'fs/promises'
-import { join, extname } from 'path'
+import { join, extname, dirname } from 'path'
 import { existsSync } from 'fs'
-import { teDirPath, teConfigPath, teStatePath } from '../utils/paths'
+import {
+  teDirPath,
+  teConfigPath,
+  teStatePath,
+  teArtifactsDirPath,
+  teArtifactKindDirPath,
+  teArtifactPath
+} from '../utils/paths'
 import type { VaultConfig, VaultState } from '../../shared/types'
+import {
+  SYSTEM_ARTIFACT_KINDS,
+  defaultSystemArtifactFilename,
+  type SystemArtifactKind
+} from '@shared/system-artifacts'
 
 const IGNORED_PROJECT_DIRS = new Set(['node_modules', 'out', 'dist', 'build'])
 
@@ -21,6 +33,33 @@ export class FileService {
     await unlink(path)
   }
 
+  private async listMarkdownFilesRecursive(dir: string, skipHidden: boolean): Promise<string[]> {
+    let entries
+    try {
+      entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+      return []
+    }
+
+    const results: string[] = []
+
+    for (const entry of entries) {
+      if (skipHidden && entry.name.startsWith('.')) continue
+
+      const fullPath = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        results.push(...(await this.listMarkdownFilesRecursive(fullPath, skipHidden)))
+        continue
+      }
+
+      if (entry.isFile() && extname(entry.name) === '.md') {
+        results.push(fullPath)
+      }
+    }
+
+    return results
+  }
+
   async listFiles(dir: string, pattern?: string): Promise<string[]> {
     const entries = await readdir(dir, { withFileTypes: true })
     const files = entries.filter((e) => e.isFile()).map((e) => join(dir, e.name))
@@ -29,20 +68,7 @@ export class FileService {
   }
 
   async listFilesRecursive(dir: string): Promise<string[]> {
-    const results: string[] = []
-    const entries = await readdir(dir, { withFileTypes: true })
-
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name)
-      if (entry.name.startsWith('.')) continue
-      if (entry.isDirectory()) {
-        results.push(...(await this.listFilesRecursive(fullPath)))
-      } else if (entry.isFile() && extname(entry.name) === '.md') {
-        results.push(fullPath)
-      }
-    }
-
-    return results
+    return this.listMarkdownFilesRecursive(dir, true)
   }
 
   async listAllFilesRecursive(dir: string): Promise<string[]> {
@@ -111,6 +137,18 @@ export class FileService {
       await mkdir(teDir, { recursive: true })
     }
 
+    const artifactsDir = teArtifactsDirPath(vaultPath)
+    if (!existsSync(artifactsDir)) {
+      await mkdir(artifactsDir, { recursive: true })
+    }
+
+    for (const kind of SYSTEM_ARTIFACT_KINDS) {
+      const kindDir = teArtifactKindDirPath(vaultPath, kind)
+      if (!existsSync(kindDir)) {
+        await mkdir(kindDir, { recursive: true })
+      }
+    }
+
     const defaultConfig: VaultConfig = {
       version: 1,
       fonts: { display: 'Inter', body: 'Inter', mono: 'JetBrains Mono' },
@@ -139,5 +177,32 @@ export class FileService {
     if (!existsSync(statePath)) {
       await this.writeFile(statePath, JSON.stringify(defaultState, null, 2))
     }
+  }
+
+  async listSystemArtifactFiles(vaultPath: string, kind?: SystemArtifactKind): Promise<string[]> {
+    const dirs = kind
+      ? [teArtifactKindDirPath(vaultPath, kind)]
+      : SYSTEM_ARTIFACT_KINDS.map((artifactKind) => teArtifactKindDirPath(vaultPath, artifactKind))
+
+    const results = await Promise.all(
+      dirs.map((dir) => this.listMarkdownFilesRecursive(dir, false))
+    )
+    return results.flat().sort()
+  }
+
+  async createSystemArtifact(
+    vaultPath: string,
+    kind: SystemArtifactKind,
+    filename: string,
+    content: string
+  ): Promise<string> {
+    const targetPath = teArtifactPath(vaultPath, kind, defaultSystemArtifactFilename(filename))
+    await mkdir(dirname(targetPath), { recursive: true })
+    await this.writeFile(targetPath, content)
+    return targetPath
+  }
+
+  async updateSystemArtifact(path: string, content: string): Promise<void> {
+    await this.writeFile(path, content)
   }
 }

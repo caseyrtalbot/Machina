@@ -125,6 +125,31 @@ export function registerFilesystemIpc(): void {
     return readFile(args.filePath, 'utf-8')
   })
 
+  typedHandle('vault:list-system-artifacts', async (args) => {
+    return fileService.listSystemArtifactFiles(args.vaultPath, args.kind)
+  })
+
+  typedHandle('vault:read-system-artifact', async (args) => {
+    assertWithinVault(args.vaultPath, args.path)
+    return fileService.readFile(args.path)
+  })
+
+  typedHandle('vault:create-system-artifact', async (args) => {
+    const path = await fileService.createSystemArtifact(
+      args.vaultPath,
+      args.kind,
+      args.filename,
+      args.content
+    )
+    assertWithinVault(args.vaultPath, path)
+    return path
+  })
+
+  typedHandle('vault:update-system-artifact', async (args) => {
+    assertWithinVault(args.vaultPath, args.path)
+    await fileService.updateSystemArtifact(args.path, args.content)
+  })
+
   // --- Shell integration ---
 
   typedHandle('shell:show-in-folder', async (args) => {

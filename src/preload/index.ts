@@ -49,6 +49,18 @@ const api = {
     watchStop: () => typedInvoke('vault:watch-stop'),
     listCommands: (dirPath: string) => typedInvoke('vault:list-commands', { dirPath }),
     readFile: (filePath: string) => typedInvoke('vault:read-file', { filePath }),
+    listSystemArtifacts: (vaultPath: string, kind?: 'session' | 'pattern' | 'tension') =>
+      typedInvoke('vault:list-system-artifacts', { vaultPath, kind }),
+    readSystemArtifact: (vaultPath: string, path: string) =>
+      typedInvoke('vault:read-system-artifact', { vaultPath, path }),
+    createSystemArtifact: (
+      vaultPath: string,
+      kind: 'session' | 'pattern' | 'tension',
+      filename: string,
+      content: string
+    ) => typedInvoke('vault:create-system-artifact', { vaultPath, kind, filename, content }),
+    updateSystemArtifact: (vaultPath: string, path: string, content: string) =>
+      typedInvoke('vault:update-system-artifact', { vaultPath, path, content }),
     deleteFile: (filePath: string) => typedInvoke('fs:delete-file', { path: filePath })
   },
   shell: {

@@ -26,6 +26,7 @@ describe('vault-worker helpers', () => {
     const result = helpers.buildResult()
     expect(result.artifacts).toHaveLength(1)
     expect(result.errors).toHaveLength(0)
+    expect(result.artifactPathById['id-test.md']).toBe('test.md')
   })
 
   it('addFile records error on failed parse', () => {

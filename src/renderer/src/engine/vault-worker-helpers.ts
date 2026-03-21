@@ -13,6 +13,7 @@ interface WorkerHelpers {
 export function createWorkerHelpers(): WorkerHelpers {
   const artifacts = new Map<string, Artifact>()
   const fileToId = new Map<string, string>()
+  const artifactPathById = new Map<string, string>()
   const errors: ParseError[] = []
 
   function clearErrorsForPath(path: string): void {
@@ -34,6 +35,7 @@ export function createWorkerHelpers(): WorkerHelpers {
       const artifact = id !== result.value.id ? { ...result.value, id } : result.value
       artifacts.set(id, artifact)
       fileToId.set(path, id)
+      artifactPathById.set(id, path)
     } else {
       errors.push({ filename: path, error: result.error })
     }
@@ -45,6 +47,7 @@ export function createWorkerHelpers(): WorkerHelpers {
     if (id) {
       artifacts.delete(id)
       fileToId.delete(path)
+      artifactPathById.delete(id)
     }
   }
 
@@ -52,13 +55,22 @@ export function createWorkerHelpers(): WorkerHelpers {
     const arts = Array.from(artifacts.values())
     const graph = buildGraph(arts)
     const fToId: Record<string, string> = {}
+    const aToPath: Record<string, string> = {}
     for (const [k, v] of fileToId) fToId[k] = v
-    return { artifacts: arts, graph, errors: [...errors], fileToId: fToId }
+    for (const [k, v] of artifactPathById) aToPath[k] = v
+    return {
+      artifacts: arts,
+      graph,
+      errors: [...errors],
+      fileToId: fToId,
+      artifactPathById: aToPath
+    }
   }
 
   function clearAll(): void {
     artifacts.clear()
     fileToId.clear()
+    artifactPathById.clear()
     errors.length = 0
   }
 
