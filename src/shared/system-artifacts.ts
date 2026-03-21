@@ -83,28 +83,6 @@ export interface SystemArtifactSection {
   readonly body?: string
 }
 
-interface BaseTemplateInput {
-  readonly id: string
-  readonly title: string
-  readonly created?: string
-  readonly modified?: string
-  readonly summary?: string
-  readonly projectRoot?: string
-}
-
-interface SessionTemplateInput extends BaseTemplateInput {
-  readonly startedAt?: string
-}
-
-interface PatternTemplateInput extends BaseTemplateInput {
-  readonly originSession?: string
-}
-
-interface TensionTemplateInput extends BaseTemplateInput {
-  readonly openedAt?: string
-  readonly question?: string
-}
-
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null
 }
@@ -118,14 +96,6 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
-function toDateString(date = new Date()): string {
-  return date.toISOString().split('T')[0]
-}
-
-function toTimestampString(date = new Date()): string {
-  return date.toISOString()
-}
-
 export function slugifyArtifactPart(value: string): string {
   const normalized = value
     .trim()
@@ -133,26 +103,6 @@ export function slugifyArtifactPart(value: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return normalized || 'artifact'
-}
-
-function baseFrontmatter(
-  kind: SystemArtifactKind,
-  input: BaseTemplateInput
-): Omit<BaseSystemArtifactFrontmatter, 'signal'> & {
-  readonly signal: BaseSystemArtifactFrontmatter['signal']
-} {
-  return {
-    id: input.id,
-    title: input.title,
-    type: kind,
-    created: input.created ?? toDateString(),
-    modified: input.modified ?? input.created ?? toDateString(),
-    signal: kind === 'pattern' ? 'validated' : kind === 'session' ? 'emerging' : 'untested',
-    tags: [kind],
-    connections: [],
-    tensions_with: [],
-    summary: input.summary
-  }
 }
 
 function renderFrontmatter(frontmatter: object): string {
@@ -229,74 +179,6 @@ export function isSystemArtifactPath(path: string): boolean {
 
 export function defaultSystemArtifactFilename(id: string): string {
   return id.endsWith('.md') ? id : `${id}.md`
-}
-
-export function createSessionArtifactTemplate(input: SessionTemplateInput): string {
-  const frontmatter: SessionArtifactFrontmatter = {
-    ...baseFrontmatter('session', input),
-    type: 'session',
-    status: 'active',
-    started_at: input.startedAt ?? toTimestampString(),
-    project_root: input.projectRoot ?? '.',
-    claude_session_ids: [],
-    file_refs: [],
-    opened_tensions: [],
-    resolved_tensions: [],
-    pattern_refs: [],
-    command_count: 0,
-    file_touch_count: 0
-  }
-
-  return `${renderFrontmatter(frontmatter)}\n## Context\n\n## What Happened\n\n## Decisions\n\n## Learnings\n\n## Next Steps\n`
-}
-
-export function createPatternArtifactTemplate(input: PatternTemplateInput): string {
-  const frontmatter: PatternArtifactFrontmatter = {
-    ...baseFrontmatter('pattern', input),
-    type: 'pattern',
-    status: 'draft',
-    origin_session: input.originSession,
-    project_root: input.projectRoot ?? '.',
-    file_refs: [],
-    note_refs: [],
-    tension_refs: [],
-    canvas_snapshot: '',
-    launch: { terminals: [] }
-  }
-
-  return `${renderFrontmatter(frontmatter)}\n## When To Use\n\n## Setup\n\n## Steps\n\n## Failure Modes\n\n## Exit Criteria\n`
-}
-
-export function createTensionArtifactTemplate(input: TensionTemplateInput): string {
-  const frontmatter: TensionArtifactFrontmatter = {
-    ...baseFrontmatter('tension', input),
-    type: 'tension',
-    status: 'open',
-    opened_at: input.openedAt ?? toTimestampString(),
-    file_refs: [],
-    pattern_refs: [],
-    question: input.question ?? '',
-    evidence_refs: []
-  }
-
-  return `${renderFrontmatter(frontmatter)}\n## Why This Matters\n\n## Competing Explanations\n\n## Current Evidence\n\n## What Would Resolve It\n`
-}
-
-export function createSystemArtifactTemplate(kind: 'session', input: SessionTemplateInput): string
-export function createSystemArtifactTemplate(kind: 'pattern', input: PatternTemplateInput): string
-export function createSystemArtifactTemplate(kind: 'tension', input: TensionTemplateInput): string
-export function createSystemArtifactTemplate(
-  kind: SystemArtifactKind,
-  input: SessionTemplateInput | PatternTemplateInput | TensionTemplateInput
-): string {
-  switch (kind) {
-    case 'session':
-      return createSessionArtifactTemplate(input as SessionTemplateInput)
-    case 'pattern':
-      return createPatternArtifactTemplate(input as PatternTemplateInput)
-    case 'tension':
-      return createTensionArtifactTemplate(input as TensionTemplateInput)
-  }
 }
 
 export function parseSystemArtifactFrontmatter(

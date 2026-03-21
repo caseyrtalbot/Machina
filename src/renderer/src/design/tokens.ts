@@ -152,10 +152,3 @@ export const canvasTokens = {
 export const animations = {
   spatialTransition: '250ms ease-out'
 } as const
-
-export const focusRing = {
-  color: colors.accent.default,
-  opacity: 0.3,
-  offset: 2,
-  width: 2
-} as const
