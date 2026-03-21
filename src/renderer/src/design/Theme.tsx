@@ -10,7 +10,7 @@ interface ThemeContextType {
   transitions: typeof transitions
 }
 
-const defaultColors = resolveColors('midnight', 'teal')
+const defaultColors = resolveColors('midnight', 'matrix')
 
 const ThemeContext = createContext<ThemeContextType>({
   colors: defaultColors,

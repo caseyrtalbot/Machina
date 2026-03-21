@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { ThemeId, AccentColorId } from '../design/themes'
+import { ACCENT_COLORS, type ThemeId, type AccentColorId } from '../design/themes'
 
 interface SettingsState {
   readonly theme: ThemeId
@@ -34,7 +34,7 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       theme: 'midnight',
-      accentColor: 'teal',
+      accentColor: 'matrix',
       fontSize: 13,
       fontFamily: 'Inter',
       defaultEditorMode: 'rich',
@@ -57,7 +57,17 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'thought-engine-settings',
-      storage: createJSONStorage(() => localStorage)
+      version: 2,
+      storage: createJSONStorage(() => localStorage),
+      migrate: (persisted) => {
+        const state = persisted as Record<string, unknown>
+        // Migrate old accent color IDs to new retro neon palette
+        const accent = state.accentColor as string | undefined
+        if (accent && !(accent in ACCENT_COLORS)) {
+          state.accentColor = 'matrix'
+        }
+        return state as unknown as SettingsState & SettingsActions
+      }
     }
   )
 )

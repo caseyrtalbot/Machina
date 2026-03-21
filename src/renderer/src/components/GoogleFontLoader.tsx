@@ -61,5 +61,12 @@ export function GoogleFontLoader() {
     document.body.style.fontFamily = buildFontFamilyValue(fontFamily)
   }, [fontFamily])
 
+  // Apply the user's font size to the app root
+  const fontSize = useSettingsStore((s) => s.fontSize)
+  useEffect(() => {
+    document.documentElement.style.setProperty('--te-font-size', `${fontSize}px`)
+    document.body.style.fontSize = `${fontSize}px`
+  }, [fontSize])
+
   return null
 }

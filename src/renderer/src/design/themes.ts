@@ -1,13 +1,13 @@
 export type ThemeId = 'midnight' | 'slate' | 'obsidian' | 'nord' | 'evergreen' | 'light'
 export type AccentColorId =
-  | 'teal'
-  | 'blue'
-  | 'violet'
-  | 'rose'
-  | 'amber'
-  | 'emerald'
-  | 'cyan'
-  | 'orange'
+  | 'matrix'
+  | 'laser'
+  | 'synthwave'
+  | 'hotpink'
+  | 'arcade'
+  | 'phosphor'
+  | 'plasma'
+  | 'neonmint'
 
 interface CanvasColors {
   surface: string
@@ -193,14 +193,14 @@ export const THEMES = {
 // ── Accent colors ───────────────────────────────────────────────────────
 
 export const ACCENT_COLORS = {
-  teal: { label: 'Teal', value: '#00e5bf' },
-  blue: { label: 'Blue', value: '#3b82f6' },
-  violet: { label: 'Violet', value: '#8b5cf6' },
-  rose: { label: 'Rose', value: '#f43f5e' },
-  amber: { label: 'Amber', value: '#f59e0b' },
-  emerald: { label: 'Emerald', value: '#10b981' },
-  cyan: { label: 'Cyan', value: '#06b6d4' },
-  orange: { label: 'Orange', value: '#f97316' }
+  matrix: { label: 'Matrix', value: '#39ff14' },
+  laser: { label: 'Laser', value: '#ff3131' },
+  synthwave: { label: 'Synthwave', value: '#b026ff' },
+  hotpink: { label: 'Hot Pink', value: '#ff10f0' },
+  arcade: { label: 'Arcade', value: '#ffff33' },
+  phosphor: { label: 'Phosphor', value: '#00ff87' },
+  plasma: { label: 'Plasma', value: '#00d4ff' },
+  neonmint: { label: 'Neon Mint', value: '#00ffcc' }
 } as const satisfies Record<AccentColorId, AccentDefinition>
 
 // ── Ordering for UI display ─────────────────────────────────────────────
@@ -215,12 +215,12 @@ export const THEME_ORDER = [
 ] as const satisfies readonly ThemeId[]
 
 export const ACCENT_ORDER = [
-  'teal',
-  'blue',
-  'violet',
-  'rose',
-  'amber',
-  'emerald',
-  'cyan',
-  'orange'
+  'matrix',
+  'laser',
+  'synthwave',
+  'hotpink',
+  'arcade',
+  'phosphor',
+  'plasma',
+  'neonmint'
 ] as const satisfies readonly AccentColorId[]
