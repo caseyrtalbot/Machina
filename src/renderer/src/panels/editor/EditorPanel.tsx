@@ -13,7 +13,7 @@ import { BacklinksPanel } from './BacklinksPanel'
 import { RichEditor } from './RichEditor'
 import { SourceEditor } from './SourceEditor'
 import { CodeFileEditor } from './CodeFileEditor'
-import { parseFrontmatter, migrateLegacyWikilinks } from './markdown-utils'
+import { parseFrontmatter } from './markdown-utils'
 import { ConceptNodeMark } from './extensions/concept-node-mark'
 import { MermaidCodeBlock } from './extensions/mermaid-code-block'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
@@ -192,13 +192,9 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     frontmatterRawRef.current = parsed.raw
     setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
 
-    // Migrate legacy [[wikilinks]] to <node> tags on load
-    let body = parsed.body
-    if (body.includes('[[')) {
-      body = migrateLegacyWikilinks(body)
-      // Mark dirty so the migrated content gets auto-saved
-      setContent(parsed.raw + body)
-    }
+    // Wikilinks are now auto-detected as graph edges via bodyLinks.
+    // No migration to <node> tags needed — both syntaxes coexist.
+    const body = parsed.body
 
     const manager = editor.storage.markdown?.manager
     if (manager) {
@@ -236,9 +232,15 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   }, [content, activeNotePath])
 
   // Empty state - only show when no file is selected
+  // Floating chrome inset: editor content shifts right to clear the floating sidebar
+  const insetStyle = { paddingLeft: 'var(--sidebar-inset, 0px)' } as React.CSSProperties
+
   if (!activeNotePath) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ color: colors.text.muted }}>
+      <div
+        className="h-full flex items-center justify-center"
+        style={{ color: colors.text.muted, ...insetStyle }}
+      >
         <div className="text-center">
           <p className="text-lg mb-2">No file selected</p>
           <p className="text-sm">Select a file from the sidebar or press Cmd+N to create one</p>
@@ -249,11 +251,15 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
   // Non-markdown files get a code editor with syntax highlighting
   if (!activeNotePath.endsWith('.md')) {
-    return <CodeFileEditor filePath={activeNotePath} />
+    return (
+      <div className="h-full" style={insetStyle}>
+        <CodeFileEditor filePath={activeNotePath} />
+      </div>
+    )
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" style={insetStyle}>
       <div className="flex-1 overflow-y-auto">
         <FrontmatterHeader
           artifact={artifact}

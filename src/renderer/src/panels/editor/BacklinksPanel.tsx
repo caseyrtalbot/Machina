@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Artifact } from '@shared/types'
 import { getArtifactColor, colors, transitions } from '../../design/tokens'
 
@@ -113,7 +113,12 @@ export function BacklinksPanel({
   backlinks,
   onNavigate
 }: BacklinksPanelProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
+
+  // Reset to collapsed when navigating to a different note
+  useEffect(() => {
+    setCollapsed(true)
+  }, [currentNoteId])
 
   if (backlinks.length === 0) return null
 

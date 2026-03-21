@@ -55,6 +55,7 @@ describe('buildMetadataEntries', () => {
       tensions_with: [],
       appears_in: [],
       related: [],
+      bodyLinks: [],
       body: 'test body'
     }
     const entries = buildMetadataEntries(artifact)
@@ -81,6 +82,7 @@ describe('buildMetadataEntries', () => {
       tensions_with: [],
       appears_in: [],
       related: [],
+      bodyLinks: [],
       body: ''
     }
     const entries = buildMetadataEntries(artifact)

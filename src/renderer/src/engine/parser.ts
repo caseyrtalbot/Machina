@@ -23,6 +23,16 @@ function stripWikilinks(values: string[]): string[] {
   return values.map((v) => v.replace(/^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$/, '$1').trim())
 }
 
+/** Extract [[wikilink]] targets from markdown body text. Deduplicated. */
+function extractBodyWikilinks(body: string): readonly string[] {
+  const matches = body.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)
+  const targets = new Set<string>()
+  for (const m of matches) {
+    targets.add(m[1].trim())
+  }
+  return [...targets]
+}
+
 function toDateString(val: unknown): string {
   if (val instanceof Date) return val.toISOString().split('T')[0]
   if (typeof val === 'string') return val
@@ -84,6 +94,7 @@ export function parseArtifact(content: string, filename: string): Result<Artifac
       appears_in: toStringArray(data?.appears_in),
       related: stripWikilinks(toStringArray(data?.related)),
       concepts: extractConceptNodes(body),
+      bodyLinks: extractBodyWikilinks(body),
       body: body.trim(),
       frontmatter: data ?? {}
     }

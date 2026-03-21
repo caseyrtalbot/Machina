@@ -278,6 +278,84 @@ Body.`
   })
 })
 
+describe('bodyLinks extraction from body wikilinks', () => {
+  it('extracts [[wikilinks]] from body text', () => {
+    const md = `---
+id: test
+title: Test
+---
+
+Naval recommends [[The Book of Secrets]] and [[Atmamun]] for deep study.`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.bodyLinks).toEqual(
+      expect.arrayContaining(['The Book of Secrets', 'Atmamun'])
+    )
+    expect(result.value.bodyLinks).toHaveLength(2)
+  })
+
+  it('extracts target from [[target|display]] pipe syntax', () => {
+    const md = `---
+id: test
+title: Test
+---
+
+See [[Genius - The Life and Science of Richard Feynman|Feynman biography]] for more.`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.bodyLinks).toEqual(['Genius - The Life and Science of Richard Feynman'])
+  })
+
+  it('deduplicates repeated wikilinks', () => {
+    const md = `---
+id: test
+title: Test
+---
+
+[[Antifragile]] is great. As I said, [[Antifragile]] changed my thinking.`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.bodyLinks).toEqual(['Antifragile'])
+  })
+
+  it('returns empty array when body has no wikilinks', () => {
+    const md = `---
+id: test
+title: Test
+---
+
+Just plain text with no links.`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.bodyLinks).toEqual([])
+  })
+
+  it('keeps bodyLinks independent from frontmatter related', () => {
+    const md = `---
+id: test
+title: Test
+related:
+  - "[[Direct Truth]]"
+---
+
+Naval also recommends [[Atmamun]] alongside [[Direct Truth]].`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.related).toEqual(['Direct Truth'])
+    expect(result.value.bodyLinks).toEqual(expect.arrayContaining(['Atmamun', 'Direct Truth']))
+  })
+})
+
 describe('serializeArtifact', () => {
   it('round-trips a valid artifact', () => {
     const parsed = parseArtifact(VALID_MD, 'test.md')

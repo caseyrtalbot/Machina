@@ -77,6 +77,8 @@ export interface Artifact {
   appears_in: string[]
   related: string[]
   concepts: readonly string[]
+  /** Wikilink targets extracted from body text (derived, not persisted to disk). */
+  readonly bodyLinks: readonly string[]
   body: string
   /** Raw frontmatter key-value pairs for metadata display (e.g. AUTHOR, CATEGORY). */
   readonly frontmatter: Readonly<Record<string, unknown>>

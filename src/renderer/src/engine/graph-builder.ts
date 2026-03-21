@@ -87,6 +87,7 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
     for (const id of a.tensions_with) addEdge(a.id, id, 'tension')
     for (const id of a.appears_in) addEdge(a.id, id, 'appears_in')
     for (const id of a.related) addEdge(a.id, id, 'related')
+    for (const id of a.bodyLinks) addEdge(a.id, id, 'related')
   }
 
   // Phase 2: Co-occurrence edges from shared terms
