@@ -18,6 +18,7 @@ import { ConceptNodeMark } from './extensions/concept-node-mark'
 import { MermaidCodeBlock } from './extensions/mermaid-code-block'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
 import { colors } from '../../design/tokens'
+import { isSystemArtifactPath } from '@shared/system-artifacts'
 
 interface EditorPanelProps {
   onNavigate: (id: string) => void
@@ -159,7 +160,6 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     }
   })
 
-  // eslint-disable-next-line react-hooks/immutability -- editorRef is a useRef; assigning during render keeps callbacks in sync
   editorRef.current = editor
 
   // Load file content from disk when active note path changes
@@ -220,6 +220,11 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
     const timer = setTimeout(async () => {
       await window.api.fs.writeFile(pathToSave, contentToSave)
+      if (isSystemArtifactPath(pathToSave)) {
+        const { syncSystemArtifactFromDisk } =
+          await import('../../system-artifacts/system-artifact-runtime')
+        await syncSystemArtifactFromDisk(pathToSave)
+      }
       // Only mark saved if still on the same file
       const current = useEditorStore.getState()
       if (current.activeNotePath === pathToSave) {

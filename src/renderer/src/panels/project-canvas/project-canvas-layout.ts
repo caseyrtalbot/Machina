@@ -158,6 +158,7 @@ export function layoutProjectCanvas(
             size: { width: w, height: h },
             content: file.relativePath,
             metadata: {
+              filePath: `${projectPath}/${file.relativePath}`,
               relativePath: file.relativePath,
               language: extensionToLanguage(file.relativePath),
               touchCount: file.touchCount,

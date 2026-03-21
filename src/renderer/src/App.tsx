@@ -4,6 +4,7 @@ import type { WorkerResult } from './engine/types'
 import { ThemeProvider } from './design/Theme'
 import { SplitPane } from './design/components/SplitPane'
 import { Sidebar } from './panels/sidebar/Sidebar'
+import type { SystemArtifactListItem } from './panels/sidebar/Sidebar'
 import { ClaudeConfigSidebar } from './panels/sidebar/ClaudeConfigSidebar'
 import { buildFileTree } from './panels/sidebar/buildFileTree'
 import { EditorPanel } from './panels/editor/EditorPanel'
@@ -21,9 +22,11 @@ import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { ArtifactType } from '@shared/types'
+import { isSystemArtifactKind } from '@shared/system-artifacts'
 import { useCanvasStore } from './store/canvas-store'
 import { saveCanvas, defaultCanvasFilename } from './panels/canvas/canvas-io'
 import { createCanvasFile } from '@shared/canvas-types'
+import { openArtifactInEditor } from './system-artifacts/system-artifact-runtime'
 
 const LazyCanvasView = lazy(() =>
   import('./panels/canvas/CanvasView').then((module) => ({ default: module.CanvasView }))
@@ -173,6 +176,7 @@ function ConnectedSidebar({
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
   const fileToId = useVaultStore((s) => s.fileToId)
+  const artifactPathById = useVaultStore((s) => s.artifactPathById)
   const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const setContentView = useViewStore((s) => s.setContentView)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
@@ -242,7 +246,43 @@ function ConnectedSidebar({
   const onCanvasPaths = useCanvasFilePaths()
   const canvasConnectionCounts = useCanvasConnectionCounts(onCanvasPaths)
 
-  const openTab = useEditorStore((s) => s.openTab)
+  const systemArtifacts = useMemo<SystemArtifactListItem[]>(() => {
+    const items = artifacts
+      .filter(
+        (
+          artifact
+        ): artifact is (typeof artifacts)[number] & { type: 'session' | 'pattern' | 'tension' } =>
+          isSystemArtifactKind(artifact.type)
+      )
+      .map((artifact) => ({
+        id: artifact.id,
+        path: artifactPathById[artifact.id] ?? '',
+        title: artifact.title,
+        type: artifact.type,
+        modified: artifact.modified,
+        status:
+          typeof artifact.frontmatter.status === 'string' ? artifact.frontmatter.status : undefined
+      }))
+      .filter((item) => item.path.length > 0)
+      .sort((a, b) => b.modified.localeCompare(a.modified) || a.title.localeCompare(b.title))
+
+    if (!searchQuery.trim()) return items
+
+    const query = searchQuery.trim().toLowerCase()
+    return items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(query) ||
+        item.type.toLowerCase().includes(query) ||
+        item.status?.toLowerCase().includes(query)
+    )
+  }, [artifactPathById, artifacts, searchQuery])
+
+  const openEditorPath = useCallback(
+    (path: string, title?: string) => {
+      openArtifactInEditor(path, title, fileToId[path] ?? null)
+    },
+    [fileToId]
+  )
 
   const handleFileSelect = useCallback(
     (path: string) => {
@@ -252,19 +292,17 @@ function ConnectedSidebar({
       if (view === 'canvas' || view === 'project-canvas') return
 
       const file = files.find((f) => f.path === path)
-      openTab(path, file?.title)
-      setContentView('editor')
+      openEditorPath(path, file?.title)
     },
-    [files, openTab, setContentView]
+    [files, openEditorPath]
   )
 
   const handleFileDoubleClick = useCallback(
     (path: string) => {
       const file = files.find((f) => f.path === path)
-      openTab(path, file?.title)
-      setContentView('editor')
+      openEditorPath(path, file?.title)
     },
-    [files, openTab, setContentView]
+    [files, openEditorPath]
   )
 
   const handleToggleDirectory = useCallback((path: string) => {
@@ -298,9 +336,8 @@ function ConnectedSidebar({
 
     await window.api.fs.writeFile(filePath, content)
     // Select the new file in the editor
-    openTab(filePath, title)
-    setContentView('editor')
-  }, [vaultPath, files, openTab, setContentView])
+    openArtifactInEditor(filePath, title)
+  }, [vaultPath, files])
 
   const handleOpenVaultPicker = useCallback(async () => {
     const path = await window.api.fs.selectVault()
@@ -358,8 +395,7 @@ function ConnectedSidebar({
           const title = filename.replace('.md', '')
           const content = `---\nid: ${title}\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
           await window.api.fs.writeFile(filePath, content)
-          openTab(filePath, title)
-          setContentView('editor')
+          openArtifactInEditor(filePath, title)
           break
         }
         case 'copy-path': {
@@ -393,7 +429,7 @@ function ConnectedSidebar({
         }
       }
     },
-    [files, openTab, setContentView]
+    [files]
   )
 
   // Show claude config sidebar when on that view
@@ -422,10 +458,12 @@ function ConnectedSidebar({
       sortMode={sortMode}
       vaultName={vaultName}
       vaultHistory={vaultHistory}
+      systemArtifacts={systemArtifacts}
       onSearch={setSearchQuery}
       onWorkspaceSelect={setActiveWorkspace}
       onFileSelect={handleFileSelect}
       onFileDoubleClick={handleFileDoubleClick}
+      onSystemArtifactSelect={(item) => openArtifactInEditor(item.path, item.title, item.id)}
       onToggleDirectory={handleToggleDirectory}
       onNewFile={handleNewFile}
       onSortChange={setSortMode}

@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CanvasSurface } from '../canvas/CanvasSurface'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useProjectCanvasStore } from '../../store/project-canvas-store'
@@ -11,7 +11,7 @@ import { useViewportCulling } from '../canvas/use-canvas-culling'
 import { getLodLevel } from '../canvas/use-canvas-lod'
 import { useVaultStore } from '../../store/vault-store'
 import { layoutProjectCanvas } from './project-canvas-layout'
-import { saveCanvas } from '../canvas/canvas-io'
+import { saveCanvas, serializeCanvas } from '../canvas/canvas-io'
 import { useProjectActivity } from '../../hooks/useProjectActivity'
 import { useSessionThread } from '../../hooks/useSessionThread'
 import { useEditorStore } from '../../store/editor-store'
@@ -20,6 +20,15 @@ import { SessionThreadPanel } from './SessionThreadPanel'
 import { colors, typography } from '../../design/tokens'
 import type { CanvasFile, CanvasNode } from '@shared/canvas-types'
 import { createCanvasFile, createCanvasNode } from '@shared/canvas-types'
+import {
+  buildPatternArtifactDocument,
+  buildSessionArtifactDocument,
+  buildTensionArtifactDocument
+} from './project-canvas-artifacts'
+import {
+  createAndOpenSystemArtifact,
+  openArtifactInEditor
+} from '../../system-artifacts/system-artifact-runtime'
 
 const PROJECT_CANVAS_FILENAME = '.thought-engine-project-canvas.json'
 const PROJECT_ROOT_MARKERS = ['.git', 'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod']
@@ -102,8 +111,10 @@ export function ProjectCanvasPanel() {
   const setCachedData = useProjectCanvasStore((s) => s.setCachedData)
 
   const nodes = useCanvasStore((s) => s.nodes)
+  const edges = useCanvasStore((s) => s.edges)
   const viewport = useCanvasStore((s) => s.viewport)
   const clearSelection = useCanvasStore((s) => s.clearSelection)
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
   const isDirty = useCanvasStore((s) => s.isDirty)
   const toCanvasFile = useCanvasStore((s) => s.toCanvasFile)
   const markSaved = useCanvasStore((s) => s.markSaved)
@@ -348,6 +359,88 @@ export function ProjectCanvasPanel() {
   }, [projectPath, nodes])
 
   const projectName = projectPath?.split('/').pop() ?? 'Project'
+  const selectedNodes = useMemo(
+    () => nodes.filter((node) => selectedNodeIds.has(node.id)),
+    [nodes, selectedNodeIds]
+  )
+
+  const handleCreateTension = useCallback(async () => {
+    if (!vaultPath || !projectPath) return
+
+    const document = buildTensionArtifactDocument({
+      projectName,
+      projectPath,
+      now: new Date(),
+      selectedNodes,
+      milestones: threadState.milestones
+    })
+
+    await createAndOpenSystemArtifact({
+      kind: 'tension',
+      filename: document.filename,
+      content: document.markdown,
+      vaultPath
+    })
+  }, [projectName, projectPath, selectedNodes, threadState.milestones, vaultPath])
+
+  const handlePromoteSelection = useCallback(async () => {
+    if (!vaultPath || !projectPath || selectedNodes.length === 0) return
+
+    const document = buildPatternArtifactDocument({
+      projectName,
+      projectPath,
+      now: new Date(),
+      selectedNodes,
+      selectedNodeIds,
+      edges
+    })
+
+    const absoluteSnapshotPath = `${vaultPath}/${document.snapshotPath}`
+    await window.api.fs.writeFile(absoluteSnapshotPath, serializeCanvas(document.snapshot))
+    await createAndOpenSystemArtifact({
+      kind: 'pattern',
+      filename: document.filename,
+      content: document.markdown,
+      vaultPath
+    })
+  }, [edges, projectName, projectPath, selectedNodeIds, selectedNodes, vaultPath])
+
+  const handleEndSession = useCallback(async () => {
+    if (!vaultPath || !projectPath) return
+
+    const allSessionEvents = await window.api.project.parseSessions(projectPath)
+    const sessionBoundary = threadState.milestones.find(
+      (milestone) => milestone.type === 'session-switched'
+    )
+    const oldestMilestone = threadState.milestones
+      .filter((milestone) => milestone.type !== 'session-switched')
+      .reduce<
+        number | null
+      >((min, milestone) => (min == null ? milestone.timestamp : Math.min(min, milestone.timestamp)), null)
+    const relevantEvents = allSessionEvents.filter((event) => {
+      if (sessionBoundary && event.timestamp < sessionBoundary.timestamp) return false
+      if (oldestMilestone != null && event.timestamp < oldestMilestone - 60_000) return false
+      return true
+    })
+
+    const document = buildSessionArtifactDocument({
+      projectName,
+      projectPath,
+      now: new Date(),
+      milestones: threadState.milestones,
+      sessionEvents: relevantEvents
+    })
+
+    await createAndOpenSystemArtifact({
+      kind: 'session',
+      filename: document.filename,
+      content: document.markdown,
+      vaultPath
+    })
+
+    threadState.clear()
+    setThreadOpen(false)
+  }, [projectName, projectPath, threadState, vaultPath])
 
   return (
     <div ref={containerRef} className="h-full relative">
@@ -393,6 +486,35 @@ export function ProjectCanvasPanel() {
         </button>
         <div className="w-px h-4" style={{ backgroundColor: colors.border.default }} />
         <button
+          onClick={handleCreateTension}
+          className="text-xs px-2 py-0.5 rounded hover:opacity-80"
+          style={{ color: colors.text.secondary }}
+          title="Capture the current investigation as a tension artifact"
+        >
+          + Tension
+        </button>
+        <button
+          onClick={handlePromoteSelection}
+          disabled={selectedNodes.length === 0}
+          className="text-xs px-2 py-0.5 rounded hover:opacity-80 disabled:opacity-40"
+          style={{ color: selectedNodes.length > 0 ? colors.text.secondary : colors.text.muted }}
+          title="Turn the selected cards into a reusable pattern"
+        >
+          Save Pattern
+        </button>
+        <button
+          onClick={handleEndSession}
+          disabled={threadState.milestones.length === 0}
+          className="text-xs px-2 py-0.5 rounded hover:opacity-80 disabled:opacity-40"
+          style={{
+            color: threadState.milestones.length > 0 ? colors.text.secondary : colors.text.muted
+          }}
+          title="Capture the current thread as a completed session artifact"
+        >
+          End Session
+        </button>
+        <div className="w-px h-4" style={{ backgroundColor: colors.border.default }} />
+        <button
           onClick={() => setThreadOpen((prev) => !prev)}
           className="text-xs px-2 py-0.5 rounded hover:opacity-80"
           style={{
@@ -434,8 +556,7 @@ export function ProjectCanvasPanel() {
         <SessionThreadPanel
           state={threadState}
           onFileClick={(filePath) => {
-            useEditorStore.getState().setActiveNote(filePath, filePath)
-            useTabStore.getState().activateTab('editor')
+            openArtifactInEditor(filePath, undefined, filePath)
           }}
         />
       )}

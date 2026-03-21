@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { isSystemArtifactPath } from '@shared/system-artifacts'
 
 type EditorMode = 'rich' | 'source'
 
@@ -31,7 +32,7 @@ interface EditorStore {
   markSaved: () => void
   setCursorPosition: (line: number, col: number) => void
 
-  openTab: (path: string, title?: string) => void
+  openTab: (path: string, title?: string, noteId?: string | null) => void
   closeTab: (path: string) => void
   switchTab: (path: string) => void
   goBack: () => void
@@ -65,9 +66,18 @@ function flushIfDirty(state: {
   content: string
 }): void {
   if (!state.isDirty || !state.activeNotePath || !state.content) return
-  window.api.fs.writeFile(state.activeNotePath, state.content).catch(() => {
-    useEditorStore.setState({ isDirty: true })
-  })
+  const path = state.activeNotePath
+  window.api.fs
+    .writeFile(path, state.content)
+    .then(async () => {
+      if (!isSystemArtifactPath(path)) return
+      const { syncSystemArtifactFromDisk } =
+        await import('../system-artifacts/system-artifact-runtime')
+      await syncSystemArtifactFromDisk(path)
+    })
+    .catch(() => {
+      useEditorStore.setState({ isDirty: true })
+    })
 }
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
@@ -113,7 +123,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   markSaved: () => set({ isDirty: false }),
   setCursorPosition: (line, col) => set({ cursorLine: line, cursorCol: col }),
 
-  openTab: (path, title) => {
+  openTab: (path, title, noteId) => {
     const state = get()
     flushIfDirty(state)
     const resolvedTitle = title ?? titleFromPath(path)
@@ -123,7 +133,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const history = pushHistory(state.historyStack, state.historyIndex, path)
 
     set({
-      activeNoteId: path,
+      activeNoteId: noteId ?? path,
       activeNotePath: path,
       isDirty: false,
       openTabs: tabs,
@@ -204,9 +214,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 export function flushPendingSave(): void {
   const state = useEditorStore.getState()
   if (!state.isDirty || !state.activeNotePath || !state.content) return
+  const path = state.activeNotePath
   window.api.fs
-    .writeFile(state.activeNotePath, state.content)
-    .then(() => useEditorStore.getState().markSaved())
+    .writeFile(path, state.content)
+    .then(async () => {
+      if (isSystemArtifactPath(path)) {
+        const { syncSystemArtifactFromDisk } =
+          await import('../system-artifacts/system-artifact-runtime')
+        await syncSystemArtifactFromDisk(path)
+      }
+      useEditorStore.getState().markSaved()
+    })
     .catch(() => {
       useEditorStore.setState({ isDirty: true })
     })

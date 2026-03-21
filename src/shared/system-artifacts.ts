@@ -78,6 +78,11 @@ export type SystemArtifactFrontmatter =
   | PatternArtifactFrontmatter
   | TensionArtifactFrontmatter
 
+export interface SystemArtifactSection {
+  readonly heading: string
+  readonly body?: string
+}
+
 interface BaseTemplateInput {
   readonly id: string
   readonly title: string
@@ -119,6 +124,15 @@ function toDateString(date = new Date()): string {
 
 function toTimestampString(date = new Date()): string {
   return date.toISOString()
+}
+
+export function slugifyArtifactPart(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return normalized || 'artifact'
 }
 
 function baseFrontmatter(
@@ -187,6 +201,20 @@ function renderFrontmatter(frontmatter: object): string {
 
   lines.push('---')
   return lines.join('\n')
+}
+
+export function renderSystemArtifactDocument(
+  frontmatter: SystemArtifactFrontmatter,
+  sections: readonly SystemArtifactSection[]
+): string {
+  const body = sections
+    .map((section) => {
+      const trimmedBody = section.body?.trim()
+      return trimmedBody ? `## ${section.heading}\n\n${trimmedBody}` : `## ${section.heading}\n`
+    })
+    .join('\n\n')
+
+  return `${renderFrontmatter(frontmatter)}\n${body}\n`
 }
 
 export function isSystemArtifactKind(value: string): value is SystemArtifactKind {
