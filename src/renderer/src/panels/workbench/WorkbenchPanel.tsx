@@ -29,6 +29,7 @@ import {
   createAndOpenSystemArtifact,
   openArtifactInEditor
 } from '../../system-artifacts/system-artifact-runtime'
+import { migrateWorkbenchFile } from './workbench-migration'
 
 const WORKBENCH_FILENAME = '.thought-engine-workbench.json'
 const PROJECT_ROOT_MARKERS = ['.git', 'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod']
@@ -270,6 +271,10 @@ export function WorkbenchPanel() {
 
     async function loadWorkbench() {
       setIsLoading(true)
+
+      // Migrate legacy filename before anything reads from disk
+      await migrateWorkbenchFile(projectPath!).catch(() => {})
+
       const canvasPath = getWorkbenchPath(projectPath!)
 
       let canvasData: CanvasFile
