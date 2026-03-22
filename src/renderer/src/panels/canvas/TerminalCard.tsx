@@ -361,8 +361,9 @@ export function TerminalCard({ node }: TerminalCardProps) {
         style={{
           minHeight: 0,
           overflow: 'hidden',
-          outline: focused ? `1px solid ${colors.accent.default}` : 'none',
-          outlineOffset: -1
+          boxShadow: focused
+            ? `0 0 0 1.5px ${colors.accent.default}, 0 0 12px rgba(0, 229, 191, 0.15)`
+            : undefined
         }}
       >
         {/* Counter-scale wrapper: render xterm at screen pixel resolution.
@@ -380,7 +381,13 @@ export function TerminalCard({ node }: TerminalCardProps) {
           <div
             ref={termContainerRef}
             className="w-full h-full"
-            style={{ padding: '4px 0 0 4px', minHeight: 0 }}
+            style={{
+              padding: '8px 12px',
+              minHeight: 0,
+              background: 'rgba(12, 14, 20, 0.85)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)'
+            }}
           />
         </div>
         {sessionDead && (
