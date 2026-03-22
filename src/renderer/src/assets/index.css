@@ -138,6 +138,13 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--color-border-default); }
 ::-webkit-scrollbar-corner { background: transparent; }
 
+/* ─── Sidebar Search ─── */
+
+.sidebar-search::placeholder {
+  color: #525252;
+  opacity: 1;
+}
+
 /* ─── Focus & Interaction ─── */
 
 .focus-ring:focus-visible {

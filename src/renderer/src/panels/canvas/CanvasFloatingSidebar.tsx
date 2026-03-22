@@ -91,7 +91,7 @@ export function CanvasFloatingSidebar({
         borderRadius: floatingPanel.borderRadius,
         boxShadow: floatingPanel.shadow,
         backdropFilter: floatingPanel.blur.sidebar,
-        backgroundColor: 'rgba(20, 20, 20, 0.92)',
+        backgroundColor: 'rgba(20, 20, 22, 0.82)',
         color: colors.text.primary
       }}
     >
@@ -132,7 +132,7 @@ export function CanvasFloatingSidebar({
           <polyline points="10 7 8 9.5 10 12" />
         </svg>
       </button>
-      <div className="h-full overflow-y-auto pt-7">{children}</div>
+      <div className="h-full overflow-y-auto pt-2">{children}</div>
     </div>
   )
 }

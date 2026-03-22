@@ -17,12 +17,21 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         setQuery(e.target.value)
         onSearch(e.target.value)
       }}
-      className="w-full px-3 py-1.5 text-sm outline-none"
+      className="sidebar-search w-full px-3 py-[7px] text-sm outline-none"
       style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
         color: colors.text.primary,
-        border: 'none',
-        borderRadius: 6
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        borderRadius: 8,
+        transition: 'border-color 150ms ease-out, background-color 150ms ease-out'
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)'
+        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)'
+        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'
       }}
     />
   )

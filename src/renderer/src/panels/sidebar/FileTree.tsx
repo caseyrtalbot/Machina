@@ -6,25 +6,42 @@ import { buildFontFamilyValue } from '../../design/google-fonts'
 import { RenameInput } from './FileContextMenu'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode } from './buildFileTree'
+import {
+  FileText,
+  FileTs,
+  FileJs,
+  BracketsCurly,
+  FileCss,
+  FileHtml,
+  FilePdf,
+  FileImage,
+  FileSvg,
+  FileCode,
+  GearSix,
+  Graph,
+  File,
+  FolderSimple
+} from '@phosphor-icons/react'
 
-/** Vertical indent guide lines connecting parent directories to children. */
-function TreeGuides({ depth }: { readonly depth: number }) {
-  if (depth === 0) return null
-  return (
-    <>
-      {Array.from({ length: depth }, (_, i) => (
-        <span
-          key={i}
-          className="absolute top-0 bottom-0 pointer-events-none"
-          style={{
-            left: 8 + i * 16 + 7,
-            width: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.06)'
-          }}
-        />
-      ))}
-    </>
-  )
+/** Generate CSS background-image with vertical indent guide lines.
+ *  Each line is a 1px-wide gradient column at the indent position.
+ *  Because it's a background on the row itself, lines connect seamlessly
+ *  between adjacent rows with no gap. */
+function indentGuideBackground(depth: number): React.CSSProperties {
+  if (depth === 0) return {}
+  const guides: string[] = []
+  const positions: string[] = []
+  for (let i = 0; i < depth; i++) {
+    const x = 8 + i * 16 + 7
+    guides.push('linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.06))')
+    positions.push(`${x}px 0`)
+  }
+  return {
+    backgroundImage: guides.join(', '),
+    backgroundPosition: positions.join(', '),
+    backgroundSize: guides.map(() => '1px 100%').join(', '),
+    backgroundRepeat: 'no-repeat'
+  }
 }
 
 export interface FileTreeProps {
@@ -79,7 +96,7 @@ function splitName(name: string): { base: string; ext: string } {
   return { base: name.slice(0, dotIdx), ext: name.slice(dotIdx) }
 }
 
-// --- File type icons ---
+// --- File type icons (Phosphor) ---
 
 type FileIconKind =
   | 'markdown'
@@ -89,23 +106,46 @@ type FileIconKind =
   | 'yaml'
   | 'css'
   | 'html'
+  | 'pdf'
+  | 'svg'
   | 'image'
   | 'canvas'
   | 'config'
   | 'generic'
 
 const ICON_COLORS: Record<FileIconKind, string> = {
-  markdown: '#94a3b8',
-  typescript: '#3178c6',
-  javascript: '#f7df1e',
-  json: '#e6a817',
-  yaml: '#cb4a32',
-  css: '#a855f7',
-  html: '#e34f26',
-  image: '#22d3ee',
-  canvas: '#34d399',
-  config: '#64748b',
-  generic: '#64748b'
+  markdown: '#9badc0',
+  typescript: '#4a90e2',
+  javascript: '#e8cc44',
+  json: '#e0a828',
+  yaml: '#e25f42',
+  css: '#b07ae8',
+  html: '#e06030',
+  pdf: '#e04848',
+  svg: '#e09838',
+  image: '#38d0e8',
+  canvas: '#44d4b0',
+  config: '#7a8a9a',
+  generic: '#7a8a9a'
+}
+
+const ICON_COMPONENT: Record<
+  FileIconKind,
+  React.ComponentType<{ size: number; color: string; weight: 'light' | 'regular' | 'duotone' }>
+> = {
+  markdown: FileText,
+  typescript: FileTs,
+  javascript: FileJs,
+  json: BracketsCurly,
+  yaml: FileCode,
+  css: FileCss,
+  html: FileHtml,
+  pdf: FilePdf,
+  svg: FileSvg,
+  image: FileImage,
+  canvas: Graph,
+  config: GearSix,
+  generic: File
 }
 
 function getFileIconKind(filename: string): FileIconKind {
@@ -119,11 +159,12 @@ function getFileIconKind(filename: string): FileIconKind {
   if (ext === 'yaml' || ext === 'yml') return 'yaml'
   if (ext === 'css' || ext === 'scss' || ext === 'less') return 'css'
   if (ext === 'html' || ext === 'htm') return 'html'
+  if (ext === 'pdf') return 'pdf'
+  if (ext === 'svg') return 'svg'
   if (
     ext === 'png' ||
     ext === 'jpg' ||
     ext === 'jpeg' ||
-    ext === 'svg' ||
     ext === 'gif' ||
     ext === 'webp' ||
     ext === 'ico'
@@ -136,132 +177,20 @@ function getFileIconKind(filename: string): FileIconKind {
 
 function FileIcon({ filename }: { readonly filename: string }) {
   const kind = getFileIconKind(filename)
-  const color = ICON_COLORS[kind]
+  const Icon = ICON_COMPONENT[kind]
+  return <Icon size={14} color={ICON_COLORS[kind]} weight="duotone" />
+}
 
-  // All icons are 14x14 inline SVGs
-  const common = {
-    width: 14,
-    height: 14,
-    viewBox: '0 0 16 16',
-    fill: 'none',
-    xmlns: 'http://www.w3.org/2000/svg'
-  }
-  const stroke = {
-    stroke: color,
-    strokeWidth: '1.5',
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const
-  }
-
-  switch (kind) {
-    case 'markdown':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M5 10V6l2 2.5L9 6v4" {...stroke} />
-          <path d="M11 8.5V10" {...stroke} />
-          <path d="M11 7V7.01" {...stroke} strokeWidth="2" />
-        </svg>
-      )
-    case 'typescript':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M5.5 6.5h3M7 6.5v4.5" {...stroke} />
-          <path
-            d="M10 6.5c1.2 0 1.5.7 1.5 1.2s-.3 1.3-1.5 1.3c1.2 0 1.5.7 1.5 1.3s-.3 1.2-1.5 1.2"
-            {...stroke}
-          />
-        </svg>
-      )
-    case 'javascript':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M7 6.5v3.5c0 .8-.5 1-1 1" {...stroke} />
-          <path
-            d="M10 6.5c1.2 0 1.5.7 1.5 1.2s-.3 1.3-1.5 1.3c1.2 0 1.5.7 1.5 1.3s-.3 1.2-1.5 1.2"
-            {...stroke}
-          />
-        </svg>
-      )
-    case 'json':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M6 5c-1.5 0-1.5 1.5-1.5 3s0 3 1.5 3" {...stroke} />
-          <path d="M10 5c1.5 0 1.5 1.5 1.5 3s0 3-1.5 3" {...stroke} />
-        </svg>
-      )
-    case 'yaml':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M5.5 5.5L8 8.5 10.5 5.5" {...stroke} />
-          <path d="M8 8.5V11.5" {...stroke} />
-        </svg>
-      )
-    case 'css':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M6 6l-1.5 2.5L6 11" {...stroke} />
-          <path d="M10 6l1.5 2.5L10 11" {...stroke} />
-        </svg>
-      )
-    case 'html':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <path d="M5.5 6l-2 2.5 2 2.5" {...stroke} />
-          <path d="M10.5 6l2 2.5-2 2.5" {...stroke} />
-          <path d="M9 5.5L7 11.5" {...stroke} />
-        </svg>
-      )
-    case 'image':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <circle cx="6" cy="5.5" r="1.5" {...stroke} />
-          <path d="M2.5 11l3-3.5 2 2 2-1.5L14 12" {...stroke} />
-        </svg>
-      )
-    case 'canvas':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <rect x="4" y="4" width="3" height="2.5" rx="0.5" {...stroke} />
-          <rect x="9" y="9" width="3" height="2.5" rx="0.5" {...stroke} />
-          <path d="M7 5.25L9 10.25" {...stroke} strokeDasharray="1.5 1.5" />
-        </svg>
-      )
-    case 'config':
-      return (
-        <svg {...common}>
-          <rect x="2" y="1.5" width="12" height="13" rx="1.5" {...stroke} />
-          <circle cx="8" cy="8" r="2" {...stroke} />
-          <path d="M8 4v2M8 10v2M4 8h2M10 8h2" {...stroke} />
-        </svg>
-      )
-    default:
-      return (
-        <svg {...common}>
-          <path
-            d="M4 1.5h5.5L13 5v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5V3A1.5 1.5 0 0 1 4 1.5z"
-            {...stroke}
-          />
-          <path d="M9.5 1.5V5H13" {...stroke} />
-        </svg>
-      )
-  }
+function FolderIcon() {
+  return <FolderSimple size={14} color="#a1a1aa" weight="duotone" />
 }
 
 /** Inline SVG chevron pointing right, rotated via CSS when expanded */
 function Chevron({ isExpanded }: { isExpanded: boolean }) {
   return (
     <svg
-      width="14"
-      height="14"
+      width="12"
+      height="12"
       viewBox="0 0 16 16"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -373,28 +302,29 @@ function DirectoryRow({
     <div
       onClick={() => onToggleDirectory(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, true)}
-      className="relative flex items-center py-0.5 cursor-pointer rounded transition-colors"
+      className="flex items-center py-[5px] cursor-pointer rounded transition-colors"
       style={{
         paddingLeft,
         paddingRight: 8,
-        marginBottom: 1,
-        color: colors.text.primary,
+        color: '#a0a0a0',
         fontFamily: treeFontFamily,
-        fontWeight: 400,
+        fontWeight: 600,
         fontSize: treeFontSize - 1,
-        textTransform: 'uppercase',
-        letterSpacing: '0.04em'
+        letterSpacing: '0.02em',
+        ...indentGuideBackground(node.depth)
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
+        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = ''
       }}
     >
-      <TreeGuides depth={node.depth} />
-      <span className="mr-1.5 flex items-center" style={{ color: colors.text.muted }}>
+      <span className="mr-1 flex items-center" style={{ color: 'rgba(255, 255, 255, 0.30)' }}>
         <Chevron isExpanded={!isCollapsed} />
+      </span>
+      <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
+        <FolderIcon />
       </span>
       {isRenaming ? (
         <RenameInput
@@ -409,8 +339,7 @@ function DirectoryRow({
         <span
           className="ml-auto text-[11px]"
           style={{
-            color: colors.text.muted,
-            opacity: 0.4,
+            color: '#6a6a6a',
             fontVariantNumeric: 'tabular-nums'
           }}
         >
@@ -450,7 +379,7 @@ function FileRow({
   treeFontSize: number
   treeFontFamily: string
 }) {
-  const paddingLeft = 8 + node.depth * 16 + 4
+  const paddingLeft = 8 + node.depth * 16 + 16
   const { base, ext } = splitName(node.name)
 
   return (
@@ -475,26 +404,25 @@ function FileRow({
       onClick={() => onFileSelect(node.path)}
       onDoubleClick={() => (onFileDoubleClick ?? onFileSelect)(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
-      className="relative flex items-center py-0.5 cursor-pointer rounded transition-colors"
+      className="flex items-center py-[5px] cursor-pointer rounded transition-colors"
       style={{
         paddingLeft,
         paddingRight: 8,
-        marginBottom: 1,
-        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.10)' : undefined,
+        backgroundColor: isActive ? 'rgba(0, 229, 191, 0.04)' : undefined,
         borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
         fontFamily: treeFontFamily,
         fontWeight: 400,
-        fontSize: treeFontSize
+        fontSize: treeFontSize,
+        ...indentGuideBackground(node.depth)
       }}
       onMouseEnter={(e) => {
-        if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
+        if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
       }}
       onMouseLeave={(e) => {
         if (!isActive) e.currentTarget.style.backgroundColor = ''
       }}
     >
-      <TreeGuides depth={node.depth} />
-      <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
+      <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: isActive ? 0.9 : 0.7 }}>
         <FileIcon filename={node.name} />
       </span>
       {isRenaming ? (
@@ -505,7 +433,7 @@ function FileRow({
         />
       ) : (
         <span className="truncate flex-1">
-          <span style={{ color: colors.text.primary }}>{base}</span>
+          <span style={{ color: isActive ? colors.text.primary : '#8c8c8c' }}>{base}</span>
           {ext && <span style={{ color: colors.text.muted }}>{ext}</span>}
         </span>
       )}

@@ -151,17 +151,17 @@ export const canvasTokens = {
 } as const
 
 export const floatingPanel = {
-  borderRadius: 8,
+  borderRadius: 12,
   shadow:
-    '0 4px 24px rgba(0,0,0,0.4), 0 1px 6px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.07)',
+    '0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05)',
   shadowCompact:
-    '0 4px 16px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.07)',
+    '0 4px 16px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)',
   shadowCard:
     '0 4px 20px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.06)',
   shadowCardSelected: '0 0 0 1.5px var(--color-accent-default), 0 4px 24px rgba(0,0,0,0.4)',
   blur: {
-    sidebar: 'blur(12px)',
-    compact: 'blur(4px)'
+    sidebar: 'blur(24px) saturate(1.3)',
+    compact: 'blur(8px) saturate(1.2)'
   }
 } as const
 
