@@ -1,0 +1,302 @@
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { EditorState, type Extension } from '@codemirror/state'
+import { EditorView, lineNumbers } from '@codemirror/view'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { useCanvasStore } from '../../store/canvas-store'
+import { useEditorStore } from '../../store/editor-store'
+import { useViewStore } from '../../store/view-store'
+import { CardShell } from './CardShell'
+import { colors } from '../../design/tokens'
+import { inferLanguage } from './file-drop-utils'
+import { computeLineDelta, countLines } from './shared/file-view-utils'
+import { loadLanguageExtension, type SupportedLanguage } from './shared/codemirror-languages'
+import type { CanvasNode } from '@shared/canvas-types'
+
+interface FileViewCardProps {
+  readonly node: CanvasNode
+}
+
+export function FileViewCard({ node }: FileViewCardProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const viewRef = useRef<EditorView | null>(null)
+  const previousLineCountRef = useRef(0)
+
+  const [fileContent, setFileContent] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [modified, setModified] = useState(false)
+  const [lineDelta, setLineDelta] = useState('')
+
+  const removeNode = useCanvasStore((s) => s.removeNode)
+
+  const filePath = node.content
+
+  const filename = useMemo(() => {
+    const parts = filePath.split('/')
+    return parts[parts.length - 1] ?? 'file'
+  }, [filePath])
+
+  const language = useMemo(() => inferLanguage(filePath) as SupportedLanguage, [filePath])
+
+  // Step 1: Read file content (separate from CodeMirror mounting)
+  useEffect(() => {
+    if (!filePath) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+
+    window.api.fs
+      .readFile(filePath)
+      .then((content: string) => {
+        if (!cancelled) {
+          setFileContent(content)
+          previousLineCountRef.current = countLines(content)
+          setLoading(false)
+          setError(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Failed to load file')
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [filePath])
+
+  // Step 2: Mount CodeMirror once content is loaded and container exists
+  useEffect(() => {
+    if (!containerRef.current || fileContent === null) return
+
+    let cancelled = false
+
+    async function mount() {
+      const langExt = await loadLanguageExtension(language)
+      if (cancelled || !containerRef.current) return
+
+      const extensions: Extension[] = [
+        EditorState.readOnly.of(true),
+        lineNumbers(),
+        oneDark,
+        EditorView.theme({
+          '&': { height: '100%', fontSize: '13px' },
+          '.cm-scroller': {
+            fontFamily: '"JetBrains Mono", monospace',
+            overflow: 'auto'
+          },
+          '.cm-content': { padding: '8px 0' }
+        })
+      ]
+
+      if (langExt) extensions.push(langExt)
+
+      const state = EditorState.create({ doc: fileContent ?? '', extensions })
+      const view = new EditorView({ state, parent: containerRef.current })
+      viewRef.current = view
+    }
+
+    mount()
+
+    return () => {
+      cancelled = true
+      viewRef.current?.destroy()
+      viewRef.current = null
+    }
+  }, [fileContent, language])
+
+  // Subscribe to filesystem changes (freeze-then-signal pattern)
+  useEffect(() => {
+    if (!filePath) return
+
+    const unsub = window.api.on.fileChanged((data) => {
+      if (data.path !== filePath) return
+
+      if (data.event === 'unlink') {
+        setError('File not found or moved')
+        return
+      }
+
+      if (data.event === 'change') {
+        // Read new content only to compute delta, do NOT update display
+        window.api.fs
+          .readFile(filePath)
+          .then((newContent: string) => {
+            const delta = computeLineDelta(previousLineCountRef.current, newContent)
+            setLineDelta(delta.display)
+            setModified(true)
+          })
+          .catch(() => {
+            // If read fails during change event, still mark modified
+            setLineDelta('modified')
+            setModified(true)
+          })
+      }
+    })
+
+    return () => {
+      unsub()
+    }
+  }, [filePath])
+
+  // Refresh: re-read file, update CodeMirror, clear modified state
+  const handleRefresh = useCallback(() => {
+    if (!filePath) return
+
+    window.api.fs
+      .readFile(filePath)
+      .then((content: string) => {
+        const view = viewRef.current
+        if (view) {
+          view.dispatch({
+            changes: {
+              from: 0,
+              to: view.state.doc.length,
+              insert: content
+            }
+          })
+        }
+        previousLineCountRef.current = countLines(content)
+        setModified(false)
+        setLineDelta('')
+        setError(null)
+      })
+      .catch(() => {
+        setError('Failed to load file')
+      })
+  }, [filePath])
+
+  // Keyboard: press R while card is focused to refresh
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const focusedId = useCanvasStore.getState().focusedCardId
+      if (focusedId !== node.id) return
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        handleRefresh()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [node.id, handleRefresh])
+
+  // Double-click: open in editor
+  const handleDoubleClick = useCallback(() => {
+    useEditorStore.getState().openTab(filePath, filename)
+    useViewStore.getState().setContentView('editor')
+  }, [filePath, filename])
+
+  const openInEditor = useCallback(() => {
+    useEditorStore.getState().openTab(filePath, filename)
+    useViewStore.getState().setContentView('editor')
+  }, [filePath, filename])
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      useCanvasStore.getState().setCardContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        nodeId: node.id
+      })
+    },
+    [node.id]
+  )
+
+  return (
+    <CardShell
+      node={node}
+      title={filename}
+      filePath={filePath}
+      onClose={() => removeNode(node.id)}
+      onOpenInEditor={openInEditor}
+      onContextMenu={handleContextMenu}
+    >
+      <div
+        className="flex flex-col h-full"
+        style={{ minHeight: 0 }}
+        onDoubleClick={handleDoubleClick}
+      >
+        {/* Code content area */}
+        <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+          {loading && (
+            <div style={{ padding: 28 }}>
+              <span className="text-sm" style={{ color: colors.text.muted }}>
+                Loading...
+              </span>
+            </div>
+          )}
+          {!loading && error && (
+            <div style={{ padding: 28 }}>
+              <span className="text-sm" style={{ color: '#ef4444' }}>
+                {error}
+              </span>
+            </div>
+          )}
+          {/* Always render container so ref is available for CodeMirror mounting */}
+          <div
+            ref={containerRef}
+            className="h-full"
+            style={{ display: loading || error ? 'none' : 'block' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+
+        {/* Modified badge: compact notification bar at bottom */}
+        {modified && (
+          <div
+            className="flex items-center justify-between shrink-0 px-3 py-1.5"
+            style={{
+              borderTop: `1px solid ${colors.border.subtle}`,
+              backgroundColor: colors.accent.muted
+            }}
+          >
+            <span className="text-xs font-mono" style={{ color: colors.accent.default }}>
+              {lineDelta}
+              {lineDelta !== 'modified' ? ' lines' : ''}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleRefresh()
+              }}
+              className="flex items-center justify-center rounded hover:opacity-80"
+              style={{
+                width: 22,
+                height: 22,
+                color: colors.accent.default,
+                cursor: 'pointer',
+                backgroundColor: 'transparent',
+                border: 'none'
+              }}
+              aria-label="Refresh file"
+              title="Refresh file"
+            >
+              <svg
+                width={12}
+                height={12}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+    </CardShell>
+  )
+}
+
+export default FileViewCard

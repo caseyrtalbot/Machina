@@ -555,7 +555,8 @@ body {
   transition: scrollbar-color 200ms ease-out;
 }
 
-.canvas-card:hover .canvas-card-content {
+.canvas-card:hover .canvas-card-content,
+.canvas-card--focused .canvas-card-content {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
@@ -575,11 +576,13 @@ body {
   transition: background 200ms ease-out;
 }
 
-.canvas-card:hover .canvas-card-content::-webkit-scrollbar-thumb {
+.canvas-card:hover .canvas-card-content::-webkit-scrollbar-thumb,
+.canvas-card--focused .canvas-card-content::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.canvas-card:hover .canvas-card-content::-webkit-scrollbar-thumb:hover {
+.canvas-card:hover .canvas-card-content::-webkit-scrollbar-thumb:hover,
+.canvas-card--focused .canvas-card-content::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.30);
 }
 

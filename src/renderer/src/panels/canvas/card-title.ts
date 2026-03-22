@@ -42,6 +42,8 @@ export function getCanvasNodeTitle(
       )
     case 'project-file':
       return String(node.metadata?.relativePath ?? node.content ?? '') || 'File'
+    case 'file-view':
+      return node.content?.split('/').pop() || 'File View'
     case 'system-artifact':
       return String(node.metadata?.title ?? '') || 'System Artifact'
     default: {

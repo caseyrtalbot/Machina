@@ -34,7 +34,8 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   terminal: ['text'],
   pdf: ['text', 'terminal'],
   'project-file': ['text'],
-  'system-artifact': ['markdown', 'text']
+  'system-artifact': ['markdown', 'text'],
+  'file-view': ['text']
 } as const
 
 function ConvertMenu({
@@ -195,7 +196,7 @@ export function CardShell({
   return (
     <div
       data-canvas-node
-      className="absolute flex flex-col canvas-card"
+      className={`absolute flex flex-col canvas-card${isFocused ? ' canvas-card--focused' : ''}`}
       style={{
         left: node.position.x,
         top: node.position.y,

@@ -237,15 +237,12 @@ export function CanvasView(): React.ReactElement {
             break
           }
           case 'code': {
+            // Create file-view card (read-only live monitor) instead of inline code card
             const language = inferLanguage(file.path)
-            const filename = file.path.split('/').pop() ?? ''
-            let content = ''
-            try {
-              content = await window.api.fs.readFile(file.path)
-            } catch {
-              // File unreadable; create card with empty content
-            }
-            node = createCanvasNode('code', pos, { content, metadata: { language, filename } })
+            node = createCanvasNode('file-view', pos, {
+              content: file.path,
+              metadata: { language, previousLineCount: 0, modified: false }
+            })
             break
           }
           default: {

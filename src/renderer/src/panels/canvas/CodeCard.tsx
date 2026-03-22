@@ -8,52 +8,14 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import type { CanvasNode, CodeNodeMeta } from '@shared/canvas-types'
+import {
+  LANGUAGES,
+  loadLanguageExtension,
+  type SupportedLanguage
+} from './shared/codemirror-languages'
 
 interface CodeCardProps {
   node: CanvasNode
-}
-
-const LANGUAGES = [
-  'typescript',
-  'javascript',
-  'python',
-  'json',
-  'html',
-  'css',
-  'plaintext'
-] as const
-
-type SupportedLanguage = (typeof LANGUAGES)[number]
-
-async function loadLanguageExtension(lang: SupportedLanguage): Promise<Extension | null> {
-  switch (lang) {
-    case 'typescript': {
-      const { javascript } = await import('@codemirror/lang-javascript')
-      return javascript({ typescript: true })
-    }
-    case 'javascript': {
-      const { javascript } = await import('@codemirror/lang-javascript')
-      return javascript()
-    }
-    case 'python': {
-      const { python } = await import('@codemirror/lang-python')
-      return python()
-    }
-    case 'json': {
-      const { json } = await import('@codemirror/lang-json')
-      return json()
-    }
-    case 'html': {
-      const { html } = await import('@codemirror/lang-html')
-      return html()
-    }
-    case 'css': {
-      const { css } = await import('@codemirror/lang-css')
-      return css()
-    }
-    default:
-      return null
-  }
 }
 
 export function CodeCard({ node }: CodeCardProps) {
