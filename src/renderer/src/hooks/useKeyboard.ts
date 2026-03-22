@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 
 interface KeyboardConfig {
   onToggleSidebar?: () => void
-  onToggleTerminal?: () => void
   onNewNote?: () => void
   onCycleView?: () => void
   onToggleSourceMode?: () => void
@@ -17,7 +16,6 @@ interface KeyboardConfig {
 
 const META_KEY_BINDINGS = [
   { key: 'b', handler: 'onToggleSidebar' },
-  { key: '`', handler: 'onToggleTerminal' },
   { key: 'n', handler: 'onNewNote' },
   { key: 'g', handler: 'onCycleView' },
   { key: '/', handler: 'onToggleSourceMode' },
