@@ -158,6 +158,7 @@ export function CardShell({
 }: CardShellProps) {
   const copyText = filePath ?? title
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
+  const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const setHoveredNode = useCanvasStore((s) => s.setHoveredNode)
@@ -202,7 +203,11 @@ export function CardShell({
         height: node.size.height,
         backgroundColor: canvasTokens.card,
         borderRadius: canvasTokens.cardRadius,
-        boxShadow: isSelected ? floatingPanel.shadowCardSelected : floatingPanel.shadowCard,
+        boxShadow: isFocused
+          ? '0 0 0 2px var(--color-accent-default), 0 0 16px rgba(0, 229, 191, 0.2), 0 4px 24px rgba(0,0,0,0.4)'
+          : isSelected
+            ? floatingPanel.shadowCardSelected
+            : floatingPanel.shadowCard,
         overflow: 'hidden',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',

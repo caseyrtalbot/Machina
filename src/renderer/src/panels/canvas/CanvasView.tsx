@@ -296,6 +296,27 @@ export function CanvasView(): React.ReactElement {
           }
         }
       }
+
+      // J/K spatial card cycling
+      if (e.key === 'j' || e.key === 'k') {
+        // Guard: don't fire in terminals, text inputs, or rich editors
+        if (useCanvasStore.getState().focusedTerminalId) return
+        if (document.activeElement?.tagName === 'TEXTAREA') return
+        if (document.activeElement?.tagName === 'INPUT') return
+        if ((document.activeElement as HTMLElement)?.isContentEditable) return
+
+        e.preventDefault()
+        if (e.key === 'j') {
+          useCanvasStore.getState().focusNextCard()
+        } else {
+          useCanvasStore.getState().focusPrevCard()
+        }
+      }
+
+      // Escape clears focus
+      if (e.key === 'Escape') {
+        useCanvasStore.getState().setFocusedCard(null)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -318,6 +339,15 @@ export function CanvasView(): React.ReactElement {
           return
         e.preventDefault()
         setImportOpen(true)
+      } else if (e.key === 'l') {
+        // CMD+L: apply default tile layout (grid-2x2) to viewport center
+        e.preventDefault()
+        const vp = useCanvasStore.getState().viewport
+        const w = containerRef.current?.clientWidth ?? 1920
+        const h = containerRef.current?.clientHeight ?? 1080
+        const centerX = (-vp.x + w / 2) / vp.zoom
+        const centerY = (-vp.y + h / 2) / vp.zoom
+        useCanvasStore.getState().applyTileLayout('grid-2x2', { x: centerX, y: centerY })
       }
     }
     window.addEventListener('keydown', handler)
