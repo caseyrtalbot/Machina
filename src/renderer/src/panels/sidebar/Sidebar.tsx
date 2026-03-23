@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react'
 
+import { rewriteWikilinks } from '@engine/rename-links'
+import { useVaultStore } from '../../store/vault-store'
 import { colors, getArtifactColor } from '../../design/tokens'
 import { FileContextMenu } from './FileContextMenu'
 import { FileTree } from './FileTree'
@@ -291,9 +293,34 @@ export function Sidebar({
       onFileAction?.({ actionId: 'rename-confirm', path: renamingPath, isDirectory })
       const parentDir = renamingPath.split('/').slice(0, -1).join('/')
       const newPath = `${parentDir}/${newName}`
+
+      // Capture backlinks before rename (index still has old stem)
+      const oldBasename = renamingPath.split('/').pop() ?? ''
+      const oldStem = oldBasename.replace(/\.md$/i, '')
+      const newStem = newName.replace(/\.md$/i, '')
+      const { fileToId, getBacklinks, artifactPathById } = useVaultStore.getState()
+      const oldId = fileToId[renamingPath]
+      // Only rewrite if the id was derived from filename (no explicit id override)
+      const needsRewrite = !isDirectory && oldId === oldStem && oldStem !== newStem
+      const backlinks = needsRewrite ? getBacklinks(oldStem) : []
+      const pathMap = { ...artifactPathById }
+
       window.api.fs
         .renameFile(renamingPath, newPath)
-        .then(() => setRenamingPath(null))
+        .then(async () => {
+          if (needsRewrite) {
+            await Promise.all(
+              backlinks.map(async (artifact) => {
+                const filePath = pathMap[artifact.id]
+                if (!filePath || filePath === renamingPath) return
+                const raw = await window.api.fs.readFile(filePath)
+                const updated = rewriteWikilinks(raw, oldStem, newStem)
+                if (updated !== raw) await window.api.fs.writeFile(filePath, updated)
+              })
+            )
+          }
+          setRenamingPath(null)
+        })
         .catch(() => setRenamingPath(null))
     },
     [renamingPath, nodes, onFileAction]
