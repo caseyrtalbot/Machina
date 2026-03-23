@@ -20,12 +20,12 @@ describe('design tokens', () => {
   })
 
   it('has artifact type colors for all types', () => {
-    expect(ARTIFACT_COLORS.gene).toBe('#22d3ee')
-    expect(ARTIFACT_COLORS.constraint).toBe('#ef4444')
-    expect(ARTIFACT_COLORS.research).toBe('#a78bfa')
-    expect(ARTIFACT_COLORS.output).toBe('#f472b6')
-    expect(ARTIFACT_COLORS.note).toBe('#94a3b8')
-    expect(ARTIFACT_COLORS.index).toBe('#38bdf8')
+    expect(ARTIFACT_COLORS.gene).toBe('#00cca8')
+    expect(ARTIFACT_COLORS.constraint).toBe('#ff847d')
+    expect(ARTIFACT_COLORS.research).toBe('#ad9cff')
+    expect(ARTIFACT_COLORS.output).toBe('#ec86cc')
+    expect(ARTIFACT_COLORS.note).toBe('#a3afc1')
+    expect(ARTIFACT_COLORS.index).toBe('#00befa')
   })
 
   it('has no color collisions between artifact types and semantic colors', () => {
@@ -102,8 +102,8 @@ describe('getArtifactColor', () => {
   })
 
   it('still returns built-in colors for known types', () => {
-    expect(getArtifactColor('gene')).toBe('#22d3ee')
-    expect(getArtifactColor('constraint')).toBe('#ef4444')
+    expect(getArtifactColor('gene')).toBe('#00cca8')
+    expect(getArtifactColor('constraint')).toBe('#ff847d')
   })
 
   it('custom type colors do not collide with built-in colors', () => {

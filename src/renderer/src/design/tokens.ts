@@ -21,34 +21,44 @@ export const colors = {
     muted: 'var(--color-accent-muted)'
   },
   semantic: {
-    cluster: '#34D399',
-    tension: '#F59E0B'
+    cluster: '#3dca8d',
+    tension: '#ecaa0b'
   }
 } as const
 
+/* ── OKLCH Perceptually Uniform Palette ──────────────────────────────────
+ * All artifact types use L=0.75, C=0.15 (varying only hue) for equal
+ * visual weight regardless of color. Exception: note uses C=0.03
+ * (desaturated) since it's the most common type and should recede.
+ *
+ * Edge kinds use deliberately lower L/C so edges don't compete with nodes.
+ *
+ * Hex values computed via scripts/oklch-to-hex.mjs with sRGB gamut clamping.
+ * To regenerate: node scripts/oklch-to-hex.mjs
+ */
 export const ARTIFACT_COLORS = {
-  gene: '#22d3ee',
-  constraint: '#ef4444',
-  research: '#a78bfa',
-  output: '#f472b6',
-  note: '#94a3b8',
-  index: '#38bdf8',
-  session: '#10b981',
-  pattern: '#f59e0b',
-  tension: '#fb7185'
+  gene: '#00cca8', // oklch(0.75 0.15 175) teal
+  constraint: '#ff847d', // oklch(0.75 0.15 25) red
+  research: '#ad9cff', // oklch(0.75 0.15 290) purple
+  output: '#ec86cc', // oklch(0.75 0.15 340) pink
+  note: '#a3afc1', // oklch(0.75 0.03 260) slate (low chroma)
+  index: '#00befa', // oklch(0.75 0.15 230) sky
+  session: '#4ec983', // oklch(0.75 0.15 155) emerald
+  pattern: '#dfa11a', // oklch(0.75 0.15 80) amber
+  tension: '#fe838f' // oklch(0.75 0.15 15) rose
 } as const satisfies Record<BuiltInArtifactType, string>
 
-// Palette excludes colors already used by built-in types
+// Custom type palette: 9 OKLCH hues at L=0.75, C=0.15, evenly spaced
 const CUSTOM_TYPE_PALETTE = [
-  '#c084fc', // purple (distinct from research #a78bfa)
-  '#818cf8', // indigo
-  '#34d399', // emerald
-  '#facc15', // yellow
-  '#fb923c', // orange
-  '#f87171', // red-light (distinct from constraint #ef4444)
-  '#2dd4bf', // teal
-  '#a3e635', // lime
-  '#fbbf24' // amber
+  '#fa8c58', // oklch(0.75 0.15 45) orange
+  '#c4af1c', // oklch(0.75 0.15 100) gold
+  '#83c35d', // oklch(0.75 0.15 135) lime
+  '#00cacb', // oklch(0.75 0.15 195) cyan
+  '#00c4e9', // oklch(0.75 0.15 215) sky-teal
+  '#5cb3ff', // oklch(0.75 0.15 250) blue
+  '#93a4ff', // oklch(0.75 0.15 275) indigo
+  '#cb91f4', // oklch(0.75 0.15 310) violet
+  '#f683b3' // oklch(0.75 0.15 355) magenta
 ] as const
 
 function hashString(str: string): number {
@@ -60,7 +70,7 @@ function hashString(str: string): number {
 }
 
 export function getArtifactColor(type: string): string {
-  if (type === 'tag') return '#f59e0b'
+  if (type === 'tag') return '#dfa11a'
   const builtIn = (ARTIFACT_COLORS as Record<string, string>)[type]
   if (builtIn) return builtIn
   return CUSTOM_TYPE_PALETTE[hashString(type) % CUSTOM_TYPE_PALETTE.length]
@@ -130,11 +140,13 @@ export const visualLanguage = {
 } as const
 
 export const EDGE_KIND_COLORS: Record<string, string> = {
-  connection: '#64748b',
-  cluster: '#34d399',
-  tension: '#f59e0b',
-  related: '#a78bfa',
-  causal: '#f472b6'
+  connection: '#667383', // oklch(0.55 0.03 255) neutral slate
+  cluster: '#3dca8d', // oklch(0.75 0.15 160) green
+  tension: '#ecaa0b', // oklch(0.78 0.16 80) amber
+  related: '#9887e8', // oklch(0.68 0.14 290) purple
+  'co-occurrence': '#4e5661', // oklch(0.45 0.02 255) dark slate
+  appears_in: '#667383', // oklch(0.55 0.03 255) neutral
+  causal: '#da76bb' // oklch(0.70 0.15 340) pink
 } as const
 
 export const canvasTokens = {

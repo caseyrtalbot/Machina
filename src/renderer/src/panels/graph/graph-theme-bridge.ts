@@ -1,4 +1,4 @@
-import { getArtifactColor } from '@renderer/design/tokens'
+import { getArtifactColor, EDGE_KIND_COLORS } from '@renderer/design/tokens'
 import type { ArtifactType, RelationshipKind } from '@shared/types'
 
 /** Convert a hex color string to a PixiJS-compatible integer. */
@@ -15,30 +15,13 @@ export function nodeColorForType(type: ArtifactType): number {
   return hexToPixi(getArtifactColor(type))
 }
 
-// Semantic relationship colors (from tokens.ts)
-const CLUSTER_COLOR = 0x34d399
-const TENSION_COLOR = 0xf59e0b
-const DEFAULT_EDGE_COLOR = 0x64748b
-const COOCCURRENCE_COLOR = 0x475569
-const APPEARS_IN_COLOR = 0x64748b
-const RELATED_COLOR = 0xa78bfa
+// Default fallback for edge kinds not in EDGE_KIND_COLORS
+const FALLBACK_EDGE_COLOR = hexToPixi(EDGE_KIND_COLORS.connection)
 
 /** Get the PixiJS color for an edge based on its relationship kind. */
 export function buildEdgeColor(kind: RelationshipKind): number {
-  switch (kind) {
-    case 'cluster':
-      return CLUSTER_COLOR
-    case 'tension':
-      return TENSION_COLOR
-    case 'connection':
-      return DEFAULT_EDGE_COLOR
-    case 'appears_in':
-      return APPEARS_IN_COLOR
-    case 'related':
-      return RELATED_COLOR
-    case 'co-occurrence':
-      return COOCCURRENCE_COLOR
-  }
+  const hex = EDGE_KIND_COLORS[kind]
+  return hex ? hexToPixi(hex) : FALLBACK_EDGE_COLOR
 }
 
 /** Edge opacity by kind (explicit relationships more visible than inferred). */
