@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { TE_DIR } from '@shared/constants'
 import type { CanvasEdge, CanvasNode } from '@shared/canvas-types'
 import type { SessionMilestone, WorkbenchSessionEvent } from '@shared/workbench-types'
 import {
@@ -53,9 +54,7 @@ describe('workbench artifacts', () => {
     })
 
     expect(result.id).toContain('p-20260320-')
-    expect(result.snapshotPath).toBe(
-      '.thought-engine/artifacts/patterns/' + result.id + '.canvas.json'
-    )
+    expect(result.snapshotPath).toBe(TE_DIR + '/artifacts/patterns/' + result.id + '.canvas.json')
     expect(result.snapshot.nodes).toHaveLength(2)
     expect(result.snapshot.edges).toHaveLength(1)
     expect(result.snapshot.nodes[0].metadata).not.toHaveProperty('isActive')

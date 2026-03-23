@@ -10,6 +10,7 @@ import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import { type SessionId, sessionId as toSessionId } from '@shared/types'
+import { TE_DIR } from '@shared/constants'
 import '@xterm/xterm/css/xterm.css'
 
 const BASE_FONT_SIZE = 13
@@ -190,7 +191,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
                   if (cancelled || !sessionIdRef.current) return
                   const nodes = useCanvasStore.getState().nodes
                   const contextFilePath = vaultPath
-                    ? `${vaultPath}/.thought-engine/context-${node.id}.txt`
+                    ? `${vaultPath}/${TE_DIR}/context-${node.id}.txt`
                     : undefined
                   const { text } = buildCanvasContext(node.id, nodes, { contextFilePath })
                   if (text) {

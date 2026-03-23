@@ -3,6 +3,7 @@ import { useCanvasStore } from '../store/canvas-store'
 import { useVaultStore } from '../store/vault-store'
 import { colors, typography } from '../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
+import { TE_DIR } from '@shared/constants'
 
 export interface ClaudeContextResult {
   /** JSX for the title bar context summary. null for non-Claude cards. */
@@ -57,7 +58,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
         .then(({ buildCanvasContext }) => {
           const { nodes } = useCanvasStore.getState()
           const contextFilePath = vaultPathRef.current
-            ? `${vaultPathRef.current}/.thought-engine/context-${node.id}.txt`
+            ? `${vaultPathRef.current}/${TE_DIR}/context-${node.id}.txt`
             : undefined
           const result = buildCanvasContext(node.id, nodes, { contextFilePath })
           if (result.text && vaultPathRef.current) {
@@ -77,7 +78,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
     return () => {
       const currentVaultPath = vaultPathRef.current ?? useVaultStore.getState().vaultPath
       if (currentVaultPath) {
-        const contextPath = `${currentVaultPath}/.thought-engine/context-${node.id}.txt`
+        const contextPath = `${currentVaultPath}/${TE_DIR}/context-${node.id}.txt`
         window.api.fs.deleteFile(contextPath).catch(() => {})
       }
     }

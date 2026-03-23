@@ -1,3 +1,5 @@
+import { TE_DIR } from './constants'
+
 export const SYSTEM_ARTIFACT_KINDS = ['session', 'pattern', 'tension'] as const
 export type SystemArtifactKind = (typeof SYSTEM_ARTIFACT_KINDS)[number]
 
@@ -173,7 +175,7 @@ export function isSystemArtifactKind(value: string): value is SystemArtifactKind
 
 export function isSystemArtifactPath(path: string): boolean {
   return SYSTEM_ARTIFACT_KINDS.some((kind) =>
-    path.includes(`/.thought-engine/artifacts/${SYSTEM_ARTIFACT_DIRECTORIES[kind]}/`)
+    path.includes(`/${TE_DIR}/artifacts/${SYSTEM_ARTIFACT_DIRECTORIES[kind]}/`)
   )
 }
 

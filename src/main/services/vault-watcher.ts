@@ -1,5 +1,6 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { EventBatcher, type BatchedEvent } from './event-batcher'
+import { TE_DIR } from '@shared/constants'
 
 export type FileEvent = 'add' | 'change' | 'unlink'
 export type FileChangeCallback = (path: string, event: FileEvent) => void
@@ -7,7 +8,7 @@ export type BatchChangeCallback = (events: BatchedEvent[]) => void
 
 export const DEFAULT_IGNORE_PATTERNS = [
   'node_modules',
-  '.thought-engine',
+  TE_DIR,
   'dist',
   'build',
   'out',

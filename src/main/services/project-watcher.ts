@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { relative } from 'path'
 import type { WorkbenchFileChangedEvent } from '@shared/workbench-types'
+import { TE_DIR } from '@shared/constants'
 
 export type ProjectFileCallback = (event: WorkbenchFileChangedEvent) => void
 
@@ -16,7 +17,7 @@ const IGNORE_PATTERNS = [
   /\.jpg$/,
   /\.jpeg$/,
   /\.ico$/,
-  /\.thought-engine/
+  new RegExp(TE_DIR.replace('.', '\\.'))
 ]
 
 function shouldIgnore(filePath: string): boolean {
@@ -42,7 +43,7 @@ export class ProjectWatcher {
         '**/build/**',
         '**/.next/**',
         '**/out/**',
-        '**/.thought-engine/**',
+        `**/${TE_DIR}/**`,
         '**/*.png',
         '**/*.jpg',
         '**/*.jpeg',

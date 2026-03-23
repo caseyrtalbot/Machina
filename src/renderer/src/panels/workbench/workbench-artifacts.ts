@@ -1,4 +1,5 @@
 import type { CanvasEdge, CanvasFile, CanvasNode } from '@shared/canvas-types'
+import { TE_DIR } from '@shared/constants'
 import type {
   WorkbenchSessionEvent,
   SessionMilestone,
@@ -130,7 +131,7 @@ export function buildPatternArtifactDocument(options: {
   const titleSeed = selectedFiles[0] ?? options.projectName
   const id = `p-${dateStampForId(options.now)}-${slugifyArtifactPart(titleSeed)}`
   const title = `Pattern: ${selectedFiles[0] ?? options.projectName}`
-  const snapshotPath = `.thought-engine/artifacts/patterns/${id}.canvas.json`
+  const snapshotPath = `${TE_DIR}/artifacts/patterns/${id}.canvas.json`
   const frontmatter: PatternArtifactFrontmatter = {
     id,
     title,

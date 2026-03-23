@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
+import { TE_DIR } from '@shared/constants'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useTabStore } from '../../store/tab-store'
 import { placeArtifactOnWorkbench } from './workbench-artifact-placement'
@@ -7,7 +8,7 @@ import type { SystemArtifactListItem } from '../sidebar/Sidebar'
 function makeItem(overrides: Partial<SystemArtifactListItem> = {}): SystemArtifactListItem {
   return {
     id: 't-20260320-test',
-    path: '/vault/.thought-engine/artifacts/tensions/t-20260320-test.md',
+    path: `/vault/${TE_DIR}/artifacts/tensions/t-20260320-test.md`,
     title: 'Test tension',
     type: 'tension',
     modified: '2026-03-20',
@@ -36,7 +37,7 @@ describe('placeArtifactOnWorkbench', () => {
       artifactKind: 'tension',
       artifactId: 't-20260320-test',
       status: 'open',
-      filePath: '/vault/.thought-engine/artifacts/tensions/t-20260320-test.md'
+      filePath: `/vault/${TE_DIR}/artifacts/tensions/t-20260320-test.md`
     })
   })
 

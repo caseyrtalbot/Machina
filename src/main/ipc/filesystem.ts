@@ -1,6 +1,6 @@
 import { dialog, shell } from 'electron'
 import { FileService } from '../services/file-service'
-import { teConfigPath, teStatePath, assertWithinVault } from '../utils/paths'
+import { teConfigPath, teStatePath, assertWithinVault, TE_DIR } from '../utils/paths'
 import { typedHandle } from '../typed-ipc'
 import type { VaultConfig, VaultState } from '../../shared/types'
 
@@ -83,7 +83,7 @@ export function registerFilesystemIpc(): void {
     try {
       return JSON.parse(content) as VaultConfig
     } catch {
-      throw new Error('Vault config is corrupted. Delete .thought-engine/config.json to reset.')
+      throw new Error(`Vault config is corrupted. Delete ${TE_DIR}/config.json to reset.`)
     }
   })
 
@@ -100,7 +100,7 @@ export function registerFilesystemIpc(): void {
     try {
       return JSON.parse(content) as VaultState
     } catch {
-      throw new Error('Vault state is corrupted. Delete .thought-engine/state.json to reset.')
+      throw new Error(`Vault state is corrupted. Delete ${TE_DIR}/state.json to reset.`)
     }
   })
 

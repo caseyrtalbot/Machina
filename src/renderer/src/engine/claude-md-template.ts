@@ -1,3 +1,5 @@
+import { TE_DIR } from '@shared/constants'
+
 export function generateClaudeMd(vaultName: string): string {
   return `# CLAUDE.md — ${vaultName}
 
@@ -112,7 +114,7 @@ When you start a new session in this vault, quickly check the state of the files
 
 ## What NOT to Do
 
-- **Don't touch \`.thought-engine/\`** — That's the app's internal config directory
+- **Don't touch \`${TE_DIR}/\`** — That's the app's internal config directory
 - **Don't delete \`tensions_with\` edges** — Tensions are the most valuable relationships
 - **Don't auto-promote signals to \`core\`** — Always ask first
 - **Don't create files without edges** — Orphan nodes have no value in a knowledge graph

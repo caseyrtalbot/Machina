@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { TE_DIR } from '@shared/constants'
 import { enrichArtifactMetadata } from './workbench-artifact-placement'
 import type { SystemArtifactKind } from '@shared/system-artifacts'
 
@@ -76,7 +77,7 @@ describe('enrichArtifactMetadata', () => {
       status: 'active',
       project_root: '/repo',
       file_refs: ['src/a.ts', 'src/b.ts'],
-      canvas_snapshot: '.thought-engine/artifacts/patterns/p-20260320-test.canvas.json',
+      canvas_snapshot: `${TE_DIR}/artifacts/patterns/p-20260320-test.canvas.json`,
       note_refs: ['note-1'],
       tension_refs: ['t-20260320-bug']
     }

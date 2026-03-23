@@ -1,7 +1,7 @@
 import { join, resolve, normalize } from 'path'
 import { SYSTEM_ARTIFACT_DIRECTORIES, type SystemArtifactKind } from '@shared/system-artifacts'
-
-export const TE_DIR = '.thought-engine'
+export { TE_DIR } from '@shared/constants'
+import { TE_DIR } from '@shared/constants'
 export const CONFIG_FILE = 'config.json'
 export const STATE_FILE = 'state.json'
 export const ARTIFACTS_DIR = 'artifacts'

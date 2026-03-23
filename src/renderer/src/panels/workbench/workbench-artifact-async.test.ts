@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { TE_DIR } from '@shared/constants'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useTabStore } from '../../store/tab-store'
 import { placeArtifactOnWorkbench, enrichPlacedArtifact } from './workbench-artifact-placement'
@@ -57,7 +58,7 @@ Card appears with basic data then updates.
 function makeItem(overrides: Partial<SystemArtifactListItem> = {}): SystemArtifactListItem {
   return {
     id: 's-20260320-dev',
-    path: '/vault/.thought-engine/artifacts/sessions/s-20260320-dev.md',
+    path: `/vault/${TE_DIR}/artifacts/sessions/s-20260320-dev.md`,
     title: 'Dev session',
     type: 'session',
     modified: '2026-03-20',
@@ -106,7 +107,7 @@ describe('enrichPlacedArtifact', () => {
   it('enriches a tension artifact with question field', async () => {
     const item = makeItem({
       id: 't-20260320-perf',
-      path: '/vault/.thought-engine/artifacts/tensions/t-20260320-perf.md',
+      path: `/vault/${TE_DIR}/artifacts/tensions/t-20260320-perf.md`,
       title: 'Performance concern',
       type: 'tension',
       status: 'open'
@@ -127,7 +128,7 @@ describe('enrichPlacedArtifact', () => {
     // Place pattern first
     const pattern = makeItem({
       id: 'p-20260320-tdd',
-      path: '/vault/.thought-engine/artifacts/patterns/p-20260320-tdd.md',
+      path: `/vault/${TE_DIR}/artifacts/patterns/p-20260320-tdd.md`,
       title: 'TDD loop',
       type: 'pattern',
       status: 'active'

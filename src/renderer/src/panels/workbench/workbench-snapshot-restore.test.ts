@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { TE_DIR } from '@shared/constants'
 import { useCanvasStore } from '../../store/canvas-store'
 import { createCanvasNode } from '@shared/canvas-types'
 import { serializeCanvas } from '../canvas/canvas-io'
@@ -43,7 +44,7 @@ describe('restorePatternSnapshot', () => {
     const existing = createCanvasNode('text', { x: -200, y: 0 }, { content: 'my note' })
     useCanvasStore.getState().addNode(existing)
 
-    const snapshotPath = '.thought-engine/artifacts/patterns/p-test.canvas.json'
+    const snapshotPath = `${TE_DIR}/artifacts/patterns/p-test.canvas.json`
     const absolutePath = '/vault/' + snapshotPath
     const reader = createMockFsReader({ [absolutePath]: serializeCanvas(SNAPSHOT_CANVAS) })
 
@@ -75,7 +76,7 @@ describe('restorePatternSnapshot', () => {
   })
 
   it('deduplicates nodes when restoring the same snapshot twice', async () => {
-    const snapshotPath = '.thought-engine/artifacts/patterns/p-test.canvas.json'
+    const snapshotPath = `${TE_DIR}/artifacts/patterns/p-test.canvas.json`
     const absolutePath = '/vault/' + snapshotPath
     const reader = createMockFsReader({ [absolutePath]: serializeCanvas(SNAPSHOT_CANVAS) })
 
