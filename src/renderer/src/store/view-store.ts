@@ -16,7 +16,7 @@ interface ViewStore {
  */
 export const useViewStore = create<ViewStore>(() => ({
   contentView: (useTabStore.getState().tabs.find((t) => t.id === useTabStore.getState().activeTabId)
-    ?.type ?? 'editor') as ContentView,
+    ?.type ?? 'canvas') as ContentView,
 
   setContentView: (view: ContentView) => {
     const def = TAB_DEFINITIONS[view]
