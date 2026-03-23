@@ -17,6 +17,7 @@ import { parseFrontmatter } from './markdown-utils'
 import { ConceptNodeMark } from './extensions/concept-node-mark'
 import { MermaidCodeBlock } from './extensions/mermaid-code-block'
 import { SlashCommand } from './extensions/slash-command'
+import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
 import { colors } from '../../design/tokens'
 import { isSystemArtifactPath } from '@shared/system-artifacts'
@@ -371,7 +372,10 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           }}
         />
         {mode === 'rich' ? (
-          <RichEditor editor={editor} />
+          <>
+            <RichEditor editor={editor} />
+            {editor && <EditorBubbleMenu editor={editor} />}
+          </>
         ) : (
           <SourceEditor content={content} onChange={setContent} />
         )}
