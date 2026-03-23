@@ -327,42 +327,48 @@ export function Sidebar({
   )
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-2 pr-8">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 p-2 pr-8">
         <SearchBar onSearch={onSearch} />
       </div>
-      <ActionBar
-        sortMode={sortMode}
-        vaultName={vaultName}
-        vaultHistory={vaultHistory}
-        onNewFile={onNewFile}
-        onSortChange={onSortChange}
-        onSelectVault={onSelectVault}
-        onOpenVaultPicker={onOpenVaultPicker}
-        onRemoveFromHistory={onRemoveFromHistory}
-        onOpenSettings={onOpenSettings}
-      />
-      {workspaces.length > 0 && (
-        <WorkspaceFilter
-          workspaces={workspaces}
-          active={activeWorkspace}
-          onSelect={onWorkspaceSelect}
+      <div className="flex-shrink-0">
+        <ActionBar
+          sortMode={sortMode}
+          vaultName={vaultName}
+          vaultHistory={vaultHistory}
+          onNewFile={onNewFile}
+          onSortChange={onSortChange}
+          onSelectVault={onSelectVault}
+          onOpenVaultPicker={onOpenVaultPicker}
+          onRemoveFromHistory={onRemoveFromHistory}
+          onOpenSettings={onOpenSettings}
         />
+      </div>
+      {workspaces.length > 0 && (
+        <div className="flex-shrink-0">
+          <WorkspaceFilter
+            workspaces={workspaces}
+            active={activeWorkspace}
+            onSelect={onWorkspaceSelect}
+          />
+        </div>
       )}
-      <SystemArtifactCollections
-        items={systemArtifacts}
-        activeFilePath={activeFilePath}
-        onSelect={onSystemArtifactSelect}
-      />
+      <div className="flex-shrink-0">
+        <SystemArtifactCollections
+          items={systemArtifacts}
+          activeFilePath={activeFilePath}
+          onSelect={onSystemArtifactSelect}
+        />
+      </div>
       <div
-        className="mx-3"
+        className="mx-3 flex-shrink-0"
         style={{
           height: 1,
           background:
             'linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.06) 80%, transparent)'
         }}
       />
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <FileTree
           nodes={nodes}
           activeFilePath={activeFilePath}

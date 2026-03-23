@@ -132,7 +132,7 @@ export function CanvasFloatingSidebar({
           <polyline points="10 7 8 9.5 10 12" />
         </svg>
       </button>
-      <div className="h-full overflow-y-auto pt-2">{children}</div>
+      <div className="flex-1 min-h-0 flex flex-col pt-2">{children}</div>
     </div>
   )
 }
