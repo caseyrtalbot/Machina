@@ -83,6 +83,8 @@ Infinite pan-zoom canvas with typed cards and edges:
 - **card-registry.ts**: `LazyCards` maps `CanvasNodeType` → lazy-loaded component. Nine types: `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`.
 - **TerminalCard.tsx**: Real PTY session in a canvas card. Culling and LOD bypassed to preserve sessions. Uses `metadata.initialCommand` for auto-commands (e.g., `claude`). Counter-scales for 1:1 pixel rendering.
 - **CanvasToolbar.tsx**: Orange button spawns a terminal card with `initialCommand: 'claude'` on the canvas.
+- **EdgeDots.tsx**: Off-screen connection indicators. Colored dots at viewport edges point toward connected cards not currently visible. Click to pan to the target card.
+- **CardShell.tsx pointer-events gating**: Unfocused cards have a transparent overlay blocking content interaction. First click focuses the card, second click interacts with content. Prevents accidental input into terminal sessions.
 
 ### Terminal Persistence
 
@@ -95,7 +97,7 @@ Project-scoped canvas showing Claude session activity, file cards, and system ar
 ### State Management (Zustand)
 
 - **vault-store**: Files, artifacts, graph, parse errors, vault path/config/state, discoveredTypes
-- **editor-store**: Active note, mode (rich|source), dirty state, content, cursor, tabs
+- **editor-store**: Active note, mode (rich|source), dirty state, content, cursor, tabs, fileMtimes (conflict detection), conflictPath
 - **canvas-store**: Nodes, edges, viewport, selection, hover, card context menu
 - **graph-view-store**: Viewport, hover/selected node, simulation state, display settings, force params
 - **terminal-store**: Active sessions, titles
@@ -111,6 +113,36 @@ Views are managed by `tab-store` and rendered via `KeepAliveSlot` (CSS `display:
 ### Settings and Theming
 
 Six themes (Midnight, Slate, Obsidian, Nord, Opal, Light) with eight retro neon accent colors. `GoogleFontLoader` applies font settings to `document.body`. Settings persisted to localStorage.
+
+### Design System
+
+Three-layer material model:
+- **Canvas void** (darkest): The infinite workspace background. Defined per theme in `themes.ts` canvas.surface.
+- **Cards** (mid-tone, semi-transparent): Content surfaces. `rgba()` values with `backdrop-filter: blur(20px)`. Float above the canvas via shadow.
+- **Glass overlays** (translucent): All floating UI (sidebar, toolbar, minimap, palettes) shares `floatingPanel.glass.bg` (`rgba(20,20,24,0.78)`) and `floatingPanel.glass.blur` (`blur(20px) saturate(1.3)`).
+
+Card colors use `rgba()` across all themes so they inherit temperature from the canvas beneath them.
+
+### Rich Text Editor (`src/renderer/src/panels/editor/`)
+
+Tiptap 3 (ProseMirror-based) with markdown round-tripping via `@tiptap/markdown` (uses `marked` v17). All content serializes to portable `.md` files.
+
+**Extensions** (in `panels/editor/extensions/`):
+- **slash-command.tsx**: Type `/` on an empty line for a block-type command palette. Uses `@tiptap/suggestion` + `@floating-ui/react`. Glass popup with keyboard navigation.
+- **EditorBubbleMenu.tsx**: Floating toolbar on text selection: Bold, Italic, Strike, Code, Highlight, Link, Concept Node. Uses Tiptap's built-in BubbleMenu.
+- **callout-block.ts**: `> [!TYPE]` admonition blocks (note, warning, tip, important). Custom `marked` tokenizer. Tinted glass backgrounds with colored left borders. Obsidian/GitHub compatible.
+- **highlight-mark.ts**: `==text==` highlight syntax. Amber tint background. Cmd+Shift+H shortcut.
+- **concept-node-mark.ts**: `<node>term</node>` inline concept tags. Custom tokenizer with v3 `parseMarkdown`/`renderMarkdown` API.
+- **mermaid-code-block.tsx**: Mermaid diagram rendering via ReactNodeViewRenderer.
+- **Block handles**: `@tiptap/extension-drag-handle` for drag-to-reorder blocks.
+
+**Extension registries**: `tiptap-config.ts` (shared base for editor + canvas cards), EditorPanel adds editor-only extensions (slash commands, bubble menu, drag handle).
+
+**Markdown rule**: Only add block types that have clean markdown representations. No text color, no multi-column layouts. If it can't round-trip through `.md`, don't ship it.
+
+### File Write Conflict Detection
+
+Editor tracks `fileMtimes` per open file. Before autosave, checks current mtime against stored mtime. If the file was modified externally (e.g., by a Claude agent), an amber banner offers "Reload from disk" or "Keep my version". Mtime entries are pruned on tab close.
 
 ### File System
 
