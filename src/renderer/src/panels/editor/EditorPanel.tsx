@@ -18,6 +18,7 @@ import { ConceptNodeMark } from './extensions/concept-node-mark'
 import { MermaidCodeBlock } from './extensions/mermaid-code-block'
 import { SlashCommand } from './extensions/slash-command'
 import { CalloutBlock } from './extensions/callout-block'
+import { HighlightMark } from './extensions/highlight-mark'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
 import { colors } from '../../design/tokens'
@@ -76,6 +77,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       Link.configure({ openOnClick: false, HTMLAttributes: { rel: null, target: null } }),
       ConceptNodeMark,
       CalloutBlock,
+      HighlightMark,
       SlashCommand
     ],
     []

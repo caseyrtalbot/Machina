@@ -7,6 +7,7 @@ import Link from '@tiptap/extension-link'
 import { ConceptNodeMark } from '../../editor/extensions/concept-node-mark'
 import { MermaidCodeBlock } from '../../editor/extensions/mermaid-code-block'
 import { CalloutBlock } from '../../editor/extensions/callout-block'
+import { HighlightMark } from '../../editor/extensions/highlight-mark'
 
 export function getCanvasEditorExtensions(): AnyExtension[] {
   return [
@@ -17,6 +18,7 @@ export function getCanvasEditorExtensions(): AnyExtension[] {
     TaskItem.configure({ nested: true }),
     Link.configure({ openOnClick: false, HTMLAttributes: { rel: null, target: null } }),
     ConceptNodeMark,
-    CalloutBlock
+    CalloutBlock,
+    HighlightMark
   ]
 }

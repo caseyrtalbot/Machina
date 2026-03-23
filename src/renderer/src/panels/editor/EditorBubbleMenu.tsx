@@ -98,6 +98,24 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
           <span style={{ fontFamily: 'monospace', fontSize: 12 }}>&lt;/&gt;</span>
         </FormatButton>
 
+        <FormatButton
+          active={editor.isActive('highlight')}
+          onClick={() => editor.chain().focus().toggleMark('highlight').run()}
+          title="Highlight (Cmd+Shift+H)"
+        >
+          <span
+            style={{
+              backgroundColor: 'rgba(234, 179, 8, 0.3)',
+              padding: '0 3px',
+              borderRadius: 2,
+              fontSize: 12,
+              lineHeight: 1
+            }}
+          >
+            H
+          </span>
+        </FormatButton>
+
         <div
           style={{
             width: 1,
