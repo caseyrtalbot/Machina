@@ -199,7 +199,12 @@ export function TerminalCard({ node }: TerminalCardProps) {
                       'edges:',
                       edges.length
                     )
-                    const context = serializeNeighborhood(node.id, nodes, edges)
+                    const contextFilePath = vaultPath
+                      ? `${vaultPath}/.thought-engine/context-${node.id}.txt`
+                      : undefined
+                    const context = serializeNeighborhood(node.id, nodes, edges, {
+                      contextFilePath
+                    })
 
                     console.log(
                       '[TE:context] context length:',

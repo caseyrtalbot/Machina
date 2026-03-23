@@ -153,6 +153,12 @@ export function serializeNeighborhood(
   // Header with skill orientation (Task 7)
   lines.push(`You are running inside a canvas card (${focusedNode.type}) in Thought Engine.`)
   lines.push('The canvas is a spatial workspace where cards represent knowledge artifacts.')
+  if (options?.contextFilePath) {
+    lines.push(
+      `Canvas context is kept up to date at: ${options.contextFilePath}`,
+      'Read this file to see the current canvas state when cards change around you.'
+    )
+  }
 
   if (neighborEdges.size > 0) {
     lines.push(EDGE_LEGEND)

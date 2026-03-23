@@ -36,4 +36,7 @@ export interface ConnectedCard {
 export interface ContextOptions {
   readonly maxTokens?: number // default 500
   readonly edgePriorityOverride?: readonly ContextEdgeKind[]
+  /** Path to the context file that auto-notify updates on canvas changes.
+   *  Included in the system prompt so Claude knows where to read updates. */
+  readonly contextFilePath?: string
 }

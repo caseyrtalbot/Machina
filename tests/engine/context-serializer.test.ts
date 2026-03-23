@@ -41,6 +41,16 @@ describe('serializeNeighborhood', () => {
     const result = serializeNeighborhood('t1', nodes, [])
     expect(result).toContain('canvas card (terminal)')
     expect(result).toContain('Thought Engine')
+    expect(result).not.toContain('context is kept up to date')
+  })
+
+  it('includes context file path when provided', () => {
+    const nodes = [makeNode('t1', 'terminal', '')]
+    const result = serializeNeighborhood('t1', nodes, [], {
+      contextFilePath: '/vault/.thought-engine/context-t1.txt'
+    })
+    expect(result).toContain('context is kept up to date at: /vault/.thought-engine/context-t1.txt')
+    expect(result).toContain('Read this file')
     expect(result).not.toContain('Connected cards')
   })
 
