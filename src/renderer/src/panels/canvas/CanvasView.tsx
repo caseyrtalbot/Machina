@@ -1,4 +1,5 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { colors, typography } from '../../design/tokens'
 import { CanvasSurface } from './CanvasSurface'
 import { useCanvasStore } from '../../store/canvas-store'
 import {
@@ -430,6 +431,24 @@ export function CanvasView(): React.ReactElement {
       </CanvasSurface>
 
       <ConnectionDragOverlay />
+
+      {nodes.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[1]">
+          <p
+            style={{
+              fontSize: 12,
+              fontFamily: typography.fontFamily.mono,
+              color: colors.text.muted,
+              letterSpacing: '0.04em',
+              marginTop: -60
+            }}
+          >
+            drop files to begin
+            <span style={{ opacity: 0.4, margin: '0 10px' }}>|</span>
+            <span style={{ opacity: 0.6 }}>Cmd+G</span>
+          </p>
+        </div>
+      )}
 
       <ZoomIndicator />
 
