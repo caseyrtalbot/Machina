@@ -183,54 +183,31 @@ export function TerminalCard({ node }: TerminalCardProps) {
           setTimeout(() => {
             if (cancelled || !sessionIdRef.current) return
 
-            // For Claude cards: inject spatial context (Decision 1B)
-            if (initialCommand === 'claude') {
-              try {
-                import('../../engine/context-serializer')
-                  .then(({ serializeNeighborhood, escapeForShell }) => {
-                    if (cancelled || !sessionIdRef.current) return
-                    const nodes = useCanvasStore.getState().nodes
-                    const edges = useCanvasStore.getState().edges
-                    console.log(
-                      '[TE:context] serializing for card',
-                      node.id,
-                      'nodes:',
-                      nodes.length,
-                      'edges:',
-                      edges.length
-                    )
-                    const contextFilePath = vaultPath
-                      ? `${vaultPath}/.thought-engine/context-${node.id}.txt`
-                      : undefined
-                    const context = serializeNeighborhood(node.id, nodes, edges, {
-                      contextFilePath
-                    })
-
-                    console.log(
-                      '[TE:context] context length:',
-                      context.length,
-                      'preview:',
-                      context.slice(0, 100)
-                    )
-                    if (context) {
-                      const escaped = escapeForShell(context)
-                      const cmd = `claude --append-system-prompt $'${escaped}'`
-                      console.log('[TE:context] sending cmd length:', cmd.length)
-                      window.api.terminal.write(sessionIdRef.current!, cmd + '\n')
-                    } else {
-                      window.api.terminal.write(sessionIdRef.current!, 'claude\n')
-                    }
-                  })
-                  .catch((err) => {
-                    console.error('Context injection failed:', err)
+            // For Claude cards: inject canvas file paths as context
+            if (isClaudeCard) {
+              import('../../engine/context-serializer')
+                .then(({ buildCanvasContext, escapeForShell }) => {
+                  if (cancelled || !sessionIdRef.current) return
+                  const nodes = useCanvasStore.getState().nodes
+                  const contextFilePath = vaultPath
+                    ? `${vaultPath}/.thought-engine/context-${node.id}.txt`
+                    : undefined
+                  const { text } = buildCanvasContext(node.id, nodes, { contextFilePath })
+                  if (text) {
+                    const escaped = escapeForShell(text)
+                    const cmd = `claude --append-system-prompt $'${escaped}'`
+                    window.api.terminal.write(sessionIdRef.current!, cmd + '\n')
+                  } else {
                     window.api.terminal.write(sessionIdRef.current!, 'claude\n')
-                    markError()
-                  })
-              } catch (err) {
-                console.error('Context injection failed:', err)
-                window.api.terminal.write(sessionIdRef.current!, 'claude\n')
-                markError()
-              }
+                  }
+                })
+                .catch((err) => {
+                  console.error('Context injection failed:', err)
+                  if (sessionIdRef.current) {
+                    window.api.terminal.write(sessionIdRef.current, 'claude\n')
+                  }
+                  markError()
+                })
             } else {
               // Non-Claude commands: send as-is
               window.api.terminal.write(sessionIdRef.current!, initialCommand + '\n')
