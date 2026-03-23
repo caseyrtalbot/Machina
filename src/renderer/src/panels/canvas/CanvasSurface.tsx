@@ -17,8 +17,8 @@ interface GridParams {
 }
 
 // Constant dot brightness — does not vary with zoom
-const MINOR_OPACITY = 0.14
-const MAJOR_OPACITY = 0.24
+const MINOR_OPACITY = 0.2
+const MAJOR_OPACITY = 0.32
 
 // Target screen-space radius in CSS pixels (what the user sees)
 const TARGET_SCREEN_RADIUS = 0.85
@@ -230,9 +230,14 @@ export function CanvasSurface({
       className="relative w-full h-full overflow-hidden"
       style={{
         backgroundColor: canvasTokens.surface,
-        backgroundImage: `radial-gradient(ellipse at 40% 40%, rgba(255,255,255,0.03) 0%, transparent 70%), ${svgDataUri}`,
-        backgroundSize: `100% 100%, ${tileSize}px ${tileSize}px`,
-        backgroundPosition: `0 0, ${bgPos}`,
+        backgroundImage: [
+          'radial-gradient(ellipse at 25% 15%, rgba(255,255,255,0.045) 0%, transparent 55%)',
+          'radial-gradient(ellipse at 75% 85%, rgba(255,255,255,0.025) 0%, transparent 50%)',
+          'radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.015) 0%, transparent 80%)',
+          svgDataUri
+        ].join(', '),
+        backgroundSize: `100% 100%, 100% 100%, 100% 100%, ${tileSize}px ${tileSize}px`,
+        backgroundPosition: `0 0, 0 0, 0 0, ${bgPos}`,
         cursor: 'default'
       }}
       onPointerDown={(e) => {

@@ -80,7 +80,7 @@ function ActionBar({
   onOpenSettings?: () => void
 }) {
   return (
-    <div className="flex flex-col gap-1 px-2 py-1">
+    <div className="flex flex-col gap-0.5 px-2 py-0.5">
       <div className="flex items-center">
         {vaultName && onSelectVault && onOpenVaultPicker ? (
           <div className="flex-1 min-w-0">
@@ -328,10 +328,18 @@ export function Sidebar({
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 p-2 pr-8">
-        <SearchBar onSearch={onSearch} />
-      </div>
-      <div className="flex-shrink-0">
+      {/* ── Controls zone: visually grouped toolbar ── */}
+      <div
+        className="flex-shrink-0"
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.02)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+          paddingBottom: 4
+        }}
+      >
+        <div className="px-2 pt-2 pb-1 pr-8">
+          <SearchBar onSearch={onSearch} />
+        </div>
         <ActionBar
           sortMode={sortMode}
           vaultName={vaultName}
@@ -343,16 +351,14 @@ export function Sidebar({
           onRemoveFromHistory={onRemoveFromHistory}
           onOpenSettings={onOpenSettings}
         />
-      </div>
-      {workspaces.length > 0 && (
-        <div className="flex-shrink-0">
+        {workspaces.length > 0 && (
           <WorkspaceFilter
             workspaces={workspaces}
             active={activeWorkspace}
             onSelect={onWorkspaceSelect}
           />
-        </div>
-      )}
+        )}
+      </div>
       <div className="flex-shrink-0">
         <SystemArtifactCollections
           items={systemArtifacts}
@@ -360,14 +366,6 @@ export function Sidebar({
           onSelect={onSystemArtifactSelect}
         />
       </div>
-      <div
-        className="mx-3 flex-shrink-0"
-        style={{
-          height: 1,
-          background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.06) 80%, transparent)'
-        }}
-      />
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hover">
         <FileTree
           nodes={nodes}

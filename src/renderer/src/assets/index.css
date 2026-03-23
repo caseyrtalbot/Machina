@@ -118,7 +118,7 @@ body {
   --color-accent-subtle: color-mix(in srgb, var(--color-accent-default) 15%, transparent);
 
   /* ── Canvas Card Defaults (overridden per theme by ThemeProvider) ── */
-  --canvas-surface-bg: #1c1d20;
+  --canvas-surface-bg: #161618;
   --canvas-card-bg: rgba(40, 42, 46, 0.72);
   --canvas-card-title-bg: rgba(34, 36, 40, 0.78);
   --canvas-card-border: color-mix(in srgb, white 8%, transparent);

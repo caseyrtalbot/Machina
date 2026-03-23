@@ -170,11 +170,15 @@ export const floatingPanel = {
   shadowCompact:
     '0 4px 16px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)',
   shadowCard:
-    '0 6px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.06)',
+    '0 6px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3), inset 0 0.5px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.07)',
   shadowCardSelected: '0 0 0 1.5px var(--color-accent-default), 0 6px 28px rgba(0,0,0,0.5)',
   glass: {
-    bg: 'rgba(20, 20, 24, 0.78)',
+    bg: 'rgba(20, 20, 24, 0.74)',
     blur: 'blur(20px) saturate(1.3)'
+  },
+  glassCard: {
+    blur: 'blur(20px) saturate(1.2)',
+    highlightEdge: 'inset 0 0.5px 0 rgba(255,255,255,0.12)'
   }
 } as const
 

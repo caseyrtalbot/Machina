@@ -306,6 +306,7 @@ function DirectoryRow({
       style={{
         paddingLeft,
         paddingRight: 8,
+        marginTop: node.depth === 0 ? 6 : undefined,
         color: '#a0a0a0',
         fontFamily: treeFontFamily,
         fontWeight: 600,
@@ -408,7 +409,7 @@ function FileRow({
       style={{
         paddingLeft,
         paddingRight: 8,
-        backgroundColor: isActive ? 'rgba(0, 229, 191, 0.04)' : undefined,
+        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.06)' : undefined,
         borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
         fontFamily: treeFontFamily,
         fontWeight: 400,

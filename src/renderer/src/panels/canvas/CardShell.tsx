@@ -232,8 +232,8 @@ export function CardShell({
               : floatingPanel.shadowCard,
         overflow: 'hidden',
         contain: 'layout style',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        backdropFilter: 'blur(20px) saturate(1.2)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
         ...(isActive
           ? ({
               '--activity-color': 'rgba(167, 139, 250, 0.3)',
@@ -263,6 +263,7 @@ export function CardShell({
           backgroundColor: canvasTokens.cardTitleBar,
           borderBottom: `1px solid ${canvasTokens.cardBorder}`,
           borderRadius: `${canvasTokens.cardRadius}px ${canvasTokens.cardRadius}px 0 0`,
+          backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%)',
           cursor: 'grab'
         }}
         onPointerDown={onDragStart}
