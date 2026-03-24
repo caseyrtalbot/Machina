@@ -60,7 +60,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   user-select: none;
   color: var(--color-text-primary);
-  background: var(--color-bg-base);
+  background: transparent;
 }
 
 /* Atmospheric overlay removed for clean reading surface */
@@ -118,10 +118,10 @@ body {
   --color-accent-subtle: color-mix(in srgb, var(--color-accent-default) 15%, transparent);
 
   /* ── Canvas Card Defaults (overridden per theme by ThemeProvider) ── */
-  --canvas-surface-bg: #161618;
-  --canvas-card-bg: rgba(40, 42, 46, 0.72);
-  --canvas-card-title-bg: rgba(34, 36, 40, 0.78);
-  --canvas-card-border: color-mix(in srgb, white 8%, transparent);
+  --canvas-surface-bg: rgba(22, 22, 24, 0.55);
+  --canvas-card-bg: rgba(40, 42, 46, 0.78);
+  --canvas-card-title-bg: rgba(0, 0, 0, 0.15);
+  --canvas-card-border: rgba(255, 255, 255, 0.06);
   --canvas-text-heading: #e8e8e8;
   --canvas-blockquote-bar: #4a4a4a;
   --canvas-link-cyan: #5cb8c4;

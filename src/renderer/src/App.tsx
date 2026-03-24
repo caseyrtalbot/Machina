@@ -912,7 +912,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       className="h-screen w-screen relative flex"
       style={
         {
-          backgroundColor: colors.bg.base,
+          backgroundColor: 'transparent',
           color: colors.text.primary,
           '--sidebar-inset': sidebarExpanded ? '340px' : '120px'
         } as React.CSSProperties

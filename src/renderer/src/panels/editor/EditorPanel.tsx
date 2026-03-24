@@ -301,7 +301,10 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
   // Empty state - only show when no file is selected
   // Floating chrome inset: editor content shifts right to clear the floating sidebar
-  const insetStyle = { paddingLeft: 'var(--sidebar-inset, 0px)' } as React.CSSProperties
+  const insetStyle = {
+    paddingLeft: 'var(--sidebar-inset, 0px)',
+    backgroundColor: 'var(--color-bg-base)'
+  } as React.CSSProperties
 
   if (!activeNotePath) {
     return (

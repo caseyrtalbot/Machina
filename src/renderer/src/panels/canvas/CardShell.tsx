@@ -224,16 +224,16 @@ export function CardShell({
         backgroundColor: canvasTokens.card,
         borderRadius: canvasTokens.cardRadius,
         boxShadow: isLocked
-          ? '0 0 0 2px var(--color-accent-default), 0 0 24px rgba(0, 229, 191, 0.3), 0 4px 32px rgba(0,0,0,0.5)'
+          ? `inset 0 0.5px 0 rgba(255,255,255,0.14), 0 0 0 2px var(--color-accent-default), 0 0 24px rgba(0, 229, 191, 0.3), 0 4px 32px rgba(0,0,0,0.5)`
           : isFocused
-            ? '0 0 0 2px var(--color-accent-default), 0 0 16px rgba(0, 229, 191, 0.2), 0 4px 24px rgba(0,0,0,0.4)'
+            ? `inset 0 0.5px 0 rgba(255,255,255,0.14), 0 0 0 2px var(--color-accent-default), 0 0 16px rgba(0, 229, 191, 0.2), 0 4px 24px rgba(0,0,0,0.4)`
             : isSelected
-              ? floatingPanel.shadowCardSelected
-              : floatingPanel.shadowCard,
+              ? `inset 0 0.5px 0 rgba(255,255,255,0.12), ${floatingPanel.shadowCardSelected}`
+              : `inset 0 0.5px 0 rgba(255,255,255,0.12), 0 6px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3)`,
         overflow: 'hidden',
         contain: 'layout style',
-        backdropFilter: 'blur(20px) saturate(1.2)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
+        backdropFilter: 'blur(24px) saturate(1.3)',
+        WebkitBackdropFilter: 'blur(24px) saturate(1.3)',
         ...(isActive
           ? ({
               '--activity-color': 'rgba(167, 139, 250, 0.3)',
@@ -261,9 +261,8 @@ export function CardShell({
           height: canvasTokens.titleBarHeight,
           padding: '0 12px',
           backgroundColor: canvasTokens.cardTitleBar,
-          borderBottom: `1px solid ${canvasTokens.cardBorder}`,
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
           borderRadius: `${canvasTokens.cardRadius}px ${canvasTokens.cardRadius}px 0 0`,
-          backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%)',
           cursor: 'grab'
         }}
         onPointerDown={onDragStart}

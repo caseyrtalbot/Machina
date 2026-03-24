@@ -170,7 +170,7 @@ export function CanvasMinimap({
         height: MINIMAP_HEIGHT,
         backgroundColor: floatingPanel.glass.bg,
         borderRadius: floatingPanel.borderRadius,
-        boxShadow: floatingPanel.shadowCompact,
+        boxShadow: `inset 0 0.5px 0 rgba(255,255,255,0.1), ${floatingPanel.shadowCompact}`,
         backdropFilter: floatingPanel.glass.blur,
         zIndex: 20,
         overflow: 'hidden',
