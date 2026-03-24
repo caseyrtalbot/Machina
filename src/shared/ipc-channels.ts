@@ -83,6 +83,19 @@ export interface IpcChannels {
   'terminal:kill': { request: { sessionId: SessionId }; response: void }
   'terminal:process-name': { request: { sessionId: SessionId }; response: string | null }
 
+  // --- Document Manager ---
+  'doc:open': { request: { path: string }; response: { content: string; version: number } }
+  'doc:close': { request: { path: string }; response: void }
+  'doc:update': {
+    request: { path: string; content: string }
+    response: { version: number }
+  }
+  'doc:save': { request: { path: string }; response: void }
+  'doc:get-content': {
+    request: { path: string }
+    response: { content: string; version: number; dirty: boolean } | null
+  }
+
   // --- Window ---
   'window:minimize': { request: void; response: void }
   'window:maximize': { request: void; response: void }
@@ -104,6 +117,11 @@ export interface IpcEvents {
   'workbench:file-changed': WorkbenchFileChangedEvent
   'session:milestone': SessionMilestone
   'session:detected': SessionDetectedEvent
+
+  // Document Manager events (main -> renderer)
+  'doc:external-change': { path: string; content: string }
+  'doc:conflict': { path: string; diskContent: string }
+  'doc:saved': { path: string }
 }
 
 export type IpcChannel = keyof IpcChannels

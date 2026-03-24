@@ -24,10 +24,6 @@ interface EditorStore {
   readonly historyStack: readonly string[]
   readonly historyIndex: number
 
-  // File conflict detection
-  readonly fileMtimes: Readonly<Record<string, string>>
-  readonly conflictPath: string | null
-
   setActiveNote: (id: string | null, path: string | null) => void
   setMode: (mode: EditorMode) => void
   setContent: (content: string) => void
@@ -35,8 +31,6 @@ interface EditorStore {
   setDirty: (dirty: boolean) => void
   markSaved: () => void
   setCursorPosition: (line: number, col: number) => void
-  setFileMtime: (path: string, mtime: string) => void
-  setConflictPath: (path: string | null) => void
 
   openTab: (path: string, title?: string, noteId?: string | null) => void
   closeTab: (path: string) => void
@@ -71,7 +65,7 @@ function pushHistory(
 }
 
 /**
- * Save current content if dirty. Fire-and-forget so callers stay synchronous.
+ * Save current content if dirty via DocumentManager. Fire-and-forget.
  * Used internally by store actions before switching away from the active file.
  */
 function flushIfDirty(state: {
@@ -81,13 +75,16 @@ function flushIfDirty(state: {
 }): void {
   if (!state.isDirty || !state.activeNotePath || !state.content) return
   const path = state.activeNotePath
-  window.api.fs
-    .writeFile(path, state.content)
+  // Push latest content to DocumentManager and trigger save
+  window.api.document
+    .update(path, state.content)
+    .then(() => window.api.document.save(path))
     .then(async () => {
-      if (!isSystemArtifactPath(path)) return
-      const { syncSystemArtifactFromDisk } =
-        await import('../system-artifacts/system-artifact-runtime')
-      await syncSystemArtifactFromDisk(path)
+      if (isSystemArtifactPath(path)) {
+        const { syncSystemArtifactFromDisk } =
+          await import('../system-artifacts/system-artifact-runtime')
+        await syncSystemArtifactFromDisk(path)
+      }
     })
     .catch(() => {
       useEditorStore.setState({ isDirty: true })
@@ -105,8 +102,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   openTabs: [],
   historyStack: [],
   historyIndex: -1,
-  fileMtimes: {},
-  conflictPath: null,
 
   setActiveNote: (id, path) => {
     if (!path) {
@@ -138,8 +133,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setDirty: (dirty) => set({ isDirty: dirty }),
   markSaved: () => set({ isDirty: false }),
   setCursorPosition: (line, col) => set({ cursorLine: line, cursorCol: col }),
-  setFileMtime: (path, mtime) => set((s) => ({ fileMtimes: { ...s.fileMtimes, [path]: mtime } })),
-  setConflictPath: (path) => set({ conflictPath: path }),
 
   openTab: (path, title, noteId) => {
     const state = get()
@@ -167,10 +160,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
     const tabs = state.openTabs.filter((t) => t.path !== path)
 
-    // Prune mtime entry for the closed file
-    const { [path]: _, ...remainingMtimes } = state.fileMtimes
-    const conflictCleared = state.conflictPath === path ? null : state.conflictPath
-
     if (state.activeNotePath === path) {
       const oldIndex = state.openTabs.findIndex((t) => t.path === path)
       const nextTab = tabs[Math.min(oldIndex, tabs.length - 1)] ?? null
@@ -179,12 +168,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         openTabs: tabs,
         activeNoteId: nextTab?.path ?? null,
         activeNotePath: nextTab?.path ?? null,
-        isDirty: false,
-        fileMtimes: remainingMtimes,
-        conflictPath: conflictCleared
+        isDirty: false
       })
     } else {
-      set({ openTabs: tabs, fileMtimes: remainingMtimes, conflictPath: conflictCleared })
+      set({ openTabs: tabs })
     }
   },
 
@@ -234,13 +221,14 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   }
 }))
 
-/** Immediately save current content if dirty. Fire-and-forget for responsiveness. */
+/** Immediately save current content if dirty via DocumentManager. Fire-and-forget. */
 export function flushPendingSave(): void {
   const state = useEditorStore.getState()
   if (!state.isDirty || !state.activeNotePath || !state.content) return
   const path = state.activeNotePath
-  window.api.fs
-    .writeFile(path, state.content)
+  window.api.document
+    .update(path, state.content)
+    .then(() => window.api.document.save(path))
     .then(async () => {
       if (isSystemArtifactPath(path)) {
         const { syncSystemArtifactFromDisk } =

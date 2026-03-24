@@ -9,6 +9,7 @@ import { registerShellIpc, getShellService } from './ipc/shell'
 import { registerConfigIpc } from './ipc/config'
 
 import { registerProjectIpc, getProjectWatcher, getSessionTailer } from './ipc/workbench'
+import { registerDocumentIpc, getDocumentManager } from './ipc/documents'
 import { typedHandle } from './typed-ipc'
 
 const PROD_CSP = [
@@ -136,6 +137,7 @@ app.whenReady().then(() => {
   registerWatcherIpc(window)
   registerShellIpc(window)
 
+  registerDocumentIpc(window)
   registerProjectIpc(window)
 
   app.on('activate', function () {
@@ -143,7 +145,10 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
+  // Flush all dirty documents before quitting
+  await getDocumentManager().flushAll()
+
   getShellService().killAll()
 
   getProjectWatcher().stop()

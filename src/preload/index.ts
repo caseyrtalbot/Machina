@@ -87,6 +87,13 @@ const api = {
     kill: (sessionId: SessionId) => typedInvoke('terminal:kill', { sessionId }),
     getProcessName: (sessionId: SessionId) => typedInvoke('terminal:process-name', { sessionId })
   },
+  document: {
+    open: (path: string) => typedInvoke('doc:open', { path }),
+    close: (path: string) => typedInvoke('doc:close', { path }),
+    update: (path: string, content: string) => typedInvoke('doc:update', { path, content }),
+    save: (path: string) => typedInvoke('doc:save', { path }),
+    getContent: (path: string) => typedInvoke('doc:get-content', { path })
+  },
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getHomePath: () => homedir(),
   on: {
@@ -106,7 +113,12 @@ const api = {
     sessionMilestone: (callback: (data: SessionMilestone) => void) =>
       typedOn('session:milestone', callback),
     sessionDetected: (callback: (data: SessionDetectedEvent) => void) =>
-      typedOn('session:detected', callback)
+      typedOn('session:detected', callback),
+    docExternalChange: (callback: (data: { path: string; content: string }) => void) =>
+      typedOn('doc:external-change', callback),
+    docConflict: (callback: (data: { path: string; diskContent: string }) => void) =>
+      typedOn('doc:conflict', callback),
+    docSaved: (callback: (data: { path: string }) => void) => typedOn('doc:saved', callback)
   }
 }
 

@@ -3,6 +3,7 @@ import { VaultWatcher } from '../services/vault-watcher'
 import { FileService } from '../services/file-service'
 import { teConfigPath } from '../utils/paths'
 import { typedHandle, typedSend } from '../typed-ipc'
+import { getDocumentManager } from './documents'
 
 const watcher = new VaultWatcher()
 const fileService = new FileService()
@@ -22,6 +23,14 @@ export function registerWatcherIpc(mainWindow: BrowserWindow): void {
       args.vaultPath,
       (events) => {
         typedSend(mainWindow, 'vault:files-changed-batch', { events })
+
+        // Route change events to DocumentManager for open files
+        const docManager = getDocumentManager()
+        for (const { path, event } of events) {
+          if (event === 'change' && docManager.documents.has(path)) {
+            docManager.handleExternalChange(path).catch(() => {})
+          }
+        }
       },
       customPatterns
     )

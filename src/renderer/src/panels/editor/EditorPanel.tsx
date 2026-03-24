@@ -24,8 +24,7 @@ import DragHandle from '@tiptap/extension-drag-handle'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
 import { colors } from '../../design/tokens'
-import { isSystemArtifactPath } from '@shared/system-artifacts'
-import { vaultEvents } from '@engine/vault-event-hub'
+import { useDocument } from '../../hooks/useDocument'
 
 interface EditorPanelProps {
   onNavigate: (id: string) => void
@@ -39,8 +38,9 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const setContent = useEditorStore((s) => s.setContent)
   const loadContent = useEditorStore((s) => s.loadContent)
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition)
-  const conflictPath = useEditorStore((s) => s.conflictPath)
-  const hasConflict = conflictPath === activeNotePath && activeNotePath !== null
+
+  // DocumentManager: all file I/O goes through main process
+  const doc = useDocument(activeNotePath)
 
   const artifact = useVaultStore((s) =>
     activeNoteId ? (s.artifacts.find((a) => a.id === activeNoteId) ?? null) : null
@@ -111,15 +111,19 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       const manager = ed.storage.markdown?.manager
       if (manager) {
         let markdown = manager.serialize(ed.getJSON())
-        // Re-prepend original frontmatter for lossless round-tripping
         const rawFm = frontmatterRawRef.current
         if (rawFm) {
           markdown = rawFm + markdown
         }
         setContent(markdown)
+        // Push directly to DocumentManager from user action (not via effect)
+        const path = useEditorStore.getState().activeNotePath
+        if (path && prevLoadedPathRef.current === path) {
+          doc.update(markdown)
+        }
       }
     },
-    [setContent]
+    [setContent, doc]
   )
 
   const handleSelectionUpdate = useCallback(
@@ -191,166 +195,55 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     }
   })
 
-  editorRef.current = editor
+  editorRef.current = editor // eslint-disable-line react-hooks/immutability -- ref tracks latest editor instance for context menu callbacks
 
-  // Conflict resolution: reload from disk or keep local version
+  // Conflict resolution via DocumentManager
   const handleReloadFromDisk = useCallback(async () => {
-    if (!activeNotePath) return
-    const [fileContent, mtime] = await Promise.all([
-      window.api.fs.readFile(activeNotePath),
-      window.api.fs.fileMtime(activeNotePath)
-    ])
-    loadContent(fileContent)
-    if (mtime) {
-      useEditorStore.getState().setFileMtime(activeNotePath, mtime)
-    }
-    useEditorStore.getState().setConflictPath(null)
-    // Reset the loaded-path ref so the content sync effect re-runs
+    await doc.resolveConflict('disk')
     prevLoadedPathRef.current = null
-  }, [activeNotePath, loadContent])
+  }, [doc])
 
   const handleKeepMine = useCallback(async () => {
-    if (!activeNotePath) return
-    const state = useEditorStore.getState()
-    // Force write, ignoring the mtime mismatch
-    await window.api.fs.writeFile(activeNotePath, state.content)
-    const newMtime = await window.api.fs.fileMtime(activeNotePath)
-    if (newMtime) {
-      useEditorStore.getState().setFileMtime(activeNotePath, newMtime)
-    }
-    useEditorStore.getState().setConflictPath(null)
-    useEditorStore.getState().markSaved()
-  }, [activeNotePath])
+    await doc.resolveConflict('mine')
+  }, [doc])
 
-  // Live reload: subscribe to file-change events for the active file.
-  // If the editor is clean (no unsaved edits), silently reload from disk.
-  // If the editor is dirty, compare content before showing the conflict banner.
+  // Reset refs when path changes to prevent stale data leaking across files
+  const prevPathRef = useRef(activeNotePath)
+  if (prevPathRef.current !== activeNotePath) {
+    prevPathRef.current = activeNotePath
+    prevLoadedPathRef.current = null
+    frontmatterRawRef.current = ''
+  }
+
+  // Load file content from DocumentManager and sync to Tiptap in one atomic step.
+  // Collapsing these into one effect eliminates the race window where React can
+  // interleave renders between content load and Tiptap sync.
   useEffect(() => {
-    if (!activeNotePath) return
+    if (!activeNotePath || !editor || doc.content === null || doc.loading) return
+    // Skip if already loaded for this path and user is editing
+    if (activeNotePath === prevLoadedPathRef.current && useEditorStore.getState().isDirty) return
 
-    const unsub = vaultEvents.subscribePath(activeNotePath, async (data) => {
-      if (data.event !== 'change') return
-
-      const state = useEditorStore.getState()
-
-      if (!state.isDirty) {
-        // Editor is clean: silently reload from disk (Obsidian model)
-        const [fileContent, mtime] = await Promise.all([
-          window.api.fs.readFile(activeNotePath),
-          window.api.fs.fileMtime(activeNotePath)
-        ])
-        if (useEditorStore.getState().activeNotePath !== activeNotePath) return
-        loadContent(fileContent)
-        if (mtime) useEditorStore.getState().setFileMtime(activeNotePath, mtime)
-        prevLoadedPathRef.current = null
-      } else {
-        // Editor is dirty: check if disk content matches editor content
-        const diskContent = await window.api.fs.readFile(activeNotePath)
-        const mtime = await window.api.fs.fileMtime(activeNotePath)
-        if (useEditorStore.getState().activeNotePath !== activeNotePath) return
-
-        if (diskContent === useEditorStore.getState().content) {
-          // Content matches: split editor wrote what we already have. Update mtime.
-          if (mtime) useEditorStore.getState().setFileMtime(activeNotePath, mtime)
-        } else {
-          // Genuine conflict: disk differs from unsaved editor content
-          useEditorStore.getState().setConflictPath(activeNotePath)
-        }
-      }
-    })
-
-    return unsub
-  }, [activeNotePath, loadContent])
-
-  // Load file content from disk when active note path changes
-  useEffect(() => {
-    if (!activeNotePath || activeNotePath === prevLoadedPathRef.current) return
     prevLoadedPathRef.current = activeNotePath
+    loadContent(doc.content)
 
-    // Clear any conflict state for the previous file
-    useEditorStore.getState().setConflictPath(null)
-
-    Promise.all([window.api.fs.readFile(activeNotePath), window.api.fs.fileMtime(activeNotePath)])
-      .then(([fileContent, mtime]) => {
-        if (useEditorStore.getState().activeNotePath !== activeNotePath) return
-        loadContent(fileContent)
-        if (mtime) {
-          useEditorStore.getState().setFileMtime(activeNotePath, mtime)
-        }
-      })
-      .catch(() => {
-        if (useEditorStore.getState().activeNotePath === activeNotePath) {
-          loadContent('')
-        }
-      })
-  }, [activeNotePath, loadContent])
-
-  // Sync loaded content into Tiptap editor when content changes for a new file
-  useEffect(() => {
-    if (!editor || !content || !activeNotePath) return
-    // Only sync on fresh file loads, not user edits
-    if (useEditorStore.getState().isDirty) return
-
-    const parsed = parseFrontmatter(content)
+    // Parse frontmatter and sync to Tiptap immediately (same synchronous block)
+    const parsed = parseFrontmatter(doc.content)
     frontmatterRawRef.current = parsed.raw
     setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
 
-    // Wikilinks are now auto-detected as graph edges via bodyLinks.
-    // No migration to <node> tags needed — both syntaxes coexist.
-    const body = parsed.body
-
     const manager = editor.storage.markdown?.manager
     if (manager) {
-      const json = manager.parse(body)
+      const json = manager.parse(parsed.body)
       editor.commands.setContent(json)
     } else {
-      editor.commands.setContent(body)
+      editor.commands.setContent(parsed.body)
     }
-  }, [content, editor, activeNotePath, setContent])
+  }, [activeNotePath, doc.content, doc.loading, loadContent, editor])
 
-  // Autosave: debounce writes by 1 second, with mtime conflict check
-  useEffect(() => {
-    if (!activeNotePath) return
-    const pathToSave = activeNotePath
-    const contentToSave = content
-
-    const state = useEditorStore.getState()
-    if (!state.isDirty) return
-    // Skip autosave while a conflict is active for this file
-    if (state.conflictPath === pathToSave) return
-
-    const timer = setTimeout(async () => {
-      // Check if file was modified externally since we loaded it
-      const expectedMtime = useEditorStore.getState().fileMtimes[pathToSave]
-      if (expectedMtime) {
-        const currentMtime = await window.api.fs.fileMtime(pathToSave)
-        if (currentMtime && currentMtime !== expectedMtime) {
-          useEditorStore.getState().setConflictPath(pathToSave)
-          return
-        }
-      }
-
-      await window.api.fs.writeFile(pathToSave, contentToSave)
-
-      // Update stored mtime after successful write
-      const newMtime = await window.api.fs.fileMtime(pathToSave)
-      if (newMtime) {
-        useEditorStore.getState().setFileMtime(pathToSave, newMtime)
-      }
-
-      if (isSystemArtifactPath(pathToSave)) {
-        const { syncSystemArtifactFromDisk } =
-          await import('../../system-artifacts/system-artifact-runtime')
-        await syncSystemArtifactFromDisk(pathToSave)
-      }
-      const current = useEditorStore.getState()
-      if (current.activeNotePath === pathToSave) {
-        current.markSaved()
-      }
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [content, activeNotePath])
+  // Note: content pushes to DocumentManager happen directly in handleUpdate
+  // and onFrontmatterChange callbacks, NOT via a useEffect. This eliminates
+  // the race condition where stale content from file A could be pushed to
+  // DocumentManager under file B's path during rapid file switching.
 
   // Empty state - only show when no file is selected
   // Floating chrome inset: editor content shifts right to clear the floating sidebar
@@ -383,7 +276,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
   return (
     <div className="h-full flex flex-col" style={insetStyle}>
-      {hasConflict && (
+      {doc.isConflict && (
         <div
           className="flex items-center justify-between px-4 py-2 shrink-0"
           style={{
@@ -431,12 +324,15 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           onNavigate={onNavigate}
           onFrontmatterChange={(newRaw) => {
             frontmatterRawRef.current = newRaw
-            // Parse the updated frontmatter for display
             const parsed = parseFrontmatter(newRaw)
             setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
-            // Reconstruct full content: new frontmatter + existing body
             const currentParsed = parseFrontmatter(content ?? '')
-            setContent(newRaw + currentParsed.body)
+            const fullContent = newRaw + currentParsed.body
+            setContent(fullContent)
+            // Push directly to DocumentManager from user action (not via effect)
+            if (activeNotePath && prevLoadedPathRef.current === activeNotePath) {
+              doc.update(fullContent)
+            }
           }}
         />
         {mode === 'rich' ? (

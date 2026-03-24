@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { colors } from '../../design/tokens'
 import { createEditorExtensions, detectLanguage } from '../canvas/shared/codemirror-setup'
+import { useDocument } from '../../hooks/useDocument'
 
 interface CodeFileEditorProps {
   readonly filePath: string
@@ -11,43 +12,40 @@ interface CodeFileEditorProps {
 export function CodeFileEditor({ filePath }: CodeFileEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const currentPathRef = useRef(filePath)
+  const isLocalEditRef = useRef(false)
+  const mountedForPathRef = useRef<string | null>(null)
 
-  const scheduleAutosave = useCallback((path: string, content: string) => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      window.api.fs.writeFile(path, content)
-    }, 1000)
-  }, [])
+  const doc = useDocument(filePath)
 
+  // Mount CodeMirror when content first arrives, or when path changes
   useEffect(() => {
+    if (doc.content === null || doc.loading) return
     if (!containerRef.current) return
-    currentPathRef.current = filePath
+    if (mountedForPathRef.current === filePath && viewRef.current) return
 
     if (viewRef.current) {
       viewRef.current.destroy()
       viewRef.current = null
     }
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = null
-    }
 
     let cancelled = false
+    mountedForPathRef.current = filePath
+    const contentToMount = doc.content
 
     async function mount() {
-      const content = await window.api.fs.readFile(filePath)
       if (cancelled || !containerRef.current) return
 
       const extensions = await createEditorExtensions(detectLanguage(filePath), {
         readOnly: false,
-        onUpdate: (text) => scheduleAutosave(currentPathRef.current, text),
+        onUpdate: (text) => {
+          isLocalEditRef.current = true
+          doc.update(text)
+        },
         fontSize: '14px',
         contentPadding: '16px 0'
       })
 
-      const state = EditorState.create({ doc: content, extensions })
+      const state = EditorState.create({ doc: contentToMount, extensions })
       const view = new EditorView({ state, parent: containerRef.current })
       viewRef.current = view
     }
@@ -56,13 +54,31 @@ export function CodeFileEditor({ filePath }: CodeFileEditorProps) {
 
     return () => {
       cancelled = true
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       if (viewRef.current) {
         viewRef.current.destroy()
         viewRef.current = null
       }
+      mountedForPathRef.current = null
     }
-  }, [filePath, scheduleAutosave])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount when content first arrives or path changes
+  }, [filePath, doc.content === null, doc.loading])
+
+  // Handle external content changes
+  useEffect(() => {
+    if (!viewRef.current || doc.content === null) return
+    if (isLocalEditRef.current) {
+      isLocalEditRef.current = false
+      return
+    }
+
+    const view = viewRef.current
+    const currentContent = view.state.doc.toString()
+    if (currentContent !== doc.content) {
+      view.dispatch({
+        changes: { from: 0, to: currentContent.length, insert: doc.content }
+      })
+    }
+  }, [doc.content])
 
   const filename = filePath.split('/').pop() ?? filePath
 
