@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { colors } from '../../design/tokens'
+import { colors, floatingPanel } from '../../design/tokens'
 
 interface SearchBarProps {
   onSearch: (query: string) => void
@@ -11,7 +11,6 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
   return (
     <div className="relative">
-      {/* Search icon */}
       <svg
         width={13}
         height={13}
@@ -35,7 +34,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
       </svg>
       <input
         type="text"
-        placeholder="Search..."
+        placeholder="Search vault..."
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)
@@ -43,13 +42,13 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         }}
         className="sidebar-search w-full outline-none"
         style={{
-          backgroundColor: focused ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.05)',
+          backgroundColor: focused ? floatingPanel.glass.inputBgFocus : floatingPanel.glass.inputBg,
           color: colors.text.primary,
-          border: `1px solid ${focused ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.08)'}`,
-          borderRadius: 6,
-          padding: '6px 12px 6px 30px',
-          fontSize: 13,
-          transition: 'border-color 200ms ease-out, background-color 200ms ease-out'
+          border: 'none',
+          borderRadius: 8,
+          padding: '8px 12px 8px 32px',
+          fontSize: 12,
+          transition: 'background-color 200ms ease-out'
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}

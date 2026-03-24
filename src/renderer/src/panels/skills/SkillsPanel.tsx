@@ -146,7 +146,7 @@ export function SkillsPanel() {
   return (
     <div
       className="h-full flex flex-col overflow-y-auto"
-      style={{ backgroundColor: colors.bg.base, paddingLeft: 'var(--sidebar-inset, 0px)' }}
+      style={{ backgroundColor: colors.bg.base }}
     >
       <div
         className="px-4 py-2 border-b text-xs shrink-0"

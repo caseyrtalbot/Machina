@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { colors } from '../../design/tokens'
+import { colors, floatingPanel } from '../../design/tokens'
 
 interface ContextMenuState {
   readonly x: number
@@ -104,7 +104,12 @@ export function VaultSelector({
         >
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
         </svg>
-        <span className="text-xs font-medium truncate flex-1">{currentName}</span>
+        <span
+          className="text-xs truncate flex-1"
+          style={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 500 }}
+        >
+          {currentName}
+        </span>
         <svg
           width={10}
           height={10}
@@ -126,10 +131,12 @@ export function VaultSelector({
           style={{
             top: '100%',
             marginTop: 2,
-            backgroundColor: colors.bg.elevated,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: 6,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            backgroundColor: floatingPanel.glass.popoverBg,
+            backdropFilter: floatingPanel.glass.popoverBlur,
+            WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
           }}
         >
           {/* Recent vaults */}
@@ -137,7 +144,7 @@ export function VaultSelector({
             <>
               <div
                 className="mx-2 my-1"
-                style={{ height: 1, backgroundColor: colors.border.default }}
+                style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)' }}
               />
               {recentVaults.map((path) => {
                 const name = vaultDisplayName(path)
@@ -188,7 +195,7 @@ export function VaultSelector({
           {/* Open different vault */}
           <div
             className="mx-2 my-1"
-            style={{ height: 1, backgroundColor: colors.border.default }}
+            style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)' }}
           />
           <button
             onClick={() => {
@@ -211,10 +218,12 @@ export function VaultSelector({
           style={{
             left: ctxMenu.x,
             top: ctxMenu.y,
-            backgroundColor: colors.bg.elevated,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: 6,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            backgroundColor: floatingPanel.glass.popoverBg,
+            backdropFilter: floatingPanel.glass.popoverBlur,
+            WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
           }}
         >
           <button

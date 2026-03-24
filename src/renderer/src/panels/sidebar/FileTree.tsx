@@ -23,24 +23,14 @@ import {
   FolderSimple
 } from '@phosphor-icons/react'
 
-/** Generate CSS background-image with vertical indent guide lines.
- *  Each line is a 1px-wide gradient column at the indent position.
- *  Because it's a background on the row itself, lines connect seamlessly
- *  between adjacent rows with no gap. */
-function indentGuideBackground(depth: number): React.CSSProperties {
+/** Indent guide via border-l on the row element.
+ *  Simpler than background-image gradients, more native-feeling. */
+function indentBorderStyle(depth: number, isActive?: boolean): React.CSSProperties {
   if (depth === 0) return {}
-  const guides: string[] = []
-  const positions: string[] = []
-  for (let i = 0; i < depth; i++) {
-    const x = 8 + i * 16 + 7
-    guides.push('linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.06))')
-    positions.push(`${x}px 0`)
-  }
   return {
-    backgroundImage: guides.join(', '),
-    backgroundPosition: positions.join(', '),
-    backgroundSize: guides.map(() => '1px 100%').join(', '),
-    backgroundRepeat: 'no-repeat'
+    borderLeft: `1px solid rgba(255, 255, 255, ${isActive ? '0.12' : '0.06'})`,
+    marginLeft: 8 + (depth - 1) * 16 + 7,
+    paddingLeft: 9
   }
 }
 
@@ -296,26 +286,24 @@ function DirectoryRow({
   treeFontSize: number
   treeFontFamily: string
 }) {
-  const paddingLeft = 8 + node.depth * 16
-
   return (
     <div
       onClick={() => onToggleDirectory(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, true)}
       className="flex items-center py-[5px] cursor-pointer rounded transition-colors"
       style={{
-        paddingLeft,
+        paddingLeft: node.depth === 0 ? 8 : undefined,
         paddingRight: 8,
         marginTop: node.depth === 0 ? 6 : undefined,
-        color: '#a0a0a0',
+        color: 'rgba(255, 255, 255, 0.60)',
         fontFamily: treeFontFamily,
         fontWeight: 600,
         fontSize: treeFontSize - 1,
         letterSpacing: '0.02em',
-        ...indentGuideBackground(node.depth)
+        ...indentBorderStyle(node.depth)
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
+        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = ''
@@ -340,7 +328,7 @@ function DirectoryRow({
         <span
           className="ml-auto text-[11px]"
           style={{
-            color: '#6a6a6a',
+            color: 'rgba(255, 255, 255, 0.20)',
             fontVariantNumeric: 'tabular-nums'
           }}
         >
@@ -380,7 +368,6 @@ function FileRow({
   treeFontSize: number
   treeFontFamily: string
 }) {
-  const paddingLeft = 8 + node.depth * 16 + 16
   const { base, ext } = splitName(node.name)
 
   return (
@@ -407,20 +394,22 @@ function FileRow({
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
       className="flex items-center py-[5px] cursor-pointer rounded transition-colors"
       style={{
-        paddingLeft,
+        paddingLeft: node.depth === 0 ? 24 : undefined,
         paddingRight: 8,
-        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.06)' : undefined,
-        borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
+        backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : undefined,
         fontFamily: treeFontFamily,
         fontWeight: 400,
         fontSize: treeFontSize,
-        ...indentGuideBackground(node.depth)
+        ...indentBorderStyle(node.depth, isActive)
       }}
       onMouseEnter={(e) => {
-        if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
+        if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
+        if (node.depth > 0) e.currentTarget.style.borderLeftColor = 'rgba(255, 255, 255, 0.15)'
       }}
       onMouseLeave={(e) => {
         if (!isActive) e.currentTarget.style.backgroundColor = ''
+        if (node.depth > 0)
+          e.currentTarget.style.borderLeftColor = `rgba(255, 255, 255, ${isActive ? '0.12' : '0.06'})`
       }}
     >
       <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: isActive ? 0.9 : 0.7 }}>
@@ -434,8 +423,10 @@ function FileRow({
         />
       ) : (
         <span className="truncate flex-1">
-          <span style={{ color: isActive ? colors.text.primary : '#8c8c8c' }}>{base}</span>
-          {ext && <span style={{ color: colors.text.muted }}>{ext}</span>}
+          <span style={{ color: isActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.50)' }}>
+            {base}
+          </span>
+          {ext && <span style={{ color: 'rgba(255,255,255,0.20)' }}>{ext}</span>}
         </span>
       )}
       {canvasConnectionCount >= 2 && (

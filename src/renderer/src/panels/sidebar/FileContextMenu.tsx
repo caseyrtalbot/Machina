@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { colors, transitions } from '../../design/tokens'
+import { colors, transitions, floatingPanel } from '../../design/tokens'
 
 export interface ContextMenuAction {
   readonly id: string
@@ -112,9 +112,11 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
       style={{
         left: adjustedPosition.x,
         top: adjustedPosition.y,
-        backgroundColor: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+        backgroundColor: floatingPanel.glass.popoverBg,
+        backdropFilter: floatingPanel.glass.popoverBlur,
+        WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
         transition: `opacity ${transitions.tooltip}`,
         fontSize: '13px'
       }}
@@ -140,7 +142,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
             )}
           </button>
           {action.separator && (
-            <div className="my-1" style={{ borderTop: `1px solid ${colors.border.default}` }} />
+            <div className="my-1" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }} />
           )}
         </div>
       ))}

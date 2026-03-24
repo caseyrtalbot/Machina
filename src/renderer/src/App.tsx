@@ -31,7 +31,7 @@ import {
   placeArtifactOnWorkbench,
   enrichPlacedArtifact
 } from './panels/workbench/workbench-artifact-placement'
-import { CanvasFloatingSidebar } from './panels/canvas/CanvasFloatingSidebar'
+// CanvasFloatingSidebar removed — sidebar is now docked
 import { getCanvasNodeTitle } from './panels/canvas/card-title'
 
 const LazyCanvasView = lazy(() =>
@@ -910,13 +910,10 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   return (
     <div
       className="h-screen w-screen relative flex"
-      style={
-        {
-          backgroundColor: 'transparent',
-          color: colors.text.primary,
-          '--sidebar-inset': sidebarExpanded ? '340px' : '120px'
-        } as React.CSSProperties
-      }
+      style={{
+        backgroundColor: 'transparent',
+        color: colors.text.primary
+      }}
     >
       {/* Titlebar drag region — transparent overlay for macOS traffic lights */}
       <div
@@ -928,25 +925,34 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           } as React.CSSProperties
         }
       />
-      <ActivityBar floating />
+      {/* Docked activity bar */}
+      <ActivityBar />
+      {/* Docked sidebar */}
+      {sidebarExpanded && (
+        <aside
+          className="h-full flex flex-col shrink-0 overflow-hidden pt-8"
+          style={{
+            width: 264,
+            backgroundColor: 'rgba(22, 22, 24, 0.72)',
+            backdropFilter: 'blur(24px) saturate(1.3)',
+            WebkitBackdropFilter: 'blur(24px) saturate(1.3)',
+            borderRight: '1px solid rgba(255, 255, 255, 0.03)'
+          }}
+        >
+          <PanelErrorBoundary name="Sidebar">
+            <ConnectedSidebar
+              onLoadVault={onLoadVault}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          </PanelErrorBoundary>
+        </aside>
+      )}
+      {/* Content area fills remaining space */}
       <div className="flex-1 overflow-hidden">
         <PanelErrorBoundary name="Content">
           <ContentArea />
         </PanelErrorBoundary>
       </div>
-      {/* Floating sidebar: always visible, collapsed or expanded */}
-      <CanvasFloatingSidebar
-        collapsed={!sidebarExpanded}
-        onToggle={toggleSidebar}
-        vaultName={vaultPath?.split('/').pop()}
-      >
-        <PanelErrorBoundary name="Sidebar">
-          <ConnectedSidebar
-            onLoadVault={onLoadVault}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-        </PanelErrorBoundary>
-      </CanvasFloatingSidebar>
       <CommandPalette
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}

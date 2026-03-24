@@ -58,6 +58,14 @@ interface SidebarProps {
   onOpenSettings?: () => void
 }
 
+/** Cycle through sort modes on click instead of using a native <select> */
+const SORT_CYCLE: SortMode[] = ['modified', 'name', 'type']
+const SORT_ICONS: Record<SortMode, string> = {
+  modified: 'M12 8H4M10 12H4M8 16H4M16 4H4', // lines descending
+  name: 'M4 4h16M4 9h12M4 14h8', // alpha sort
+  type: 'M4 4h16M4 9h16M4 14h16' // grouped
+}
+
 function ActionBar({
   sortMode = 'modified',
   vaultName,
@@ -79,8 +87,14 @@ function ActionBar({
   onRemoveFromHistory?: (path: string) => void
   onOpenSettings?: () => void
 }) {
+  const cycleSortMode = () => {
+    const idx = SORT_CYCLE.indexOf(sortMode)
+    onSortChange?.(SORT_CYCLE[(idx + 1) % SORT_CYCLE.length])
+  }
+
   return (
-    <div className="flex flex-col gap-0.5 px-2 py-0.5">
+    <div className="flex flex-col gap-2 px-3 py-1">
+      {/* Vault selector row */}
       <div className="flex items-center">
         {vaultName && onSelectVault && onOpenVaultPicker ? (
           <div className="flex-1 min-w-0">
@@ -98,42 +112,86 @@ function ActionBar({
         {onOpenSettings && (
           <button
             onClick={onOpenSettings}
-            className="flex items-center justify-center shrink-0 rounded cursor-pointer transition-opacity"
-            style={{ width: 28, height: 28, color: colors.text.muted, opacity: 0.6 }}
+            className="flex items-center justify-center shrink-0 rounded cursor-pointer"
+            style={{ width: 24, height: 24, color: colors.text.muted, opacity: 0.5 }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '1'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '0.6'
+              e.currentTarget.style.opacity = '0.5'
             }}
             title="Settings"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 4.754a3.246 3.246 0 100 6.492 3.246 3.246 0 000-6.492zM5.754 8a2.246 2.246 0 114.492 0 2.246 2.246 0 01-4.492 0z" />
               <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 01-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 01-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 01.52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 011.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 011.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 01.52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 01-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 01-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 002.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 001.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 00-1.115 2.693l.16.291c.415.764-.421 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 00-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 00-2.692-1.115l-.292.16c-.764.415-1.6-.421-1.184-1.185l.159-.291A1.873 1.873 0 001.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 003.06 4.377l-.16-.292c-.415-.764.421-1.6 1.185-1.184l.292.159a1.873 1.873 0 002.692-1.115l.094-.319z" />
             </svg>
           </button>
         )}
       </div>
-      <div className="flex items-center gap-1 text-xs" style={{ color: colors.text.muted }}>
-        <button
-          onClick={onNewFile}
-          className="px-2 py-0.5 rounded hover:bg-[var(--color-bg-elevated)] transition-colors cursor-pointer"
-          title="New file"
+      {/* Section header: Files label with action icons */}
+      <div className="flex items-center justify-between">
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.15em',
+            color: 'rgba(255, 255, 255, 0.25)'
+          }}
         >
-          + File
-        </button>
-        <div className="flex-1" />
-        <select
-          value={sortMode}
-          onChange={(e) => onSortChange?.(e.target.value as SortMode)}
-          className="bg-transparent text-xs cursor-pointer"
-          style={{ color: colors.text.muted }}
-        >
-          <option value="modified">Modified</option>
-          <option value="name">Name</option>
-          <option value="type">Type</option>
-        </select>
+          Files
+        </span>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={onNewFile}
+            className="flex items-center justify-center rounded cursor-pointer"
+            style={{ width: 22, height: 22, color: colors.text.muted, opacity: 0.5 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.5'
+            }}
+            title="New file"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <line x1="6" y1="2" x2="6" y2="10" />
+              <line x1="2" y1="6" x2="10" y2="6" />
+            </svg>
+          </button>
+          <button
+            onClick={cycleSortMode}
+            className="flex items-center justify-center rounded cursor-pointer"
+            style={{ width: 22, height: 22, color: colors.text.muted, opacity: 0.5 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.5'
+            }}
+            title={`Sort: ${sortMode}`}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            >
+              <path d={SORT_ICONS[sortMode]} />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -328,16 +386,8 @@ export function Sidebar({
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* ── Controls zone: visually grouped toolbar ── */}
-      <div
-        className="flex-shrink-0"
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.02)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-          paddingBottom: 4
-        }}
-      >
-        <div className="px-2 pt-2 pb-1 pr-8">
+      <div className="flex-shrink-0">
+        <div className="px-3 pt-2 pb-1">
           <SearchBar onSearch={onSearch} />
         </div>
         <ActionBar

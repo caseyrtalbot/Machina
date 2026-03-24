@@ -1,12 +1,6 @@
 import { useTabStore, TAB_DEFINITIONS } from '../store/tab-store'
 import type { TabType } from '../store/tab-store'
-import { colors, floatingPanel } from '../design/tokens'
-
-interface ActivityItem {
-  view: TabType
-  label: string
-  icon: React.ReactNode
-}
+import { colors } from '../design/tokens'
 
 const ICON_SIZE = 20
 
@@ -84,6 +78,12 @@ const SkillsIcon = (
   </svg>
 )
 
+interface ActivityItem {
+  view: TabType
+  label: string
+  icon: React.ReactNode
+}
+
 const ITEMS: ActivityItem[] = [
   { view: 'editor', label: 'Editor', icon: EditorIcon },
   { view: 'canvas', label: 'Canvas', icon: CanvasIcon },
@@ -91,36 +91,19 @@ const ITEMS: ActivityItem[] = [
   { view: 'skills', label: 'Skills', icon: SkillsIcon }
 ]
 
-export function ActivityBar({ floating }: { readonly floating?: boolean }) {
+export function ActivityBar() {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const openTab = useTabStore((s) => s.openTab)
 
   return (
     <div
-      className={
-        floating
-          ? 'absolute flex flex-col items-center gap-0.5'
-          : 'flex flex-col items-center shrink-0 pt-8 gap-0.5'
-      }
-      style={
-        floating
-          ? {
-              top: 40,
-              left: 12,
-              width: 40,
-              zIndex: 40,
-              padding: '6px 0',
-              borderRadius: floatingPanel.borderRadius,
-              boxShadow: `inset 0 0.5px 0 rgba(255,255,255,0.1), ${floatingPanel.shadowCompact}`,
-              backdropFilter: floatingPanel.glass.blur,
-              backgroundColor: floatingPanel.glass.bg
-            }
-          : {
-              width: 40,
-              backgroundColor: colors.bg.base,
-              borderRight: '1px solid rgba(255, 255, 255, 0.04)'
-            }
-      }
+      className="flex flex-col items-center shrink-0 pt-12 gap-1"
+      style={{
+        width: 48,
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+        backdropFilter: 'blur(24px) saturate(1.3)',
+        WebkitBackdropFilter: 'blur(24px) saturate(1.3)'
+      }}
     >
       {ITEMS.map(({ view, label, icon }) => {
         const isActive = activeTabId === view
@@ -131,35 +114,27 @@ export function ActivityBar({ floating }: { readonly floating?: boolean }) {
             onClick={() =>
               openTab({ id: view, type: view, label: def.label, closeable: view !== 'editor' })
             }
-            className="relative flex items-center justify-center transition-opacity cursor-pointer"
+            className="relative flex items-center justify-center cursor-pointer"
             style={{
-              width: 32,
-              height: 32,
-              opacity: isActive ? 1 : 0.4,
+              width: 34,
+              height: 34,
+              opacity: isActive ? 0.9 : 0.3,
               color: colors.text.primary,
-              borderRadius: 6
+              borderRadius: 8,
+              backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+              transition: 'opacity 150ms ease-out, background-color 150ms ease-out'
             }}
             onMouseEnter={(e) => {
               if (!isActive) e.currentTarget.style.opacity = '0.8'
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
+              if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
             }}
             onMouseLeave={(e) => {
-              if (!isActive) e.currentTarget.style.opacity = isActive ? '1' : '0.4'
-              e.currentTarget.style.backgroundColor = 'transparent'
+              if (!isActive) e.currentTarget.style.opacity = '0.35'
+              if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
             }}
             title={label}
             aria-label={`Switch to ${label} view`}
           >
-            {isActive && (
-              <span
-                className="absolute left-0 rounded-r"
-                style={{
-                  width: 2,
-                  height: 16,
-                  backgroundColor: colors.accent.default
-                }}
-              />
-            )}
             {icon}
           </button>
         )
