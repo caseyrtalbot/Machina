@@ -209,6 +209,46 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     useEditorStore.getState().markSaved()
   }, [activeNotePath])
 
+  // Live reload: subscribe to file-change events for the active file.
+  // If the editor is clean (no unsaved edits), silently reload from disk.
+  // If the editor is dirty, compare content before showing the conflict banner.
+  useEffect(() => {
+    if (!activeNotePath) return
+
+    const unsub = window.api.on.fileChanged(async (data) => {
+      if (data.path !== activeNotePath || data.event !== 'change') return
+
+      const state = useEditorStore.getState()
+
+      if (!state.isDirty) {
+        // Editor is clean: silently reload from disk (Obsidian model)
+        const [fileContent, mtime] = await Promise.all([
+          window.api.fs.readFile(activeNotePath),
+          window.api.fs.fileMtime(activeNotePath)
+        ])
+        if (useEditorStore.getState().activeNotePath !== activeNotePath) return
+        loadContent(fileContent)
+        if (mtime) useEditorStore.getState().setFileMtime(activeNotePath, mtime)
+        prevLoadedPathRef.current = null
+      } else {
+        // Editor is dirty: check if disk content matches editor content
+        const diskContent = await window.api.fs.readFile(activeNotePath)
+        const mtime = await window.api.fs.fileMtime(activeNotePath)
+        if (useEditorStore.getState().activeNotePath !== activeNotePath) return
+
+        if (diskContent === useEditorStore.getState().content) {
+          // Content matches: split editor wrote what we already have. Update mtime.
+          if (mtime) useEditorStore.getState().setFileMtime(activeNotePath, mtime)
+        } else {
+          // Genuine conflict: disk differs from unsaved editor content
+          useEditorStore.getState().setConflictPath(activeNotePath)
+        }
+      }
+    })
+
+    return unsub
+  }, [activeNotePath, loadContent])
+
   // Load file content from disk when active note path changes
   useEffect(() => {
     if (!activeNotePath || activeNotePath === prevLoadedPathRef.current) return
