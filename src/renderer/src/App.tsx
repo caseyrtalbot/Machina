@@ -28,6 +28,7 @@ import { useWorkbenchActionStore } from './store/workbench-actions-store'
 import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
+import { vaultEvents } from './engine/vault-event-hub'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { ArtifactType } from '@shared/types'
 import { isSystemArtifactKind } from '@shared/system-artifacts'
@@ -832,6 +833,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
     }))
 
     return [...BUILT_IN_COMMANDS, ...workbenchCommands, ...cardItems, ...noteItems]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- canvasNodeCount is an invalidation signal for getState().nodes snapshot
   }, [
     artifacts,
     artifactById,
@@ -1128,7 +1130,8 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const unsub = window.api.on.filesChangedBatch(async (data) => {
+    const unsub = vaultEvents.subscribeBatch(async (events) => {
+      const data = { events }
       // Process all events in one pass using a Map to avoid state accumulation race
       const currentFiles = useVaultStore.getState().files
       const fileMap = new Map(currentFiles.map((f) => [f.path, f]))

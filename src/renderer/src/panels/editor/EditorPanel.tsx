@@ -24,6 +24,7 @@ import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
 import { colors } from '../../design/tokens'
 import { isSystemArtifactPath } from '@shared/system-artifacts'
+import { vaultEvents } from '@engine/vault-event-hub'
 
 interface EditorPanelProps {
   onNavigate: (id: string) => void
@@ -215,8 +216,8 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   useEffect(() => {
     if (!activeNotePath) return
 
-    const unsub = window.api.on.fileChanged(async (data) => {
-      if (data.path !== activeNotePath || data.event !== 'change') return
+    const unsub = vaultEvents.subscribePath(activeNotePath, async (data) => {
+      if (data.event !== 'change') return
 
       const state = useEditorStore.getState()
 
@@ -437,6 +438,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       </div>
 
       <BacklinksPanel
+        key={activeNoteId ?? ''}
         currentNoteId={activeNoteId ?? ''}
         currentNoteTitle={artifact?.title}
         backlinks={backlinks}

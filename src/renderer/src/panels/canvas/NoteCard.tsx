@@ -9,6 +9,7 @@ import { MetadataGrid } from './shared/MetadataGrid'
 import { frontmatterToEntries } from './shared/frontmatter-utils'
 import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
+import { vaultEvents } from '@engine/vault-event-hub'
 
 interface NoteCardProps {
   node: CanvasNode
@@ -74,8 +75,8 @@ export function NoteCard({ node }: NoteCardProps) {
 
   // Re-read on vault file changes (reactive)
   useEffect(() => {
-    const unsub = window.api.on.fileChanged((data) => {
-      if (data.path === filePath && data.event === 'change') {
+    const unsub = vaultEvents.subscribePath(filePath, (data) => {
+      if (data.event === 'change') {
         window.api.fs
           .readFile(filePath)
           .then((content: string) => {

@@ -9,6 +9,7 @@ import { colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
 import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
 import type { CanvasNode } from '@shared/canvas-types'
+import { vaultEvents } from '@engine/vault-event-hub'
 
 interface FileViewCardProps {
   readonly node: CanvasNode
@@ -20,7 +21,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   const previousLineCountRef = useRef(0)
 
   const [fileContent, setFileContent] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Boolean(node.content))
   const [error, setError] = useState<string | null>(null)
   const [modified, setModified] = useState(false)
   const [lineDelta, setLineDelta] = useState('')
@@ -38,12 +39,9 @@ export function FileViewCard({ node }: FileViewCardProps) {
 
   // Step 1: Read file content (separate from CodeMirror mounting)
   useEffect(() => {
-    if (!filePath) {
-      setLoading(false)
-      return
-    }
+    if (!filePath) return
     let cancelled = false
-    setLoading(true)
+    setLoading(true) // eslint-disable-line react-hooks/set-state-in-effect -- loading gate before async fetch
 
     window.api.fs
       .readFile(filePath)
@@ -95,9 +93,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   useEffect(() => {
     if (!filePath) return
 
-    const unsub = window.api.on.fileChanged((data) => {
-      if (data.path !== filePath) return
-
+    const unsub = vaultEvents.subscribePath(filePath, (data) => {
       if (data.event === 'unlink') {
         setError('File not found or moved')
         return
