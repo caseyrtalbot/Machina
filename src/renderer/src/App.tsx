@@ -191,12 +191,21 @@ function ConnectedSidebar({
   const [searchQuery, setSearchQuery] = useState('')
   const [vaultHistory, setVaultHistory] = useState<string[]>([])
 
-  // Load vault history on mount
+  // Load vault history on mount, auto-prune paths that no longer exist on disk
   useEffect(() => {
     window.api.config
       .read('app', 'vaultHistory')
-      .then((history) => {
-        if (Array.isArray(history)) setVaultHistory(history as string[])
+      .then(async (history) => {
+        if (!Array.isArray(history)) return
+        const paths = history as string[]
+        const checks = await Promise.all(
+          paths.map(async (p) => ({ path: p, exists: await window.api.fs.fileExists(p) }))
+        )
+        const valid = checks.filter((c) => c.exists).map((c) => c.path)
+        setVaultHistory(valid)
+        if (valid.length !== paths.length) {
+          window.api.config.write('app', 'vaultHistory', valid)
+        }
       })
       .catch(() => {})
   }, [])
