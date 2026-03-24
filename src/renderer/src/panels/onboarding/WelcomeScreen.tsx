@@ -76,7 +76,7 @@ export function WelcomeScreen({ onVaultSelected }: WelcomeScreenProps) {
               lineHeight: 1.2
             }}
           >
-            Thought Engine
+            Machina
           </h1>
           <p
             style={{

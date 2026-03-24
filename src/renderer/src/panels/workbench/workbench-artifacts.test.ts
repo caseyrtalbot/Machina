@@ -45,7 +45,7 @@ describe('workbench artifacts', () => {
     ]
 
     const result = buildPatternArtifactDocument({
-      projectName: 'thought-engine',
+      projectName: 'machina',
       projectPath: '/repo',
       now: new Date('2026-03-20T12:34:00Z'),
       selectedNodes,
@@ -83,7 +83,7 @@ describe('workbench artifacts', () => {
     ]
 
     const result = buildTensionArtifactDocument({
-      projectName: 'thought-engine',
+      projectName: 'machina',
       projectPath: '/repo',
       now: new Date('2026-03-20T12:34:00Z'),
       selectedNodes,
@@ -139,7 +139,7 @@ describe('workbench artifacts', () => {
     ]
 
     const result = buildSessionArtifactDocument({
-      projectName: 'thought-engine',
+      projectName: 'machina',
       projectPath: '/repo',
       now: new Date('2026-03-20T12:34:00Z'),
       milestones,

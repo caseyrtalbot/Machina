@@ -210,7 +210,7 @@ function ConnectedSidebar({
       .catch(() => {})
   }, [])
 
-  const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
+  const vaultName = vaultPath?.split('/').pop() ?? 'Machina'
 
   const allTreeNodes = useMemo(() => {
     const paths = files.map((f) => f.path)

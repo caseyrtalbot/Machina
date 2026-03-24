@@ -167,7 +167,7 @@ export const useTabStore = create<TabStore>()(
       }
     }),
     {
-      name: 'thought-engine-tabs',
+      name: 'machina-tabs',
       version: 3,
       storage: createJSONStorage(() => localStorage),
       migrate: (persistedState) =>

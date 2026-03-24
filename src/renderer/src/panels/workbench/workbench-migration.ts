@@ -1,5 +1,5 @@
-const WORKBENCH_FILENAME = '.thought-engine-workbench.json'
-const LEGACY_WORKBENCH_FILENAME = '.thought-engine-project-canvas.json'
+const WORKBENCH_FILENAME = '.machina-workbench.json'
+const LEGACY_WORKBENCH_FILENAME = '.thought-engine-workbench.json'
 
 export interface WorkbenchFs {
   readonly fileExists: (path: string) => Promise<boolean>

@@ -4,7 +4,7 @@ import { buildIgnorePatterns, DEFAULT_IGNORE_PATTERNS } from '../../src/main/ser
 describe('vault-watcher ignore patterns', () => {
   it('includes default ignores', () => {
     expect(DEFAULT_IGNORE_PATTERNS).toContain('node_modules')
-    expect(DEFAULT_IGNORE_PATTERNS).toContain('.thought-engine')
+    expect(DEFAULT_IGNORE_PATTERNS).toContain('.machina')
     expect(DEFAULT_IGNORE_PATTERNS).toContain('dist')
     expect(DEFAULT_IGNORE_PATTERNS).toContain('build')
   })

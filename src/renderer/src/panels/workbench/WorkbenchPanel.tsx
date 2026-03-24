@@ -31,7 +31,7 @@ import {
 } from '../../system-artifacts/system-artifact-runtime'
 import { migrateWorkbenchFile } from './workbench-migration'
 
-const WORKBENCH_FILENAME = '.thought-engine-workbench.json'
+const WORKBENCH_FILENAME = '.machina-workbench.json'
 const PROJECT_ROOT_MARKERS = ['.git', 'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod']
 const MAX_WALK_UP = 5
 

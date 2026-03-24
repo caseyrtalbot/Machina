@@ -66,7 +66,7 @@ export function buildCanvasContext(
   }
 
   const lines: string[] = [
-    'You are running inside a canvas card (terminal) in Thought Engine.',
+    'You are running inside a canvas card (terminal) in Machina.',
     'The canvas is a spatial workspace where the user arranges files they are thinking about.'
   ]
 

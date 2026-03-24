@@ -2,7 +2,7 @@
  * OKLCH → Hex conversion script.
  *
  * Computes sRGB hex equivalents for the perceptually uniform OKLCH palette
- * used by Thought Engine's design tokens. Run once to generate hex values,
+ * used by Machina's design tokens. Run once to generate hex values,
  * then copy them into tokens.ts.
  *
  * Math: OKLCH → OKLab → linear sRGB → sRGB (gamma) → hex

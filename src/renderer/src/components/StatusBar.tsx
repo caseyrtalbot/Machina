@@ -35,7 +35,7 @@ export function StatusBar() {
 
   const contentView = useViewStore((s) => s.contentView)
 
-  const vaultName = vaultPath?.split('/').pop() ?? 'Thought Engine'
+  const vaultName = vaultPath?.split('/').pop() ?? 'Machina'
 
   return (
     <div

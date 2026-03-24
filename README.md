@@ -1,6 +1,6 @@
-# thought-engine
+# Machina
 
-An Electron application with React and TypeScript
+Local-first knowledge engine for spatial thinking
 
 ## Recommended IDE Setup
 

@@ -111,11 +111,11 @@ test.describe.serial('Welcome Screen', () => {
     if (app) await app.close()
   })
 
-  test('shows Thought Engine heading', async () => {
+  test('shows Machina heading', async () => {
     const heading = page.locator('h1').first()
     await expect(heading).toBeVisible({ timeout: 5000 })
     const text = await heading.textContent()
-    expect(text).toContain('Thought Engine')
+    expect(text).toContain('Machina')
   })
 
   test('shows Create New Vault and Open Existing Folder buttons', async () => {

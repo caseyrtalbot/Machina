@@ -3,7 +3,7 @@ import { TE_DIR } from '@shared/constants'
 export function generateClaudeMd(vaultName: string): string {
   return `# CLAUDE.md — ${vaultName}
 
-You are operating inside the **${vaultName}** Thought Engine vault. Your role is to build and enrich the ontology: connections, patterns, tensions, and clusters between ideas.
+You are operating inside the **${vaultName}** Machina vault. Your role is to build and enrich the ontology: connections, patterns, tensions, and clusters between ideas.
 
 ## The One Rule
 
@@ -77,12 +77,29 @@ When using a custom type, pick a short prefix (1-2 chars) that doesn't collide w
 ## Vault Commands
 
 When the user asks you to:
-- \`/connect-vault\` — Read all files, standardize frontmatter, discover connections/tensions across the entire vault. Use this first on a new or raw vault.
+- \`/connect-vault\` — Analyze vault files and discover connections/tensions. **Uses incremental processing** (see below).
 - \`/connect <id1> <id2>\` — Add bidirectional connections between two artifacts
 - \`/interrogate <id>\` — Analyze an artifact: find missing edges, weak signals, logical gaps
 - \`/map\` — Generate a high-level overview of the vault's current ontology
 - \`/status\` — Report vault health: orphan nodes, signal distribution, type coverage
 - \`/promote <id>\` — Suggest signal promotion with justification
+
+### Incremental /connect-vault
+
+The manifest at \`${TE_DIR}/connect-manifest.json\` tracks which files have been analyzed and their content hashes.
+
+**First run** (no manifest): Analyze all files. Write the manifest when done.
+
+**Subsequent runs**: Read the manifest. Only analyze:
+1. **New files** — not in the manifest
+2. **Changed files** — content hash differs from manifest
+3. **Skip unchanged files** — hash matches, already analyzed
+
+When analyzing incrementally, read \`${TE_DIR}/graph-summary.txt\` (if it exists) to understand the existing vault structure without re-reading every file. Place new nodes relative to the existing graph.
+
+After analysis, update the manifest with the new hashes and timestamp.
+
+To force a full re-scan, delete \`${TE_DIR}/connect-manifest.json\` and run \`/connect-vault\` again.
 
 ## Inline Links
 

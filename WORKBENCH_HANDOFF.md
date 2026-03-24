@@ -40,7 +40,7 @@ this session's feature work.
 - Pattern cards show "Restore" button when snapshot exists
 
 ### Infrastructure
-- `workbench-migration.ts`: renames legacy `.thought-engine-project-canvas.json`
+- `workbench-migration.ts`: renames legacy `.thought-engine-workbench.json` to `.machina-workbench.json`
 - `workbench-artifact-placement.ts`: placement, enrichment, edges, snapshot restore
 - `terminal-actions-store.ts`: pending activation pattern for lazy-mounted TerminalPanel
 - IPC namespace `project:*` renamed to `workbench:*` end-to-end
@@ -50,7 +50,7 @@ this session's feature work.
 
 - `e2e/fixtures/test-vault/category-creation.md`
 - `.claude/`
-- `.thought-engine/`
+- `.machina/`
 
 ## Test Suite
 

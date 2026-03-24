@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: thought-engine
+appId: com.caseytalbot.machina
+productName: Machina
 directories:
   buildResources: build
 files:
@@ -11,8 +11,9 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  - node_modules/node-pty/**
 win:
-  executableName: thought-engine
+  executableName: machina
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

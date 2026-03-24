@@ -56,7 +56,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setScrollbackLines: (value) => set({ scrollbackLines: value })
     }),
     {
-      name: 'thought-engine-settings',
+      name: 'machina-settings',
       version: 2,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted) => {

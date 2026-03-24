@@ -15,8 +15,8 @@ function createMockFs(files: Record<string, boolean>): WorkbenchFs & {
 }
 
 const PROJECT = '/Users/test/project'
-const NEW_FILE = `${PROJECT}/.thought-engine-workbench.json`
-const LEGACY_FILE = `${PROJECT}/.thought-engine-project-canvas.json`
+const NEW_FILE = `${PROJECT}/.machina-workbench.json`
+const LEGACY_FILE = `${PROJECT}/.thought-engine-workbench.json`
 
 describe('migrateWorkbenchFile', () => {
   it('renames legacy file when new file does not exist', async () => {

@@ -1,5 +1,5 @@
 /**
- * Curated Google Fonts catalog for Thought Engine.
+ * Curated Google Fonts catalog for Machina.
  *
  * Each entry includes the font name (as used in the Google Fonts API),
  * its category for filtering, and the weights we load.

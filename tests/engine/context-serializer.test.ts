@@ -78,10 +78,10 @@ describe('buildCanvasContext', () => {
   it('includes context file path when provided', () => {
     const nodes = [makeNode('t1', 'terminal', '')]
     const result = buildCanvasContext('t1', nodes, {
-      contextFilePath: '/vault/.thought-engine/context-t1.txt'
+      contextFilePath: '/vault/.machina/context-t1.txt'
     })
     expect(result.text).toContain(
-      'Canvas context is kept up to date at: /vault/.thought-engine/context-t1.txt'
+      'Canvas context is kept up to date at: /vault/.machina/context-t1.txt'
     )
     expect(result.text).toContain('Read that file')
   })

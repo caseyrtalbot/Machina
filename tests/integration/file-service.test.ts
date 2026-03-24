@@ -66,18 +66,18 @@ describe('FileService', () => {
 
   it('initializes vault directory', async () => {
     await svc.initVault(dir)
-    expect(existsSync(join(dir, '.thought-engine', 'config.json'))).toBe(true)
-    expect(existsSync(join(dir, '.thought-engine', 'state.json'))).toBe(true)
-    expect(existsSync(join(dir, '.thought-engine', 'artifacts', 'sessions'))).toBe(true)
-    expect(existsSync(join(dir, '.thought-engine', 'artifacts', 'patterns'))).toBe(true)
-    expect(existsSync(join(dir, '.thought-engine', 'artifacts', 'tensions'))).toBe(true)
+    expect(existsSync(join(dir, '.machina', 'config.json'))).toBe(true)
+    expect(existsSync(join(dir, '.machina', 'state.json'))).toBe(true)
+    expect(existsSync(join(dir, '.machina', 'artifacts', 'sessions'))).toBe(true)
+    expect(existsSync(join(dir, '.machina', 'artifacts', 'patterns'))).toBe(true)
+    expect(existsSync(join(dir, '.machina', 'artifacts', 'tensions'))).toBe(true)
   })
 
   it('creates, lists, and updates system artifacts', async () => {
     await svc.initVault(dir)
 
     const path = await svc.createSystemArtifact(dir, 'session', 'debug-session', '# Debug Session')
-    expect(path).toBe(join(dir, '.thought-engine', 'artifacts', 'sessions', 'debug-session.md'))
+    expect(path).toBe(join(dir, '.machina', 'artifacts', 'sessions', 'debug-session.md'))
 
     let artifacts = await svc.listSystemArtifactFiles(dir)
     expect(artifacts).toEqual([path])

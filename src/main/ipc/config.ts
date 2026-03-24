@@ -4,7 +4,7 @@ import { typedHandle } from '../typed-ipc'
 // electron-store v11+ is ESM-only; when bundled as CJS the default
 // export lands on .default.  Handle both cases for safety.
 const Store = (StoreModule as { default?: typeof StoreModule }).default ?? StoreModule
-const appStore = new Store({ name: 'thought-engine-settings' })
+const appStore = new Store({ name: 'machina-settings' })
 
 export function registerConfigIpc(): void {
   typedHandle('config:read', async (args) => {
