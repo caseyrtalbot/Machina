@@ -423,10 +423,10 @@ function FileRow({
         />
       ) : (
         <span className="truncate flex-1">
-          <span style={{ color: isActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.50)' }}>
+          <span style={{ color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.78)' }}>
             {base}
           </span>
-          {ext && <span style={{ color: 'rgba(255,255,255,0.20)' }}>{ext}</span>}
+          {ext && <span style={{ color: 'rgba(255,255,255,0.32)' }}>{ext}</span>}
         </span>
       )}
       {canvasConnectionCount >= 2 && (
