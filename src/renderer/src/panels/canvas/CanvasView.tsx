@@ -28,7 +28,6 @@ import { inferLanguage, type DragFileData } from './file-drop-utils'
 import { useViewportCulling } from './use-canvas-culling'
 import { getLodLevel } from './use-canvas-lod'
 import { findOpenPosition } from './canvas-layout'
-import { SplitPane } from '../../design/components/SplitPane'
 import { CanvasSplitEditor } from './CanvasSplitEditor'
 
 export function CanvasView(): React.ReactElement {
@@ -407,177 +406,176 @@ export function CanvasView(): React.ReactElement {
     return () => clearTimeout(timer)
   }, [filePath, isDirty, toCanvasFile, markSaved])
 
-  const canvasContent = (
-    <div ref={containerRef} className="h-full relative">
-      {/* eslint-disable react-hooks/refs -- commandStack is a stable ref that doesn't change between renders */}
-      <CanvasToolbar
-        canUndo={commandStack.current.canUndo()}
-        canRedo={commandStack.current.canRedo()}
-        onUndo={() => commandStack.current.undo()}
-        onRedo={() => commandStack.current.redo()}
-        onAddCard={() => {
-          const vp = useCanvasStore.getState().viewport
-          const node = createCanvasNode('text', {
-            x: -vp.x / vp.zoom + 200,
-            y: -vp.y / vp.zoom + 200
-          })
-          addNodeWithUndo(node)
-        }}
-        onOpenImport={() => setImportOpen(true)}
-      />
-      {/* eslint-enable react-hooks/refs */}
-      <CanvasSurface
-        onContextMenu={handleContextMenu}
-        onBackgroundClick={handleBackgroundClick}
-        onFileDrop={handleFileDrop}
-      >
-        <EdgeLayer />
-        {visibleNodes.map((node) => {
-          // Terminal cards always render at full LOD to preserve PTY sessions
-          if ((lod === 'dot' || lod === 'preview') && node.type !== 'terminal') {
-            return <CardLodPreview key={node.id} node={node} lod={lod} />
-          }
-          const Card = LazyCards[node.type]
-          if (!Card) return null
-          return (
-            <Suspense key={node.id} fallback={<CardShellSkeleton node={node} />}>
-              <Card node={node} />
-            </Suspense>
-          )
-        })}
-      </CanvasSurface>
-
-      <ConnectionDragOverlay />
-
-      {nodes.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[1]">
-          <p
-            style={{
-              fontSize: 12,
-              fontFamily: typography.fontFamily.mono,
-              color: colors.text.muted,
-              letterSpacing: '0.04em',
-              marginTop: -60
-            }}
-          >
-            drop files to begin
-            <span style={{ opacity: 0.4, margin: '0 10px' }}>|</span>
-            <span style={{ opacity: 0.6 }}>Cmd+G</span>
-          </p>
-        </div>
-      )}
-
-      <ZoomIndicator />
-
-      <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
-
-      {/* Hint: files need enrichment */}
-      {rawFileCount > 0 && (
-        <div className="absolute inset-0 flex items-end justify-center z-10 pointer-events-none pb-14">
-          <div
-            className="text-center px-4 py-2 rounded-full"
-            style={{
-              backgroundColor: 'rgba(20, 20, 20, 0.85)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid var(--color-border-default)'
-            }}
-          >
-            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {rawFileCount} file{rawFileCount !== 1 ? 's' : ''} without metadata
-            </span>
-            <span
-              className="text-xs mx-2"
-              style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}
-            >
-              |
-            </span>
-            <span className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
-              /connect-vault
-            </span>
-          </div>
-        </div>
-      )}
-
-      <CanvasMinimap containerWidth={containerSize.width} containerHeight={containerSize.height} />
-
-      <ImportPalette
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImport={handleImportExecute}
-        containerWidth={containerSize.width}
-        containerHeight={containerSize.height}
-      />
-
-      {contextMenu && (
-        <CanvasContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onAddCard={handleAddCard}
-          onClose={() => setContextMenu(null)}
+  return (
+    <div className="flex h-full w-full overflow-hidden">
+      <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
+        {/* eslint-disable react-hooks/refs -- commandStack is a stable ref that doesn't change between renders */}
+        <CanvasToolbar
+          canUndo={commandStack.current.canUndo()}
+          canRedo={commandStack.current.canRedo()}
+          onUndo={() => commandStack.current.undo()}
+          onRedo={() => commandStack.current.redo()}
+          onAddCard={() => {
+            const vp = useCanvasStore.getState().viewport
+            const node = createCanvasNode('text', {
+              x: -vp.x / vp.zoom + 200,
+              y: -vp.y / vp.zoom + 200
+            })
+            addNodeWithUndo(node)
+          }}
+          onOpenImport={() => setImportOpen(true)}
         />
-      )}
+        {/* eslint-enable react-hooks/refs */}
+        <CanvasSurface
+          onContextMenu={handleContextMenu}
+          onBackgroundClick={handleBackgroundClick}
+          onFileDrop={handleFileDrop}
+        >
+          <EdgeLayer />
+          {visibleNodes.map((node) => {
+            // Terminal cards always render at full LOD to preserve PTY sessions
+            if ((lod === 'dot' || lod === 'preview') && node.type !== 'terminal') {
+              return <CardLodPreview key={node.id} node={node} lod={lod} />
+            }
+            const Card = LazyCards[node.type]
+            if (!Card) return null
+            return (
+              <Suspense key={node.id} fallback={<CardShellSkeleton node={node} />}>
+                <Card node={node} />
+              </Suspense>
+            )
+          })}
+        </CanvasSurface>
 
-      {cardContextMenu &&
-        (() => {
-          const menuNode = nodes.find((n) => n.id === cardContextMenu.nodeId)
-          if (!menuNode || menuNode.type !== 'note') return null
-          const menuFilePath = menuNode.content
-          const { graph, fileToId, artifacts } = useVaultStore.getState()
-          return (
-            <CardContextMenu
-              x={cardContextMenu.x}
-              y={cardContextMenu.y}
-              onShowConnections={() => {
-                const { newNodes, newEdges } = computeShowConnections(
-                  menuNode,
-                  nodes,
-                  graph,
-                  fileToId,
-                  artifacts
-                )
-                if (newNodes.length > 0 || newEdges.length > 0) {
-                  commandStack.current.execute({
-                    execute: () => addNodesAndEdges(newNodes, newEdges),
-                    undo: () => {
-                      const store = useCanvasStore.getState()
-                      const nodeIds = new Set(newNodes.map((n) => n.id))
-                      const edgeIds = new Set(newEdges.map((e) => e.id))
-                      useCanvasStore.setState({
-                        nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
-                        edges: store.edges.filter((e) => !edgeIds.has(e.id)),
-                        isDirty: true
-                      })
-                    }
-                  })
-                }
-                setCardContextMenu(null)
+        <ConnectionDragOverlay />
+
+        {nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[1]">
+            <p
+              style={{
+                fontSize: 12,
+                fontFamily: typography.fontFamily.mono,
+                color: colors.text.muted,
+                letterSpacing: '0.04em',
+                marginTop: -60
               }}
-              onOpenInEditor={() => {
-                useCanvasStore.getState().openSplit(menuFilePath)
-                setCardContextMenu(null)
+            >
+              drop files to begin
+              <span style={{ opacity: 0.4, margin: '0 10px' }}>|</span>
+              <span style={{ opacity: 0.6 }}>Cmd+G</span>
+            </p>
+          </div>
+        )}
+
+        <ZoomIndicator />
+
+        <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
+
+        {/* Hint: files need enrichment */}
+        {rawFileCount > 0 && (
+          <div className="absolute inset-0 flex items-end justify-center z-10 pointer-events-none pb-14">
+            <div
+              className="text-center px-4 py-2 rounded-full"
+              style={{
+                backgroundColor: 'rgba(20, 20, 20, 0.85)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid var(--color-border-default)'
               }}
-              onCopyPath={() => {
-                navigator.clipboard.writeText(menuFilePath)
-                setCardContextMenu(null)
-              }}
-              onClose={() => setCardContextMenu(null)}
-            />
-          )
-        })()}
+            >
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {rawFileCount} file{rawFileCount !== 1 ? 's' : ''} without metadata
+              </span>
+              <span
+                className="text-xs mx-2"
+                style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}
+              >
+                |
+              </span>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
+                /connect-vault
+              </span>
+            </div>
+          </div>
+        )}
+
+        <CanvasMinimap
+          containerWidth={containerSize.width}
+          containerHeight={containerSize.height}
+        />
+
+        <ImportPalette
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          onImport={handleImportExecute}
+          containerWidth={containerSize.width}
+          containerHeight={containerSize.height}
+        />
+
+        {contextMenu && (
+          <CanvasContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onAddCard={handleAddCard}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
+
+        {cardContextMenu &&
+          (() => {
+            const menuNode = nodes.find((n) => n.id === cardContextMenu.nodeId)
+            if (!menuNode || menuNode.type !== 'note') return null
+            const menuFilePath = menuNode.content
+            const { graph, fileToId, artifacts } = useVaultStore.getState()
+            return (
+              <CardContextMenu
+                x={cardContextMenu.x}
+                y={cardContextMenu.y}
+                onShowConnections={() => {
+                  const { newNodes, newEdges } = computeShowConnections(
+                    menuNode,
+                    nodes,
+                    graph,
+                    fileToId,
+                    artifacts
+                  )
+                  if (newNodes.length > 0 || newEdges.length > 0) {
+                    commandStack.current.execute({
+                      execute: () => addNodesAndEdges(newNodes, newEdges),
+                      undo: () => {
+                        const store = useCanvasStore.getState()
+                        const nodeIds = new Set(newNodes.map((n) => n.id))
+                        const edgeIds = new Set(newEdges.map((e) => e.id))
+                        useCanvasStore.setState({
+                          nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
+                          edges: store.edges.filter((e) => !edgeIds.has(e.id)),
+                          isDirty: true
+                        })
+                      }
+                    })
+                  }
+                  setCardContextMenu(null)
+                }}
+                onOpenInEditor={() => {
+                  useCanvasStore.getState().openSplit(menuFilePath)
+                  setCardContextMenu(null)
+                }}
+                onCopyPath={() => {
+                  navigator.clipboard.writeText(menuFilePath)
+                  setCardContextMenu(null)
+                }}
+                onClose={() => setCardContextMenu(null)}
+              />
+            )
+          })()}
+      </div>
+      {splitFilePath && (
+        <>
+          <div className="panel-divider" />
+          <div style={{ width: 480, flexShrink: 0 }} className="h-full overflow-hidden">
+            <CanvasSplitEditor filePath={splitFilePath} />
+          </div>
+        </>
+      )}
     </div>
   )
-
-  if (splitFilePath) {
-    return (
-      <SplitPane
-        left={canvasContent}
-        right={<CanvasSplitEditor filePath={splitFilePath} />}
-        initialLeftWidth={Math.round((containerSize.width || 1200) * 0.6)}
-        minLeftWidth={400}
-        minRightWidth={300}
-      />
-    )
-  }
-
-  return canvasContent
 }
