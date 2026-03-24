@@ -12,6 +12,7 @@ import type { ArtifactType } from '@shared/types'
 import type { SystemArtifactKind } from '@shared/system-artifacts'
 import type { FlatTreeNode } from './buildFileTree'
 import type { FileContextMenuState } from './FileContextMenu'
+import { TagBrowser } from './TagBrowser'
 
 type SortMode = 'modified' | 'name' | 'type'
 
@@ -416,6 +417,7 @@ export function Sidebar({
           onSelect={onSystemArtifactSelect}
         />
       </div>
+      <TagBrowser />
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hover">
         <FileTree
           nodes={nodes}
