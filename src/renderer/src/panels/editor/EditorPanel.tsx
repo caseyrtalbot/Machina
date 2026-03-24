@@ -19,6 +19,7 @@ import { MermaidCodeBlock } from './extensions/mermaid-code-block'
 import { SlashCommand } from './extensions/slash-command'
 import { CalloutBlock } from './extensions/callout-block'
 import { HighlightMark } from './extensions/highlight-mark'
+import { WikilinkNode } from './extensions/wikilink-node'
 import DragHandle from '@tiptap/extension-drag-handle'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
@@ -68,6 +69,16 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     actions: ContextMenuAction[]
   } | null>(null)
 
+  // Resolve a wikilink target title to an artifact and navigate
+  const handleWikilinkNavigate = useCallback(
+    (target: string) => {
+      const artifacts = useVaultStore.getState().artifacts
+      const match = artifacts.find((a) => a.title.toLowerCase() === target.toLowerCase())
+      if (match) onNavigate(match.id)
+    },
+    [onNavigate]
+  )
+
   // Build Tiptap extensions
   const extensions = useMemo(
     () => [
@@ -80,6 +91,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       ConceptNodeMark,
       CalloutBlock,
       HighlightMark,
+      WikilinkNode.configure({ onNavigate: handleWikilinkNavigate }),
       DragHandle.configure({
         render() {
           const el = document.createElement('div')
@@ -90,7 +102,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       }),
       SlashCommand
     ],
-    []
+    [handleWikilinkNavigate]
   )
 
   const handleUpdate = useCallback(

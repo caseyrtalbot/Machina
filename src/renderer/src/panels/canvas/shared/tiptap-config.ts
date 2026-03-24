@@ -8,8 +8,13 @@ import { ConceptNodeMark } from '../../editor/extensions/concept-node-mark'
 import { MermaidCodeBlock } from '../../editor/extensions/mermaid-code-block'
 import { CalloutBlock } from '../../editor/extensions/callout-block'
 import { HighlightMark } from '../../editor/extensions/highlight-mark'
+import { WikilinkNode } from '../../editor/extensions/wikilink-node'
 
-export function getCanvasEditorExtensions(): AnyExtension[] {
+export interface TiptapConfigOptions {
+  onWikilinkNavigate?: (target: string) => void
+}
+
+export function getCanvasEditorExtensions(options?: TiptapConfigOptions): AnyExtension[] {
   return [
     StarterKit.configure({ codeBlock: false }),
     MermaidCodeBlock,
@@ -19,6 +24,7 @@ export function getCanvasEditorExtensions(): AnyExtension[] {
     Link.configure({ openOnClick: false, HTMLAttributes: { rel: null, target: null } }),
     ConceptNodeMark,
     CalloutBlock,
-    HighlightMark
+    HighlightMark,
+    WikilinkNode.configure({ onNavigate: options?.onWikilinkNavigate })
   ]
 }
