@@ -123,9 +123,8 @@ export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
               backgroundColor: dot.color,
               cursor: 'pointer',
               opacity: isHovered ? 1 : 0.7,
-              transform: isHovered ? 'scale(1.5)' : 'scale(1)',
-              transition: 'opacity 150ms, transform 150ms',
-              boxShadow: `0 0 6px ${dot.color}80`
+              transform: isHovered ? 'scale(1.3)' : 'scale(1)',
+              transition: 'opacity 200ms ease, transform 200ms ease'
             }}
             onClick={() => handleClick(dot.targetNodeId)}
             onMouseEnter={() => setHoveredId(dot.targetNodeId)}
