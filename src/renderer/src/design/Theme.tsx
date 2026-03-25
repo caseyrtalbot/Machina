@@ -3,8 +3,7 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
-  useEffect,
-  useState,
+  useSyncExternalStore,
   type ReactNode
 } from 'react'
 import { spacing, typography, transitions } from './tokens'
@@ -48,23 +47,32 @@ const ThemeContext = createContext<ThemeContextType>({
   }
 })
 
+const SYSTEM_THEME_QUERY = '(prefers-color-scheme: dark)'
+
+function subscribeToSystemTheme(onStoreChange: () => void): () => void {
+  const mq = window.matchMedia(SYSTEM_THEME_QUERY)
+  const handler = () => onStoreChange()
+  mq.addEventListener('change', handler)
+  return () => mq.removeEventListener('change', handler)
+}
+
+function getSystemResolvedTheme(): ResolvedThemeId {
+  return window.matchMedia(SYSTEM_THEME_QUERY).matches ? 'dark' : 'light'
+}
+
+function subscribeToNothing(_onStoreChange: () => void): () => void {
+  return () => {}
+}
+
 function useResolvedTheme(): ResolvedThemeId {
   const theme = useSettingsStore((s) => s.theme)
-  const [resolved, setResolved] = useState<ResolvedThemeId>(() => resolveTheme(theme))
+  const systemResolved = useSyncExternalStore(
+    theme === 'system' ? subscribeToSystemTheme : subscribeToNothing,
+    getSystemResolvedTheme,
+    () => resolveTheme('dark')
+  )
 
-  useEffect(() => {
-    if (theme !== 'system') {
-      setResolved(theme)
-      return
-    }
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = (e: MediaQueryListEvent) => setResolved(e.matches ? 'dark' : 'light')
-    setResolved(mq.matches ? 'dark' : 'light')
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [theme])
-
-  return resolved
+  return theme === 'system' ? systemResolved : theme
 }
 
 function applyEnvCssVars(resolved: ResolvedThemeId, env: EnvironmentSettings): void {

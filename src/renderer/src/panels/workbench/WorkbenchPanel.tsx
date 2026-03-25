@@ -161,13 +161,15 @@ function fitViewportToNodes(
 
 /**
  * WorkbenchPanel uses a "store swap" pattern:
- * When activated, save vault canvas state, load the workbench into canvas-store.
- * When deactivated, save the workbench and restore the vault canvas.
+ * When the tab becomes active, save vault canvas state and load the workbench
+ * into canvas-store. When the tab becomes inactive, save the workbench and
+ * restore the vault canvas snapshot.
  * The panel stays mounted (keep-alive) so terminal sessions survive tab switches.
  */
 export function WorkbenchPanel() {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const setCachedData = useWorkbenchStore((s) => s.setCachedData)
+  const setProjectPath = useWorkbenchStore((s) => s.setProjectPath)
   const setWorkbenchActions = useWorkbenchActionStore((s) => s.setRegistration)
   const resetWorkbenchActions = useWorkbenchActionStore((s) => s.reset)
 
@@ -199,18 +201,23 @@ export function WorkbenchPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
   const prevSizeRef = useRef(containerSize)
+  const containerSizeRef = useRef(containerSize)
 
   // Keep content centered when the container resizes
   useEffect(() => {
+    containerSizeRef.current = containerSize
+    if (!isActiveTab) return
     const prev = prevSizeRef.current
     prevSizeRef.current = containerSize
     if (prev.width === 1920 && prev.height === 1080) return
+    if (containerSize.width === 0 || containerSize.height === 0) return
+    if (prev.width === 0 || prev.height === 0) return
     const dw = containerSize.width - prev.width
     const dh = containerSize.height - prev.height
     if (dw === 0 && dh === 0) return
     const { x, y, zoom } = useCanvasStore.getState().viewport
     useCanvasStore.getState().setViewport({ x: x + dw / 2, y: y + dh / 2, zoom })
-  }, [containerSize])
+  }, [containerSize, isActiveTab])
 
   useEffect(() => {
     if (!isActiveTab) return
@@ -222,7 +229,6 @@ export function WorkbenchPanel() {
   }, [isActiveTab])
 
   const savedCanvasState = useRef<{ filePath: string | null; data: CanvasFile } | null>(null)
-  const isMounted = useRef(true)
 
   // Auto-detect project root on vault change
   useEffect(() => {
@@ -239,7 +245,7 @@ export function WorkbenchPanel() {
   }, [vaultPath])
 
   // Activity monitoring: glow cards when files change
-  useProjectActivity(!isLoading, projectPath)
+  useProjectActivity(isActiveTab && !isLoading, projectPath)
 
   useEffect(() => {
     const el = containerRef.current
@@ -259,10 +265,13 @@ export function WorkbenchPanel() {
 
   // --- Store swap: save vault canvas, load workbench ---
   useEffect(() => {
-    if (!projectPath) return
-    isMounted.current = true
+    if (!projectPath || !isActiveTab) return
+
+    let cancelled = false
 
     const store = useCanvasStore.getState()
+    const activeProjectPath = projectPath
+    const workbenchPath = getWorkbenchPath(activeProjectPath)
 
     // Save current vault canvas state
     savedCanvasState.current = {
@@ -274,55 +283,67 @@ export function WorkbenchPanel() {
       setIsLoading(true)
 
       // Migrate legacy filename before anything reads from disk
-      await migrateWorkbenchFile(projectPath!).catch((err) => logError('workbench-migrate', err))
+      await migrateWorkbenchFile(activeProjectPath).catch((err) =>
+        logError('workbench-migrate', err)
+      )
 
-      const canvasPath = getWorkbenchPath(projectPath!)
+      const workbenchCache = useWorkbenchStore.getState()
+      let canvasData =
+        workbenchCache.projectPath === activeProjectPath && workbenchCache.cachedData
+          ? workbenchCache.cachedData
+          : (null as CanvasFile | null)
 
-      let canvasData: CanvasFile
-      try {
-        // Parse session events to discover which files Claude touched
-        const sessionEvents = await window.api.workbench.parseSessions(projectPath!)
+      if (!canvasData) {
+        try {
+          // Parse session events to discover which files Claude touched
+          const sessionEvents = await window.api.workbench.parseSessions(activeProjectPath)
 
-        if (!isMounted.current) return
+          if (cancelled) return
 
-        // Generate layout from session events
-        const { nodes } = layoutWorkbench(sessionEvents, projectPath!, containerSize)
+          // Generate layout from session events
+          const { nodes } = layoutWorkbench(
+            sessionEvents,
+            activeProjectPath,
+            containerSizeRef.current
+          )
 
-        // Center on the first terminal card
-        const terminalNode = nodes.find((n) => n.type === 'terminal')
-        const vp = terminalNode
-          ? centerOnNode(terminalNode, containerSize)
-          : fitViewportToNodes(nodes, containerSize)
+          // Center on the first terminal card
+          const terminalNode = nodes.find((n) => n.type === 'terminal')
+          const vp = terminalNode
+            ? centerOnNode(terminalNode, containerSizeRef.current)
+            : fitViewportToNodes(nodes, containerSizeRef.current)
 
-        canvasData = { nodes, edges: [], viewport: vp }
-        setCachedData(canvasData)
-      } catch (err) {
-        console.error('[WorkbenchPanel] Failed to load workbench:', err)
-        canvasData = createCanvasFile()
+          canvasData = { nodes, edges: [], viewport: vp }
+          setCachedData(canvasData)
+        } catch (err) {
+          console.error('[WorkbenchPanel] Failed to load workbench:', err)
+          canvasData = createCanvasFile()
+        }
       }
 
-      if (!isMounted.current) return
-      useCanvasStore.getState().loadCanvas(canvasPath, canvasData)
+      if (cancelled || !canvasData) return
+      setProjectPath(activeProjectPath)
+      useCanvasStore.getState().loadCanvas(workbenchPath, canvasData)
       setIsLoading(false)
 
       // Start watching the project directory
       window.api.workbench
-        .watchStart(projectPath!)
+        .watchStart(activeProjectPath)
         .catch((err) => logError('workbench-watch-start', err))
     }
 
-    loadWorkbench()
+    void loadWorkbench()
 
     return () => {
-      isMounted.current = false
+      cancelled = true
       window.api.workbench.watchStop().catch((err) => logError('workbench-watch-stop', err))
 
-      // Save current workbench state
-      const currentData = useCanvasStore.getState().toCanvasFile()
-      setCachedData(currentData)
-      if (projectPath) {
-        const canvasPath = getWorkbenchPath(projectPath)
-        saveCanvas(canvasPath, currentData).catch((err) =>
+      const currentStore = useCanvasStore.getState()
+      if (currentStore.filePath === workbenchPath) {
+        const currentData = currentStore.toCanvasFile()
+        setCachedData(currentData)
+        setProjectPath(activeProjectPath)
+        saveCanvas(workbenchPath, currentData).catch((err) =>
           notifyError('workbench-save', err, 'Failed to save workbench canvas')
         )
       }
@@ -334,12 +355,13 @@ export function WorkbenchPanel() {
       } else {
         useCanvasStore.getState().closeCanvas()
       }
+      setIsLoading(false)
     }
-  }, [projectPath]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isActiveTab, projectPath, setCachedData, setProjectPath])
 
   // Auto-save debounce
   useEffect(() => {
-    if (!isDirty || !projectPath) return
+    if (!isActiveTab || !isDirty || !projectPath) return
     const canvasPath = getWorkbenchPath(projectPath)
     const timer = setTimeout(async () => {
       const data = toCanvasFile()
@@ -348,7 +370,7 @@ export function WorkbenchPanel() {
       markSaved()
     }, 500)
     return () => clearTimeout(timer)
-  }, [isDirty, toCanvasFile, markSaved, projectPath, setCachedData])
+  }, [isActiveTab, isDirty, toCanvasFile, markSaved, projectPath, setCachedData])
 
   const visibleNodes = useViewportCulling(nodes, viewport, containerSize)
   const lod = getLodLevel(viewport.zoom)

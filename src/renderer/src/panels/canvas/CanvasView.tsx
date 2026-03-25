@@ -29,6 +29,7 @@ import { useViewportCulling } from './use-canvas-culling'
 import { getLodLevel } from './use-canvas-lod'
 import { findOpenPosition } from './canvas-layout'
 import { CanvasSplitEditor } from './CanvasSplitEditor'
+import { useTabStore } from '../../store/tab-store'
 
 /** Draggable divider + editor panel. Separate component to isolate drag
  *  state from CanvasView and prevent canvas DOM remounts. */
@@ -100,6 +101,7 @@ export function CanvasView(): React.ReactElement {
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
+  const activeTabId = useTabStore((s) => s.activeTabId)
 
   // Ensure a canvas file exists so autosave can persist terminal session IDs.
   // Without a file, terminal cards vanish on restart.
@@ -481,18 +483,17 @@ export function CanvasView(): React.ReactElement {
 
   // Auto-save debounce
   useEffect(() => {
-    if (!filePath || !isDirty) return
+    if (activeTabId !== 'canvas' || !filePath || !isDirty) return
     const timer = setTimeout(async () => {
       await saveCanvas(filePath, toCanvasFile())
       markSaved()
     }, 500)
     return () => clearTimeout(timer)
-  }, [filePath, isDirty, toCanvasFile, markSaved])
+  }, [activeTabId, filePath, isDirty, toCanvasFile, markSaved])
 
   return (
     <div className="flex h-full w-full overflow-hidden">
       <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
-        {/* eslint-disable react-hooks/refs -- commandStack is a stable ref that doesn't change between renders */}
         <CanvasToolbar
           canUndo={commandStack.current.canUndo()}
           canRedo={commandStack.current.canRedo()}
@@ -508,7 +509,6 @@ export function CanvasView(): React.ReactElement {
           }}
           onOpenImport={() => setImportOpen(true)}
         />
-        {/* eslint-enable react-hooks/refs */}
         <CanvasSurface
           onContextMenu={handleContextMenu}
           onBackgroundClick={handleBackgroundClick}

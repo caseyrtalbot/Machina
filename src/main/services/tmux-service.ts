@@ -42,8 +42,6 @@ export class TmuxService {
   private onData: DataCallback = () => {}
   private onExit: ExitCallback = () => {}
 
-  private constructor() {}
-
   /**
    * Factory: returns a TmuxService if tmux >= 2.6 is available, otherwise null.
    * The caller falls back to ephemeral node-pty when null.
