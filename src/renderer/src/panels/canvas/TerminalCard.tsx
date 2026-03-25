@@ -51,34 +51,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
   // IMPORTANT: xterm must be mounted BEFORE the PTY is created so the
   // terminalData listener can write to it as soon as the shell sends output.
   useEffect(() => {
-    let sessionId = sessionIdRef.current
+    const existingSessionId = sessionIdRef.current
     let cancelled = false
-
-    // Validate persisted session ID — it may be stale from a previous app run.
-    // If the PTY no longer exists, clear the ref so createSession() spawns a fresh one.
-    if (sessionId) {
-      try {
-        const processName = window.api.terminal.getProcessName(sessionId)
-        // getProcessName returns a Promise; handle both sync-null and async-null
-        if (processName instanceof Promise) {
-          processName
-            .then((name) => {
-              if (!name && !cancelled) {
-                sessionIdRef.current = null
-              }
-            })
-            .catch(() => {
-              if (!cancelled) sessionIdRef.current = null
-            })
-        } else if (!processName) {
-          sessionIdRef.current = null
-          sessionId = null
-        }
-      } catch {
-        sessionIdRef.current = null
-        sessionId = null
-      }
-    }
 
     // Support metadata-driven cwd and initial command
     const initialCommand =
@@ -169,76 +143,120 @@ export function TerminalCard({ node }: TerminalCardProps) {
       }
     })
 
-    // Step 2: Create PTY session (async) — xterm is already mounted and
-    // the terminalData listener is ready, so no output will be dropped.
-    async function createSession() {
-      if (!sessionId) {
-        const cwd = initialCwd || vaultPath || '/'
-        sessionId = await window.api.terminal.create(cwd)
-        if (cancelled) return
-        sessionIdRef.current = sessionId
-        updateContent(node.id, sessionId)
+    // Step 2: Connect to a session (async). If we have an existing session ID,
+    // try to reconnect (tmux replay). Otherwise create a fresh session.
+    async function connectSession() {
+      let sessionId = existingSessionId
 
-        // Send initial command ONLY for new sessions (Decision 2A)
-        if (initialCommand) {
-          setTimeout(() => {
-            if (cancelled || !sessionIdRef.current) return
-
-            // For Claude cards: inject canvas file paths as context
-            if (isClaudeCard) {
-              import('../../engine/context-serializer')
-                .then(({ buildCanvasContext, escapeForShell }) => {
-                  if (cancelled || !sessionIdRef.current) return
-                  const nodes = useCanvasStore.getState().nodes
-                  const contextFilePath = vaultPath
-                    ? `${vaultPath}/${TE_DIR}/context-${node.id}.txt`
-                    : undefined
-                  const { text } = buildCanvasContext(node.id, nodes, { contextFilePath })
-                  if (text) {
-                    const escaped = escapeForShell(text)
-                    const cmd = `claude --append-system-prompt $'${escaped}'`
-                    window.api.terminal.write(sessionIdRef.current!, cmd + '\n')
-                  } else {
-                    window.api.terminal.write(sessionIdRef.current!, 'claude\n')
-                  }
-                })
-                .catch((err) => {
-                  console.error('Context injection failed:', err)
-                  if (sessionIdRef.current) {
-                    window.api.terminal.write(sessionIdRef.current, 'claude\n')
-                  }
-                  markError()
-                })
-            } else {
-              // Non-Claude commands: send as-is
-              window.api.terminal.write(sessionIdRef.current!, initialCommand + '\n')
-            }
-          }, 500)
+      // Reconnect path: try to reattach to a surviving tmux session
+      if (sessionId && termRef.current) {
+        // Ensure xterm has real dimensions before reconnecting.
+        // fitAddon.fit() may not have run yet if the card hasn't laid out.
+        if (fitRef.current) {
+          try {
+            fitRef.current.fit()
+          } catch {
+            // Container not yet sized — use defaults
+          }
         }
+        const cols = termRef.current.cols || 80
+        const rows = termRef.current.rows || 24
+        const result = await window.api.terminal.reconnect(sessionId, cols, rows)
+        if (cancelled) return
+
+        if (result) {
+          // Success: replay scrollback and wire live data
+          sessionIdRef.current = sessionId
+          if (result.scrollback) {
+            termRef.current.write(result.scrollback)
+          }
+          requestAnimationFrame(() => {
+            if (!cancelled && fitRef.current) fitRef.current.fit()
+          })
+          return
+        }
+
+        // Reconnect failed: session is gone, fall through to create
+        sessionIdRef.current = null
+        sessionId = null
       }
 
-      // Reattach path: just resize, no command re-injection
+      // Create path: spawn a new session
+      const cwd = initialCwd || vaultPath || '/'
+      sessionId = await window.api.terminal.create(cwd)
+      if (cancelled) return
+      sessionIdRef.current = sessionId
+      updateContent(node.id, sessionId)
+
+      // Send initial command ONLY for new sessions
+      if (initialCommand) {
+        setTimeout(() => {
+          if (cancelled || !sessionIdRef.current) return
+
+          // For Claude cards: inject canvas file paths as context
+          if (isClaudeCard) {
+            import('../../engine/context-serializer')
+              .then(({ buildCanvasContext, escapeForShell }) => {
+                if (cancelled || !sessionIdRef.current) return
+                const nodes = useCanvasStore.getState().nodes
+                const contextFilePath = vaultPath
+                  ? `${vaultPath}/${TE_DIR}/context-${node.id}.txt`
+                  : undefined
+                const { text } = buildCanvasContext(node.id, nodes, { contextFilePath })
+                if (text) {
+                  const escaped = escapeForShell(text)
+                  const cmd = `claude --append-system-prompt $'${escaped}'`
+                  window.api.terminal.write(sessionIdRef.current!, cmd + '\n')
+                } else {
+                  window.api.terminal.write(sessionIdRef.current!, 'claude\n')
+                }
+              })
+              .catch((err) => {
+                console.error('Context injection failed:', err)
+                if (sessionIdRef.current) {
+                  window.api.terminal.write(sessionIdRef.current, 'claude\n')
+                }
+                markError()
+              })
+          } else {
+            window.api.terminal.write(sessionIdRef.current!, initialCommand + '\n')
+          }
+        }, 500)
+      }
+
+      // Resize to match xterm dimensions
       if (termRef.current) {
         const { cols, rows } = termRef.current
         window.api.terminal.resize(sessionId!, cols, rows)
       }
 
-      // Re-fit after layout settles
       requestAnimationFrame(() => {
         if (!cancelled && fitRef.current) fitRef.current.fit()
       })
     }
 
-    createSession()
+    // Defer session connection until after the browser has laid out the card.
+    // xterm's viewport crashes if written to before it has real dimensions.
+    // Double-rAF ensures: rAF1 = layout computed, rAF2 = xterm internals ready.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (cancelled) return
+        if (fitRef.current) {
+          try {
+            fitRef.current.fit()
+          } catch {
+            // Container might still be zero-sized
+          }
+        }
+        connectSession()
+      })
+    })
 
+    // Cleanup: dispose xterm but do NOT kill the session.
+    // Sessions survive unmount (tmux detach happens via shutdown() on quit).
+    // Only the explicit Close button calls terminal.kill().
     return () => {
       cancelled = true
-      const sid = sessionIdRef.current
-      if (sid) {
-        window.api.terminal.kill(sid)
-      }
-      // Dispose WebGL addon explicitly before terminal to avoid
-      // _isDisposed crash when DOM is removed before xterm cleanup
       try {
         webglRef.current?.dispose()
       } catch {
@@ -268,7 +286,15 @@ export function TerminalCard({ node }: TerminalCardProps) {
       dataBuffer = []
       flushTimer = undefined
       if (chunk && termRef.current) {
-        termRef.current.write(chunk)
+        try {
+          termRef.current.write(chunk)
+        } catch {
+          // xterm viewport not yet initialized (dimensions undefined).
+          // Data arrives from tmux redraw before the card is laid out.
+          // Re-queue: it will flush on the next cycle once layout completes.
+          dataBuffer.push(chunk)
+          flushTimer = setTimeout(flushData, 16)
+        }
       }
     }
 

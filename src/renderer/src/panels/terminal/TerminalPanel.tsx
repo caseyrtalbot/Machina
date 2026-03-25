@@ -39,9 +39,10 @@ export function TerminalPanel() {
 
   const createTerminalInstance = useCallback(async () => {
     const cwd = vaultPath || '/'
+    const title = `Shell ${sessions.length + 1}`
     let sessionId: SessionId
     try {
-      sessionId = await window.api.terminal.create(cwd)
+      sessionId = await window.api.terminal.create(cwd, undefined, title, vaultPath ?? undefined)
     } catch (err) {
       setError(
         `Failed to create terminal: ${err instanceof Error ? err.message : String(err)}. ` +
@@ -50,7 +51,6 @@ export function TerminalPanel() {
       return null
     }
     setError(null)
-    const title = `Shell ${sessions.length + 1}`
 
     addSession({ id: sessionId, title })
 
@@ -147,7 +147,8 @@ export function TerminalPanel() {
     return () => clearTimeout(timer)
   }, [handleActivateClaude])
 
-  // Mount/unmount terminal DOM when active session changes
+  // Mount/unmount terminal DOM when active session changes.
+  // For discovered sessions, reconnect to replay scrollback on first mount.
   useEffect(() => {
     const container = activeContainerRef.current
     if (!container || !activeSessionId) return
@@ -159,15 +160,27 @@ export function TerminalPanel() {
     container.innerHTML = ''
     instance.terminal.open(container)
 
-    // Load WebGL addon for GPU-accelerated rendering (crisper text, like modern terminals).
-    // Falls back silently to Canvas 2D if WebGL is unavailable in this context.
+    // Load WebGL addon for GPU-accelerated rendering
     try {
       instance.terminal.loadAddon(new WebglAddon())
     } catch {
-      // WebGL unavailable — Canvas 2D renderer remains active
+      // WebGL unavailable
     }
 
     instance.fitAddon.fit()
+
+    // Reconnect: replay scrollback for surviving sessions
+    const { cols, rows } = instance.terminal
+    window.api.terminal
+      .reconnect(activeSessionId, cols, rows)
+      .then((result) => {
+        if (result?.scrollback) {
+          instance.terminal.write(result.scrollback)
+        }
+      })
+      .catch(() => {
+        // Not a tmux session or reconnect failed, data flows via terminalData listener
+      })
   }, [activeSessionId])
 
   // Listen for data and exit events from main process
@@ -304,24 +317,85 @@ export function TerminalPanel() {
     [sessions.length, removeSession]
   )
 
-  // Create initial terminal session on mount (ref guards against Strict Mode double-fire)
+  // On mount: discover surviving tmux sessions, then create a fresh one if none found.
+  // Ref guards against Strict Mode double-fire.
   const didInit = useRef(false)
   useEffect(() => {
     if (didInit.current) return
     didInit.current = true
-    // Defer to avoid synchronous setState during effect execution
-    queueMicrotask(() => {
-      createTerminalInstance()
+
+    queueMicrotask(async () => {
+      let discoveredCount = 0
+
+      // Try to discover surviving sessions from a previous app run
+      try {
+        const discovered = await window.api.terminal.discover()
+
+        // Include sessions tagged with this vault, or untagged sessions
+        const vaultSessions = vaultPath
+          ? discovered.filter((d) => !d.meta.vaultPath || d.meta.vaultPath === vaultPath)
+          : discovered
+
+        for (const { sessionId, meta } of vaultSessions) {
+          try {
+            const title = meta.label ?? 'Shell (restored)'
+            addSession({ id: sessionId, title })
+
+            const term = new Terminal({
+              fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, monospace',
+              fontSize: termFontSize,
+              lineHeight: 1.2,
+              letterSpacing: 0,
+              fontWeight: '400',
+              fontWeightBold: '600',
+              theme: {
+                background: colors.bg.base,
+                foreground: colors.text.primary,
+                cursor: colors.accent.default,
+                selectionBackground: colors.accent.muted
+              },
+              scrollback: 10000,
+              cursorBlink: true,
+              drawBoldTextInBrightColors: true,
+              minimumContrastRatio: 1
+            })
+
+            const fitAddon = new FitAddon()
+            const searchAddon = new SearchAddon()
+            term.loadAddon(fitAddon)
+            term.loadAddon(new WebLinksAddon())
+            term.loadAddon(searchAddon)
+            searchAddonsRef.current.set(sessionId, searchAddon)
+
+            term.onData((data) => {
+              window.api.terminal.write(sessionId, data)
+            })
+
+            instancesRef.current.set(sessionId, { terminal: term, fitAddon, sessionId })
+            discoveredCount++
+          } catch (err) {
+            console.error(`Failed to restore session ${sessionId}:`, err)
+          }
+        }
+      } catch (err) {
+        console.error('Terminal session discovery failed:', err)
+      }
+
+      // Only create a fresh session if nothing was discovered.
+      // Use instancesRef (live ref) instead of sessions (stale closure).
+      if (discoveredCount === 0 && instancesRef.current.size === 0) {
+        createTerminalInstance()
+      }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup all terminals on unmount
+  // Cleanup all terminals on unmount: dispose xterm but do NOT kill sessions.
+  // Tmux sessions survive unmount; shutdown() handles detaching on quit.
   useEffect(() => {
     const instances = instancesRef.current
     return () => {
-      for (const [id, instance] of instances) {
+      for (const [, instance] of instances) {
         instance.terminal.dispose()
-        window.api.terminal.kill(id)
       }
       instances.clear()
     }

@@ -74,7 +74,10 @@ export interface IpcChannels {
   'shell:trash-item': { request: { path: string }; response: void }
 
   // --- Terminal ---
-  'terminal:create': { request: { cwd: string; shell?: string }; response: SessionId }
+  'terminal:create': {
+    request: { cwd: string; shell?: string; label?: string; vaultPath?: string }
+    response: SessionId
+  }
   'terminal:write': { request: { sessionId: SessionId; data: string }; response: void }
   'terminal:resize': {
     request: { sessionId: SessionId; cols: number; rows: number }
@@ -82,6 +85,21 @@ export interface IpcChannels {
   }
   'terminal:kill': { request: { sessionId: SessionId }; response: void }
   'terminal:process-name': { request: { sessionId: SessionId }; response: string | null }
+  'terminal:reconnect': {
+    request: { sessionId: SessionId; cols: number; rows: number }
+    response: {
+      scrollback: string
+      meta: { shell: string; cwd: string; label?: string }
+    } | null
+  }
+  'terminal:discover': {
+    request: void
+    response: Array<{
+      sessionId: SessionId
+      meta: { shell: string; cwd: string; createdAt: string; label?: string; vaultPath?: string }
+    }>
+  }
+  'terminal:tmux-available': { request: void; response: boolean }
 
   // --- Document Manager ---
   'doc:open': { request: { path: string }; response: { content: string; version: number } }

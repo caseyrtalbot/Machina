@@ -79,13 +79,18 @@ const api = {
     tailStop: () => typedInvoke('session:tail-stop')
   },
   terminal: {
-    create: (cwd: string, shell?: string) => typedInvoke('terminal:create', { cwd, shell }),
+    create: (cwd: string, shell?: string, label?: string, vaultPath?: string) =>
+      typedInvoke('terminal:create', { cwd, shell, label, vaultPath }),
     write: (sessionId: SessionId, data: string) =>
       typedInvoke('terminal:write', { sessionId, data }),
     resize: (sessionId: SessionId, cols: number, rows: number) =>
       typedInvoke('terminal:resize', { sessionId, cols, rows }),
     kill: (sessionId: SessionId) => typedInvoke('terminal:kill', { sessionId }),
-    getProcessName: (sessionId: SessionId) => typedInvoke('terminal:process-name', { sessionId })
+    getProcessName: (sessionId: SessionId) => typedInvoke('terminal:process-name', { sessionId }),
+    reconnect: (sessionId: SessionId, cols: number, rows: number) =>
+      typedInvoke('terminal:reconnect', { sessionId, cols, rows }),
+    discover: () => typedInvoke('terminal:discover'),
+    tmuxAvailable: () => typedInvoke('terminal:tmux-available')
   },
   document: {
     open: (path: string) => typedInvoke('doc:open', { path }),

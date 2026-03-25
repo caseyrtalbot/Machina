@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { ShellService } from '../services/shell-service'
 import { typedHandle, typedSend } from '../typed-ipc'
+import { sessionId } from '@shared/types'
 
 const shellService = new ShellService()
 
@@ -15,7 +16,7 @@ export function registerShellIpc(mainWindow: BrowserWindow): void {
   )
 
   typedHandle('terminal:create', async (args) => {
-    return shellService.create(args.cwd, args.shell)
+    return shellService.create(args.cwd, args.shell, args.label, args.vaultPath)
   })
 
   typedHandle('terminal:write', async (args) => {
@@ -32,6 +33,22 @@ export function registerShellIpc(mainWindow: BrowserWindow): void {
 
   typedHandle('terminal:process-name', async (args) => {
     return shellService.getProcessName(args.sessionId)
+  })
+
+  typedHandle('terminal:reconnect', async (args) => {
+    return shellService.reconnect(args.sessionId, args.cols, args.rows)
+  })
+
+  typedHandle('terminal:discover', async () => {
+    const discovered = shellService.discover()
+    return discovered.map((d) => ({
+      sessionId: sessionId(d.sessionId),
+      meta: d.meta
+    }))
+  })
+
+  typedHandle('terminal:tmux-available', async () => {
+    return shellService.tmuxAvailable
   })
 }
 

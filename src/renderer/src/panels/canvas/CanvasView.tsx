@@ -98,6 +98,36 @@ export function CanvasView(): React.ReactElement {
     ).length
   })
 
+  const vaultPath = useVaultStore((s) => s.vaultPath)
+  const loadCanvas = useCanvasStore((s) => s.loadCanvas)
+
+  // Ensure a canvas file exists so autosave can persist terminal session IDs.
+  // Without a file, terminal cards vanish on restart.
+  const didEnsureCanvas = useRef(false)
+  useEffect(() => {
+    if (didEnsureCanvas.current || filePath || !vaultPath) return
+    didEnsureCanvas.current = true
+
+    void (async () => {
+      const defaultPath = `${vaultPath}/Untitled.canvas`
+      try {
+        const exists = await window.api.fs.fileExists(defaultPath)
+        if (exists) {
+          const raw = await window.api.fs.readFile(defaultPath)
+          const { deserializeCanvas } = await import('./canvas-io')
+          loadCanvas(defaultPath, deserializeCanvas(raw))
+        } else {
+          const { createCanvasFile } = await import('@shared/canvas-types')
+          const data = createCanvasFile()
+          await window.api.fs.writeFile(defaultPath, JSON.stringify(data, null, 2))
+          loadCanvas(defaultPath, data)
+        }
+      } catch {
+        // Non-fatal: canvas works without persistence
+      }
+    })()
+  }, [filePath, vaultPath, loadCanvas])
+
   // Track container size for viewport culling
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })

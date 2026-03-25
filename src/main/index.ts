@@ -177,7 +177,7 @@ app.on('before-quit', (event) => {
     await getDocumentManager().flushAll()
 
     // Step 3: Clean up services
-    getShellService().killAll()
+    getShellService().shutdown()
     getProjectWatcher().stop()
     getSessionTailer()?.stop()
   }
