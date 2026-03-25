@@ -607,8 +607,7 @@ function ResizableSidebar({
         className="h-full flex flex-col shrink-0 overflow-hidden pt-8"
         style={{
           width,
-          backgroundColor: colors.bg.base,
-          borderLeft: `1px solid ${colors.border.subtle}`
+          backgroundColor: colors.bg.base
         }}
       >
         <PanelErrorBoundary name="Sidebar">

@@ -112,7 +112,7 @@ export function ActivityBar() {
       style={{
         width: 48,
         backgroundColor: colors.bg.base,
-        borderRight: `1px solid ${colors.border.subtle}`
+        borderRight: `1px solid ${colors.border.default}`
       }}
     >
       {ITEMS.map(({ view, label, icon }) => {

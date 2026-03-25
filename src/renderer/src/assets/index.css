@@ -222,7 +222,7 @@ body {
   position: relative;
   flex-shrink: 0;
   width: 1px;
-  background: color-mix(in srgb, white 3%, transparent);
+  background: var(--color-border-default);
   cursor: col-resize;
 }
 

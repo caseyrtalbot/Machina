@@ -228,7 +228,7 @@ export function CardShell({
         height: node.size.height,
         backgroundColor: canvasTokens.card,
         borderRadius: 8,
-        border: '1px solid rgba(128, 128, 128, 0.2)',
+        border: `1px solid ${colors.border.default}`,
         boxShadow: isLocked
           ? `0 0 0 1px rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.5)`
           : isFocused
