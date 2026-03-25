@@ -1,4 +1,8 @@
-export type ThemeId = 'midnight' | 'slate' | 'obsidian' | 'nord' | 'evergreen' | 'light'
+// src/renderer/src/design/themes.ts
+
+export type ThemeId = 'dark' | 'light' | 'system'
+export type ResolvedThemeId = 'dark' | 'light'
+
 export type AccentColorId =
   | 'matrix'
   | 'laser'
@@ -9,42 +13,106 @@ export type AccentColorId =
   | 'plasma'
   | 'neonmint'
 
-interface CanvasColors {
-  surface: string
-  card: string
-  cardTitleBar: string
-  cardBorder: string
-  textHeading: string
-  blockquoteBar: string
+export interface EnvironmentSettings {
+  readonly canvasTranslucency: number
+  readonly cardOpacity: number
+  readonly cardHeaderDarkness: number
+  readonly cardBlur: number
+  readonly gridDotVisibility: number
+  readonly panelLightness: number
+  readonly activityBarOpacity: number
+  readonly cardTitleFontSize: number
+  readonly sidebarFontSize: number
 }
 
-interface StructuralColors {
-  bg: { base: string; surface: string; elevated: string }
-  border: { default: string; subtle: string }
-  text: { primary: string; secondary: string; muted: string }
-  canvas: CanvasColors
+export const ENV_DEFAULTS: Record<ResolvedThemeId, EnvironmentSettings> = {
+  dark: {
+    canvasTranslucency: 40,
+    cardOpacity: 94,
+    cardHeaderDarkness: 45,
+    cardBlur: 12,
+    gridDotVisibility: 20,
+    panelLightness: 5,
+    activityBarOpacity: 55,
+    cardTitleFontSize: 12,
+    sidebarFontSize: 13
+  },
+  light: {
+    canvasTranslucency: 45,
+    cardOpacity: 90,
+    cardHeaderDarkness: 4,
+    cardBlur: 8,
+    gridDotVisibility: 15,
+    panelLightness: 98,
+    activityBarOpacity: 12,
+    cardTitleFontSize: 12,
+    sidebarFontSize: 13
+  }
 }
 
-interface ThemeDefinition {
-  label: string
-  colors: StructuralColors
+export interface BaseRgb {
+  readonly r: number
+  readonly g: number
+  readonly b: number
+}
+
+export interface ThemeBaseColors {
+  readonly canvasSurface: BaseRgb
+  readonly cardBody: BaseRgb
+}
+
+export const BASE_COLORS: Record<ResolvedThemeId, ThemeBaseColors> = {
+  dark: {
+    canvasSurface: { r: 18, g: 18, b: 20 },
+    cardBody: { r: 16, g: 16, b: 20 }
+  },
+  light: {
+    canvasSurface: { r: 232, g: 236, b: 240 },
+    cardBody: { r: 255, g: 255, b: 255 }
+  }
+}
+
+export interface StructuralColors {
+  readonly border: { readonly default: string; readonly subtle: string }
+  readonly text: { readonly primary: string; readonly secondary: string; readonly muted: string }
+  readonly canvas: {
+    readonly cardBorder: string
+    readonly textHeading: string
+    readonly blockquoteBar: string
+  }
+}
+
+export const STRUCTURAL_COLORS: Record<ResolvedThemeId, StructuralColors> = {
+  dark: {
+    border: {
+      default: 'color-mix(in srgb, white 8%, transparent)',
+      subtle: 'color-mix(in srgb, white 4%, transparent)'
+    },
+    text: { primary: '#d9d9d9', secondary: '#808080', muted: '#525252' },
+    canvas: {
+      cardBorder: 'rgba(255, 255, 255, 0.06)',
+      textHeading: '#e8e8e8',
+      blockquoteBar: '#4a4a4a'
+    }
+  },
+  light: {
+    border: {
+      default: '#e2e8f0',
+      subtle: 'color-mix(in srgb, black 6%, transparent)'
+    },
+    text: { primary: '#0f172a', secondary: '#475569', muted: '#94a3b8' },
+    canvas: {
+      cardBorder: 'rgba(0, 0, 0, 0.06)',
+      textHeading: '#0f172a',
+      blockquoteBar: '#cbd5e1'
+    }
+  }
 }
 
 interface AccentDefinition {
-  label: string
-  value: string
+  readonly label: string
+  readonly value: string
 }
-
-export interface ResolvedColors {
-  bg: { base: string; surface: string; elevated: string }
-  border: { default: string; subtle: string }
-  text: { primary: string; secondary: string; muted: string }
-  accent: { default: string; hover: string; muted: string }
-  semantic: { cluster: string; tension: string }
-  canvas: CanvasColors
-}
-
-// ── Color math ──────────────────────────────────────────────────────────
 
 function parseHex(hex: string): [number, number, number] {
   return [
@@ -61,7 +129,7 @@ function lightenHex(hex: string, factor: number): string {
   return `#${toHex(lighten(r))}${toHex(lighten(g))}${toHex(lighten(b))}`
 }
 
-function computeAccentVariants(hex: string): {
+export function computeAccentVariants(hex: string): {
   default: string
   hover: string
   muted: string
@@ -73,124 +141,7 @@ function computeAccentVariants(hex: string): {
   }
 }
 
-export function resolveColors(themeId: ThemeId, accentId: AccentColorId): ResolvedColors {
-  const theme = THEMES[themeId]
-  const accentHex = ACCENT_COLORS[accentId].value
-  return {
-    ...theme.colors,
-    accent: computeAccentVariants(accentHex),
-    semantic: { cluster: '#34D399', tension: '#F59E0B' },
-    canvas: theme.colors.canvas
-  }
-}
-
-// ── Theme palettes ──────────────────────────────────────────────────────
-
-export const THEMES = {
-  midnight: {
-    label: 'Midnight',
-    colors: {
-      bg: { base: '#141414', surface: '#1f1f1f', elevated: '#2a2a2a' },
-      border: {
-        default: 'color-mix(in srgb, white 8%, transparent)',
-        subtle: 'color-mix(in srgb, white 4%, transparent)'
-      },
-      text: { primary: '#d9d9d9', secondary: '#808080', muted: '#525252' },
-      canvas: {
-        surface: 'rgba(22, 22, 24, 0.55)',
-        card: 'rgba(40, 42, 46, 0.78)',
-        cardTitleBar: 'rgba(0, 0, 0, 0.15)',
-        cardBorder: 'rgba(255, 255, 255, 0.06)',
-        textHeading: '#e8e8e8',
-        blockquoteBar: '#4a4a4a'
-      }
-    }
-  },
-  slate: {
-    label: 'Slate',
-    colors: {
-      bg: { base: '#0f172a', surface: '#1e293b', elevated: '#334155' },
-      border: { default: '#475569', subtle: 'color-mix(in srgb, white 8%, transparent)' },
-      text: { primary: '#f1f5f9', secondary: '#94a3b8', muted: '#64748b' },
-      canvas: {
-        surface: 'rgba(20, 28, 42, 0.55)',
-        card: 'rgba(36, 50, 68, 0.78)',
-        cardTitleBar: 'rgba(0, 0, 0, 0.15)',
-        cardBorder: 'rgba(255, 255, 255, 0.06)',
-        textHeading: '#e2e8f0',
-        blockquoteBar: '#475569'
-      }
-    }
-  },
-  obsidian: {
-    label: 'Obsidian',
-    colors: {
-      bg: { base: '#1e1e1e', surface: '#252525', elevated: '#2d2d2d' },
-      border: { default: '#3e3e3e', subtle: 'color-mix(in srgb, white 6%, transparent)' },
-      text: { primary: '#dcddde', secondary: '#999999', muted: '#666666' },
-      canvas: {
-        surface: 'rgba(26, 26, 26, 0.55)',
-        card: 'rgba(42, 42, 44, 0.78)',
-        cardTitleBar: 'rgba(0, 0, 0, 0.15)',
-        cardBorder: 'rgba(255, 255, 255, 0.06)',
-        textHeading: '#e0e0e0',
-        blockquoteBar: '#484848'
-      }
-    }
-  },
-  nord: {
-    label: 'Nord',
-    colors: {
-      bg: { base: '#2e3440', surface: '#3b4252', elevated: '#434c5e' },
-      border: { default: '#4c566a', subtle: 'color-mix(in srgb, white 8%, transparent)' },
-      text: { primary: '#eceff4', secondary: '#d8dee9', muted: '#7b88a1' },
-      canvas: {
-        surface: 'rgba(44, 51, 64, 0.55)',
-        card: 'rgba(54, 62, 74, 0.78)',
-        cardTitleBar: 'rgba(0, 0, 0, 0.15)',
-        cardBorder: 'rgba(255, 255, 255, 0.06)',
-        textHeading: '#eceff4',
-        blockquoteBar: '#4c566a'
-      }
-    }
-  },
-  evergreen: {
-    label: 'Opal',
-    colors: {
-      bg: { base: '#0c0c0e', surface: '#131315', elevated: '#1c1c1f' },
-      border: { default: '#2a2a2d', subtle: 'color-mix(in srgb, white 6%, transparent)' },
-      text: { primary: '#e6e8ec', secondary: '#8b8e96', muted: '#4a4c54' },
-      canvas: {
-        surface: 'rgba(14, 14, 16, 0.55)',
-        card: 'rgba(26, 26, 30, 0.78)',
-        cardTitleBar: 'rgba(0, 0, 0, 0.15)',
-        cardBorder: 'rgba(255, 255, 255, 0.06)',
-        textHeading: '#e6e8ec',
-        blockquoteBar: '#3a3a3e'
-      }
-    }
-  },
-  light: {
-    label: 'Light',
-    colors: {
-      bg: { base: '#ffffff', surface: '#f8fafc', elevated: '#f1f5f9' },
-      border: { default: '#e2e8f0', subtle: 'color-mix(in srgb, black 6%, transparent)' },
-      text: { primary: '#0f172a', secondary: '#475569', muted: '#94a3b8' },
-      canvas: {
-        surface: 'rgba(232, 236, 240, 0.55)',
-        card: 'rgba(255, 255, 255, 0.85)',
-        cardTitleBar: 'rgba(0, 0, 0, 0.04)',
-        cardBorder: 'rgba(0, 0, 0, 0.06)',
-        textHeading: '#0f172a',
-        blockquoteBar: '#cbd5e1'
-      }
-    }
-  }
-} as const satisfies Record<ThemeId, ThemeDefinition>
-
-// ── Accent colors ───────────────────────────────────────────────────────
-
-export const ACCENT_COLORS = {
+export const ACCENT_COLORS: Record<AccentColorId, AccentDefinition> = {
   matrix: { label: 'Matrix', value: '#39ff14' },
   laser: { label: 'Laser', value: '#ff3131' },
   synthwave: { label: 'Synthwave', value: '#b026ff' },
@@ -199,20 +150,9 @@ export const ACCENT_COLORS = {
   phosphor: { label: 'Phosphor', value: '#00ff87' },
   plasma: { label: 'Plasma', value: '#00d4ff' },
   neonmint: { label: 'Neon Mint', value: '#00ffcc' }
-} as const satisfies Record<AccentColorId, AccentDefinition>
+}
 
-// ── Ordering for UI display ─────────────────────────────────────────────
-
-export const THEME_ORDER = [
-  'midnight',
-  'slate',
-  'obsidian',
-  'nord',
-  'evergreen',
-  'light'
-] as const satisfies readonly ThemeId[]
-
-export const ACCENT_ORDER = [
+export const ACCENT_ORDER: readonly AccentColorId[] = [
   'matrix',
   'laser',
   'synthwave',
@@ -221,4 +161,4 @@ export const ACCENT_ORDER = [
   'phosphor',
   'plasma',
   'neonmint'
-] as const satisfies readonly AccentColorId[]
+]
