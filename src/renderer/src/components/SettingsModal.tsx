@@ -207,7 +207,7 @@ function AppearanceTab() {
       <SettingRow label="Body Font">
         <FontPicker value={bodyFont} onChange={setBodyFont} />
       </SettingRow>
-      <SettingRow label="Mono Font">
+      <SettingRow label="Code Font">
         <FontPicker value={monoFont} onChange={setMonoFont} />
       </SettingRow>
     </div>

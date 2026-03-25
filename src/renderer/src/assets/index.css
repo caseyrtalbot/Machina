@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+/* ─── Base Typography ─── */
+
+html, body {
+  font-family: var(--font-body, system-ui, sans-serif);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display, system-ui, sans-serif);
+}
+
 /* ─── Activity Bar ─── */
 
 .activity-btn {
