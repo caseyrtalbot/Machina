@@ -138,7 +138,6 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 function AppearanceTab() {
   const theme = useSettingsStore((s) => s.theme)
   const accentColor = useSettingsStore((s) => s.accentColor)
-  const displayFont = useSettingsStore((s) => s.displayFont)
   const bodyFont = useSettingsStore((s) => s.bodyFont)
   const monoFont = useSettingsStore((s) => s.monoFont)
   const setTheme = useSettingsStore((s) => s.setTheme)
@@ -146,6 +145,11 @@ function AppearanceTab() {
   const setDisplayFont = useSettingsStore((s) => s.setDisplayFont)
   const setBodyFont = useSettingsStore((s) => s.setBodyFont)
   const setMonoFont = useSettingsStore((s) => s.setMonoFont)
+
+  const handleFontChange = (name: string) => {
+    setDisplayFont(name)
+    setBodyFont(name)
+  }
 
   const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
     { id: 'dark', label: 'Dark' },
@@ -201,11 +205,8 @@ function AppearanceTab() {
       </div>
 
       <SectionHeading>Typography</SectionHeading>
-      <SettingRow label="Display Font">
-        <FontPicker value={displayFont} onChange={setDisplayFont} />
-      </SettingRow>
-      <SettingRow label="Body Font">
-        <FontPicker value={bodyFont} onChange={setBodyFont} />
+      <SettingRow label="Font">
+        <FontPicker value={bodyFont} onChange={handleFontChange} />
       </SettingRow>
       <SettingRow label="Code Font">
         <FontPicker value={monoFont} onChange={setMonoFont} />
@@ -498,48 +499,60 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
     if (isOpen) firstTabRef.current?.focus()
   }, [isOpen])
 
-  if (!isOpen) return null
-
   return (
     <div
       role="dialog"
-      aria-modal="true"
       aria-label="Settings"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-      onClick={onClose}
+      className="fixed top-0 right-0 bottom-0 z-40 flex"
+      style={{
+        width: 380,
+        transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 200ms ease-out',
+        pointerEvents: isOpen ? 'auto' : 'none'
+      }}
     >
       <div
-        className="flex rounded-xl border overflow-hidden"
+        className="flex flex-col h-full w-full"
         style={{
-          width: 560,
-          height: 480,
           backgroundColor: colors.bg.surface,
-          borderColor: colors.border.default
+          borderLeft: `1px solid ${colors.border.default}`,
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          boxShadow: isOpen ? '-8px 0 32px rgba(0, 0, 0, 0.3)' : 'none'
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        {/* Left sidebar */}
+        {/* Header with close and tab nav */}
         <div
-          className="flex flex-col pt-4 pb-4 flex-shrink-0"
-          style={{
-            width: 160,
-            borderRight: `1px solid ${colors.border.default}`,
-            backgroundColor: colors.bg.base
-          }}
+          className="flex items-center justify-between px-4 pt-10 pb-2 flex-shrink-0"
+          style={{ borderBottom: `1px solid ${colors.border.default}` }}
         >
-          <span className="text-xs font-medium px-4 mb-3" style={{ color: colors.text.muted }}>
+          <span className="text-xs font-medium" style={{ color: colors.text.muted }}>
             Settings
           </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs px-2 py-1 rounded transition-colors"
+            style={{ color: colors.text.muted }}
+          >
+            Close
+          </button>
+        </div>
+
+        {/* Tab strip */}
+        <div
+          className="flex gap-0.5 px-3 py-2 flex-shrink-0"
+          style={{ borderBottom: `1px solid ${colors.border.default}` }}
+        >
           {TABS.map((tab, i) => (
             <button
               key={tab.id}
               ref={i === 0 ? firstTabRef : undefined}
               type="button"
               onClick={() => setCurrentTab(tab.id)}
-              className="text-left text-xs px-4 py-2 transition-colors"
+              className="text-[11px] px-2 py-1 rounded transition-colors"
               style={{
-                color: currentTab === tab.id ? colors.text.primary : colors.text.secondary,
+                color: currentTab === tab.id ? colors.text.primary : colors.text.muted,
                 backgroundColor: currentTab === tab.id ? colors.accent.muted : 'transparent'
               }}
             >
@@ -548,30 +561,9 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
           ))}
         </div>
 
-        {/* Right content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header */}
-          <div
-            className="h-11 flex items-center justify-between px-5 flex-shrink-0 border-b"
-            style={{ borderColor: colors.border.default }}
-          >
-            <span className="text-sm font-medium" style={{ color: colors.text.primary }}>
-              {TABS.find((t) => t.id === currentTab)?.label}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-xs px-2 py-1 rounded transition-colors"
-              style={{ color: colors.text.muted }}
-            >
-              Close
-            </button>
-          </div>
-
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            {renderTabContent(currentTab, onChangeVault)}
-          </div>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {renderTabContent(currentTab, onChangeVault)}
         </div>
       </div>
     </div>
