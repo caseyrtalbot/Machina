@@ -284,8 +284,9 @@ export function CanvasSurface({
             top: Math.min(rect.startY, rect.endY),
             width: Math.abs(rect.endX - rect.startX),
             height: Math.abs(rect.endY - rect.startY),
-            borderColor: colors.accent.default,
-            backgroundColor: colors.accent.muted
+            borderColor: '#4a9eff',
+            borderWidth: 1.5,
+            backgroundColor: 'rgba(74, 158, 255, 0.08)'
           }}
         />
       )}
