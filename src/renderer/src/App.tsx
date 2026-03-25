@@ -29,6 +29,7 @@ import { useEditorStore, flushPendingSave } from './store/editor-store'
 import { useViewStore } from './store/view-store'
 import { useWorkbenchActionStore } from './store/workbench-actions-store'
 import { colors } from './design/tokens'
+import { useEnv } from './design/Theme'
 import { SettingsModal } from './components/SettingsModal'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
 import pLimit from 'p-limit'
@@ -577,6 +578,7 @@ function ResizableSidebar({
   const [width, setWidth] = useState(264)
   const dragging = useRef(false)
   const activityBarWidth = 48
+  const { activityBarOpacity } = useEnv()
 
   const handleMouseDown = useCallback(() => {
     dragging.current = true
@@ -607,7 +609,9 @@ function ResizableSidebar({
         className="h-full flex flex-col shrink-0 overflow-hidden pt-8"
         style={{
           width,
-          backgroundColor: colors.bg.base
+          backgroundColor: `rgba(0, 0, 0, ${activityBarOpacity / 100})`,
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)'
         }}
       >
         <PanelErrorBoundary name="Sidebar">

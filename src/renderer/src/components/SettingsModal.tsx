@@ -266,7 +266,7 @@ function EnvironmentTab() {
           onChange={(v) => setEnv('panelLightness', v)}
         />
       </SettingRow>
-      <SettingRow label="Activity Bar Opacity">
+      <SettingRow label="Menu Opacity">
         <SliderInput
           value={env.activityBarOpacity}
           min={20}

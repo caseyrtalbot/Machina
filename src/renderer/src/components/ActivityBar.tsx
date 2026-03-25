@@ -3,6 +3,7 @@ import type { TabType } from '../store/tab-store'
 import { useVaultStore } from '../store/vault-store'
 import { useUiStore } from '../store/ui-store'
 import { colors } from '../design/tokens'
+import { useEnv } from '../design/Theme'
 
 const ICON_SIZE = 20
 
@@ -105,13 +106,16 @@ export function ActivityBar() {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const openTab = useTabStore((s) => s.openTab)
   const ghostCount = useGhostCount()
+  const { activityBarOpacity } = useEnv()
 
   return (
     <div
       className="flex flex-col items-center shrink-0 pt-12 gap-1"
       style={{
         width: 48,
-        backgroundColor: colors.bg.base,
+        backgroundColor: `rgba(0, 0, 0, ${activityBarOpacity / 100})`,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
         borderRight: `1px solid ${colors.border.default}`
       }}
     >
