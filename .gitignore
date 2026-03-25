@@ -24,3 +24,5 @@ test-results/
 
 # Ephemeral project state
 .thought-engine-project-canvas.json
+.thought-engine/
+.thought-engine-dev/

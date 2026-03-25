@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import { useTabStore, TAB_DEFINITIONS } from '../store/tab-store'
 import type { TabType } from '../store/tab-store'
 import { useVaultStore } from '../store/vault-store'
 import { useUiStore } from '../store/ui-store'
+import { buildGhostIndex } from '../engine/ghost-index'
 import { colors } from '../design/tokens'
 import { useEnv } from '../design/Theme'
 import { Atom } from '@phosphor-icons/react'
@@ -82,10 +84,11 @@ const ITEMS: ActivityItem[] = [
 ]
 
 function useGhostCount(): number {
-  const nodes = useVaultStore((s) => s.graph.nodes)
+  const graph = useVaultStore((s) => s.graph)
+  const artifacts = useVaultStore((s) => s.artifacts)
   const dismissed = useUiStore((s) => s.dismissedGhosts)
-  const ghostCount = nodes.filter((n) => !n.path && !dismissed.includes(n.id)).length
-  return ghostCount
+  const ghosts = useMemo(() => buildGhostIndex(graph, artifacts), [graph, artifacts])
+  return useMemo(() => ghosts.filter((g) => !dismissed.includes(g.id)).length, [ghosts, dismissed])
 }
 
 export function ActivityBar() {
@@ -120,25 +123,20 @@ export function ActivityBar() {
             onClick={() =>
               openTab({ id: view, type: view, label: def.label, closeable: view !== 'editor' })
             }
-            className="relative flex items-center justify-center cursor-pointer"
-            style={{
-              width: 34,
-              height: 34,
-              opacity: isActive ? 0.9 : isGhostTab && ghostTint ? 0.7 : 0.4,
-              color: ghostTint ?? colors.text.primary,
-              borderRadius: 8,
-              backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
-              transition:
-                'opacity 150ms ease-out, background-color 150ms ease-out, color 300ms ease-out'
-            }}
-            onMouseEnter={(e) => {
-              if (!isActive) e.currentTarget.style.opacity = '0.8'
-              if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'
-            }}
-            onMouseLeave={(e) => {
-              if (!isActive) e.currentTarget.style.opacity = isGhostTab && ghostTint ? '0.7' : '0.4'
-              if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
-            }}
+            className="activity-btn relative flex items-center justify-center cursor-pointer"
+            data-active={isActive || undefined}
+            style={
+              {
+                width: 34,
+                height: 34,
+                '--base-opacity': isActive ? 0.9 : isGhostTab && ghostTint ? 0.7 : 0.4,
+                '--base-bg': isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                color: ghostTint ?? colors.text.primary,
+                borderRadius: 8,
+                transition:
+                  'opacity 150ms ease-out, background-color 150ms ease-out, color 300ms ease-out'
+              } as React.CSSProperties
+            }
             title={isGhostTab ? `${label} (${ghostCount})` : label}
             aria-label={`Switch to ${label} view`}
           >

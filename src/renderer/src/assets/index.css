@@ -1,5 +1,17 @@
 @import 'tailwindcss';
 
+/* ─── Activity Bar ─── */
+
+.activity-btn {
+  opacity: var(--base-opacity);
+  background-color: var(--base-bg);
+}
+
+.activity-btn:not([data-active]):hover {
+  opacity: 0.8;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
 /* ─── Entrance Animations ─── */
 
 @keyframes te-fade-in {
