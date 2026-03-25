@@ -44,7 +44,7 @@ export function rehydrateUiState(): void {
 /**
  * Gather current state from all stores into a VaultState object.
  */
-const PERSISTABLE_VIEWS = new Set(['editor', 'canvas', 'skills'])
+const PERSISTABLE_VIEWS = new Set(['editor', 'canvas'])
 
 function gatherVaultState(): VaultState {
   const vault = useVaultStore.getState()

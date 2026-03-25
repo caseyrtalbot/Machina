@@ -60,9 +60,6 @@ import { getCanvasNodeTitle } from './panels/canvas/card-title'
 const LazyCanvasView = lazy(() =>
   import('./panels/canvas/CanvasView').then((module) => ({ default: module.CanvasView }))
 )
-const LazySkillsPanel = lazy(() =>
-  import('./panels/skills/SkillsPanel').then((module) => ({ default: module.SkillsPanel }))
-)
 
 const LazyWorkbenchPanel = lazy(() =>
   import('./panels/workbench/WorkbenchPanel').then((module) => ({
@@ -151,14 +148,6 @@ function ContentArea() {
           </Suspense>
         </KeepAliveSlot>
       )}
-      {openTypes.has('skills') && mountedTypes.has('skills') && (
-        <KeepAliveSlot active={activeType === 'skills'}>
-          <Suspense fallback={<PanelLoadingFallback label="Loading skills..." />}>
-            <LazySkillsPanel />
-          </Suspense>
-        </KeepAliveSlot>
-      )}
-
       {openTypes.has('workbench') && mountedTypes.has('workbench') && (
         <KeepAliveSlot active={activeType === 'workbench'}>
           <Suspense fallback={<PanelLoadingFallback label="Loading workbench..." />}>
@@ -510,7 +499,7 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
     label: 'Cycle Main View',
     category: 'command',
     shortcut: '\u2318G',
-    description: 'Rotate between the editor, vault canvas, and skills tabs.'
+    description: 'Rotate between the editor and vault canvas tabs.'
   },
   {
     id: 'cmd:toggle-sidebar',
@@ -688,8 +677,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
   const toggleView = useCallback(() => {
     if (contentView === 'editor') setContentView('canvas')
-    else if (contentView === 'canvas') setContentView('skills')
-    else if (contentView === 'skills') setContentView('editor')
+    else if (contentView === 'canvas') setContentView('editor')
     else setContentView('editor')
   }, [contentView, setContentView])
 
@@ -1155,7 +1143,7 @@ export default function App() {
       if (state) {
         if (state.contentView) {
           const view = state.contentView as string
-          if (view === 'editor' || view === 'canvas' || view === 'skills') {
+          if (view === 'editor' || view === 'canvas') {
             useViewStore.getState().setContentView(view)
           }
         }

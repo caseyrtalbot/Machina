@@ -9,10 +9,10 @@ const WORKBENCH_TAB: ViewTab = {
   closeable: true
 }
 
-const SKILLS_TAB: ViewTab = {
-  id: 'skills',
-  type: 'skills',
-  label: 'Skills',
+const GRAPH_TAB: ViewTab = {
+  id: 'graph',
+  type: 'graph',
+  label: 'Graph',
   closeable: true
 }
 
@@ -48,15 +48,15 @@ describe('tab-store live actions', () => {
 
   it('closeTab removes tab and shifts active to nearest neighbor', () => {
     useTabStore.getState().openTab(WORKBENCH_TAB)
-    useTabStore.getState().openTab(SKILLS_TAB)
+    useTabStore.getState().openTab(GRAPH_TAB)
     useTabStore.getState().activateTab('workbench')
 
     useTabStore.getState().closeTab('workbench')
 
     const state = useTabStore.getState()
     expect(state.tabs.map((t) => t.id)).not.toContain('workbench')
-    // Nearest neighbor at the same index position (skills shifted into workbench's slot)
-    expect(state.activeTabId).toBe('skills')
+    // Nearest neighbor at the same index position (graph shifted into workbench's slot)
+    expect(state.activeTabId).toBe('graph')
   })
 
   it('closeTab does nothing for non-closeable tabs', () => {

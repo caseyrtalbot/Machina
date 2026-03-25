@@ -28,12 +28,6 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
       <line x1="16" y1="10" x2="13" y2="16" />
     </>
   ),
-  skills: (
-    <>
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
-    </>
-  ),
   workbench: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="2" />

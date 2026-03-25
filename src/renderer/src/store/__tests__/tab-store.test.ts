@@ -93,7 +93,7 @@ describe('normalizePersistedTabState', () => {
         { id: 'editor', type: 'editor', label: 'Editor', closeable: false },
         { id: 'canvas', type: 'canvas', label: 'Vault Canvas', closeable: true }
       ],
-      activeTabId: 'skills'
+      activeTabId: 'graph'
     })
 
     expect(result.activeTabId).toBe('editor')

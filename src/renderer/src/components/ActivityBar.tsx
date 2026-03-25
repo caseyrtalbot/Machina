@@ -62,22 +62,6 @@ const GraphIcon = (
   </svg>
 )
 
-const SkillsIcon = (
-  <svg
-    width={ICON_SIZE}
-    height={ICON_SIZE}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="4 17 10 11 4 5" />
-    <line x1="12" y1="19" x2="20" y2="19" />
-  </svg>
-)
-
 interface ActivityItem {
   view: TabType
   label: string
@@ -87,8 +71,7 @@ interface ActivityItem {
 const ITEMS: ActivityItem[] = [
   { view: 'editor', label: 'Editor', icon: EditorIcon },
   { view: 'canvas', label: 'Canvas', icon: CanvasIcon },
-  { view: 'graph', label: 'Graph', icon: GraphIcon },
-  { view: 'skills', label: 'Skills', icon: SkillsIcon }
+  { view: 'graph', label: 'Graph', icon: GraphIcon }
 ]
 
 export function ActivityBar() {

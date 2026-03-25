@@ -227,11 +227,11 @@ describe('vault-persist integration', () => {
       useVaultStore.setState({ vaultPath: '/v' })
       const unsub = subscribeVaultPersist()
 
-      useViewStore.setState({ contentView: 'skills' })
+      useViewStore.setState({ contentView: 'editor' })
       vi.advanceTimersByTime(1000)
 
       expect(writeStateMock).toHaveBeenCalledOnce()
-      expect(writeStateMock.mock.calls[0][1].contentView).toBe('skills')
+      expect(writeStateMock.mock.calls[0][1].contentView).toBe('editor')
 
       unsub()
     })
