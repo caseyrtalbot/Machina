@@ -1,12 +1,25 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { ACCENT_COLORS, type ThemeId, type AccentColorId } from '../design/themes'
+import {
+  ACCENT_COLORS,
+  ENV_DEFAULTS,
+  type ThemeId,
+  type ResolvedThemeId,
+  type AccentColorId,
+  type EnvironmentSettings
+} from '../design/themes'
+
+export function resolveTheme(theme: ThemeId): ResolvedThemeId {
+  if (theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+  return theme
+}
 
 interface SettingsState {
   readonly theme: ThemeId
   readonly accentColor: AccentColorId
-  readonly fontSize: number
-  readonly fontFamily: string
+  readonly env: EnvironmentSettings
   readonly defaultEditorMode: 'rich' | 'source'
   readonly autosaveInterval: number
   readonly spellCheck: boolean
@@ -18,8 +31,8 @@ interface SettingsState {
 interface SettingsActions {
   setTheme: (value: ThemeId) => void
   setAccentColor: (value: AccentColorId) => void
-  setFontSize: (value: number) => void
-  setFontFamily: (value: string) => void
+  setEnv: <K extends keyof EnvironmentSettings>(key: K, value: EnvironmentSettings[K]) => void
+  resetEnv: () => void
   setDefaultEditorMode: (value: 'rich' | 'source') => void
   setAutosaveInterval: (value: number) => void
   setSpellCheck: (value: boolean) => void
@@ -32,11 +45,10 @@ type SettingsStore = SettingsState & SettingsActions
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
-    (set) => ({
-      theme: 'midnight',
+    (set, get) => ({
+      theme: 'dark',
       accentColor: 'matrix',
-      fontSize: 13,
-      fontFamily: 'Inter',
+      env: { ...ENV_DEFAULTS.dark },
       defaultEditorMode: 'rich',
       autosaveInterval: 1500,
       spellCheck: false,
@@ -44,10 +56,19 @@ export const useSettingsStore = create<SettingsStore>()(
       terminalFontSize: 13,
       scrollbackLines: 10000,
 
-      setTheme: (value) => set({ theme: value }),
+      // Resets env to theme defaults on EVERY explicit theme switch,
+      // including re-clicking the current theme. This is intentional:
+      // it gives users a quick "reset to defaults" path.
+      setTheme: (value) => {
+        const resolved = resolveTheme(value)
+        set({ theme: value, env: { ...ENV_DEFAULTS[resolved] } })
+      },
       setAccentColor: (value) => set({ accentColor: value }),
-      setFontSize: (value) => set({ fontSize: value }),
-      setFontFamily: (value) => set({ fontFamily: value }),
+      setEnv: (key, value) => set((state) => ({ env: { ...state.env, [key]: value } })),
+      resetEnv: () => {
+        const resolved = resolveTheme(get().theme)
+        set({ env: { ...ENV_DEFAULTS[resolved] } })
+      },
       setDefaultEditorMode: (value) => set({ defaultEditorMode: value }),
       setAutosaveInterval: (value) => set({ autosaveInterval: value }),
       setSpellCheck: (value) => set({ spellCheck: value }),
@@ -57,15 +78,29 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'machina-settings',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
-      migrate: (persisted) => {
+      migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
-        // Migrate old accent color IDs to new retro neon palette
+
+        if (version < 3) {
+          const oldTheme = state.theme as string
+          const isLight = oldTheme === 'light'
+          state.theme = isLight ? 'light' : 'dark'
+
+          const defaults = isLight ? ENV_DEFAULTS.light : ENV_DEFAULTS.dark
+          const oldFontSize = (state.fontSize as number | undefined) ?? 13
+          state.env = { ...defaults, sidebarFontSize: oldFontSize }
+
+          delete state.fontSize
+          delete state.fontFamily
+        }
+
         const accent = state.accentColor as string | undefined
         if (accent && !(accent in ACCENT_COLORS)) {
           state.accentColor = 'matrix'
         }
+
         return state as unknown as SettingsState & SettingsActions
       }
     }
