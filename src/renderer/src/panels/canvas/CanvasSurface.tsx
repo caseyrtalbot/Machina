@@ -189,10 +189,10 @@ export function CanvasSurface({
   const spotlightSvg = useMemo(() => {
     const params = computeGridParams(viewport.zoom)
     const bright: GridParams = {
-      minorOpacity: Math.min(params.minorOpacity * 3 + 0.08, 0.5),
-      majorOpacity: Math.min(params.majorOpacity * 2.5 + 0.1, 0.7),
-      minorRadius: params.minorRadius * 1.4,
-      majorRadius: params.majorRadius * 1.4
+      minorOpacity: Math.min(params.minorOpacity * 2 + 0.04, 0.35),
+      majorOpacity: Math.min(params.majorOpacity * 1.8 + 0.06, 0.5),
+      minorRadius: params.minorRadius * 1.2,
+      majorRadius: params.majorRadius * 1.2
     }
     const svg = buildGridSvg(bright)
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
@@ -232,13 +232,12 @@ export function CanvasSurface({
       style={{
         backgroundColor: canvasTokens.surface,
         backgroundImage: [
-          'radial-gradient(ellipse at 25% 15%, rgba(255,255,255,0.045) 0%, transparent 55%)',
-          'radial-gradient(ellipse at 75% 85%, rgba(255,255,255,0.025) 0%, transparent 50%)',
-          'radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.015) 0%, transparent 80%)',
+          'radial-gradient(ellipse at 25% 15%, rgba(255,255,255,0.02) 0%, transparent 55%)',
+          'radial-gradient(ellipse at 75% 85%, rgba(255,255,255,0.012) 0%, transparent 50%)',
           svgDataUri
         ].join(', '),
-        backgroundSize: `100% 100%, 100% 100%, 100% 100%, ${tileSize}px ${tileSize}px`,
-        backgroundPosition: `0 0, 0 0, 0 0, ${bgPos}`,
+        backgroundSize: `100% 100%, 100% 100%, ${tileSize}px ${tileSize}px`,
+        backgroundPosition: `0 0, 0 0, ${bgPos}`,
         cursor: 'default'
       }}
       onPointerDown={(e) => {

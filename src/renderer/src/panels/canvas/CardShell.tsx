@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
-import { colors, canvasTokens, typography, floatingPanel } from '../../design/tokens'
+import { colors, canvasTokens, typography } from '../../design/tokens'
 import {
   startConnectionDrag,
   endConnectionDrag,
@@ -138,8 +138,11 @@ function TitleBarButton({
       style={{
         width: 24,
         height: 24,
-        color: colors.text.muted,
-        cursor: 'pointer'
+        color: colors.text.primary,
+        opacity: 0.4,
+        cursor: 'pointer',
+        padding: '0 2px',
+        borderRadius: 4
       }}
       aria-label={label}
       title={label}
@@ -222,14 +225,15 @@ export function CardShell({
         width: node.size.width,
         height: node.size.height,
         backgroundColor: canvasTokens.card,
-        borderRadius: canvasTokens.cardRadius,
+        borderRadius: 8,
+        border: '1px solid rgba(128, 128, 128, 0.2)',
         boxShadow: isLocked
-          ? `inset 0 0.5px 0 rgba(255,255,255,0.14), 0 0 0 2px var(--color-accent-default), 0 0 24px rgba(0, 229, 191, 0.3), 0 4px 32px rgba(0,0,0,0.5)`
+          ? `0 0 0 1px rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.5)`
           : isFocused
-            ? `inset 0 0.5px 0 rgba(255,255,255,0.14), 0 0 0 2px var(--color-accent-default), 0 0 16px rgba(0, 229, 191, 0.2), 0 4px 24px rgba(0,0,0,0.4)`
+            ? `0 0 0 1px rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.5)`
             : isSelected
-              ? `inset 0 0.5px 0 rgba(255,255,255,0.12), ${floatingPanel.shadowCardSelected}`
-              : `inset 0 0.5px 0 rgba(255,255,255,0.12), 0 6px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3)`,
+              ? `0 0 0 1px #4a9eff, 0 2px 8px rgba(0, 0, 0, 0.5)`
+              : `0 2px 8px rgba(0, 0, 0, 0.5)`,
         overflow: 'hidden',
         contain: 'layout style',
         backdropFilter: 'blur(24px) saturate(1.3)',
@@ -258,11 +262,10 @@ export function CardShell({
       <div
         className="flex items-center justify-between shrink-0 select-none"
         style={{
-          height: canvasTokens.titleBarHeight,
-          padding: '0 12px',
-          backgroundColor: canvasTokens.cardTitleBar,
-          borderBottom: '1px solid rgba(255,255,255,0.04)',
-          borderRadius: `${canvasTokens.cardRadius}px ${canvasTokens.cardRadius}px 0 0`,
+          padding: '6px 8px',
+          backgroundColor: 'transparent',
+          borderBottom: 'none',
+          borderRadius: '7px 7px 0 0',
           cursor: 'grab'
         }}
         onPointerDown={onDragStart}
@@ -274,7 +277,10 @@ export function CardShell({
             style={{
               fontFamily: typography.fontFamily.mono,
               fontSize: 11,
-              color: colors.text.secondary,
+              lineHeight: 1,
+              fontWeight: 500,
+              color: colors.text.primary,
+              opacity: 0.7,
               direction: 'rtl',
               textAlign: 'left',
               unicodeBidi: 'plaintext'
@@ -412,16 +418,17 @@ export function CardShell({
         (['top', 'right', 'bottom', 'left'] as CanvasSide[]).map((side) => {
           const style: React.CSSProperties = {
             position: 'absolute',
-            width: 10,
-            height: 10,
+            width: 8,
+            height: 8,
             borderRadius: '50%',
-            backgroundColor: colors.accent.default,
+            backgroundColor: 'rgb(72, 210, 130)',
             cursor: 'crosshair',
             zIndex: 10,
-            ...(side === 'top' && { top: -5, left: '50%', marginLeft: -5 }),
-            ...(side === 'bottom' && { bottom: -5, left: '50%', marginLeft: -5 }),
-            ...(side === 'left' && { left: -5, top: '50%', marginTop: -5 }),
-            ...(side === 'right' && { right: -5, top: '50%', marginTop: -5 })
+            transition: 'opacity 200ms ease',
+            ...(side === 'top' && { top: -4, left: '50%', marginLeft: -4 }),
+            ...(side === 'bottom' && { bottom: -4, left: '50%', marginLeft: -4 }),
+            ...(side === 'left' && { left: -4, top: '50%', marginTop: -4 }),
+            ...(side === 'right' && { right: -4, top: '50%', marginTop: -4 })
           }
           return (
             <div

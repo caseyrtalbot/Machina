@@ -443,7 +443,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
           minHeight: 0,
           overflow: 'hidden',
           boxShadow: focused
-            ? `0 0 0 1.5px ${colors.accent.default}, 0 0 12px rgba(0, 229, 191, 0.15)`
+            ? `0 0 0 1px rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.5)`
             : undefined
         }}
       >
