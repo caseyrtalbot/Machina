@@ -1,5 +1,6 @@
 import { dialog, shell } from 'electron'
 import { FileService } from '../services/file-service'
+import { createVaultIgnoreFilter } from '../services/vault-watcher'
 import { teConfigPath, teStatePath, assertWithinVault } from '../utils/paths'
 import { TE_DIR } from '@shared/constants'
 import { typedHandle } from '../typed-ipc'
@@ -72,7 +73,16 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:list-all-files', async (args) => {
-    return fileService.listAllFilesRecursive(args.dir)
+    let customPatterns: string[] = []
+    try {
+      const configContent = await fileService.readFile(teConfigPath(args.dir))
+      const config = JSON.parse(configContent)
+      customPatterns = config?.watcher?.ignorePatterns ?? []
+    } catch {
+      // Config doesn't exist or is malformed; use defaults only
+    }
+    const ignoreFilter = await createVaultIgnoreFilter(args.dir, customPatterns)
+    return fileService.listAllFilesRecursive(args.dir, ignoreFilter)
   })
 
   // --- Vault data ---

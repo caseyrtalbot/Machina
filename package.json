@@ -67,6 +67,7 @@
     "d3-quadtree": "^3.0.1",
     "electron-store": "^11.0.2",
     "gray-matter": "^4.0.3",
+    "ignore": "^7.0.5",
     "mermaid": "^11.13.0",
     "minisearch": "^7.2.0",
     "node-pty": "^1.1.0",

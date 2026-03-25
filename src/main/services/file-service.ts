@@ -11,6 +11,8 @@ import {
   teArtifactKindDirPath,
   teArtifactPath
 } from '../utils/paths'
+import { shouldIgnore } from './gitignore-filter'
+import type { Ignore } from 'ignore'
 import type { VaultConfig, VaultState } from '../../shared/types'
 import {
   SYSTEM_ARTIFACT_KINDS,
@@ -93,7 +95,7 @@ export class FileService {
     return this.listMarkdownFilesRecursive(dir, true)
   }
 
-  async listAllFilesRecursive(dir: string): Promise<string[]> {
+  async listAllFilesRecursive(dir: string, ignoreFilter?: Ignore): Promise<string[]> {
     const results: string[] = []
     const pendingDirs = [dir]
     const seenDirs = new Set<string>()
@@ -119,8 +121,15 @@ export class FileService {
 
       for (const entry of entries) {
         const fullPath = join(currentDir, entry.name)
-        if (entry.name.startsWith('.')) continue
-        if (IGNORED_PROJECT_DIRS.has(entry.name)) continue
+
+        // When an ignore filter is provided, use it for all filtering.
+        // Otherwise fall back to the legacy hardcoded checks.
+        if (ignoreFilter) {
+          if (shouldIgnore(ignoreFilter, dir, fullPath)) continue
+        } else {
+          if (entry.name.startsWith('.')) continue
+          if (IGNORED_PROJECT_DIRS.has(entry.name)) continue
+        }
 
         if (entry.isFile()) {
           results.push(fullPath)

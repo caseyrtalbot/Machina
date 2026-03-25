@@ -1,6 +1,8 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { EventBatcher, type BatchedEvent } from './event-batcher'
+import { loadGitignoreFilter, shouldIgnore } from './gitignore-filter'
 import { TE_DIR } from '@shared/constants'
+import type { Ignore } from 'ignore'
 
 type FileEvent = 'add' | 'change' | 'unlink'
 type BatchChangeCallback = (events: BatchedEvent[]) => void
@@ -12,25 +14,9 @@ export const DEFAULT_IGNORE_PATTERNS = [
   'build',
   'out',
   '.git',
-  '.DS_Store'
+  '.DS_Store',
+  '.*'
 ] as const
-
-export function buildIgnorePatterns(custom: readonly string[]): string[] {
-  const set = new Set<string>([...DEFAULT_IGNORE_PATTERNS])
-  for (const pattern of custom) {
-    set.add(pattern)
-  }
-  return Array.from(set)
-}
-
-function patternsToChokidarIgnored(patterns: readonly string[]): RegExp[] {
-  return [
-    /(^|[/\\])\../,
-    ...patterns.map(
-      (p) => new RegExp(`(^|[/\\\\])${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[/\\\\])`)
-    )
-  ]
-}
 
 const BATCH_INTERVAL_MS = 50
 
@@ -47,8 +33,10 @@ export class VaultWatcher {
 
     this.batcher = new EventBatcher(onBatch, BATCH_INTERVAL_MS)
 
+    const ig = await loadGitignoreFilter(vaultPath, DEFAULT_IGNORE_PATTERNS, customIgnorePatterns)
+
     this.watcher = watch(vaultPath, {
-      ignored: patternsToChokidarIgnored(buildIgnorePatterns(customIgnorePatterns)),
+      ignored: (path: string) => shouldIgnore(ig, vaultPath, path),
       persistent: true,
       ignoreInitial: true,
       followSymlinks: false,
@@ -77,4 +65,15 @@ export class VaultWatcher {
       this.watcher = null
     }
   }
+}
+
+/**
+ * Creates a gitignore-aware filter for use outside the watcher (e.g. file listing).
+ * Returns an Ignore instance that can be used with shouldIgnore().
+ */
+export async function createVaultIgnoreFilter(
+  vaultPath: string,
+  customIgnorePatterns: readonly string[] = []
+): Promise<Ignore> {
+  return loadGitignoreFilter(vaultPath, DEFAULT_IGNORE_PATTERNS, customIgnorePatterns)
 }
