@@ -4,6 +4,7 @@ import { useVaultStore } from '../store/vault-store'
 import { useUiStore } from '../store/ui-store'
 import { colors } from '../design/tokens'
 import { useEnv } from '../design/Theme'
+import { Atom } from '@phosphor-icons/react'
 
 const ICON_SIZE = 20
 
@@ -65,22 +66,7 @@ const GraphIcon = (
   </svg>
 )
 
-const GhostsIcon = (
-  <svg
-    width={ICON_SIZE}
-    height={ICON_SIZE}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="13" r="7" />
-    <line x1="12" y1="10" x2="12" y2="14" />
-    <circle cx="12" cy="16.5" r="0.5" fill="currentColor" stroke="none" />
-  </svg>
-)
+const GhostsIcon = <Atom size={ICON_SIZE} weight="regular" />
 
 interface ActivityItem {
   view: TabType
