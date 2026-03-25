@@ -262,9 +262,9 @@ export function CardShell({
       <div
         className="flex items-center justify-between shrink-0 select-none"
         style={{
-          padding: '6px 8px',
-          backgroundColor: 'transparent',
-          borderBottom: 'none',
+          padding: '7px 10px',
+          backgroundColor: canvasTokens.cardTitleBar,
+          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
           borderRadius: '7px 7px 0 0',
           cursor: 'grab'
         }}
@@ -276,11 +276,11 @@ export function CardShell({
             className="truncate"
             style={{
               fontFamily: typography.fontFamily.mono,
-              fontSize: 11,
+              fontSize: 12,
               lineHeight: 1,
               fontWeight: 500,
               color: colors.text.primary,
-              opacity: 0.7,
+              opacity: 0.8,
               direction: 'rtl',
               textAlign: 'left',
               unicodeBidi: 'plaintext'

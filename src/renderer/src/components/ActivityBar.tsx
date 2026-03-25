@@ -111,7 +111,7 @@ export function ActivityBar() {
       className="flex flex-col items-center shrink-0 pt-12 gap-1"
       style={{
         width: 48,
-        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+        backgroundColor: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(24px) saturate(1.3)',
         WebkitBackdropFilter: 'blur(24px) saturate(1.3)'
       }}
