@@ -1,4 +1,4 @@
-import { execFileSync, execFile } from 'child_process'
+import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -56,20 +56,6 @@ export function tmuxExec(...args: string[]): string {
     encoding: 'utf-8',
     timeout: EXEC_TIMEOUT
   }).trim()
-}
-
-export function tmuxExecAsync(...args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      'tmux',
-      ['-L', TMUX_SOCKET, ...args],
-      { encoding: 'utf-8', timeout: EXEC_TIMEOUT },
-      (err, stdout) => {
-        if (err) reject(err)
-        else resolve((stdout ?? '').trim())
-      }
-    )
-  })
 }
 
 // ---------------------------------------------------------------------------

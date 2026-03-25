@@ -103,6 +103,3 @@ export function updateManifest(
     files: updated
   }
 }
-
-/** The manifest filename within the .machina directory. */
-export const MANIFEST_FILENAME = 'connect-manifest.json'

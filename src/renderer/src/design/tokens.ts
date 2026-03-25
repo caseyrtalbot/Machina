@@ -157,7 +157,6 @@ export const canvasTokens = {
   textHeading: 'var(--canvas-text-heading)',
   blockquoteBar: 'var(--canvas-blockquote-bar)',
   cardRadius: 6,
-  titleBarHeight: 34,
   contentPadding: 24,
   badgeGreen: '#4caf50',
   linkCyan: '#5cb8c4'
@@ -167,8 +166,6 @@ export const floatingPanel = {
   borderRadius: 12,
   shadow: '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)',
   shadowCompact: '0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)',
-  shadowCard: '0 2px 8px rgba(0,0,0,0.5)',
-  shadowCardSelected: '0 0 0 1.5px #4a9eff, 0 2px 8px rgba(0,0,0,0.5)',
   glass: {
     bg: 'rgba(8, 8, 12, 0.88)',
     blur: 'blur(24px) saturate(1.3)',
@@ -182,10 +179,6 @@ export const floatingPanel = {
       textTransform: 'uppercase' as const,
       letterSpacing: '0.15em'
     }
-  },
-  glassCard: {
-    blur: 'blur(12px) saturate(1.2)',
-    highlightEdge: 'none'
   }
 } as const
 
