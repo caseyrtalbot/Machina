@@ -16,6 +16,14 @@ const fileService = new FileService()
  */
 let activePathGuard: PathGuard | null = null
 
+/** Callback invoked after vault:init completes. Set via onVaultReady(). */
+let vaultReadyCallback: ((vaultPath: string) => void) | null = null
+
+/** Register a callback to fire when a vault is initialized. */
+export function onVaultReady(cb: (vaultPath: string) => void): void {
+  vaultReadyCallback = cb
+}
+
 /** Update the active PathGuard when the vault root changes. */
 function setActiveVault(vaultPath: string): void {
   activePathGuard = new PathGuard(vaultPath)
@@ -103,6 +111,7 @@ export function registerFilesystemIpc(): void {
   typedHandle('vault:init', async (args) => {
     setActiveVault(args.vaultPath)
     await fileService.initVault(args.vaultPath)
+    vaultReadyCallback?.(args.vaultPath)
   })
 
   typedHandle('vault:read-config', async (args) => {
@@ -150,9 +159,10 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('vault:read-file', async (args) => {
-    if (activePathGuard) {
-      activePathGuard.assertWithinVault(args.filePath)
+    if (!activePathGuard) {
+      throw new Error('vault:read-file called before vault:init')
     }
+    activePathGuard.assertWithinVault(args.filePath)
     const { readFile } = await import('node:fs/promises')
     return readFile(args.filePath, 'utf-8')
   })

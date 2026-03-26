@@ -3,10 +3,10 @@
  * to provide safe, audited read-only access to vault content.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { VaultQueryFacade } from '../vault-query-facade'
+import { VaultQueryFacade, MtimeConflictError, MissingIdError } from '../vault-query-facade'
 import { PathGuard } from '../path-guard'
 import { AuditLogger } from '../audit-logger'
 import { PathGuardError } from '@shared/agent-types'
@@ -108,5 +108,81 @@ describe('VaultQueryFacade', () => {
         decision: 'allowed'
       })
     )
+  })
+
+  describe('writeFile', () => {
+    it('writes content and stamps modified_by in frontmatter', async () => {
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+      const newContent =
+        '---\nid: hello\ntitle: Hello Updated\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags: []\n---\n\n# Hello Updated\n'
+
+      await facade.writeFile(filePath, newContent, { agentId: 'test-agent' })
+
+      const written = readFileSync(filePath, 'utf-8')
+      expect(written).toContain('modified_by: test-agent')
+      expect(written).toContain('modified_at:')
+      expect(written).toContain('# Hello Updated')
+    })
+
+    it('rejects path outside vault', async () => {
+      await expect(
+        facade.writeFile('/etc/passwd', 'hacked', { agentId: 'bad-agent' })
+      ).rejects.toThrow(PathGuardError)
+    })
+
+    it('rejects when mtime does not match (optimistic lock)', async () => {
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+      const content = '---\nid: hello\ntitle: Hello\ntype: note\n---\n\n# Hello\n'
+
+      await expect(
+        facade.writeFile(filePath, content, {
+          agentId: 'test-agent',
+          expectedMtime: '1999-01-01T00:00:00.000Z'
+        })
+      ).rejects.toThrow(MtimeConflictError)
+    })
+
+    it('logs an audit entry on successful write', async () => {
+      const logger = new AuditLogger(join(vaultRoot, '.te', 'audit'))
+      const logSpy = vi.spyOn(logger, 'log')
+      const guard = new PathGuard(vaultRoot)
+      const spiedFacade = new VaultQueryFacade(guard, logger, vaultRoot)
+
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+      const content = '---\nid: hello\ntitle: Hello\ntype: note\n---\n\n# Hello\n'
+
+      await spiedFacade.writeFile(filePath, content, { agentId: 'test-agent' })
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tool: 'vault.write_file',
+          decision: 'allowed'
+        })
+      )
+    })
+  })
+
+  describe('createFile', () => {
+    it('creates a new file and stamps created_by in frontmatter', async () => {
+      const filePath = join(vaultRoot, 'notes', 'new-note.md')
+      const content = '---\nid: new-note\ntitle: New Note\ntype: note\n---\n\n# New Note\n'
+
+      await facade.createFile(filePath, content, { agentId: 'test-agent' })
+
+      const written = readFileSync(filePath, 'utf-8')
+      expect(written).toContain('created_by: test-agent')
+      expect(written).toContain('created_at:')
+      expect(written).toContain('id: new-note')
+      expect(written).toContain('# New Note')
+    })
+
+    it('rejects if frontmatter has no id: field', async () => {
+      const filePath = join(vaultRoot, 'notes', 'no-id.md')
+      const content = '---\ntitle: No ID\ntype: note\n---\n\n# No ID\n'
+
+      await expect(facade.createFile(filePath, content, { agentId: 'test-agent' })).rejects.toThrow(
+        MissingIdError
+      )
+    })
   })
 })

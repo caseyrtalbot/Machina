@@ -3,13 +3,15 @@ import { execSync } from 'child_process'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerFilesystemIpc } from './ipc/filesystem'
+import { registerFilesystemIpc, onVaultReady } from './ipc/filesystem'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerShellIpc, getShellService } from './ipc/shell'
 import { registerConfigIpc } from './ipc/config'
 
 import { registerProjectIpc, getProjectWatcher, getSessionTailer } from './ipc/workbench'
 import { registerDocumentIpc, getDocumentManager } from './ipc/documents'
+import { registerMcpIpc } from './ipc/mcp'
+import { McpLifecycle } from './services/mcp-lifecycle'
 import { typedHandle, typedSend } from './typed-ipc'
 
 const PROD_CSP = [
@@ -49,6 +51,7 @@ if (!process.env.LANG) {
 }
 
 let mainWindow: BrowserWindow | null = null
+const mcpLifecycle = new McpLifecycle()
 
 function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
@@ -133,12 +136,18 @@ app.whenReady().then(() => {
   registerWindowIpc()
   registerFilesystemIpc()
 
+  // Wire MCP server creation to vault initialization
+  onVaultReady((vaultPath) => {
+    mcpLifecycle.createForVault(vaultPath)
+  })
+
   const window = createWindow()
   registerWatcherIpc(window)
   registerShellIpc(window)
 
   registerDocumentIpc(window)
   registerProjectIpc(window)
+  registerMcpIpc(mcpLifecycle)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -177,6 +186,7 @@ app.on('before-quit', (event) => {
     await getDocumentManager().flushAll()
 
     // Step 3: Clean up services
+    await mcpLifecycle.stop()
     getShellService().shutdown()
     getProjectWatcher().stop()
     getSessionTailer()?.stop()
