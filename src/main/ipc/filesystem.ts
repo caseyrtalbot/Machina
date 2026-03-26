@@ -12,7 +12,7 @@ const fileService = new FileService()
 /**
  * Active vault PathGuard instance. Set when vault:init is called
  * (the first lifecycle event for any vault). Used by vault:read-file
- * which doesn't receive vaultPath in its args.
+ * and fs:* handlers that enforce vault-scoped access.
  */
 let activePathGuard: PathGuard | null = null
 
@@ -29,32 +29,50 @@ function setActiveVault(vaultPath: string): void {
   activePathGuard = new PathGuard(vaultPath)
 }
 
+/**
+ * Assert that the active PathGuard exists and the path is within the vault.
+ * Throws if no vault is initialized or the path escapes the vault boundary.
+ */
+function guardPath(path: string, channel: string): string {
+  if (!activePathGuard) {
+    throw new Error(`${channel} called before vault:init`)
+  }
+  return activePathGuard.assertWithinVault(path)
+}
+
 export function registerFilesystemIpc(): void {
   typedHandle('fs:read-file', async (args) => {
-    return fileService.readFile(args.path)
+    const resolved = guardPath(args.path, 'fs:read-file')
+    return fileService.readFile(resolved)
   })
 
   typedHandle('fs:write-file', async (args) => {
-    await fileService.writeFile(args.path, args.content)
+    const resolved = guardPath(args.path, 'fs:write-file')
+    await fileService.writeFile(resolved, args.content)
   })
 
   typedHandle('fs:file-mtime', async (args) => {
-    return fileService.getFileMtime(args.path)
+    const resolved = guardPath(args.path, 'fs:file-mtime')
+    return fileService.getFileMtime(resolved)
   })
 
   typedHandle('fs:delete-file', async (args) => {
-    await fileService.deleteFile(args.path)
+    const resolved = guardPath(args.path, 'fs:delete-file')
+    await fileService.deleteFile(resolved)
   })
 
   typedHandle('fs:list-files', async (args) => {
+    guardPath(args.dir, 'fs:list-files')
     return fileService.listFiles(args.dir, args.pattern)
   })
 
   typedHandle('fs:list-files-recursive', async (args) => {
+    guardPath(args.dir, 'fs:list-files-recursive')
     return fileService.listFilesRecursive(args.dir)
   })
 
   typedHandle('fs:file-exists', async (args) => {
+    guardPath(args.path, 'fs:file-exists')
     const { existsSync } = await import('node:fs')
     return existsSync(args.path)
   })
@@ -65,13 +83,17 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:rename-file', async (args) => {
+    const resolvedOld = guardPath(args.oldPath, 'fs:rename-file')
+    const resolvedNew = guardPath(args.newPath, 'fs:rename-file')
     const { rename } = await import('node:fs/promises')
-    await rename(args.oldPath, args.newPath)
+    await rename(resolvedOld, resolvedNew)
   })
 
   typedHandle('fs:copy-file', async (args) => {
+    const resolvedSrc = guardPath(args.srcPath, 'fs:copy-file')
+    const resolvedDest = guardPath(args.destPath, 'fs:copy-file')
     const { copyFile } = await import('node:fs/promises')
-    await copyFile(args.srcPath, args.destPath)
+    await copyFile(resolvedSrc, resolvedDest)
   })
 
   typedHandle('fs:create-folder', async (args) => {
@@ -83,13 +105,15 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:mkdir', async (args) => {
+    guardPath(args.path, 'fs:mkdir')
     const { mkdir } = await import('node:fs/promises')
     await mkdir(args.path, { recursive: true })
   })
 
   typedHandle('fs:read-binary', async (args) => {
+    const resolved = guardPath(args.path, 'fs:read-binary')
     const { readFile } = await import('node:fs/promises')
-    const buffer = await readFile(args.path)
+    const buffer = await readFile(resolved)
     return buffer.toString('base64')
   })
 
@@ -149,10 +173,7 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('vault:list-commands', async (args) => {
-    if (!activePathGuard) {
-      throw new Error('vault:list-commands called before vault:init')
-    }
-    activePathGuard.assertWithinVault(args.dirPath)
+    guardPath(args.dirPath, 'vault:list-commands')
     const { readdir } = await import('node:fs/promises')
     try {
       const entries = await readdir(args.dirPath)
@@ -163,10 +184,7 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('vault:read-file', async (args) => {
-    if (!activePathGuard) {
-      throw new Error('vault:read-file called before vault:init')
-    }
-    const resolved = activePathGuard.assertWithinVault(args.filePath)
+    const resolved = guardPath(args.filePath, 'vault:read-file')
     const { readFile } = await import('node:fs/promises')
     return readFile(resolved, 'utf-8')
   })
