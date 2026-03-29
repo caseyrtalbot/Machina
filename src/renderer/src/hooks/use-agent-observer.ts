@@ -41,19 +41,21 @@ function buildMetadata(state: AgentSidecarState): Record<string, unknown> {
 /**
  * Observes agent states and reconciles them with canvas cards.
  * Creates new cards for unknown sessions, updates metadata for existing ones.
+ *
+ * Reads nodes, viewport, addNode, and updateNodeMetadata imperatively via
+ * useCanvasStore.getState() so the effect only re-runs when agent states change,
+ * avoiding wasted cycles from canvas store reference churn.
  */
 export function useAgentObserver(): void {
   const states = useAgentStates()
-  const addNode = useCanvasStore((s) => s.addNode)
-  const updateNodeMetadata = useCanvasStore((s) => s.updateNodeMetadata)
-  const nodes = useCanvasStore((s) => s.nodes)
-  const viewport = useCanvasStore((s) => s.viewport)
 
   // Track which sessions we've already processed to avoid re-creating on re-render
   const processedRef = useRef(new Set<string>())
 
   useEffect(() => {
     if (states.length === 0) return
+
+    const { nodes, viewport, addNode, updateNodeMetadata } = useCanvasStore.getState()
 
     const existingSessionIds = new Set(
       nodes.filter((n) => n.type === 'agent-session').map((n) => n.metadata.sessionId as string)
@@ -71,14 +73,14 @@ export function useAgentObserver(): void {
           updateNodeMetadata(card.id, metadata)
         }
       } else if (!processedRef.current.has(state.sessionId)) {
-        // Create new card with smart placement
+        // Create new card at viewport center
         processedRef.current.add(state.sessionId)
         const placementViewport = {
           ...viewport,
           width: globalThis.innerWidth ?? 1200,
           height: globalThis.innerHeight ?? 800
         }
-        const position = computeAgentPlacement(state.sourceNodeId, nodes, placementViewport)
+        const position = computeAgentPlacement(nodes, placementViewport)
         const node = createCanvasNode('agent-session', position, { metadata })
         addNode(node)
       }
@@ -95,5 +97,5 @@ export function useAgentObserver(): void {
         processedRef.current.delete(sessionId)
       }
     }
-  }, [states, nodes, viewport, addNode, updateNodeMetadata])
+  }, [states])
 }

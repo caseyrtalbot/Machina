@@ -25,17 +25,6 @@ describe('AgentSpawnConfig', () => {
     expect(config.prompt).toBe('Fix the bug in parser.ts')
   })
 
-  it('accepts optional sourceNodeId field', () => {
-    const config: AgentSpawnConfig = {
-      sessionId: 'test-789',
-      vaultRoot: '/tmp/vault',
-      cwd: '/tmp/vault/project',
-      sourceNodeId: 'node-abc'
-    }
-
-    expect(config.sourceNodeId).toBe('node-abc')
-  })
-
   it('enforces readonly on all fields', () => {
     const config: AgentSpawnConfig = {
       sessionId: 'test-readonly',
@@ -62,14 +51,12 @@ describe('AgentSpawnRequest', () => {
     expect(request.cwd).toBe('/tmp/vault/project')
   })
 
-  it('accepts optional prompt and sourceNodeId', () => {
+  it('accepts optional prompt', () => {
     const request: AgentSpawnRequest = {
       cwd: '/tmp/vault/project',
-      prompt: 'Refactor the store',
-      sourceNodeId: 'node-xyz'
+      prompt: 'Refactor the store'
     }
 
     expect(request.prompt).toBe('Refactor the store')
-    expect(request.sourceNodeId).toBe('node-xyz')
   })
 })
