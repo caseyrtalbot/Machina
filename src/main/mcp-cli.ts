@@ -4,7 +4,7 @@
  *
  * Claude Code (or any MCP client) spawns this as a subprocess and
  * communicates over stdio. The server exposes read-only vault tools:
- * vault.read_file, search.query, graph.get_neighbors.
+ * vault.read_file, search.query, graph.get_neighbors, graph.get_ghosts.
  *
  * Write tools are intentionally excluded: without Electron's dialog
  * there is no HITL gate to confirm destructive operations.
@@ -63,7 +63,7 @@ export async function startMcpServer(vaultPath: string): Promise<void> {
   await server.connect(transport)
 
   process.stderr.write(
-    `[thought-engine-mcp] Server ready (3 read-only tools, ${deps.vaultIndex.getArtifacts().length} files indexed)\n`
+    `[thought-engine-mcp] Server ready (4 read-only tools, ${deps.vaultIndex.getArtifacts().length} files indexed)\n`
   )
 }
 

@@ -12,6 +12,7 @@ import type { AuditLogger } from './audit-logger'
 import type { SearchEngine, SearchHit } from '@shared/engine/search-engine'
 import type { VaultIndex } from '@shared/engine/indexer'
 import type { GraphNode, GraphEdge } from '@shared/types'
+import { buildGhostIndex, type GhostEntry } from '@shared/engine/ghost-index'
 
 export interface VaultQueryDeps {
   readonly searchEngine?: SearchEngine
@@ -216,5 +217,12 @@ export class VaultQueryFacade {
     }
     const nodes = graph.nodes.filter((n) => neighborIds.has(n.id))
     return { nodes, edges }
+  }
+
+  getGhosts(): readonly GhostEntry[] {
+    if (!this.vaultIndex) return []
+    const graph = this.vaultIndex.getGraph()
+    const artifacts = this.vaultIndex.getArtifacts()
+    return buildGhostIndex(graph, artifacts)
   }
 }

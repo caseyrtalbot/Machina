@@ -116,7 +116,7 @@ describe('MCP Server', () => {
     rmSync(vaultRoot, { recursive: true, force: true })
   })
 
-  it('lists 5 registered tools when gate is provided', async () => {
+  it('lists 6 registered tools when gate is provided', async () => {
     const gate = new AlwaysApproveGate()
     const { client, server } = await createConnectedPair(vaultRoot, gate)
 
@@ -124,6 +124,7 @@ describe('MCP Server', () => {
     const toolNames = tools.map((t) => t.name).sort()
 
     expect(toolNames).toEqual([
+      'graph.get_ghosts',
       'graph.get_neighbors',
       'search.query',
       'vault.create_file',
@@ -216,6 +217,83 @@ describe('MCP Server', () => {
 
     await client.close()
     await server.close()
+  })
+
+  describe('graph.get_ghosts', () => {
+    /** Build deps where hello.md references a non-existent "phantom" note via wikilink. */
+    function buildGhostDeps(vaultRoot: string) {
+      const guard = new PathGuard(vaultRoot)
+      const logger = new AuditLogger(join(vaultRoot, '.te', 'audit'))
+      const vaultIndex = new VaultIndex()
+
+      const helloContent =
+        '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags: []\n---\n\nSee [[phantom]] for more ideas.\n'
+      vaultIndex.addFile('hello.md', helloContent)
+
+      const facade = new VaultQueryFacade(guard, logger, vaultRoot, { vaultIndex })
+      return { facade, logger }
+    }
+
+    async function createGhostPair(vaultRoot: string, gate?: HitlGate) {
+      const { facade } = buildGhostDeps(vaultRoot)
+      const server = createMcpServer(facade, gate ? { gate } : undefined)
+
+      const client = new Client({ name: 'test-client', version: '1.0.0' })
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+
+      await server.connect(serverTransport)
+      await client.connect(clientTransport)
+
+      return { server, client, facade }
+    }
+
+    it('returns ghost entries as JSON content', async () => {
+      const { client, server } = await createGhostPair(vaultRoot)
+
+      const result = await client.callTool({
+        name: 'graph.get_ghosts',
+        arguments: {}
+      })
+
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text
+      // Should be wrapped in spotlighting markers
+      expect(text).toContain('SPOTLIGHT:7f3a9b2e')
+      expect(text).toContain('graph.get_ghosts')
+
+      // Extract JSON from spotlighting envelope (between INSTRUCTIONS] line and closing boundary)
+      const jsonMatch = text.match(/INSTRUCTIONS\]\n([\s\S]*?)\n\s*<!--SPOTLIGHT/)
+      expect(jsonMatch).not.toBeNull()
+      const ghosts = JSON.parse(jsonMatch![1].trim())
+      expect(ghosts).toHaveLength(1)
+      expect(ghosts[0].id).toBe('phantom')
+      expect(ghosts[0].referenceCount).toBeGreaterThan(0)
+      expect(ghosts[0].references[0].context).toBeDefined()
+
+      await client.close()
+      await server.close()
+    })
+
+    it('with includeContext: false strips context from references', async () => {
+      const { client, server } = await createGhostPair(vaultRoot)
+
+      const result = await client.callTool({
+        name: 'graph.get_ghosts',
+        arguments: { includeContext: false }
+      })
+
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text
+      const jsonMatch = text.match(/INSTRUCTIONS\]\n([\s\S]*?)\n\s*<!--SPOTLIGHT/)
+      expect(jsonMatch).not.toBeNull()
+      const ghosts = JSON.parse(jsonMatch![1].trim())
+      expect(ghosts).toHaveLength(1)
+      // Context should be stripped
+      for (const ref of ghosts[0].references) {
+        expect(ref).not.toHaveProperty('context')
+      }
+
+      await client.close()
+      await server.close()
+    })
   })
 
   it('search.query returns ranked results', async () => {

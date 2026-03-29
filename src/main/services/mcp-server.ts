@@ -1,8 +1,8 @@
 /**
  * MCP server for Thought Engine.
  *
- * Exposes vault content via five tools: vault.read_file, search.query,
- * graph.get_neighbors, vault.write_file, and vault.create_file.
+ * Exposes vault content via six tools: vault.read_file, search.query,
+ * graph.get_neighbors, graph.get_ghosts, vault.write_file, and vault.create_file.
  * Read tools wrap content in Spotlighting trust markers. Write tools
  * require HITL gate approval before execution.
  * Uses stdio transport for Claude Desktop integration.
@@ -100,6 +100,33 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
     async ({ nodeId }) => {
       const result = facade.getNeighbors(nodeId)
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+    }
+  )
+
+  server.registerTool(
+    'graph.get_ghosts',
+    {
+      description:
+        'List unresolved wikilink references (ghost nodes). Returns ideas referenced but not yet written, sorted by reference count.',
+      inputSchema: {
+        includeContext: z
+          .boolean()
+          .optional()
+          .describe('Include sentence-level context for each reference (default true)')
+      }
+    },
+    async ({ includeContext }) => {
+      const ghosts = facade.getGhosts()
+      const entries =
+        includeContext === false
+          ? ghosts.map((g) => ({
+              ...g,
+              references: g.references.map(({ filePath, fileTitle }) => ({ filePath, fileTitle }))
+            }))
+          : ghosts
+      const json = JSON.stringify(entries)
+      const wrapped = wrapSpotlighting('graph.get_ghosts', 'ghost-index', json)
+      return { content: [{ type: 'text' as const, text: wrapped }] }
     }
   )
 

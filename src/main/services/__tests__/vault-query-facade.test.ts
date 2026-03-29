@@ -162,6 +162,34 @@ describe('VaultQueryFacade', () => {
     })
   })
 
+  describe('getGhosts', () => {
+    it('returns empty array when no vaultIndex', () => {
+      // Default facade has no vaultIndex
+      const ghosts = facade.getGhosts()
+      expect(ghosts).toEqual([])
+    })
+
+    it('returns ghost entries from buildGhostIndex when vault has ghosts', () => {
+      const index = new VaultIndex()
+      // hello.md references "phantom" via wikilink, but phantom has no file
+      index.addFile(
+        'hello.md',
+        '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags: []\n---\n\nSee [[phantom]] for more ideas.\n'
+      )
+      const guard = new PathGuard(vaultRoot)
+      const logger = new AuditLogger(join(vaultRoot, '.te', 'audit'))
+      const ghostFacade = new VaultQueryFacade(guard, logger, vaultRoot, {
+        vaultIndex: index
+      })
+
+      const ghosts = ghostFacade.getGhosts()
+      expect(ghosts).toHaveLength(1)
+      expect(ghosts[0].id).toBe('phantom')
+      expect(ghosts[0].referenceCount).toBeGreaterThan(0)
+      expect(ghosts[0].references.length).toBeGreaterThan(0)
+    })
+  })
+
   describe('createFile', () => {
     it('creates a new file and stamps created_by in frontmatter', async () => {
       const filePath = join(vaultRoot, 'notes', 'new-note.md')

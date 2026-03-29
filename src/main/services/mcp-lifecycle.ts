@@ -50,7 +50,7 @@ export class McpLifecycle implements McpStatusProvider {
     const rateLimiter = new WriteRateLimiter()
 
     this.server = createMcpServer(facade, { gate, rateLimiter })
-    this._toolCount = 5 // 3 read + 2 write (gate always provided)
+    this._toolCount = 6 // 4 read + 2 write (gate always provided)
     this._created = true
     return this.server
   }
