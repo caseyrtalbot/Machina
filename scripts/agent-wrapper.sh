@@ -62,6 +62,9 @@ write_sidecar() {
   \"exitCode\": ${exit_code}"
   fi
   if [[ -n "$error_msg" ]]; then
+    # JSON-escape backslashes and double quotes in error messages
+    error_msg="${error_msg//\\/\\\\}"
+    error_msg="${error_msg//\"/\\\"}"
     json="${json},
   \"error\": \"${error_msg}\""
   fi
@@ -79,6 +82,9 @@ collect_files_touched() {
     while IFS= read -r line; do
       local file="${line:3}"
       if [[ -n "$file" ]]; then
+        # JSON-escape backslashes and double quotes in filenames
+        file="${file//\\/\\\\}"
+        file="${file//\"/\\\"}"
         [[ "$first" == "true" ]] && first=false || files_json="${files_json},"
         files_json="${files_json}\"${file}\""
       fi
@@ -114,7 +120,7 @@ write_sidecar "running"
 
 CLAUDE_ARGS=("--print")
 if [[ -n "$PROMPT" ]]; then
-  CLAUDE_ARGS+=("--prompt" "$PROMPT")
+  CLAUDE_ARGS+=("$PROMPT")
 fi
 
 # Launch claude in the specified working directory

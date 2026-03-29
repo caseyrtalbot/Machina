@@ -202,7 +202,7 @@ describe('agent-wrapper.sh', () => {
   })
 
   describe('prompt passing', () => {
-    it('passes prompt to claude via --prompt flag', () => {
+    it('passes prompt to claude as positional argument', () => {
       // Create a claude stub that echoes its args to a file
       const argsClaudeDir = mkdtempSync(join(tmpdir(), 'te-args-claude-'))
       const argsFile = join(tmpVault, 'claude-args.txt')
@@ -220,6 +220,8 @@ describe('agent-wrapper.sh', () => {
       expect(existsSync(argsFile)).toBe(true)
       const args = readFileSync(argsFile, 'utf-8')
       expect(args).toContain('Fix the parser')
+      // Prompt is positional, not passed via --prompt flag to claude CLI
+      expect(args).not.toContain('--prompt')
 
       rmSync(argsClaudeDir, { recursive: true, force: true })
     })

@@ -112,6 +112,19 @@ describe('AgentSpawner', () => {
     expect(labelArg).toHaveLength('agent:'.length + 8)
   })
 
+  it('uses dev path for wrapper when not in asar bundle', async () => {
+    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
+    const spawner = new AgentSpawner(mockShellService, '/vault/root')
+    const request: AgentSpawnRequest = { cwd: '/projects/my-app' }
+
+    spawner.spawn(request)
+
+    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    // In test/dev, __dirname does NOT contain .asar, so uses relative path from out/main/
+    expect(shellArg).toContain('scripts/agent-wrapper.sh')
+    expect(shellArg).not.toContain('resourcesPath')
+  })
+
   it('passes vaultRoot as vaultPath to shellService.create', async () => {
     const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
     const spawner = new AgentSpawner(mockShellService, '/vault/root')

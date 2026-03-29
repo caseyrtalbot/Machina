@@ -17,7 +17,9 @@ export class AgentSpawner {
 
   spawn(request: AgentSpawnRequest): SessionId {
     const sessionId = randomUUID()
-    const wrapperPath = join(__dirname, '../../scripts/agent-wrapper.sh')
+    const wrapperPath = __dirname.includes('.asar')
+      ? join(process.resourcesPath, 'scripts', 'agent-wrapper.sh')
+      : join(__dirname, '../../scripts/agent-wrapper.sh')
 
     const args = [
       'bash',
