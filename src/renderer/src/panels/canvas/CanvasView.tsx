@@ -196,12 +196,14 @@ export function CanvasView(): React.ReactElement {
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
   const activeTabId = useTabStore((s) => s.activeTabId)
 
-  // Ensure a canvas file exists so autosave can persist terminal session IDs.
-  // Without a file, terminal cards vanish on restart.
-  const didEnsureCanvas = useRef(false)
+  // Load existing canvas file if one exists, but don't create one eagerly.
+  // A canvas file is created lazily on first mutation (see ensureCanvasFile below).
+  // This prevents empty Untitled.canvas files from appearing in vaults where
+  // the user hasn't interacted with the canvas yet.
+  const didLoadCanvas = useRef(false)
   useEffect(() => {
-    if (didEnsureCanvas.current || filePath || !vaultPath) return
-    didEnsureCanvas.current = true
+    if (didLoadCanvas.current || filePath || !vaultPath) return
+    didLoadCanvas.current = true
 
     void (async () => {
       const defaultPath = `${vaultPath}/Untitled.canvas`
@@ -211,17 +213,33 @@ export function CanvasView(): React.ReactElement {
           const raw = await window.api.fs.readFile(defaultPath)
           const { deserializeCanvas } = await import('./canvas-io')
           loadCanvas(defaultPath, deserializeCanvas(raw))
-        } else {
-          const { createCanvasFile } = await import('@shared/canvas-types')
-          const data = createCanvasFile()
-          await window.api.fs.writeFile(defaultPath, JSON.stringify(data, null, 2))
-          loadCanvas(defaultPath, data)
         }
+        // If no file exists, canvas works in-memory until first mutation
       } catch {
         // Non-fatal: canvas works without persistence
       }
     })()
   }, [filePath, vaultPath, loadCanvas])
+
+  // Lazily create the canvas file on first mutation so autosave has a path.
+  // This replaces the eager creation that used to write Untitled.canvas on mount.
+  const didEnsureFile = useRef(false)
+  useEffect(() => {
+    if (didEnsureFile.current || filePath || !vaultPath || !isDirty) return
+    didEnsureFile.current = true
+
+    void (async () => {
+      const defaultPath = `${vaultPath}/Untitled.canvas`
+      try {
+        const { createCanvasFile } = await import('@shared/canvas-types')
+        const data = createCanvasFile()
+        await window.api.fs.writeFile(defaultPath, JSON.stringify(data, null, 2))
+        loadCanvas(defaultPath, { ...data, ...toCanvasFile() })
+      } catch {
+        // Non-fatal
+      }
+    })()
+  }, [filePath, vaultPath, isDirty, loadCanvas, toCanvasFile])
 
   // Track container size for viewport culling
   const containerRef = useRef<HTMLDivElement>(null)
