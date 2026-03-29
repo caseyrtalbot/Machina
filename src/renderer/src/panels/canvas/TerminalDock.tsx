@@ -31,7 +31,7 @@ function dotStyle(status: TerminalStatus['status']): React.CSSProperties {
     case 'unknown':
       return { ...base, backgroundColor: colors.text.muted, opacity: 0.5 }
     case 'idle':
-      return { ...base, backgroundColor: '#3dca8d' }
+      return { ...base, backgroundColor: colors.semantic.cluster }
     case 'busy':
       return {
         ...base,

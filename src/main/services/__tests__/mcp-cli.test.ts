@@ -91,7 +91,7 @@ describe('MCP CLI server (standalone)', () => {
     return { server, client, deps }
   }
 
-  it('indexes vault files and creates a server with 3 read-only tools', async () => {
+  it('indexes vault files and creates a server with 4 read-only tools', async () => {
     const { server, client, deps } = await createCliServer()
 
     // Should have indexed both files
