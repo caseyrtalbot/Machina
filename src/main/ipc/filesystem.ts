@@ -2,7 +2,8 @@ import { dialog, shell } from 'electron'
 import { FileService } from '../services/file-service'
 import { createVaultIgnoreFilter } from '../services/vault-watcher'
 import { PathGuard } from '../services/path-guard'
-import { teConfigPath, teStatePath, assertWithinVault } from '../utils/paths'
+import { teConfigPath, teStatePath, teArtifactPath, assertWithinVault } from '../utils/paths'
+import { defaultSystemArtifactFilename } from '@shared/system-artifacts'
 import { TE_DIR } from '@shared/constants'
 import { typedHandle } from '../typed-ipc'
 import type { VaultConfig, VaultState } from '../../shared/types'
@@ -62,19 +63,19 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:list-files', async (args) => {
-    guardPath(args.dir, 'fs:list-files')
-    return fileService.listFiles(args.dir, args.pattern)
+    const resolved = guardPath(args.dir, 'fs:list-files')
+    return fileService.listFiles(resolved, args.pattern)
   })
 
   typedHandle('fs:list-files-recursive', async (args) => {
-    guardPath(args.dir, 'fs:list-files-recursive')
-    return fileService.listFilesRecursive(args.dir)
+    const resolved = guardPath(args.dir, 'fs:list-files-recursive')
+    return fileService.listFilesRecursive(resolved)
   })
 
   typedHandle('fs:file-exists', async (args) => {
-    guardPath(args.path, 'fs:file-exists')
+    const resolved = guardPath(args.path, 'fs:file-exists')
     const { existsSync } = await import('node:fs')
-    return existsSync(args.path)
+    return existsSync(resolved)
   })
 
   typedHandle('fs:select-vault', async () => {
@@ -105,9 +106,9 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:mkdir', async (args) => {
-    guardPath(args.path, 'fs:mkdir')
+    const resolved = guardPath(args.path, 'fs:mkdir')
     const { mkdir } = await import('node:fs/promises')
-    await mkdir(args.path, { recursive: true })
+    await mkdir(resolved, { recursive: true })
   })
 
   typedHandle('fs:read-binary', async (args) => {
@@ -199,14 +200,13 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('vault:create-system-artifact', async (args) => {
-    const path = await fileService.createSystemArtifact(
+    const expectedPath = teArtifactPath(
       args.vaultPath,
       args.kind,
-      args.filename,
-      args.content
+      defaultSystemArtifactFilename(args.filename)
     )
-    assertWithinVault(args.vaultPath, path)
-    return path
+    assertWithinVault(args.vaultPath, expectedPath)
+    return fileService.createSystemArtifact(args.vaultPath, args.kind, args.filename, args.content)
   })
 
   typedHandle('vault:update-system-artifact', async (args) => {
