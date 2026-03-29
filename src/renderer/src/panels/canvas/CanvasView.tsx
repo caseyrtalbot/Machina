@@ -25,6 +25,7 @@ import { CanvasMinimap } from './CanvasMinimap'
 import { ZoomIndicator } from './ZoomIndicator'
 import { EdgeDots } from './EdgeDots'
 import { ImportPalette } from './ImportPalette'
+import { TerminalDock } from './TerminalDock'
 import { inferLanguage, type DragFileData } from './file-drop-utils'
 import { useViewportCulling } from './use-canvas-culling'
 import { getLodLevel } from './use-canvas-lod'
@@ -679,6 +680,8 @@ export function CanvasView(): React.ReactElement {
           containerWidth={containerSize.width}
           containerHeight={containerSize.height}
         />
+
+        <TerminalDock containerWidth={containerSize.width} containerHeight={containerSize.height} />
 
         <ImportPalette
           open={importOpen}

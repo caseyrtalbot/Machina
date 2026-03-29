@@ -67,6 +67,7 @@ function TerminalPill({
   readonly node: {
     readonly position: { readonly x: number; readonly y: number }
     readonly size: { readonly width: number; readonly height: number }
+    readonly metadata: Readonly<Record<string, unknown>>
   }
   readonly onNavigate: (status: TerminalStatus) => void
 }) {
@@ -91,9 +92,10 @@ function TerminalPill({
     flexShrink: 0
   }
 
-  const cwd = typeof status.processName === 'string' ? status.processName : ''
+  const processLabel =
+    status.processName && status.processName !== status.label ? status.processName : ''
   const fullCwd =
-    node && typeof (node as Record<string, unknown>)['metadata'] === 'object' ? '' : ''
+    typeof node.metadata?.initialCwd === 'string' ? (node.metadata.initialCwd as string) : ''
 
   return (
     <div
@@ -118,7 +120,7 @@ function TerminalPill({
       >
         {status.label}
       </span>
-      {cwd && (
+      {processLabel && (
         <span
           style={{
             fontFamily: typography.fontFamily.mono,
@@ -126,7 +128,7 @@ function TerminalPill({
             color: colors.text.muted
           }}
         >
-          {cwd}
+          {processLabel}
         </span>
       )}
     </div>

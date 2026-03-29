@@ -264,6 +264,34 @@ describe('useTerminalStatus', () => {
     expect(result.current[0].status).toBe('error')
   })
 
+  it('poll reject does not overwrite settled error with dead', async () => {
+    // First poll starts (slow, will reject)
+    mockGetProcessName.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('timeout')), 100)
+        })
+    )
+
+    const nodes = [makeTerminalNode()]
+    const { result } = renderHook(() => useTerminalStatus(nodes))
+
+    // Exit fires with error code before the poll rejects
+    act(() => {
+      exitCallback?.({ sessionId: 'session-abc', code: 1 })
+    })
+
+    expect(result.current[0].status).toBe('error')
+
+    // Now let the poll rejection land
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+
+    // Status should remain error, NOT flip to dead
+    expect(result.current[0].status).toBe('error')
+  })
+
   it('skips nodes with empty content', async () => {
     mockGetProcessName.mockResolvedValue('zsh')
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
 import { withTimeout } from '@renderer/utils/ipc-timeout'
 
@@ -54,22 +54,28 @@ export function deriveStatus(
 // --- Hook ---
 
 export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonly TerminalStatus[] {
-  const settledRef = useRef<Map<string, number>>(new Map())
-  const processNamesRef = useRef<Map<string, string>>(new Map())
-  const [, setRenderTick] = useState(0)
+  const [settled, setSettled] = useState<ReadonlyMap<string, number>>(() => new Map())
+  const [processNames, setProcessNames] = useState<ReadonlyMap<string, string>>(() => new Map())
 
-  const triggerRender = useCallback(() => {
-    setRenderTick((prev) => prev + 1)
+  const nodeKey = terminalNodes.map((n) => `${n.id}:${n.content}`).join(',')
+
+  const markSettled = useCallback((sessionId: string, code: number) => {
+    setSettled((prev) => new Map([...prev, [sessionId, code]]))
   }, [])
-
-  const nodeKey = terminalNodes.map((n) => n.id).join(',')
 
   useEffect(() => {
     let cancelled = false
 
     const pollAll = async (): Promise<void> => {
+      // Read current settled state via setter to avoid stale closures
+      let currentSettled: ReadonlyMap<string, number> = new Map()
+      setSettled((prev) => {
+        currentSettled = prev
+        return prev
+      })
+
       const pollable = terminalNodes.filter(
-        (n) => n.content !== '' && !settledRef.current.has(n.content)
+        (n) => n.content !== '' && !currentSettled.has(n.content)
       )
 
       const results = await Promise.allSettled(
@@ -86,28 +92,24 @@ export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonl
 
       if (cancelled) return
 
-      let changed = false
       for (let i = 0; i < results.length; i++) {
         const result = results[i]
         const sessionId = pollable[i].content
 
-        if (settledRef.current.has(sessionId)) continue
-
         if (result.status === 'fulfilled') {
-          const prev = processNamesRef.current.get(sessionId)
           const next = result.value.name ?? ''
-          if (prev !== next) {
-            processNamesRef.current = new Map(processNamesRef.current).set(sessionId, next)
-            changed = true
-          }
+          setProcessNames((prev) => {
+            if (prev.get(sessionId) === next) return prev
+            return new Map([...prev, [sessionId, next]])
+          })
         } else {
-          // Rejected or timed out: mark as dead
-          settledRef.current = new Map(settledRef.current).set(sessionId, 0)
-          changed = true
+          // Rejected or timed out: only mark dead if not already settled
+          setSettled((prev) => {
+            if (prev.has(sessionId)) return prev
+            return new Map([...prev, [sessionId, 0]])
+          })
         }
       }
-
-      if (changed) triggerRender()
     }
 
     // Immediate poll on mount
@@ -119,8 +121,7 @@ export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonl
     // Exit listener
     const unsubscribe = window.api.on.terminalExit((data: { sessionId: string; code: number }) => {
       if (cancelled) return
-      settledRef.current = new Map(settledRef.current).set(data.sessionId, data.code)
-      triggerRender()
+      markSettled(data.sessionId, data.code)
     })
 
     return () => {
@@ -128,9 +129,9 @@ export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonl
       clearInterval(interval)
       unsubscribe()
     }
-  }, [nodeKey, triggerRender]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nodeKey, markSettled]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Derive statuses from current ref state
+  // Derive statuses from state (not refs — React tracks these)
   const statuses: TerminalStatus[] = terminalNodes.map((node) => {
     const sessionId = node.content
     return {
@@ -140,8 +141,8 @@ export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonl
       status:
         sessionId === ''
           ? 'unknown'
-          : deriveStatus(sessionId, settledRef.current, processNamesRef.current, node.metadata),
-      processName: processNamesRef.current.get(sessionId) ?? ''
+          : deriveStatus(sessionId, settled, processNames, node.metadata),
+      processName: processNames.get(sessionId) ?? ''
     }
   })
 

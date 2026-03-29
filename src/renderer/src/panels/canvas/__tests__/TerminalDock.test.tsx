@@ -222,4 +222,48 @@ describe('TerminalDock', () => {
     expect(mockSetFocusedTerminal).not.toHaveBeenCalled()
     expect(mockSetSelection).not.toHaveBeenCalled()
   })
+
+  it('navigation is no-op when containerHeight is 0', () => {
+    const n1 = makeTerminalNode('term-1')
+    mockNodes = [n1]
+    mockStatuses = [makeStatus('term-1')]
+
+    render(<TerminalDock containerWidth={1200} containerHeight={0} />)
+
+    const pill = screen.getByTestId('terminal-pill')
+    fireEvent.click(pill)
+
+    expect(mockSetViewport).not.toHaveBeenCalled()
+    expect(mockSetFocusedTerminal).not.toHaveBeenCalled()
+    expect(mockSetSelection).not.toHaveBeenCalled()
+  })
+
+  it('shows correct dot colors for each status', () => {
+    const n1 = makeTerminalNode('t-idle')
+    const n2 = makeTerminalNode('t-busy')
+    const n3 = makeTerminalNode('t-error')
+    const n4 = makeTerminalNode('t-claude')
+    const n5 = makeTerminalNode('t-dead')
+    mockNodes = [n1, n2, n3, n4, n5]
+    mockStatuses = [
+      makeStatus('t-idle', 'idle'),
+      makeStatus('t-busy', 'busy'),
+      makeStatus('t-error', 'error'),
+      makeStatus('t-claude', 'claude'),
+      makeStatus('t-dead', 'dead')
+    ]
+
+    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+
+    const dots = screen.getAllByTestId('status-dot')
+    expect(dots).toHaveLength(5)
+
+    // Verify dot background colors match spec
+    expect(dots[0].style.backgroundColor).toBe('#3dca8d') // idle
+    expect(dots[1].style.backgroundColor).toBe('#60a5fa') // busy
+    expect(dots[2].style.backgroundColor).toBe('#ef4444') // error
+    expect(dots[3].style.backgroundColor).toBe('#00e5bf') // claude
+    // dead uses CSS variable, check it exists
+    expect(dots[4].style.backgroundColor).toBeTruthy()
+  })
 })
