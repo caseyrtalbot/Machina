@@ -158,10 +158,12 @@ describe('ShellService', () => {
         () => {},
         () => {}
       )
-      const id = service.create('/tmp', undefined, 'Shell 1', '/vault')
+      const id = service.create('/tmp', undefined, undefined, undefined, 'Shell 1', '/vault')
       expect(mockTmuxService.create).toHaveBeenCalledWith(
         id,
         '/tmp',
+        undefined,
+        undefined,
         undefined,
         'Shell 1',
         '/vault'

@@ -60,12 +60,34 @@ export class TmuxService {
   // Create
   // -----------------------------------------------------------------------
 
-  create(sessionId: string, cwd: string, shell?: string, label?: string, vaultPath?: string): void {
+  create(
+    sessionId: string,
+    cwd: string,
+    cols?: number,
+    rows?: number,
+    shell?: string,
+    label?: string,
+    vaultPath?: string
+  ): void {
     const defaultShell = shell || process.env.SHELL || '/bin/zsh'
     const name = tmuxSessionName(sessionId)
+    const c = cols || 80
+    const r = rows || 24
 
-    // Create a detached tmux session with initial size
-    tmuxExec('new-session', '-d', '-s', name, '-c', cwd, '-x', '80', '-y', '24', defaultShell)
+    // Create a detached tmux session at the actual terminal dimensions
+    tmuxExec(
+      'new-session',
+      '-d',
+      '-s',
+      name,
+      '-c',
+      cwd,
+      '-x',
+      String(c),
+      '-y',
+      String(r),
+      defaultShell
+    )
 
     // Set generous scrollback limit and hide the status bar.
     // The status bar leaks tmux internals into the embedded terminal UI.
@@ -82,7 +104,7 @@ export class TmuxService {
     })
 
     // Attach a node-pty client to pipe data to the renderer
-    this.attachClient(sessionId, name, 80, 24)
+    this.attachClient(sessionId, name, c, r)
   }
 
   // -----------------------------------------------------------------------

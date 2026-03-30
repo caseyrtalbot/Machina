@@ -40,11 +40,18 @@ export class ShellService {
   // Create
   // -----------------------------------------------------------------------
 
-  create(cwd: string, shell?: string, label?: string, vaultPath?: string): SessionId {
+  create(
+    cwd: string,
+    cols?: number,
+    rows?: number,
+    shell?: string,
+    label?: string,
+    vaultPath?: string
+  ): SessionId {
     const id = sessionId(randomUUID())
 
     if (this.tmux) {
-      this.tmux.create(id, cwd, shell, label, vaultPath)
+      this.tmux.create(id, cwd, cols, rows, shell, label, vaultPath)
       return id
     }
 

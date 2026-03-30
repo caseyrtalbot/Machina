@@ -27,7 +27,14 @@ export function registerShellIpc(): void {
   )
 
   typedHandleWithEvent('terminal:create', (args, event) => {
-    const result = shellService.create(args.cwd, args.shell, args.label, args.vaultPath)
+    const result = shellService.create(
+      args.cwd,
+      args.cols,
+      args.rows,
+      args.shell,
+      args.label,
+      args.vaultPath
+    )
     register(result, event.sender.id)
     return result
   })

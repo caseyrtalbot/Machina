@@ -38,6 +38,13 @@ export class AgentSpawner {
 
     const label = `agent:${sessionId.slice(0, 8)}`
 
-    return this.shellService.create(request.cwd, args.join(' '), label, this.vaultRoot)
+    return this.shellService.create(
+      request.cwd,
+      undefined,
+      undefined,
+      args.join(' '),
+      label,
+      this.vaultRoot
+    )
   }
 }

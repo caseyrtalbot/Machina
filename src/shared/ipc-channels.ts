@@ -76,7 +76,14 @@ export interface IpcChannels {
 
   // --- Terminal ---
   'terminal:create': {
-    request: { cwd: string; shell?: string; label?: string; vaultPath?: string }
+    request: {
+      cwd: string
+      cols?: number
+      rows?: number
+      shell?: string
+      label?: string
+      vaultPath?: string
+    }
     response: SessionId
   }
   'terminal:write': { request: { sessionId: SessionId; data: string }; response: void }

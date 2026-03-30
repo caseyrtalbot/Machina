@@ -1,6 +1,8 @@
 interface TerminalApi {
   create: (args: {
     cwd: string
+    cols?: number
+    rows?: number
     shell?: string
     label?: string
     vaultPath?: string

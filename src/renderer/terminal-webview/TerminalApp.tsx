@@ -270,9 +270,11 @@ export function TerminalApp() {
         }
       }
 
-      // Create path: spawn a new session
+      // Create path: spawn a new session at the actual terminal dimensions
       const newSessionId = await window.terminalApi.create({
-        cwd: cwd || '/'
+        cwd: cwd || '/',
+        cols,
+        rows
       })
       if (cancelled) return
 
@@ -295,15 +297,6 @@ export function TerminalApp() {
             })
           }
         }, 500)
-      }
-
-      // Resize to match xterm dimensions
-      if (termRef.current) {
-        window.terminalApi.resize({
-          sessionId: newSessionId,
-          cols: termRef.current.cols,
-          rows: termRef.current.rows
-        })
       }
     }
 

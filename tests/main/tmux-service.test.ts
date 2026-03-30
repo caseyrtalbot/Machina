@@ -54,7 +54,7 @@ describe.skipIf(!HAS_TMUX)('TmuxService (integration)', () => {
 
   it('create + discover lifecycle', () => {
     const id = randomUUID()
-    service.create(id, '/tmp', undefined, 'Test Shell')
+    service.create(id, '/tmp', undefined, undefined, undefined, 'Test Shell')
 
     // Detach the client so discover() can find the orphaned session.
     // discover() correctly skips sessions with active clients.

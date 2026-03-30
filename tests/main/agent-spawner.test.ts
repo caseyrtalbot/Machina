@@ -65,7 +65,7 @@ describe('AgentSpawner', () => {
 
     spawner.spawn(request)
 
-    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
     expect(shellArg).toContain('agent-wrapper.sh')
     expect(shellArg).toContain('--session-id')
     // Args are now shell-escaped (single-quoted)
@@ -83,7 +83,7 @@ describe('AgentSpawner', () => {
 
     spawner.spawn(request)
 
-    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
     expect(shellArg).toContain('--prompt')
     expect(shellArg).toContain('Fix the failing tests')
   })
@@ -95,7 +95,7 @@ describe('AgentSpawner', () => {
 
     spawner.spawn(request)
 
-    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
     expect(shellArg).not.toContain('--prompt')
   })
 
@@ -106,7 +106,7 @@ describe('AgentSpawner', () => {
 
     spawner.spawn(request)
 
-    const labelArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][2]
+    const labelArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][4]
     expect(labelArg).toMatch(/^agent:/)
     // Label should include the first 8 chars of the session ID
     expect(labelArg).toHaveLength('agent:'.length + 8)
@@ -119,7 +119,7 @@ describe('AgentSpawner', () => {
 
     spawner.spawn(request)
 
-    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
     // In test/dev, __dirname does NOT contain .asar, so uses relative path from out/main/
     expect(shellArg).toContain('scripts/agent-wrapper.sh')
     expect(shellArg).not.toContain('resourcesPath')
@@ -132,7 +132,7 @@ describe('AgentSpawner', () => {
 
     spawner.spawn(request)
 
-    const vaultPathArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
+    const vaultPathArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][5]
     expect(vaultPathArg).toBe('/vault/root')
   })
 })
