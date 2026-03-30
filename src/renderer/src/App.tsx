@@ -580,10 +580,12 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
 
 function ResizableSidebar({
   onLoadVault,
-  onOpenSettings
+  onOpenSettings,
+  collapsed
 }: {
   onLoadVault: (path: string) => Promise<void>
   onOpenSettings: () => void
+  collapsed: boolean
 }) {
   const [width, setWidth] = useState(264)
   const dragging = useRef(false)
@@ -618,7 +620,8 @@ function ResizableSidebar({
       <aside
         className="h-full flex flex-col shrink-0 overflow-hidden pt-8"
         style={{
-          width,
+          width: collapsed ? 0 : width,
+          transition: dragging.current ? undefined : 'width 200ms ease-out',
           backgroundColor: `rgba(0, 0, 0, ${activityBarOpacity / 100})`,
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)'
@@ -628,7 +631,15 @@ function ResizableSidebar({
           <ConnectedSidebar onLoadVault={onLoadVault} onOpenSettings={onOpenSettings} />
         </PanelErrorBoundary>
       </aside>
-      <div className="panel-divider" onMouseDown={handleMouseDown} />
+      <div
+        className="panel-divider"
+        onMouseDown={collapsed ? undefined : handleMouseDown}
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? 'none' : undefined,
+          transition: 'opacity 200ms ease-out'
+        }}
+      />
     </>
   )
 }
@@ -1078,11 +1089,13 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         }
       />
       {/* Docked activity bar */}
-      <ActivityBar />
+      <ActivityBar onToggleSidebar={toggleSidebar} sidebarExpanded={sidebarExpanded} />
       {/* Docked sidebar with draggable divider */}
-      {sidebarExpanded && (
-        <ResizableSidebar onLoadVault={onLoadVault} onOpenSettings={() => setSettingsOpen(true)} />
-      )}
+      <ResizableSidebar
+        onLoadVault={onLoadVault}
+        onOpenSettings={() => setSettingsOpen(true)}
+        collapsed={!sidebarExpanded}
+      />
       {/* Content area fills remaining space */}
       <div className="flex-1 overflow-hidden">
         <PanelErrorBoundary name="Content">

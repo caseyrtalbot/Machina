@@ -91,7 +91,34 @@ function useGhostCount(): number {
   return useMemo(() => ghosts.filter((g) => !dismissed.includes(g.id)).length, [ghosts, dismissed])
 }
 
-export function ActivityBar() {
+const SidebarToggleIcon = ({ expanded }: { expanded: boolean }) => (
+  <svg
+    width={18}
+    height={18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{
+      transform: expanded ? 'scaleX(1)' : 'scaleX(-1)',
+      transition: 'transform 200ms ease-out'
+    }}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+    <polyline points="14 9 16 12 14 15" />
+  </svg>
+)
+
+export function ActivityBar({
+  onToggleSidebar,
+  sidebarExpanded
+}: {
+  onToggleSidebar?: () => void
+  sidebarExpanded?: boolean
+}) {
   const activeTabId = useTabStore((s) => s.activeTabId)
   const openTab = useTabStore((s) => s.openTab)
   const ghostCount = useGhostCount()
@@ -146,6 +173,29 @@ export function ActivityBar() {
           </button>
         )
       })}
+
+      {onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="activity-btn flex items-center justify-center cursor-pointer mt-auto mb-3"
+          style={
+            {
+              width: 34,
+              height: 34,
+              '--base-opacity': 0.4,
+              '--base-bg': 'transparent',
+              color: colors.text.primary,
+              borderRadius: 8,
+              transition: 'opacity 150ms ease-out, background-color 150ms ease-out'
+            } as React.CSSProperties
+          }
+          title={sidebarExpanded ? 'Hide sidebar (\u2318B)' : 'Show sidebar (\u2318B)'}
+          aria-label="Toggle sidebar"
+        >
+          <SidebarToggleIcon expanded={sidebarExpanded ?? true} />
+        </button>
+      )}
     </div>
   )
 }

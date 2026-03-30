@@ -71,22 +71,26 @@ function ActionBar({
   sortMode = 'modified',
   vaultName,
   vaultHistory = [],
+  filesCollapsed = false,
   onNewFile,
   onSortChange,
   onSelectVault,
   onOpenVaultPicker,
   onRemoveFromHistory,
-  onOpenSettings
+  onOpenSettings,
+  onToggleFiles
 }: {
   sortMode?: SortMode
   vaultName?: string
   vaultHistory?: readonly string[]
+  filesCollapsed?: boolean
   onNewFile?: () => void
   onSortChange?: (mode: SortMode) => void
   onSelectVault?: (path: string) => void
   onOpenVaultPicker?: () => void
   onRemoveFromHistory?: (path: string) => void
   onOpenSettings?: () => void
+  onToggleFiles?: () => void
 }) {
   const cycleSortMode = () => {
     const idx = SORT_CYCLE.indexOf(sortMode)
@@ -133,17 +137,42 @@ function ActionBar({
       </div>
       {/* Section header: Files label with action icons */}
       <div className="flex items-center justify-between">
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.15em',
-            color: 'rgba(255, 255, 255, 0.25)'
-          }}
+        <button
+          onClick={() => onToggleFiles?.()}
+          className="flex items-center gap-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', padding: 0 }}
         >
-          Files
-        </span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 16 16"
+            fill="none"
+            style={{
+              transform: filesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+              transition: 'transform 150ms ease-out',
+              color: 'rgba(255, 255, 255, 0.25)'
+            }}
+          >
+            <path
+              d="M6 4L10 8L6 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.15em',
+              color: 'rgba(255, 255, 255, 0.25)'
+            }}
+          >
+            Files
+          </span>
+        </button>
         <div className="flex items-center gap-0.5">
           <button
             onClick={onNewFile}
@@ -323,6 +352,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [filesCollapsed, setFilesCollapsed] = useState(false)
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, path: string, isDirectory: boolean) => {
@@ -396,12 +426,14 @@ export function Sidebar({
           sortMode={sortMode}
           vaultName={vaultName}
           vaultHistory={vaultHistory}
+          filesCollapsed={filesCollapsed}
           onNewFile={onNewFile}
           onSortChange={onSortChange}
           onSelectVault={onSelectVault}
           onOpenVaultPicker={onOpenVaultPicker}
           onRemoveFromHistory={onRemoveFromHistory}
           onOpenSettings={onOpenSettings}
+          onToggleFiles={() => setFilesCollapsed((prev) => !prev)}
         />
         {workspaces.length > 0 && (
           <WorkspaceFilter
@@ -418,24 +450,28 @@ export function Sidebar({
           onSelect={onSystemArtifactSelect}
         />
       </div>
-      <TagBrowser />
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hover">
-        <FileTree
-          nodes={nodes}
-          activeFilePath={activeFilePath}
-          collapsedPaths={collapsedPaths}
-          artifactTypes={artifactTypes}
-          onCanvasPaths={onCanvasPaths}
-          canvasConnectionCounts={canvasConnectionCounts}
-          onFileSelect={onFileSelect}
-          onFileDoubleClick={onFileDoubleClick}
-          onToggleDirectory={onToggleDirectory}
-          onContextMenu={handleContextMenu}
-          renamingPath={renamingPath}
-          onRenameConfirm={handleRenameConfirm}
-          onRenameCancel={() => setRenamingPath(null)}
-        />
-      </div>
+      {!filesCollapsed && (
+        <>
+          <TagBrowser />
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hover">
+            <FileTree
+              nodes={nodes}
+              activeFilePath={activeFilePath}
+              collapsedPaths={collapsedPaths}
+              artifactTypes={artifactTypes}
+              onCanvasPaths={onCanvasPaths}
+              canvasConnectionCounts={canvasConnectionCounts}
+              onFileSelect={onFileSelect}
+              onFileDoubleClick={onFileDoubleClick}
+              onToggleDirectory={onToggleDirectory}
+              onContextMenu={handleContextMenu}
+              renamingPath={renamingPath}
+              onRenameConfirm={handleRenameConfirm}
+              onRenameCancel={() => setRenamingPath(null)}
+            />
+          </div>
+        </>
+      )}
 
       <FileContextMenu
         state={contextMenu}
