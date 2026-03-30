@@ -1,10 +1,10 @@
-import { memo, useMemo } from 'react'
+import { Fragment, memo, useMemo } from 'react'
 import { TE_FILE_MIME, inferCardType, type DragFileData } from '../canvas/file-drop-utils'
 import { colors } from '../../design/tokens'
 import { useSettingsStore } from '../../store/settings-store'
 import { RenameInput } from './FileContextMenu'
 import type { ArtifactType } from '@shared/types'
-import type { FlatTreeNode } from './buildFileTree'
+import type { FlatTreeNode, TreeSortMode } from './buildFileTree'
 import {
   FileText,
   FileTs,
@@ -33,10 +33,55 @@ function indentBorderStyle(depth: number, isActive?: boolean): React.CSSProperti
   }
 }
 
+// --- Date grouping helpers (matches collab SourcesFeed pattern) ---
+
+function formatRelativeTime(isoDate?: string): string {
+  if (!isoDate) return ''
+  const date = new Date(isoDate)
+  if (isNaN(date.getTime())) return ''
+
+  const diff = Math.abs(Date.now() - date.getTime())
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (hours < 24) {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  }
+
+  const month = date.toLocaleDateString('en-US', { month: 'short' })
+  if (days < 365) {
+    const day = date.toLocaleDateString('en-US', { day: '2-digit' })
+    return `${day} ${month}`
+  }
+  return `${month} ${date.toLocaleDateString('en-US', { year: 'numeric' })}`
+}
+
+function getDateKey(timestamp?: string): string {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  if (isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function formatDateLabel(timestamp?: string): string {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  if (isNaN(date.getTime())) return ''
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+  if (itemDate.getTime() === today.getTime()) return 'Today'
+  if (itemDate.getTime() === yesterday.getTime()) return 'Yesterday'
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 interface FileTreeProps {
   nodes: FlatTreeNode[]
   activeFilePath: string | null
   collapsedPaths: Set<string>
+  sortMode?: TreeSortMode
   artifactTypes?: Map<string, ArtifactType>
   onCanvasPaths?: ReadonlySet<string>
   canvasConnectionCounts?: ReadonlyMap<string, number>
@@ -204,6 +249,7 @@ export const FileTree = memo(function FileTree({
   nodes,
   activeFilePath,
   collapsedPaths,
+  sortMode,
   artifactTypes,
   onCanvasPaths,
   canvasConnectionCounts,
@@ -223,42 +269,66 @@ export const FileTree = memo(function FileTree({
 
   const settingsFontSize = useSettingsStore((s) => s.env.sidebarFontSize)
   const resolvedFont = 'inherit'
+  const showDateHeaders = sortMode === 'modified'
 
   return (
     <div data-testid="file-tree" className="text-sm select-none px-1 py-1">
-      {visibleNodes.map((node) =>
-        node.isDirectory ? (
-          <DirectoryRow
-            key={node.path}
-            node={node}
-            isCollapsed={collapsedPaths.has(node.path)}
-            onToggleDirectory={onToggleDirectory}
-            onContextMenu={onContextMenu}
-            isRenaming={renamingPath === node.path}
-            onRenameConfirm={onRenameConfirm}
-            onRenameCancel={onRenameCancel}
-            treeFontSize={settingsFontSize}
-            treeFontFamily={resolvedFont}
-          />
-        ) : (
-          <FileRow
-            key={node.path}
-            node={node}
-            isActive={node.path === activeFilePath}
-            artifactType={artifactTypes?.get(node.path)}
-            isOnCanvas={onCanvasPaths?.has(node.path) ?? false}
-            canvasConnectionCount={canvasConnectionCounts?.get(node.path) ?? 0}
-            onFileSelect={onFileSelect}
-            onFileDoubleClick={onFileDoubleClick}
-            onContextMenu={onContextMenu}
-            isRenaming={renamingPath === node.path}
-            onRenameConfirm={onRenameConfirm}
-            onRenameCancel={onRenameCancel}
-            treeFontSize={settingsFontSize}
-            treeFontFamily={resolvedFont}
-          />
+      {visibleNodes.map((node, i) => {
+        // Insert date separator when sorted by modified and the date bucket changes
+        let dateHeader: React.ReactNode = null
+        if (showDateHeaders && !node.isDirectory && node.modified) {
+          const dateKey = getDateKey(node.modified)
+          let needsHeader = true
+          for (let j = i - 1; j >= 0; j--) {
+            if (!visibleNodes[j].isDirectory && visibleNodes[j].modified) {
+              needsHeader = getDateKey(visibleNodes[j].modified) !== dateKey
+              break
+            }
+          }
+          if (needsHeader) {
+            dateHeader = (
+              <div key={`date-${dateKey}`} className="date-separator">
+                {formatDateLabel(node.modified)}
+              </div>
+            )
+          }
+        }
+
+        return (
+          <Fragment key={node.path}>
+            {dateHeader}
+            {node.isDirectory ? (
+              <DirectoryRow
+                node={node}
+                isCollapsed={collapsedPaths.has(node.path)}
+                onToggleDirectory={onToggleDirectory}
+                onContextMenu={onContextMenu}
+                isRenaming={renamingPath === node.path}
+                onRenameConfirm={onRenameConfirm}
+                onRenameCancel={onRenameCancel}
+                treeFontSize={settingsFontSize}
+                treeFontFamily={resolvedFont}
+              />
+            ) : (
+              <FileRow
+                node={node}
+                isActive={node.path === activeFilePath}
+                artifactType={artifactTypes?.get(node.path)}
+                isOnCanvas={onCanvasPaths?.has(node.path) ?? false}
+                canvasConnectionCount={canvasConnectionCounts?.get(node.path) ?? 0}
+                onFileSelect={onFileSelect}
+                onFileDoubleClick={onFileDoubleClick}
+                onContextMenu={onContextMenu}
+                isRenaming={renamingPath === node.path}
+                onRenameConfirm={onRenameConfirm}
+                onRenameCancel={onRenameCancel}
+                treeFontSize={settingsFontSize}
+                treeFontFamily={resolvedFont}
+              />
+            )}
+          </Fragment>
         )
-      )}
+      })}
     </div>
   )
 })
@@ -288,7 +358,7 @@ function DirectoryRow({
     <div
       onClick={() => onToggleDirectory(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, true)}
-      className="flex items-center py-[5px] cursor-pointer transition-colors"
+      className="flex items-center py-[2px] cursor-pointer transition-colors"
       style={{
         paddingLeft: node.depth === 0 ? 8 : undefined,
         paddingRight: 8,
@@ -391,12 +461,11 @@ function FileRow({
       onClick={() => onFileSelect(node.path)}
       onDoubleClick={() => (onFileDoubleClick ?? onFileSelect)(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
-      className="flex items-center py-[5px] cursor-pointer file-row-hover"
+      className="flex items-center py-[2px] cursor-pointer file-row-hover"
       style={{
         paddingLeft: node.depth === 0 ? 24 : undefined,
         paddingRight: 8,
         fontFamily: treeFontFamily,
-        fontWeight: 400,
         fontSize: treeFontSize,
         ...indentBorderStyle(node.depth, isActive)
       }}
@@ -418,17 +487,12 @@ function FileRow({
           onCancel={onRenameCancel ?? (() => {})}
         />
       ) : (
-        <span className="truncate flex-1">
-          <span
-            className="file-name-glow"
-            style={{ color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.78)' }}
-          >
-            {base}
-          </span>
-          {ext && <span style={{ color: 'rgba(255,255,255,0.32)' }}>{ext}</span>}
+        <span className="truncate flex-1 file-name-text" style={{ color: 'rgb(220, 220, 220)' }}>
+          {base}
+          {ext && <span style={{ opacity: 0.4 }}>{ext}</span>}
         </span>
       )}
-      {canvasConnectionCount >= 2 && (
+      {canvasConnectionCount >= 2 ? (
         <span
           className="ml-auto flex-shrink-0"
           style={{
@@ -440,6 +504,8 @@ function FileRow({
         >
           {canvasConnectionCount}
         </span>
+      ) : (
+        node.modified && <span className="row-timestamp">{formatRelativeTime(node.modified)}</span>
       )}
     </div>
   )

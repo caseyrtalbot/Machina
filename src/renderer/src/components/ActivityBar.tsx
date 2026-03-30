@@ -126,15 +126,25 @@ export function ActivityBar({
 
   return (
     <div
-      className="flex flex-col items-center shrink-0 pt-12 gap-1"
+      className="flex flex-col items-center shrink-0 pt-12 gap-1 relative"
       style={{
         width: 48,
         backgroundColor: `rgba(0, 0, 0, ${activityBarOpacity / 100})`,
         backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderRight: `1px solid ${colors.border.default}`
+        WebkitBackdropFilter: 'blur(16px)'
       }}
     >
+      {/* Border line starts below traffic lights, flush with search bar top */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 40,
+          right: 0,
+          bottom: 0,
+          width: 1,
+          backgroundColor: colors.border.default
+        }}
+      />
       {ITEMS.map(({ view, label, icon }) => {
         const isActive = activeTabId === view
         const def = TAB_DEFINITIONS[view]

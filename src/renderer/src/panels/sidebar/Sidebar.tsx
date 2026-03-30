@@ -458,6 +458,7 @@ export function Sidebar({
               nodes={nodes}
               activeFilePath={activeFilePath}
               collapsedPaths={collapsedPaths}
+              sortMode={sortMode}
               artifactTypes={artifactTypes}
               onCanvasPaths={onCanvasPaths}
               canvasConnectionCounts={canvasConnectionCounts}

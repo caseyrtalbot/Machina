@@ -14,6 +14,7 @@ export interface FlatTreeNode {
   isDirectory: boolean
   depth: number
   itemCount: number
+  modified: string
 }
 
 export interface IndexedTreeNode extends FlatTreeNode {
@@ -183,7 +184,8 @@ export function buildFileTree(
         parentPath: node.parentPath,
         isDirectory: node.isDirectory,
         depth: node.depth,
-        itemCount: node.itemCount
+        itemCount: node.itemCount,
+        modified: node.modified
       })
 
       if (node.isDirectory) {
