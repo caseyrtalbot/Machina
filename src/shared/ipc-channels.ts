@@ -129,6 +129,7 @@ export interface IpcChannels {
 
   // --- App Lifecycle ---
   'app:quit-ready': { request: void; response: void }
+  'app:path-exists': { request: { path: string }; response: boolean }
 
   // --- Window ---
   'window:minimize': { request: void; response: void }

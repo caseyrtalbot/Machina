@@ -105,7 +105,7 @@ export function normalizePersistedTabState(snapshot: PersistedTabSnapshot | unde
     normalizedTabs.push(DEFAULT_TABS[1])
   }
 
-  const activeTabId = normalizeTabId(snapshot?.activeTabId ?? 'canvas')
+  const activeTabId = normalizeTabId(snapshot?.activeTabId ?? 'editor')
   return {
     tabs: normalizedTabs,
     activeTabId: normalizedTabs.some((tab) => tab.id === activeTabId)
@@ -118,7 +118,7 @@ export const useTabStore = create<TabStore>()(
   persist(
     (set, get) => ({
       tabs: DEFAULT_TABS,
-      activeTabId: 'canvas',
+      activeTabId: 'editor',
 
       openTab: (tab) => {
         const { tabs } = get()

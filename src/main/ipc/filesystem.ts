@@ -131,6 +131,13 @@ export function registerFilesystemIpc(): void {
     return fileService.listAllFilesRecursive(args.dir, ignoreFilter)
   })
 
+  // --- App-level (no vault guard) ---
+
+  typedHandle('app:path-exists', async (args) => {
+    const { existsSync } = await import('node:fs')
+    return existsSync(args.path)
+  })
+
   // --- Vault data ---
 
   typedHandle('vault:init', async (args) => {

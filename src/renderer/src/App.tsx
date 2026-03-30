@@ -215,7 +215,7 @@ function ConnectedSidebar({
         if (!Array.isArray(history)) return
         const paths = history as string[]
         const checks = await Promise.all(
-          paths.map(async (p) => ({ path: p, exists: await window.api.fs.fileExists(p) }))
+          paths.map(async (p) => ({ path: p, exists: await window.api.app.pathExists(p) }))
         )
         const valid = checks.filter((c) => c.exists).map((c) => c.path)
         setVaultHistory(valid)
@@ -391,8 +391,8 @@ function ConnectedSidebar({
 
   const handleSelectVault = useCallback(
     async (path: string) => {
-      // Validate path exists before attempting to load
-      const exists = await window.api.fs.fileExists(path)
+      // Validate path exists before attempting to load (unguarded — no vault yet)
+      const exists = await window.api.app.pathExists(path)
       if (!exists) {
         // Auto-remove from history and update state
         const history = (await window.api.config.read('app', 'vaultHistory')) as string[] | null

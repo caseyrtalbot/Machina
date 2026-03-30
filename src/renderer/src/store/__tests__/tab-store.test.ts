@@ -84,7 +84,7 @@ describe('normalizePersistedTabState', () => {
     const result = normalizePersistedTabState(null)
 
     expect(result.tabs.map((tab) => tab.id)).toEqual(['editor', 'canvas'])
-    expect(result.activeTabId).toBe('canvas')
+    expect(result.activeTabId).toBe('editor')
   })
 
   it('resolves active tab to first tab when persisted active tab is gone', () => {

@@ -139,6 +139,9 @@ const api = {
     appWillQuit: (callback: (data: Record<string, never>) => void) =>
       typedOn('app:will-quit', callback)
   },
+  app: {
+    pathExists: (path: string) => typedInvoke('app:path-exists', { path })
+  },
   lifecycle: {
     quitReady: () => typedInvoke('app:quit-ready')
   }
