@@ -114,11 +114,17 @@ export function TerminalCard({ node }: TerminalCardProps) {
     // In prod, use a relative file path from the current renderer location.
     const base = import.meta.env.DEV
       ? new URL('/terminal-webview/index.html', window.location.origin).href
-      : new URL('../terminal-webview/index.html', window.location.href).href
+      : new URL('./terminal-webview/index.html', window.location.href).href
 
     const qs = params.toString()
     return qs ? `${base}?${qs}` : base
-  }, [launchSessionId, node.id, node.metadata?.initialCwd, node.metadata?.initialCommand, vaultPath])
+  }, [
+    launchSessionId,
+    node.id,
+    node.metadata?.initialCwd,
+    node.metadata?.initialCommand,
+    vaultPath
+  ])
 
   useEffect(() => {
     sessionIdRef.current = node.content ? toSessionId(node.content) : null
