@@ -24,6 +24,14 @@ export default defineConfig({
       alias: {
         '@shared': resolve('src/shared')
       }
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          'terminal-webview': resolve(__dirname, 'src/preload/terminal-webview.ts')
+        }
+      }
     }
   },
   renderer: {
@@ -32,6 +40,14 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src'),
         '@shared': resolve('src/shared'),
         '@engine': resolve('src/renderer/src/engine')
+      }
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          'terminal-webview': resolve(__dirname, 'src/renderer/terminal-webview/index.html')
+        }
       }
     },
     plugins: [react(), tailwindcss()],

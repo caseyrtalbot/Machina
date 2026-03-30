@@ -1,4 +1,4 @@
-import { ipcMain, type BrowserWindow } from 'electron'
+import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import type {
   IpcChannel,
   IpcRequest,
@@ -12,6 +12,16 @@ export function typedHandle<C extends IpcChannel>(
   handler: (request: IpcRequest<C>) => Promise<IpcResponse<C>> | IpcResponse<C>
 ): void {
   ipcMain.handle(channel, (_event, args) => handler(args))
+}
+
+export function typedHandleWithEvent<C extends IpcChannel>(
+  channel: C,
+  handler: (
+    request: IpcRequest<C>,
+    event: IpcMainInvokeEvent
+  ) => Promise<IpcResponse<C>> | IpcResponse<C>
+): void {
+  ipcMain.handle(channel, (event, args) => handler(args, event))
 }
 
 export function typedSend<E extends IpcEvent>(

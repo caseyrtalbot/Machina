@@ -24,6 +24,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
   const removeNode = useCanvasStore((s) => s.removeNode)
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
+  const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
   const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const initialCwd = typeof node.metadata?.initialCwd === 'string' ? node.metadata.initialCwd : null
@@ -119,7 +120,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
       focus: () => void
       send: (channel: string) => void
     }
-    if (isLocked) {
+    if (isFocused || isLocked) {
       webview.focus()
       try {
         webview.send('focus')
@@ -133,7 +134,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
         /* webview not ready */
       }
     }
-  }, [isLocked])
+  }, [isFocused, isLocked])
 
   // ── Close handler ───────────────────────────────────────────────────────
 
@@ -192,6 +193,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
           </div>
         </div>
       ) : (
+        /* eslint-disable react/no-unknown-property */
         <webview
           key={webviewKey}
           ref={webviewRef as React.RefObject<never>}
@@ -200,10 +202,11 @@ export function TerminalCard({ node }: TerminalCardProps) {
           style={{
             width: '100%',
             height: '100%',
-            pointerEvents: isLocked ? 'auto' : 'none'
+            pointerEvents: isFocused || isLocked ? 'auto' : 'none'
           }}
           webpreferences="contextIsolation=yes"
         />
+        /* eslint-enable react/no-unknown-property */
       )}
     </CardShell>
   )

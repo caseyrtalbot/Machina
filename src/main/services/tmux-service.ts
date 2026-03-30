@@ -82,7 +82,7 @@ export class TmuxService {
     })
 
     // Attach a node-pty client to pipe data to the renderer
-    this.attachClient(sessionId, name)
+    this.attachClient(sessionId, name, 80, 24)
   }
 
   // -----------------------------------------------------------------------
@@ -119,8 +119,15 @@ export class TmuxService {
       // resize can fail if session has no window
     }
 
-    // Attach a fresh client — tmux redraws the current pane content automatically
-    this.attachClient(sessionId, name)
+    // Only attach a new client if one isn't already connected.
+    // The panel terminal calls reconnect for every active session (including
+    // ones it just created), which would kill the existing client.
+    if (!this.clients.has(sessionId)) {
+      this.attachClient(sessionId, name, cols, rows)
+    } else {
+      // Client already attached — just resize
+      this.resize(sessionId, cols, rows)
+    }
 
     return {
       scrollback: '',
@@ -279,7 +286,7 @@ export class TmuxService {
   // Private helpers
   // -----------------------------------------------------------------------
 
-  private attachClient(sessionId: string, tmuxName: string): void {
+  private attachClient(sessionId: string, tmuxName: string, cols = 80, rows = 24): void {
     // Kill any existing client for this session
     const existing = this.clients.get(sessionId)
     if (existing) {
@@ -287,14 +294,20 @@ export class TmuxService {
       this.clients.delete(sessionId)
     }
 
-    const pty = spawn('tmux', ['-L', TMUX_SOCKET, 'attach-session', '-t', tmuxName], {
+    // Build UTF-8 safe environment (matches Collaborator pattern)
+    const env: Record<string, string> = {
+      ...(process.env as Record<string, string>),
+      PROMPT_EOL_MARK: ''
+    }
+    if (!env.LANG || !env.LANG.includes('UTF-8')) {
+      env.LANG = 'en_US.UTF-8'
+    }
+
+    const pty = spawn('tmux', ['-L', TMUX_SOCKET, '-u', 'attach-session', '-t', tmuxName], {
       name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      env: {
-        ...(process.env as Record<string, string>),
-        PROMPT_EOL_MARK: ''
-      }
+      cols,
+      rows,
+      env
     })
 
     pty.onData((data) => this.onData(sessionId, data))

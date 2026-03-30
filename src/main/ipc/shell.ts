@@ -1,6 +1,6 @@
-import type { BrowserWindow } from 'electron'
 import { ShellService } from '../services/shell-service'
-import { typedHandle, typedSend } from '../typed-ipc'
+import { typedHandle, typedHandleWithEvent } from '../typed-ipc'
+import { register, unregister, getWebContents } from '../services/session-router'
 import { sessionId } from '@shared/types'
 
 const shellService = new ShellService()
@@ -13,18 +13,23 @@ function assertValidSessionId(id: string): void {
   }
 }
 
-export function registerShellIpc(mainWindow: BrowserWindow): void {
+export function registerShellIpc(): void {
   shellService.setCallbacks(
     (sessionId, data) => {
-      typedSend(mainWindow, 'terminal:data', { sessionId, data })
+      const wc = getWebContents(sessionId)
+      if (wc) wc.send('terminal:data', { sessionId, data })
     },
     (sessionId, code) => {
-      typedSend(mainWindow, 'terminal:exit', { sessionId, code })
+      const wc = getWebContents(sessionId)
+      if (wc) wc.send('terminal:exit', { sessionId, code })
+      unregister(sessionId)
     }
   )
 
-  typedHandle('terminal:create', async (args) => {
-    return shellService.create(args.cwd, args.shell, args.label, args.vaultPath)
+  typedHandleWithEvent('terminal:create', (args, event) => {
+    const result = shellService.create(args.cwd, args.shell, args.label, args.vaultPath)
+    register(result, event.sender.id)
+    return result
   })
 
   typedHandle('terminal:write', async (args) => {
@@ -47,9 +52,13 @@ export function registerShellIpc(mainWindow: BrowserWindow): void {
     return shellService.getProcessName(args.sessionId)
   })
 
-  typedHandle('terminal:reconnect', async (args) => {
+  typedHandleWithEvent('terminal:reconnect', (args, event) => {
     assertValidSessionId(args.sessionId)
-    return shellService.reconnect(args.sessionId, args.cols, args.rows)
+    const result = shellService.reconnect(args.sessionId, args.cols, args.rows)
+    if (result) {
+      register(args.sessionId, event.sender.id)
+    }
+    return result
   })
 
   typedHandle('terminal:discover', async () => {

@@ -1,0 +1,12 @@
+{
+  "workflow_id": "forge-2026-03-29",
+  "phase": "EXECUTION",
+  "started_at": "2026-03-29T00:00:00Z",
+  "phases_completed": ["DISCOVERY", "DESIGN", "PLANNING"],
+  "current_gate": null,
+  "artifacts": {
+    "discovery_approval": "User approved direction summary 2026-03-29",
+    "spec": "docs/forge/specs/2026-03-29-terminal-webview-design.md",
+    "plan": "docs/forge/plans/2026-03-29-terminal-webview-plan.md"
+  }
+}

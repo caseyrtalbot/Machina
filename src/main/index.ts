@@ -76,7 +76,8 @@ function createWindow(): BrowserWindow {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      nodeIntegrationInWorker: true
+      nodeIntegrationInWorker: true,
+      webviewTag: true
     }
   })
 
@@ -156,7 +157,7 @@ app.whenReady().then(() => {
 
   const window = createWindow()
   registerWatcherIpc(window)
-  registerShellIpc(window)
+  registerShellIpc()
 
   registerDocumentIpc(window)
   registerProjectIpc(window)

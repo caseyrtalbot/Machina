@@ -1,5 +1,6 @@
 import { contextBridge, webUtils } from 'electron'
 import { homedir } from 'os'
+import { join } from 'path'
 import { typedInvoke, typedOn } from './typed-ipc'
 import type { SessionId, VaultConfig, VaultState } from '../shared/types'
 
@@ -109,6 +110,7 @@ const api = {
   },
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getHomePath: () => homedir(),
+  getTerminalPreloadPath: () => join(__dirname, 'terminal-webview.js'),
   on: {
     terminalData: (callback: (data: { sessionId: SessionId; data: string }) => void) =>
       typedOn('terminal:data', callback),
