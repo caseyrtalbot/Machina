@@ -50,6 +50,7 @@ export function tmuxSessionName(sessionId: string): string {
 // ---------------------------------------------------------------------------
 
 const EXEC_TIMEOUT = 5_000
+const QUIET_STDIO: ['ignore', 'pipe', 'pipe'] = ['ignore', 'pipe', 'pipe']
 
 function getApp(): typeof import('electron').app | null {
   try {
@@ -111,7 +112,8 @@ export function tmuxExec(...args: string[]): string {
   return execFileSync(getTmuxBin(), [...baseArgs(), ...args], {
     encoding: 'utf-8',
     timeout: EXEC_TIMEOUT,
-    env: tmuxRuntimeEnv()
+    env: tmuxRuntimeEnv(),
+    stdio: QUIET_STDIO
   }).trim()
 }
 
@@ -124,7 +126,8 @@ export function verifyTmuxAvailable(): boolean {
     const output = execFileSync(getTmuxBin(), ['-V'], {
       encoding: 'utf-8',
       timeout: EXEC_TIMEOUT,
-      env: tmuxRuntimeEnv()
+      env: tmuxRuntimeEnv(),
+      stdio: QUIET_STDIO
     }).trim()
 
     // Parse version from "tmux 3.4" or "tmux 2.6a"

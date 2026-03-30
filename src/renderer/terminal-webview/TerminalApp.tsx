@@ -334,9 +334,11 @@ export function TerminalApp() {
 
         if (result) {
           sessionIdRef.current = urlSessionId
-          if (result.scrollback) {
-            termRef.current?.write(result.scrollback)
-          }
+          // Canvas terminals render live TUI sessions like Claude in a small
+          // embedded viewport. Replaying capture-pane scrollback here exposes
+          // stale alternate-screen frames when the user scrolls, which reads
+          // as duplicated/glitchy UI. Let the live tmux redraw repopulate the
+          // viewport instead of restoring buffered scrollback.
           return
         }
       }

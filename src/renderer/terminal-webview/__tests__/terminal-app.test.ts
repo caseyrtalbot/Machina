@@ -161,8 +161,9 @@ describe('TerminalApp component', () => {
       expect(src).toContain("sendToHost('session-created'")
     })
 
-    it('writes scrollback on successful reconnect', () => {
-      expect(src).toContain('scrollback')
+    it('does not replay scrollback on reconnect in the canvas webview', () => {
+      expect(src).toContain('stale alternate-screen frames')
+      expect(src).not.toContain('termRef.current?.write(result.scrollback)')
     })
 
     it('sends initial command after 500ms delay', () => {
