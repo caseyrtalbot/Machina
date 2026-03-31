@@ -1459,7 +1459,7 @@ body {
 }
 
 .canvas-minimap {
-  position: relative;
+  position: absolute;
   overflow: hidden;
   border: 1px solid var(--chrome-panel-border);
   border-radius: 10px;

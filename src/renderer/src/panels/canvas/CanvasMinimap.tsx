@@ -163,7 +163,7 @@ export function CanvasMinimap({
       data-testid="canvas-minimap"
       className="canvas-minimap absolute pointer-events-auto"
       style={{
-        bottom: 12,
+        bottom: 40,
         right: 12,
         width: MINIMAP_WIDTH,
         height: MINIMAP_HEIGHT,
