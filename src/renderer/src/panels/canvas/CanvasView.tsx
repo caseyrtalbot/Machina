@@ -33,6 +33,11 @@ import { findOpenPosition } from './canvas-layout'
 import { CanvasSplitEditor } from './CanvasSplitEditor'
 import { CanvasWelcomeCard, EmptyCanvasHint } from './CanvasEmptyStates'
 import { useTabStore } from '../../store/tab-store'
+import { mapFolderToCanvas, cancelFolderMap } from './folder-map-orchestrator'
+import type { FolderMapProgress } from './folder-map-orchestrator'
+import { FolderMapPreview } from './FolderMapPreview'
+import { applyFolderMapPlan } from './folder-map-apply'
+import { buildFolderMapPlan, type CanvasMutationPlan } from '@shared/canvas-mutation-types'
 
 /** Draggable divider + editor panel. Separate component to isolate drag
  *  state from CanvasView and prevent canvas DOM remounts. */
@@ -73,7 +78,15 @@ function SplitDividerAndPanel({ filePath }: { readonly filePath: string }) {
   )
 }
 
-export function CanvasView(): React.ReactElement {
+interface CanvasViewProps {
+  readonly pendingFolderMap?: string | null
+  readonly onFolderMapConsumed?: () => void
+}
+
+export function CanvasView({
+  pendingFolderMap,
+  onFolderMapConsumed
+}: CanvasViewProps = {}): React.ReactElement {
   const nodes = useCanvasStore((s) => s.nodes)
   const viewport = useCanvasStore((s) => s.viewport)
   const clearSelection = useCanvasStore((s) => s.clearSelection)
@@ -89,6 +102,8 @@ export function CanvasView(): React.ReactElement {
   const splitFilePath = useCanvasStore((s) => s.splitFilePath)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
   const commandStack = useRef(new CommandStack())
+  const [folderMapProgress, setFolderMapProgress] = useState<FolderMapProgress | null>(null)
+  const [previewPlan, setPreviewPlan] = useState<CanvasMutationPlan | null>(null)
   const rawFileCount = useVaultStore((s) => {
     const total = s.artifacts.length
     if (total === 0) return 0
@@ -522,6 +537,59 @@ export function CanvasView(): React.ReactElement {
     return () => clearTimeout(timer)
   }, [activeTabId, filePath, isDirty, toCanvasFile, markSaved])
 
+  // Folder-map: trigger analysis when a folder path is passed in
+  useEffect(() => {
+    if (!pendingFolderMap) return
+    onFolderMapConsumed?.()
+
+    void (async () => {
+      try {
+        const existingNodes = useCanvasStore.getState().nodes
+        const result = await mapFolderToCanvas(
+          pendingFolderMap,
+          existingNodes,
+          setFolderMapProgress
+        )
+        if (result) {
+          const plan = buildFolderMapPlan(
+            `fmo_${Date.now().toString(36)}`,
+            [...result.nodes],
+            [...result.edges],
+            result.snapshot.skippedCount,
+            result.snapshot.unresolvedRefs.length
+          )
+          setPreviewPlan(plan)
+        }
+      } catch (err) {
+        console.error('Folder map failed:', err)
+      } finally {
+        setFolderMapProgress(null)
+      }
+    })()
+
+    return () => cancelFolderMap()
+  }, [pendingFolderMap, onFolderMapConsumed])
+
+  // Folder-map: apply plan to canvas with undo support
+  const handleApplyPlan = useCallback(() => {
+    if (!previewPlan) return
+    applyFolderMapPlan(previewPlan, commandStack.current)
+    const addNodeOps = previewPlan.ops.filter((op) => op.type === 'add-node')
+    if (addNodeOps.length > 50) {
+      const allNodes = useCanvasStore.getState().nodes
+      const canvasEl = document.querySelector('[data-canvas-surface]')
+      if (canvasEl) {
+        const vp = computeImportViewport(allNodes, canvasEl.clientWidth, canvasEl.clientHeight)
+        useCanvasStore.getState().setViewport(vp)
+      }
+    }
+    setPreviewPlan(null)
+  }, [previewPlan])
+
+  const handleCancelPlan = useCallback(() => {
+    setPreviewPlan(null)
+  }, [])
+
   return (
     <div className="flex h-full w-full overflow-hidden">
       <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
@@ -559,7 +627,38 @@ export function CanvasView(): React.ReactElement {
               </Suspense>
             )
           })}
+          {previewPlan && (
+            <FolderMapPreview
+              plan={previewPlan}
+              onApply={handleApplyPlan}
+              onCancel={handleCancelPlan}
+            />
+          )}
         </CanvasSurface>
+
+        {folderMapProgress &&
+          folderMapProgress.phase !== 'idle' &&
+          folderMapProgress.phase !== 'done' && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border-subtle)',
+                fontSize: '13px',
+                color: 'var(--color-text-secondary)',
+                zIndex: 10
+              }}
+            >
+              {folderMapProgress.phase === 'error'
+                ? `\u26A0 ${folderMapProgress.errorMessage ?? 'Mapping failed'}`
+                : `Mapping\u2026 ${folderMapProgress.filesProcessed}/${folderMapProgress.totalFiles} files`}
+            </div>
+          )}
 
         <ConnectionDragOverlay />
 
