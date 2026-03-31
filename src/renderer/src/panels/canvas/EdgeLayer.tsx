@@ -32,7 +32,26 @@ function getControlOffset(side: CanvasSide, distance: number): { dx: number; dy:
   }
 }
 
-function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNode[] }) {
+export function getEdgeStrokeDasharray(kind: string | undefined): string | undefined {
+  if (kind === 'imports') return '6 4'
+  if (kind === 'references') return '2 4'
+  return undefined
+}
+
+export function getEdgeStrokeWidth(kind: string | undefined): number {
+  if (kind === 'contains') return 1
+  return 1.5
+}
+
+function EdgePath({
+  edge,
+  nodes,
+  zoom
+}: {
+  edge: CanvasEdge
+  nodes: readonly CanvasNode[]
+  zoom: number
+}) {
   const isSelected = useCanvasStore((s) => s.selectedEdgeId === edge.id)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
   const hoveredNodeId = useCanvasStore((s) => s.hoveredNodeId)
@@ -44,10 +63,13 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
   if (edge.hidden) {
     const endpointHovered = hoveredNodeId === edge.fromNode || hoveredNodeId === edge.toNode
     const endpointSelected = selectedNodeIds.has(edge.fromNode) || selectedNodeIds.has(edge.toNode)
-    if (!endpointHovered && !endpointSelected) return null
+    const zoomRevealed = zoom > 0.8 && (edge.kind === 'imports' || edge.kind === 'references')
+    if (!endpointHovered && !endpointSelected && !zoomRevealed) return null
   }
 
   const kindColor = edge.kind ? EDGE_KIND_COLORS[edge.kind] : undefined
+  const strokeDasharray = getEdgeStrokeDasharray(edge.kind)
+  const strokeWidthBase = getEdgeStrokeWidth(edge.kind)
   const endpointActive =
     from_node.metadata?.isActive === true || to_node.metadata?.isActive === true
 
@@ -79,10 +101,10 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
         d={d}
         fill="none"
         stroke={isSelected ? colors.accent.default : (kindColor ?? colors.text.secondary)}
-        strokeWidth={isSelected ? 2.5 : 1.5}
+        strokeWidth={isSelected ? 2.5 : strokeWidthBase}
         markerEnd="url(#arrowhead)"
         opacity={endpointActive ? 1 : isSelected ? 1 : 0.6}
-        strokeDasharray={endpointActive ? '8 4' : undefined}
+        strokeDasharray={endpointActive ? '8 4' : strokeDasharray}
         style={endpointActive ? { animation: 'te-edge-flow 0.8s linear infinite' } : undefined}
       />
     </g>
@@ -92,6 +114,7 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: readonly CanvasNod
 export function EdgeLayer() {
   const nodes = useCanvasStore((s) => s.nodes)
   const edges = useCanvasStore((s) => s.edges)
+  const zoom = useCanvasStore((s) => s.viewport.zoom)
 
   return (
     <svg
@@ -115,7 +138,7 @@ export function EdgeLayer() {
       </defs>
       <g style={{ pointerEvents: 'all' }}>
         {edges.map((edge) => (
-          <EdgePath key={edge.id} edge={edge} nodes={nodes} />
+          <EdgePath key={edge.id} edge={edge} nodes={nodes} zoom={zoom} />
         ))}
       </g>
     </svg>

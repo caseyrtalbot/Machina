@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   colors,
   ARTIFACT_COLORS,
+  EDGE_KIND_COLORS,
   getArtifactColor,
   typeScale,
   borderRadius,
@@ -110,5 +111,23 @@ describe('getArtifactColor', () => {
     const builtInColors = new Set(Object.values(ARTIFACT_COLORS))
     const customColor = getArtifactColor('myCustomType')
     expect(builtInColors.has(customColor)).toBe(false)
+  })
+})
+
+describe('EDGE_KIND_COLORS', () => {
+  it('has colors for contains, imports, and references edge kinds', () => {
+    expect(EDGE_KIND_COLORS.contains).toBe('#4e5661')
+    expect(EDGE_KIND_COLORS.imports).toBe('#5b8dd9')
+    expect(EDGE_KIND_COLORS.references).toBe('#9887e8')
+  })
+
+  it('retains existing edge kind colors unchanged', () => {
+    expect(EDGE_KIND_COLORS.connection).toBe('#667383')
+    expect(EDGE_KIND_COLORS.cluster).toBe('#3dca8d')
+    expect(EDGE_KIND_COLORS.tension).toBe('#ecaa0b')
+    expect(EDGE_KIND_COLORS.related).toBe('#9887e8')
+    expect(EDGE_KIND_COLORS['co-occurrence']).toBe('#4e5661')
+    expect(EDGE_KIND_COLORS.appears_in).toBe('#667383')
+    expect(EDGE_KIND_COLORS.causal).toBe('#da76bb')
   })
 })
