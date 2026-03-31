@@ -11,7 +11,7 @@ import type {
 } from './project-map-types'
 import type { CanvasNodeType } from '../canvas-types'
 import { stableNodeId, isBinaryPath } from './project-map-types'
-import * as path from 'path'
+import * as path from './posix-path'
 
 // ─── Import Extraction ──────────────────────────────────────────────
 
@@ -145,9 +145,9 @@ const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'])
 const MD_EXTENSIONS = new Set(['.md', '.mdx'])
 const CONFIG_EXTENSIONS = new Set(['.json', '.yaml', '.yml', '.toml'])
 
-function inferNodeType(filePath: string): CanvasNodeType {
-  const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
-  if (MD_EXTENSIONS.has(ext)) return 'note'
+function inferNodeType(_filePath: string): CanvasNodeType {
+  // All files in a folder map render as compact project-file cards,
+  // not full NoteCards. The card shows file name + metadata, not content.
   return 'project-file'
 }
 

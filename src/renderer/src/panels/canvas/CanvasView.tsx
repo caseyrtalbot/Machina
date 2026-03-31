@@ -78,16 +78,9 @@ function SplitDividerAndPanel({ filePath }: { readonly filePath: string }) {
   )
 }
 
-interface CanvasViewProps {
-  readonly pendingFolderMap?: string | null
-  readonly onFolderMapConsumed?: () => void
-}
-
-export function CanvasView({
-  pendingFolderMap,
-  onFolderMapConsumed
-}: CanvasViewProps = {}): React.ReactElement {
+export function CanvasView(): React.ReactElement {
   const nodes = useCanvasStore((s) => s.nodes)
+  const pendingFolderMap = useCanvasStore((s) => s.pendingFolderMap)
   const viewport = useCanvasStore((s) => s.viewport)
   const clearSelection = useCanvasStore((s) => s.clearSelection)
   const addNode = useCanvasStore((s) => s.addNode)
@@ -537,19 +530,24 @@ export function CanvasView({
     return () => clearTimeout(timer)
   }, [activeTabId, filePath, isDirty, toCanvasFile, markSaved])
 
-  // Folder-map: trigger analysis when a folder path is passed in
+  // Folder-map: trigger analysis when a folder path is set.
+  // We capture the path, clear pendingFolderMap immediately, and run the orchestrator.
+  // Cancel only runs on unmount via a separate effect, NOT on dependency changes,
+  // because clearing pendingFolderMap to null re-fires this effect and the cleanup
+  // would cancel the in-flight operation.
+  useEffect(() => {
+    return () => cancelFolderMap()
+  }, [])
+
   useEffect(() => {
     if (!pendingFolderMap) return
-    onFolderMapConsumed?.()
+    const path = pendingFolderMap
+    useCanvasStore.getState().setPendingFolderMap(null)
 
     void (async () => {
       try {
         const existingNodes = useCanvasStore.getState().nodes
-        const result = await mapFolderToCanvas(
-          pendingFolderMap,
-          existingNodes,
-          setFolderMapProgress
-        )
+        const result = await mapFolderToCanvas(path, existingNodes, setFolderMapProgress)
         if (result) {
           const plan = buildFolderMapPlan(
             `fmo_${Date.now().toString(36)}`,
@@ -566,9 +564,7 @@ export function CanvasView({
         setFolderMapProgress(null)
       }
     })()
-
-    return () => cancelFolderMap()
-  }, [pendingFolderMap, onFolderMapConsumed])
+  }, [pendingFolderMap])
 
   // Folder-map: apply plan to canvas with undo support
   const handleApplyPlan = useCallback(() => {
