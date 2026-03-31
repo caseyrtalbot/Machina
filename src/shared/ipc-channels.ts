@@ -148,6 +148,22 @@ export interface IpcChannels {
     request: AgentSpawnRequest
     response: { sessionId: string } | { error: string }
   }
+
+  // --- Canvas ---
+  'canvas:get-snapshot': {
+    request: { canvasPath: string }
+    response: { file: import('./canvas-types').CanvasFile; mtime: string }
+  }
+  'canvas:apply-plan': {
+    request: {
+      canvasPath: string
+      expectedMtime: string
+      plan: import('./canvas-mutation-types').CanvasMutationPlan
+    }
+    response:
+      | { applied: boolean; mtime: string }
+      | { error: 'stale' | 'validation-failed'; message: string }
+  }
 }
 
 export interface IpcEvents {

@@ -12,6 +12,7 @@ import { registerProjectIpc, getProjectWatcher, getSessionTailer } from './ipc/w
 import { registerDocumentIpc, getDocumentManager } from './ipc/documents'
 import { registerMcpIpc } from './ipc/mcp'
 import { registerAgentIpc, setAgentServices, stopAgentServices } from './ipc/agents'
+import { registerCanvasIpc } from './ipc/canvas'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { TmuxMonitor } from './services/tmux-monitor'
 import { AgentSpawner } from './services/agent-spawner'
@@ -175,6 +176,7 @@ app.whenReady().then(() => {
   registerProjectIpc()
   registerMcpIpc(mcpLifecycle)
   registerAgentIpc() // Register once at startup, services update via setAgentServices
+  registerCanvasIpc()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

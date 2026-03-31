@@ -100,6 +100,12 @@ const api = {
     getStates: () => typedInvoke('agent:get-states'),
     spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request)
   },
+  canvas: {
+    getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    applyPlan: (canvasPath: string, expectedMtime: string, plan: any) =>
+      typedInvoke('canvas:apply-plan', { canvasPath, expectedMtime, plan })
+  },
   document: {
     open: (path: string) => typedInvoke('doc:open', { path }),
     close: (path: string) => typedInvoke('doc:close', { path }),
