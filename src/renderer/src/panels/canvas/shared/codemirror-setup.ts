@@ -28,6 +28,7 @@ export async function createEditorExtensions(
 
   const extensions: Extension[] = [
     lineNumbers(),
+    EditorView.lineWrapping,
     oneDark,
     EditorView.theme({
       '&': { height: '100%', fontSize },
