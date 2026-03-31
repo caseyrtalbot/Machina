@@ -6,7 +6,7 @@
  * Exports processWorkerMessage + resetWorkerState for testability.
  */
 
-import type { CanvasNode } from '@shared/canvas-types'
+import type { CanvasNode, CanvasEdge } from '@shared/canvas-types'
 import type { ProjectMapOptions } from '@shared/engine/project-map-types'
 import type { FileInput } from '@shared/engine/project-map-analyzers'
 import { buildProjectMapSnapshot } from '@shared/engine/project-map-analyzers'
@@ -46,7 +46,7 @@ export type ProjectMapWorkerOut =
       operationId: string
       snapshot: ReturnType<typeof buildProjectMapSnapshot>
       nodes: CanvasNode[]
-      edges: CanvasNode[]
+      edges: CanvasEdge[]
     }
   | { type: 'error'; operationId: string; message: string }
 
