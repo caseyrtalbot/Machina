@@ -76,6 +76,10 @@ export function resolveImportPath(
     return allFilePaths.has(resolved) ? resolved : null
   }
 
+  if (allFilePaths.has(resolved)) {
+    return resolved
+  }
+
   for (const ext of EXTENSION_PRIORITY) {
     const candidate = resolved + ext
     if (allFilePaths.has(candidate)) return candidate
@@ -213,22 +217,47 @@ export function buildProjectMapSnapshot(
     return node
   }
 
+  function linkParentChain(filePath: string, childId: string | null, depth: number): void {
+    let parentPath = path.dirname(filePath)
+    let nextChildId = childId
+    let nextChildPath = filePath
+    let parentDepth = depth - 1
+
+    while (parentPath.length >= rootPath.length) {
+      const parentNode = ensureDirNode(parentPath, parentDepth)
+      if (nextChildId && !parentNode.children.includes(nextChildId)) {
+        parentNode.children.push(nextChildId)
+      }
+
+      if (parentPath === rootPath) break
+
+      nextChildPath = parentPath
+      nextChildId = dirNodes.get(nextChildPath)?.id ?? null
+      parentPath = path.dirname(parentPath)
+      parentDepth--
+    }
+  }
+
   // Build directory tree + file nodes
   const fileNodes = new Map<string, ProjectMapNode>()
+  ensureDirNode(rootPath, 0)
 
   for (const file of files) {
+    const relativePath = path.relative(rootPath, file.path)
+    const depth = relativePath === '.' ? 1 : relativePath.split(path.sep).length
+
     if (file.content === null || file.error) {
       skippedCount++
+      linkParentChain(file.path, null, depth)
       continue
     }
 
     if (isBinaryPath(file.path)) {
       skippedCount++
+      linkParentChain(file.path, null, depth)
       continue
     }
 
-    const relativePath = path.relative(rootPath, file.path)
-    const depth = relativePath.split(path.sep).length
     const lineCount = file.content.split('\n').length
 
     const node: ProjectMapNode = {
@@ -244,33 +273,13 @@ export function buildProjectMapSnapshot(
     }
     fileNodes.set(file.path, node)
 
-    // Ensure parent directories exist and link children
-    let parentPath = path.dirname(file.path)
-    let childPath = file.path
-    let parentDepth = depth - 1
-
-    while (parentPath.length >= rootPath.length) {
-      const parentNode = ensureDirNode(parentPath, parentDepth)
-      const childId =
-        childPath === file.path
-          ? node.id
-          : (dirNodes.get(childPath)?.id ?? fileNodes.get(childPath)?.id ?? '')
-
-      if (childId && !parentNode.children.includes(childId)) {
-        parentNode.children.push(childId)
-      }
-
-      if (parentPath === rootPath) break
-      childPath = parentPath
-      parentPath = path.dirname(parentPath)
-      parentDepth--
-    }
+    linkParentChain(file.path, node.id, depth)
   }
 
   // Collect all nodes, respecting maxNodes
   const allDirNodes = [...dirNodes.values()]
   const allFileNodes = [...fileNodes.values()]
-  const totalFileCount = allFileNodes.length
+  const totalFileCount = files.length
 
   // Sort by depth for breadth-first truncation
   const sortedNodes = [...allDirNodes, ...allFileNodes].sort((a, b) => a.depth - b.depth)

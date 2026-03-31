@@ -35,9 +35,13 @@ import { CanvasWelcomeCard, EmptyCanvasHint } from './CanvasEmptyStates'
 import { useTabStore } from '../../store/tab-store'
 import { mapFolderToCanvas, cancelFolderMap } from './folder-map-orchestrator'
 import type { FolderMapProgress } from './folder-map-orchestrator'
-import { FolderMapPreview } from './FolderMapPreview'
+import { FolderMapPreviewGhosts, FolderMapPreviewBar } from './FolderMapPreview'
 import { applyFolderMapPlan } from './folder-map-apply'
-import { buildFolderMapPlan, type CanvasMutationPlan } from '@shared/canvas-mutation-types'
+import {
+  buildFolderMapPlan,
+  filterCanvasAdditions,
+  type CanvasMutationPlan
+} from '@shared/canvas-mutation-types'
 
 /** Draggable divider + editor panel. Separate component to isolate drag
  *  state from CanvasView and prevent canvas DOM remounts. */
@@ -546,13 +550,25 @@ export function CanvasView(): React.ReactElement {
 
     void (async () => {
       try {
-        const existingNodes = useCanvasStore.getState().nodes
-        const result = await mapFolderToCanvas(path, existingNodes, setFolderMapProgress)
+        const startState = useCanvasStore.getState()
+        const result = await mapFolderToCanvas(path, startState.nodes, setFolderMapProgress)
         if (result) {
-          const plan = buildFolderMapPlan(
-            `fmo_${Date.now().toString(36)}`,
+          const currentState = useCanvasStore.getState()
+          const additions = filterCanvasAdditions(
             [...result.nodes],
             [...result.edges],
+            currentState.nodes,
+            currentState.edges
+          )
+          if (additions.nodes.length === 0 && additions.edges.length === 0) {
+            setPreviewPlan(null)
+            return
+          }
+
+          const plan = buildFolderMapPlan(
+            `fmo_${Date.now().toString(36)}`,
+            additions.nodes,
+            additions.edges,
             result.snapshot.skippedCount,
             result.snapshot.unresolvedRefs.length
           )
@@ -623,14 +639,16 @@ export function CanvasView(): React.ReactElement {
               </Suspense>
             )
           })}
-          {previewPlan && (
-            <FolderMapPreview
-              plan={previewPlan}
-              onApply={handleApplyPlan}
-              onCancel={handleCancelPlan}
-            />
-          )}
+          {previewPlan && <FolderMapPreviewGhosts plan={previewPlan} />}
         </CanvasSurface>
+
+        {previewPlan && (
+          <FolderMapPreviewBar
+            plan={previewPlan}
+            onApply={handleApplyPlan}
+            onCancel={handleCancelPlan}
+          />
+        )}
 
         {folderMapProgress &&
           folderMapProgress.phase !== 'idle' &&
