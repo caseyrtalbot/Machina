@@ -51,13 +51,10 @@ export function tmuxSessionName(sessionId: string): string {
 
 const EXEC_TIMEOUT = 5_000
 const QUIET_STDIO: ['ignore', 'pipe', 'pipe'] = ['ignore', 'pipe', 'pipe']
+const electronProcess = process as NodeJS.Process & { resourcesPath?: string }
 
-function getApp(): typeof import('electron').app | null {
-  try {
-    return require('electron').app
-  } catch {
-    return null
-  }
+function isPackagedApp(): boolean {
+  return !is.dev && typeof electronProcess.resourcesPath === 'string'
 }
 
 function baseArgs(): string[] {
@@ -65,9 +62,8 @@ function baseArgs(): string[] {
 }
 
 export function getTmuxBin(): string {
-  const app = getApp()
-  if (app?.isPackaged) {
-    const bundled = join(process.resourcesPath, 'tmux')
+  if (isPackagedApp()) {
+    const bundled = join(electronProcess.resourcesPath!, 'tmux')
     if (existsSync(bundled)) {
       return bundled
     }
@@ -76,22 +72,19 @@ export function getTmuxBin(): string {
 }
 
 export function getTmuxConf(): string {
-  const app = getApp()
-  if (app?.isPackaged) {
-    const bundled = join(process.resourcesPath, 'tmux.conf')
+  if (isPackagedApp()) {
+    const bundled = join(electronProcess.resourcesPath!, 'tmux.conf')
     if (existsSync(bundled)) {
       return bundled
     }
   }
 
-  const root = app?.getAppPath?.() ?? process.cwd()
-  return join(root, 'resources', 'tmux.conf')
+  return join(process.cwd(), 'resources', 'tmux.conf')
 }
 
 export function getTerminfoDir(): string | undefined {
-  const app = getApp()
-  if (app?.isPackaged) {
-    const bundled = join(process.resourcesPath, 'terminfo')
+  if (isPackagedApp()) {
+    const bundled = join(electronProcess.resourcesPath!, 'terminfo')
     return existsSync(bundled) ? bundled : undefined
   }
 

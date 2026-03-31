@@ -35,6 +35,61 @@ export interface CanvasMutationPlan {
   }
 }
 
+function edgeSignature(
+  edge: Pick<
+    CanvasEdge,
+    'fromNode' | 'toNode' | 'fromSide' | 'toSide' | 'kind' | 'label' | 'hidden'
+  >
+): string {
+  return [
+    edge.fromNode,
+    edge.toNode,
+    edge.fromSide,
+    edge.toSide,
+    edge.kind ?? '',
+    edge.label ?? '',
+    edge.hidden ? '1' : '0'
+  ].join('\u0000')
+}
+
+export function filterCanvasAdditions(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  existingNodes: readonly Pick<CanvasNode, 'id'>[],
+  existingEdges: readonly Pick<
+    CanvasEdge,
+    'fromNode' | 'toNode' | 'fromSide' | 'toSide' | 'kind' | 'label' | 'hidden'
+  >[]
+): {
+  readonly nodes: readonly CanvasNode[]
+  readonly edges: readonly CanvasEdge[]
+} {
+  const retainedNodes: CanvasNode[] = []
+  const availableNodeIds = new Set(existingNodes.map((node) => node.id))
+
+  for (const node of nodes) {
+    if (availableNodeIds.has(node.id)) continue
+    availableNodeIds.add(node.id)
+    retainedNodes.push(node)
+  }
+
+  const existingEdgeSignatures = new Set(existingEdges.map((edge) => edgeSignature(edge)))
+  const retainedEdges: CanvasEdge[] = []
+  const addedEdgeSignatures = new Set<string>()
+
+  for (const edge of edges) {
+    if (!availableNodeIds.has(edge.fromNode) || !availableNodeIds.has(edge.toNode)) continue
+
+    const signature = edgeSignature(edge)
+    if (existingEdgeSignatures.has(signature) || addedEdgeSignatures.has(signature)) continue
+
+    addedEdgeSignatures.add(signature)
+    retainedEdges.push(edge)
+  }
+
+  return { nodes: retainedNodes, edges: retainedEdges }
+}
+
 export function buildFolderMapPlan(
   operationId: string,
   nodes: readonly CanvasNode[],

@@ -12,6 +12,8 @@ function validateOp(
     case 'add-node':
       if (!op.node.type || !op.node.position || !op.node.size)
         return 'add-node: missing required fields'
+      if (existingNodeIds.has(op.node.id)) return `add-node: nodeId ${op.node.id} already exists`
+      if (addedNodeIds.has(op.node.id)) return `add-node: nodeId ${op.node.id} duplicated in plan`
       addedNodeIds.add(op.node.id)
       return null
     case 'add-edge':

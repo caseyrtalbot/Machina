@@ -7,6 +7,12 @@ interface ProjectFolderCardProps {
   readonly node: CanvasNode
 }
 
+function lastPathSegment(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const parts = value.split(/[\\/]/).filter(Boolean)
+  return parts.at(-1) ?? null
+}
+
 export default function ProjectFolderCard({ node }: ProjectFolderCardProps) {
   const removeNode = useCanvasStore((s) => s.removeNode)
 
@@ -18,8 +24,8 @@ export default function ProjectFolderCard({ node }: ProjectFolderCardProps) {
 
   const folderName =
     relativePath === '.'
-      ? ((node.metadata.rootPath as string)?.split('/').pop() ?? 'Root')
-      : (relativePath ?? '').split('/').pop() || 'Folder'
+      ? (lastPathSegment(node.metadata.rootPath) ?? 'Root')
+      : (lastPathSegment(relativePath) ?? 'Folder')
 
   return (
     <CardShell node={node} title={folderName} onClose={() => removeNode(node.id)}>

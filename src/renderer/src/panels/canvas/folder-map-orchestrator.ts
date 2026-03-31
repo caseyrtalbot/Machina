@@ -75,13 +75,11 @@ export async function mapFolderToCanvas(
     const allFiles = await window.api.fs.listAllFiles(rootPath)
     if (isCancelled()) return null
 
-    const textFiles = allFiles.filter((f) => !isBinaryPath(f.path))
-    const totalFiles = textFiles.length
-
-    if (totalFiles === 0) {
-      onProgress({ phase: 'done', filesProcessed: 0, totalFiles: 0 })
-      return null
-    }
+    const skippedFiles = allFiles
+      .filter((f) => isBinaryPath(f.path))
+      .map((f) => ({ path: f.path, content: null, error: 'binary-skipped' }))
+    const readableFiles = allFiles.filter((f) => !isBinaryPath(f.path))
+    const totalFiles = allFiles.length
 
     // 2. Create worker
     const worker = new Worker(new URL('../../workers/project-map-worker.ts', import.meta.url), {
@@ -147,10 +145,18 @@ export async function mapFolderToCanvas(
       }
       worker.postMessage(startMsg)
 
+      if (skippedFiles.length > 0) {
+        worker.postMessage({
+          type: 'append-files',
+          operationId,
+          files: skippedFiles
+        } satisfies ProjectMapWorkerIn)
+      }
+
       // Read files in chunks
       void (async () => {
         try {
-          for (let i = 0; i < textFiles.length; i += CHUNK_SIZE) {
+          for (let i = 0; i < readableFiles.length; i += CHUNK_SIZE) {
             if (isCancelled()) {
               worker.postMessage({ type: 'cancel', operationId })
               worker.terminate()
@@ -158,8 +164,8 @@ export async function mapFolderToCanvas(
               return
             }
 
-            const chunk = textFiles.slice(i, i + CHUNK_SIZE)
-            onProgress({ phase: 'reading', filesProcessed: i, totalFiles })
+            const chunk = readableFiles.slice(i, i + CHUNK_SIZE)
+            onProgress({ phase: 'reading', filesProcessed: skippedFiles.length + i, totalFiles })
 
             const results = await window.api.fs.readFilesBatch(chunk.map((f) => f.path))
             if (isCancelled()) {

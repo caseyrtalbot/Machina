@@ -3,15 +3,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasNode } from '@shared/canvas-types'
 
 // Stub design tokens so the component can reference colors without CSS vars
-vi.mock('../../../design/tokens', () => ({
-  colors: {
-    bg: { base: '#000', surface: '#111', elevated: '#222', muted: '#333' },
-    border: { default: '#444', subtle: '#555' },
-    text: { primary: '#fff', secondary: '#ccc', muted: '#999', tertiary: '#777' },
-    accent: { default: '#0af', hover: '#0cf', muted: '#068' },
-    semantic: { cluster: '#3dca8d', tension: '#ecaa0b' }
+vi.mock('../../../design/tokens', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../design/tokens')>()
+  return {
+    ...actual,
+    colors: {
+      ...actual.colors,
+      bg: { base: '#000', surface: '#111', elevated: '#222', muted: '#333' },
+      border: { default: '#444', subtle: '#555' },
+      text: { primary: '#fff', secondary: '#ccc', muted: '#999', tertiary: '#777' },
+      accent: { default: '#0af', hover: '#0cf', muted: '#068' },
+      semantic: { cluster: '#3dca8d', tension: '#ecaa0b' }
+    }
   }
-}))
+})
 
 function makeFolderNode(metaOverrides?: Partial<Record<string, unknown>>): CanvasNode {
   return {

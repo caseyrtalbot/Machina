@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasNode, CanvasEdge } from '../canvas-types'
-import { buildFolderMapPlan } from '../canvas-mutation-types'
+import { buildFolderMapPlan, filterCanvasAdditions } from '../canvas-mutation-types'
 import type { CanvasMutationOp, CanvasMutationPlan } from '../canvas-mutation-types'
 
 const makeNode = (id: string, type: CanvasNode['type'] = 'project-file'): CanvasNode => ({
@@ -115,5 +115,36 @@ describe('buildFolderMapPlan', () => {
     expect(plan).toHaveProperty('source')
     expect(plan).toHaveProperty('ops')
     expect(plan).toHaveProperty('summary')
+  })
+})
+
+describe('filterCanvasAdditions', () => {
+  it('skips nodes whose ids already exist on the canvas', () => {
+    const existingNode = makeNode('existing')
+    const newNode = makeNode('new')
+
+    const filtered = filterCanvasAdditions([existingNode, newNode], [], [existingNode], [])
+
+    expect(filtered.nodes).toEqual([newNode])
+  })
+
+  it('deduplicates edges against existing canvas edges and new duplicates', () => {
+    const existingA = makeNode('a')
+    const existingB = makeNode('b')
+    const existingEdge = makeEdge('edge-existing', 'a', 'b')
+    const duplicateEdge = makeEdge('edge-duplicate', 'a', 'b')
+    const uniqueEdge = {
+      ...makeEdge('edge-unique', 'b', 'a'),
+      kind: 'cluster' as const
+    }
+
+    const filtered = filterCanvasAdditions(
+      [],
+      [duplicateEdge, duplicateEdge, uniqueEdge],
+      [existingA, existingB],
+      [existingEdge]
+    )
+
+    expect(filtered.edges).toEqual([uniqueEdge])
   })
 })
