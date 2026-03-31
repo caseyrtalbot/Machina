@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { extractImportSpecifiers, resolveImportPath } from '@shared/engine/project-map-analyzers'
+import {
+  extractImportSpecifiers,
+  resolveImportPath,
+  extractMarkdownRefs,
+  extractConfigPathRefs
+} from '@shared/engine/project-map-analyzers'
 
 describe('extractImportSpecifiers', () => {
   it('extracts named import', () => {
@@ -133,5 +138,55 @@ describe('resolveImportPath', () => {
         ROOT
       )
     ).toBe('/project/src/readme.md')
+  })
+})
+
+describe('extractMarkdownRefs', () => {
+  it('extracts wikilinks', () => {
+    expect(extractMarkdownRefs(`See [[some-note]] and [[another|display text]].`)).toEqual([
+      'some-note',
+      'another'
+    ])
+  })
+
+  it('extracts relative markdown links', () => {
+    expect(extractMarkdownRefs(`Check [this](./sibling.md) and [that](../other/file.md).`)).toEqual(
+      ['./sibling.md', '../other/file.md']
+    )
+  })
+
+  it('skips absolute URLs', () => {
+    expect(extractMarkdownRefs(`[site](https://example.com)`)).toEqual([])
+  })
+
+  it('extracts both wikilinks and relative links', () => {
+    expect(extractMarkdownRefs(`[[note1]] and [link](./file.md)`)).toEqual(['note1', './file.md'])
+  })
+
+  it('handles empty content', () => {
+    expect(extractMarkdownRefs('')).toEqual([])
+  })
+})
+
+describe('extractConfigPathRefs', () => {
+  it('extracts relative path values from JSON', () => {
+    expect(
+      extractConfigPathRefs(`{"main": "./src/index.ts", "types": "./dist/index.d.ts"}`)
+    ).toEqual(['./src/index.ts', './dist/index.d.ts'])
+  })
+
+  it('skips non-relative string values', () => {
+    expect(extractConfigPathRefs(`{"name": "my-package", "version": "1.0.0"}`)).toEqual([])
+  })
+
+  it('extracts paths from YAML-like content', () => {
+    expect(extractConfigPathRefs(`main: ./src/index.ts\noutput: ../dist/bundle.js`)).toEqual([
+      './src/index.ts',
+      '../dist/bundle.js'
+    ])
+  })
+
+  it('handles empty content', () => {
+    expect(extractConfigPathRefs('')).toEqual([])
   })
 })

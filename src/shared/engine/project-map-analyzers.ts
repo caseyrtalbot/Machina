@@ -80,3 +80,53 @@ export function resolveImportPath(
 
   return null
 }
+
+// ─── Markdown Reference Extraction ──────────────────────────────────
+
+/**
+ * Extract references from markdown content: wikilinks and relative links.
+ * Wikilinks return the target name; relative links return the href.
+ */
+export function extractMarkdownRefs(content: string): readonly string[] {
+  const refs: string[] = []
+
+  const wikilinkRe = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
+  let match: RegExpExecArray | null
+  while ((match = wikilinkRe.exec(content)) !== null) {
+    refs.push(match[1])
+  }
+
+  const mdLinkRe = /\[(?:[^\]]*)\]\((\.[^)]+)\)/g
+  while ((match = mdLinkRe.exec(content)) !== null) {
+    const href = match[1]
+    if (href.startsWith('./') || href.startsWith('../')) {
+      refs.push(href)
+    }
+  }
+
+  return refs
+}
+
+// ─── Config Path Reference Extraction ────────────────────────────────
+
+/**
+ * Extract relative path references from config files (JSON, YAML).
+ * Returns specifiers starting with './' or '../'.
+ */
+export function extractConfigPathRefs(content: string): readonly string[] {
+  const refs: string[] = []
+
+  const quotedPathRe = /["'](\.\.\/.+?|\.\/[^"']+?)["']/g
+  let match: RegExpExecArray | null
+  while ((match = quotedPathRe.exec(content)) !== null) {
+    refs.push(match[1])
+  }
+
+  const yamlPathRe = /:\s+(\.\.\/.+|\.\/\S+)/g
+  while ((match = yamlPathRe.exec(content)) !== null) {
+    const val = match[1]
+    if (!refs.includes(val)) refs.push(val)
+  }
+
+  return refs
+}
