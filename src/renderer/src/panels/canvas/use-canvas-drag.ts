@@ -47,16 +47,20 @@ export function useNodeDrag(nodeId: string) {
         groupPositions
       }
 
+      let latestSingleX = 0
+      let latestSingleY = 0
+      let latestMultiUpdates: Map<string, { x: number; y: number }> | null = null
+      let rafPending = false
+
       const onMove = (me: PointerEvent) => {
         if (!dragStart.current) return
         const dx = (me.clientX - dragStart.current.x) / zoom
         const dy = (me.clientY - dragStart.current.y) / zoom
 
-        const { moveNode } = useCanvasStore.getState()
+        const { moveNode, moveNodes } = useCanvasStore.getState()
         const positions = dragStart.current.groupPositions
 
         if (positions.size > 1) {
-          // Multi-node drag: compute delta from the primary node's start position
           let primaryX = dragStart.current.nx + dx
           let primaryY = dragStart.current.ny + dy
 
@@ -68,11 +72,22 @@ export function useNodeDrag(nodeId: string) {
           const deltaX = primaryX - dragStart.current.nx
           const deltaY = primaryY - dragStart.current.ny
 
+          const updates = new Map<string, { x: number; y: number }>()
           for (const [id, startPos] of positions) {
-            moveNode(id, { x: startPos.x + deltaX, y: startPos.y + deltaY })
+            updates.set(id, { x: startPos.x + deltaX, y: startPos.y + deltaY })
+          }
+          latestMultiUpdates = updates
+
+          if (!rafPending) {
+            rafPending = true
+            requestAnimationFrame(() => {
+              rafPending = false
+              if (latestMultiUpdates) {
+                moveNodes(latestMultiUpdates)
+              }
+            })
           }
         } else {
-          // Single node drag (existing behavior)
           let newX = dragStart.current.nx + dx
           let newY = dragStart.current.ny + dy
 
@@ -81,11 +96,29 @@ export function useNodeDrag(nodeId: string) {
             newY = snapToGrid(newY, SNAP_GRID_SIZE)
           }
 
-          moveNode(nodeId, { x: newX, y: newY })
+          latestSingleX = newX
+          latestSingleY = newY
+
+          if (!rafPending) {
+            rafPending = true
+            requestAnimationFrame(() => {
+              rafPending = false
+              moveNode(nodeId, { x: latestSingleX, y: latestSingleY })
+            })
+          }
         }
       }
 
       const onUp = () => {
+        // Flush final position if a RAF is still pending
+        if (rafPending) {
+          const { moveNode: mv, moveNodes: mvs } = useCanvasStore.getState()
+          if (latestMultiUpdates) {
+            mvs(latestMultiUpdates)
+          } else {
+            mv(nodeId, { x: latestSingleX, y: latestSingleY })
+          }
+        }
         dragStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
