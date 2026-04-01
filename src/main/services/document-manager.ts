@@ -170,6 +170,22 @@ export class DocumentManager {
     }
   }
 
+  /**
+   * Register a path as about to be written by an external source (e.g., MCP agent).
+   * Prevents the vault watcher from triggering a reload for this write.
+   * The flag auto-clears after PENDING_WRITE_TIMEOUT_MS as a safety net.
+   */
+  registerExternalWrite(path: string): void {
+    this.clearPendingWrite(path)
+    this._pendingWrites.add(path)
+
+    const timeoutId = setTimeout(() => {
+      this._pendingWrites.delete(path)
+      this._pendingWriteTimers.delete(path)
+    }, PENDING_WRITE_TIMEOUT_MS)
+    this._pendingWriteTimers.set(path, timeoutId)
+  }
+
   // --- Internal ---
 
   private isDirty(doc: Document): boolean {
