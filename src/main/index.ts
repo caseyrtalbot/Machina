@@ -161,7 +161,10 @@ app.whenReady().then(() => {
   // Services update on vault switch without re-registering IPC handlers.
   onVaultReady(async (vaultPath) => {
     const deps = await initVaultIndex(vaultPath)
-    mcpLifecycle.createForVault(vaultPath, deps)
+    mcpLifecycle.createForVault(vaultPath, {
+      ...deps,
+      documentManager: getDocumentManager()
+    })
 
     const monitor = TmuxMonitor.tryCreate(vaultPath)
     const spawner = new AgentSpawner(getShellService(), vaultPath)

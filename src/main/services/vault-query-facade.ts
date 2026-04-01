@@ -13,10 +13,12 @@ import type { SearchEngine, SearchHit } from '@shared/engine/search-engine'
 import type { VaultIndex } from '@shared/engine/indexer'
 import type { GraphNode, GraphEdge } from '@shared/types'
 import { buildGhostIndex, type GhostEntry } from '@shared/engine/ghost-index'
+import type { DocumentManager } from './document-manager'
 
 export interface VaultQueryDeps {
   readonly searchEngine?: SearchEngine
   readonly vaultIndex?: VaultIndex
+  readonly documentManager?: DocumentManager
 }
 
 export interface NeighborResult {
@@ -52,6 +54,7 @@ export class MissingIdError extends Error {
 export class VaultQueryFacade {
   private readonly searchEngine?: SearchEngine
   private readonly vaultIndex?: VaultIndex
+  private readonly documentManager?: DocumentManager
 
   readonly vaultRoot: string
 
@@ -64,6 +67,7 @@ export class VaultQueryFacade {
     this.vaultRoot = vaultRoot
     this.searchEngine = deps?.searchEngine
     this.vaultIndex = deps?.vaultIndex
+    this.documentManager = deps?.documentManager
   }
 
   async readFile(filePath: string): Promise<string> {
@@ -125,6 +129,9 @@ export class VaultQueryFacade {
     // Stamp provenance in frontmatter
     const stamped = this.stampProvenance(content, opts.agentId)
 
+    // Register with DocumentManager to suppress vault watcher echo
+    this.documentManager?.registerExternalWrite(resolved)
+
     await fsWriteFile(resolved, stamped, 'utf-8')
 
     this.logger.log({
@@ -168,6 +175,9 @@ export class VaultQueryFacade {
       created_at: new Date().toISOString()
     }
     const stamped = matter.stringify(parsed.content, data)
+
+    // Register with DocumentManager to suppress vault watcher echo
+    this.documentManager?.registerExternalWrite(resolved)
 
     // Exclusive create: fail if file already exists (prevents silent overwrite)
     const fh = await open(resolved, 'wx')

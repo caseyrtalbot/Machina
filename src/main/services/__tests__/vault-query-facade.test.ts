@@ -12,6 +12,7 @@ import { AuditLogger } from '../audit-logger'
 import { PathGuardError } from '@shared/agent-types'
 import { SearchEngine } from '@shared/engine/search-engine'
 import { VaultIndex } from '@shared/engine/indexer'
+import type { DocumentManager } from '../document-manager'
 
 function createTestVault(): string {
   const base = join(tmpdir(), `vqf-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
@@ -160,6 +161,29 @@ describe('VaultQueryFacade', () => {
         })
       )
     })
+
+    it('calls registerExternalWrite before writing to disk', async () => {
+      const mockDocManager = {
+        registerExternalWrite: vi.fn()
+      } as unknown as DocumentManager
+
+      const guard = new PathGuard(vaultRoot)
+      const logger = new AuditLogger(join(vaultRoot, '.te', 'audit'))
+      const facadeWithDm = new VaultQueryFacade(guard, logger, vaultRoot, {
+        documentManager: mockDocManager
+      })
+
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+      const content = '---\nid: hello\ntitle: Hello\ntype: note\n---\n\n# Hello\n'
+
+      await facadeWithDm.writeFile(filePath, content, { agentId: 'test-agent' })
+
+      expect(mockDocManager.registerExternalWrite).toHaveBeenCalledOnce()
+      // Should be called with the resolved absolute path
+      expect(mockDocManager.registerExternalWrite).toHaveBeenCalledWith(
+        join(vaultRoot, 'notes', 'hello.md')
+      )
+    })
   })
 
   describe('getGhosts', () => {
@@ -210,6 +234,29 @@ describe('VaultQueryFacade', () => {
 
       await expect(facade.createFile(filePath, content, { agentId: 'test-agent' })).rejects.toThrow(
         MissingIdError
+      )
+    })
+
+    it('calls registerExternalWrite before creating file on disk', async () => {
+      const mockDocManager = {
+        registerExternalWrite: vi.fn()
+      } as unknown as DocumentManager
+
+      const guard = new PathGuard(vaultRoot)
+      const logger = new AuditLogger(join(vaultRoot, '.te', 'audit'))
+      const facadeWithDm = new VaultQueryFacade(guard, logger, vaultRoot, {
+        documentManager: mockDocManager
+      })
+
+      const filePath = join(vaultRoot, 'notes', 'created-note.md')
+      const content =
+        '---\nid: created-note\ntitle: Created Note\ntype: note\n---\n\n# Created Note\n'
+
+      await facadeWithDm.createFile(filePath, content, { agentId: 'test-agent' })
+
+      expect(mockDocManager.registerExternalWrite).toHaveBeenCalledOnce()
+      expect(mockDocManager.registerExternalWrite).toHaveBeenCalledWith(
+        join(vaultRoot, 'notes', 'created-note.md')
       )
     })
   })
