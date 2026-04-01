@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -192,4 +192,4 @@ export function CodeCard({ node }: CodeCardProps) {
   )
 }
 
-export default CodeCard
+export default memo(CodeCard)

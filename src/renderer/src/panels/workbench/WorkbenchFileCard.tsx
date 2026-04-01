@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, memo } from 'react'
 import { CardShell } from '../canvas/CardShell'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, typography } from '../../design/tokens'
@@ -120,4 +120,4 @@ export function WorkbenchFileCard({ node }: WorkbenchFileCardProps) {
   )
 }
 
-export default WorkbenchFileCard
+export default memo(WorkbenchFileCard)

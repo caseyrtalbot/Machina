@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, memo } from 'react'
 import { CardShell } from './CardShell'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, typography } from '../../design/tokens'
@@ -177,4 +177,4 @@ export function AgentSessionCard({ node }: AgentSessionCardProps) {
   )
 }
 
-export default AgentSessionCard
+export default memo(AgentSessionCard)

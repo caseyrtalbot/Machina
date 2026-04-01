@@ -69,6 +69,8 @@ function validateCanvasOp(
     case 'add-node':
       if (!op.node.type || !op.node.position || !op.node.size)
         return 'add-node: missing required fields'
+      if (existingNodeIds.has(op.node.id)) return `add-node: nodeId ${op.node.id} already exists`
+      if (addedNodeIds.has(op.node.id)) return `add-node: nodeId ${op.node.id} duplicated in plan`
       addedNodeIds.add(op.node.id)
       return null
     case 'add-edge':
@@ -201,7 +203,10 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
             if (entry.name === 'node_modules' || entry.name === '.git') continue
             await walkDir(fullPath)
           } else {
-            if (isBinaryPath(fullPath)) continue
+            if (isBinaryPath(fullPath)) {
+              fileInputs.push({ path: fullPath, content: null, error: 'binary-skipped' })
+              continue
+            }
             try {
               const content = await readFile(fullPath, 'utf-8')
               fileInputs.push({ path: fullPath, content })

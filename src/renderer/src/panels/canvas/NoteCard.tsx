@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
 import { logError } from '../../utils/error-logger'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { CardShell } from './CardShell'
 import { getCanvasEditorExtensions } from './shared/tiptap-config'
 import { CardBadge } from './shared/CardBadge'
@@ -20,13 +21,18 @@ export function NoteCard({ node }: NoteCardProps) {
   const [body, setBody] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const removeNode = useCanvasStore((s) => s.removeNode)
-  const artifacts = useVaultStore((s) => s.artifacts)
-  const fileToId = useVaultStore((s) => s.fileToId)
-
   // The node.content holds the vault file path
   const filePath = node.content
-  const artifactId = fileToId[filePath]
-  const artifact = artifacts.find((a) => a.id === artifactId)
+  const artifactId = useVaultStore((s) => s.fileToId[filePath])
+  const artifact = useStoreWithEqualityFn(
+    useVaultStore,
+    (s) => (artifactId ? s.artifactById[artifactId] : undefined),
+    (a, b) =>
+      a?.id === b?.id &&
+      a?.title === b?.title &&
+      a?.type === b?.type &&
+      a?.frontmatter === b?.frontmatter
+  )
   const title = artifact?.title ?? filePath.split('/').pop()?.replace('.md', '') ?? 'Note'
 
   // Build metadata entries from artifact frontmatter (single source of truth)
@@ -93,16 +99,20 @@ export function NoteCard({ node }: NoteCardProps) {
     }
   }, [filePath])
 
-  // Sync body into Tiptap editor for rich rendering
+  // Sync body into Tiptap editor for rich rendering.
+  // queueMicrotask defers setContent out of React's commit phase,
+  // avoiding ProseMirror's internal flushSync collision.
   useEffect(() => {
     if (!editor || !body || loading) return
-    const manager = editor.storage.markdown?.manager
-    if (manager) {
-      const json = manager.parse(body)
-      editor.commands.setContent(json)
-    } else {
-      editor.commands.setContent(body)
-    }
+    queueMicrotask(() => {
+      if (editor.isDestroyed) return
+      const manager = editor.storage.markdown?.manager
+      if (manager) {
+        editor.commands.setContent(manager.parse(body))
+      } else {
+        editor.commands.setContent(body)
+      }
+    })
   }, [editor, body, loading])
 
   // Auto-scroll past badge + metadata to reveal the title on first load
@@ -186,4 +196,4 @@ export function NoteCard({ node }: NoteCardProps) {
   )
 }
 
-export default NoteCard
+export default memo(NoteCard)

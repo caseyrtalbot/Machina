@@ -22,7 +22,10 @@ import { readFileSync } from 'node:fs'
 
 function createTestVault(): string {
   const base = join(tmpdir(), `mcp-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  mkdirSync(join(base, 'assets'), { recursive: true })
+  mkdirSync(join(base, 'empty-dir'), { recursive: true })
   mkdirSync(join(base, 'notes'), { recursive: true })
+  writeFileSync(join(base, 'assets', 'logo.png'), 'not-a-real-png')
   writeFileSync(
     join(base, 'notes', 'hello.md'),
     '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - greeting\nconnections:\n  - world\n---\n\n# Hello World\n\nThis is a test note about greetings.\n'
@@ -32,6 +35,12 @@ function createTestVault(): string {
     '---\nid: world\ntitle: World\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - place\n---\n\n# World\n\nThe world is vast.\n'
   )
   return realpathSync(base)
+}
+
+function extractWrappedJson(text: string): unknown {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  return JSON.parse(text.slice(start, end + 1))
 }
 
 function buildTestDeps(vaultRoot: string) {
@@ -241,6 +250,48 @@ describe('MCP Server', () => {
       expect.objectContaining({ source: 'hello', target: 'world', kind: 'connection' })
     )
     expect(parsed.nodes.map((n: { id: string }) => n.id)).toContain('world')
+
+    await client.close()
+    await server.close()
+  })
+
+  it('project.map_folder counts skipped binary files', async () => {
+    const { client, server } = await createConnectedPair(vaultRoot)
+
+    const result = await client.callTool({
+      name: 'project.map_folder',
+      arguments: { rootPath: vaultRoot }
+    })
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text
+    const snapshot = extractWrappedJson(text) as {
+      skippedCount: number
+      nodes: Array<{ relativePath: string }>
+    }
+
+    expect(snapshot.skippedCount).toBe(1)
+    expect(snapshot.nodes.some((node) => node.relativePath === 'assets')).toBe(true)
+
+    await client.close()
+    await server.close()
+  })
+
+  it('project.map_folder returns the root node for an empty folder', async () => {
+    const { client, server } = await createConnectedPair(vaultRoot)
+
+    const result = await client.callTool({
+      name: 'project.map_folder',
+      arguments: { rootPath: join(vaultRoot, 'empty-dir') }
+    })
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text
+    const snapshot = extractWrappedJson(text) as {
+      nodes: Array<{ relativePath: string; isDirectory: boolean }>
+    }
+
+    expect(snapshot.nodes).toEqual([
+      expect.objectContaining({ relativePath: '.', isDirectory: true })
+    ])
 
     await client.close()
     await server.close()

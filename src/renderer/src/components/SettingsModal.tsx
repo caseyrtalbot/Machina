@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { colors } from '../design/tokens'
-import { ACCENT_COLORS, ACCENT_ORDER, type ThemeId } from '../design/themes'
 import { FontPicker } from './FontPicker'
 
-type TabId = 'appearance' | 'environment' | 'editor' | 'terminal' | 'vault'
+type TabId = 'appearance' | 'environment' | 'editor' | 'vault'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -47,14 +46,13 @@ function SliderInput({ value, min, max, step, onChange, unit }: SliderInputProps
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="graph-slider w-28"
-        style={{ accentColor: colors.accent.default }}
       />
       <span
-        className="settings-label w-12 text-right tabular-nums"
+        className="settings-value w-12 text-right tabular-nums"
         style={{ color: colors.text.secondary }}
       >
         {value}
-        {unit ? unit : ''}
+        {unit ?? ''}
       </span>
     </div>
   )
@@ -74,8 +72,8 @@ function Toggle({ value, onChange }: ToggleProps) {
       onClick={() => onChange(!value)}
       className="settings-toggle w-9 h-5 rounded-full relative transition-colors flex-shrink-0"
       style={{
-        backgroundColor: value ? colors.accent.default : colors.bg.elevated,
-        border: `1px solid ${value ? colors.accent.default : colors.border.default}`
+        backgroundColor: value ? 'rgba(255, 255, 255, 0.3)' : colors.bg.elevated,
+        border: `1px solid ${value ? 'rgba(255, 255, 255, 0.4)' : colors.border.default}`
       }}
     >
       <span
@@ -106,9 +104,7 @@ function SelectInput({ value, options, onChange }: SelectInputProps) {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="settings-select text-xs rounded"
-      style={{
-        outline: 'none'
-      }}
+      style={{ outline: 'none' }}
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
@@ -124,12 +120,8 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 function AppearanceTab() {
-  const theme = useSettingsStore((s) => s.theme)
-  const accentColor = useSettingsStore((s) => s.accentColor)
   const bodyFont = useSettingsStore((s) => s.bodyFont)
   const monoFont = useSettingsStore((s) => s.monoFont)
-  const setTheme = useSettingsStore((s) => s.setTheme)
-  const setAccentColor = useSettingsStore((s) => s.setAccentColor)
   const setDisplayFont = useSettingsStore((s) => s.setDisplayFont)
   const setBodyFont = useSettingsStore((s) => s.setBodyFont)
   const setMonoFont = useSettingsStore((s) => s.setMonoFont)
@@ -139,59 +131,8 @@ function AppearanceTab() {
     setBodyFont(name)
   }
 
-  const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
-    { id: 'dark', label: 'Dark' },
-    { id: 'light', label: 'Light' },
-    { id: 'system', label: 'System' }
-  ]
-
   return (
     <div>
-      <SectionHeading>Theme</SectionHeading>
-      <div className="flex gap-2 mb-5">
-        {THEME_OPTIONS.map(({ id, label }) => {
-          const isSelected = theme === id
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTheme(id)}
-              className="settings-button text-center transition-all text-xs flex-1"
-              style={{
-                border: `1.5px solid ${isSelected ? colors.accent.default : colors.border.default}`,
-                backgroundColor: isSelected ? colors.accent.muted : colors.bg.elevated
-              }}
-            >
-              <span style={{ color: colors.text.primary }}>{label}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      <SectionHeading>Accent Color</SectionHeading>
-      <div className="flex gap-2.5 mb-5">
-        {ACCENT_ORDER.map((id) => {
-          const a = ACCENT_COLORS[id]
-          const isSelected = accentColor === id
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setAccentColor(id)}
-              title={a.label}
-              className="w-6 h-6 rounded-full transition-all flex-shrink-0"
-              style={{
-                backgroundColor: a.value,
-                outline: isSelected ? `2px solid ${a.value}` : '2px solid transparent',
-                outlineOffset: '2px',
-                transform: isSelected ? 'scale(1.15)' : undefined,
-                boxShadow: isSelected ? `0 0 12px ${a.value}80, 0 0 4px ${a.value}40` : undefined
-              }}
-            />
-          )
-        })}
-      </div>
-
       <SectionHeading>Typography</SectionHeading>
       <SettingRow label="Font">
         <FontPicker value={bodyFont} onChange={handleFontChange} />
@@ -301,9 +242,7 @@ function EnvironmentTab() {
           type="button"
           onClick={resetEnv}
           className="settings-button text-xs transition-colors"
-          style={{
-            color: colors.text.primary
-          }}
+          style={{ color: colors.text.primary }}
         >
           Reset to Defaults
         </button>
@@ -349,57 +288,8 @@ function EditorTab() {
   )
 }
 
-function TerminalTab() {
-  const terminalShell = useSettingsStore((s) => s.terminalShell)
-  const terminalFontSize = useSettingsStore((s) => s.terminalFontSize)
-  const scrollbackLines = useSettingsStore((s) => s.scrollbackLines)
-  const setTerminalShell = useSettingsStore((s) => s.setTerminalShell)
-  const setTerminalFontSize = useSettingsStore((s) => s.setTerminalFontSize)
-  const setScrollbackLines = useSettingsStore((s) => s.setScrollbackLines)
-
-  return (
-    <div>
-      <SectionHeading>Terminal</SectionHeading>
-      <SettingRow label="Shell Path">
-        <input
-          type="text"
-          value={terminalShell}
-          onChange={(e) => setTerminalShell(e.target.value)}
-          placeholder="/bin/zsh"
-          className="settings-input text-xs w-44"
-          style={{
-            outline: 'none'
-          }}
-        />
-      </SettingRow>
-      <SettingRow label="Font Size">
-        <SliderInput
-          value={terminalFontSize}
-          min={8}
-          max={24}
-          step={1}
-          onChange={setTerminalFontSize}
-        />
-      </SettingRow>
-      <SettingRow label="Scrollback Lines">
-        <SliderInput
-          value={scrollbackLines}
-          min={1000}
-          max={100000}
-          step={1000}
-          onChange={setScrollbackLines}
-        />
-      </SettingRow>
-    </div>
-  )
-}
-
 function VaultTab({ onChangeVault }: { onChangeVault?: () => void }) {
   const vaultPath = useVaultStore((s) => s.vaultPath)
-
-  const handleReindex = () => {
-    // Placeholder: vault re-index will be wired when the indexer API is available
-  }
 
   return (
     <div>
@@ -421,16 +311,6 @@ function VaultTab({ onChangeVault }: { onChangeVault?: () => void }) {
         >
           Open Vault...
         </button>
-        <button
-          type="button"
-          onClick={handleReindex}
-          className="settings-button text-xs"
-          style={{
-            color: colors.text.primary
-          }}
-        >
-          Re-index Vault
-        </button>
       </div>
     </div>
   )
@@ -440,7 +320,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'environment', label: 'Environment' },
   { id: 'editor', label: 'Editor' },
-  { id: 'terminal', label: 'Terminal' },
   { id: 'vault', label: 'Vault' }
 ]
 
@@ -452,8 +331,6 @@ function renderTabContent(tab: TabId, onChangeVault?: () => void) {
       return <EnvironmentTab />
     case 'editor':
       return <EditorTab />
-    case 'terminal':
-      return <TerminalTab />
     case 'vault':
       return <VaultTab onChangeVault={onChangeVault} />
   }
@@ -493,8 +370,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         style={{
           backgroundColor: colors.bg.surface,
           borderLeft: `1px solid ${colors.border.default}`,
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
           boxShadow: isOpen ? '-8px 0 32px rgba(0, 0, 0, 0.3)' : 'none'
         }}
       >

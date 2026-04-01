@@ -124,4 +124,38 @@ describe('getLodLevel', () => {
   it('returns full at zoom 3.0 (max zoom)', () => {
     expect(getLodLevel(3.0)).toBe('full')
   })
+
+  it('returns full for text card at zoom 0.3', () => {
+    expect(getLodLevel(0.3, 'text')).toBe('full')
+  })
+
+  it('returns preview for note card at zoom 0.3 (heavy threshold)', () => {
+    expect(getLodLevel(0.3, 'note')).toBe('preview')
+  })
+
+  it('returns preview for markdown card at zoom 0.3 (heavy threshold)', () => {
+    expect(getLodLevel(0.3, 'markdown')).toBe('preview')
+  })
+
+  it('returns full for note card at zoom 0.5 (heavy boundary)', () => {
+    expect(getLodLevel(0.5, 'note')).toBe('full')
+  })
+
+  it('returns full for markdown card at zoom 0.5 (heavy boundary)', () => {
+    expect(getLodLevel(0.5, 'markdown')).toBe('full')
+  })
+
+  it('returns preview for note card at zoom 0.49', () => {
+    expect(getLodLevel(0.49, 'note')).toBe('preview')
+  })
+
+  it('returns dot for note card at zoom 0.14', () => {
+    expect(getLodLevel(0.14, 'note')).toBe('dot')
+  })
+
+  it('uses standard threshold for non-heavy types', () => {
+    expect(getLodLevel(0.35, 'code')).toBe('full')
+    expect(getLodLevel(0.35, 'terminal')).toBe('full')
+    expect(getLodLevel(0.35, 'image')).toBe('full')
+  })
 })

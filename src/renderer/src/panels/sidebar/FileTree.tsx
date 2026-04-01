@@ -24,15 +24,13 @@ import {
 
 /** Indent guide via border-l on the row element.
  *  Simpler than background-image gradients, more native-feeling. */
-function treeGuideColor(emphasis: 'rest' | 'active' | 'hover' = 'rest'): string {
+function treeGuideColor(emphasis: 'rest' | 'active' = 'rest'): string {
   switch (emphasis) {
     case 'active':
-      return 'color-mix(in srgb, var(--color-accent-default) 24%, var(--color-text-primary) 4%)'
-    case 'hover':
-      return 'color-mix(in srgb, var(--color-text-primary) 18%, transparent)'
+      return 'rgba(255, 255, 255, 0.12)'
     case 'rest':
     default:
-      return 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)'
+      return 'rgba(255, 255, 255, 0.06)'
   }
 }
 
@@ -383,18 +381,8 @@ function DirectoryRow({
         transition: 'color 120ms ease-out',
         ...indentBorderStyle(node.depth)
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = 'var(--color-text-primary)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color =
-          'color-mix(in srgb, var(--color-text-secondary) 88%, transparent)'
-      }}
     >
-      <span
-        className="mr-1 flex items-center"
-        style={{ color: 'color-mix(in srgb, var(--color-text-muted) 88%, transparent)' }}
-      >
+      <span className="mr-1 flex items-center" style={{ color: 'var(--color-text-muted)' }}>
         <Chevron isExpanded={!isCollapsed} />
       </span>
       <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
@@ -485,13 +473,6 @@ function FileRow({
         fontFamily: treeFontFamily,
         fontSize: treeFontSize,
         ...indentBorderStyle(node.depth, isActive)
-      }}
-      onMouseEnter={(e) => {
-        if (node.depth > 0) e.currentTarget.style.borderLeftColor = treeGuideColor('hover')
-      }}
-      onMouseLeave={(e) => {
-        if (node.depth > 0)
-          e.currentTarget.style.borderLeftColor = treeGuideColor(isActive ? 'active' : 'rest')
       }}
     >
       <span

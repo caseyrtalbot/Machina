@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { colors } from '../../design/tokens'
 
 interface SearchBarProps {
   onSearch: (query: string) => void
@@ -26,12 +25,6 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
       />
-      <span
-        className="sidebar-search-meta"
-        style={{ color: focused ? colors.text.secondary : colors.text.muted }}
-      >
-        live
-      </span>
     </div>
   )
 }

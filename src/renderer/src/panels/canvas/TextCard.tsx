@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
@@ -70,4 +70,4 @@ export function TextCard({ node }: TextCardProps) {
   )
 }
 
-export default TextCard
+export default memo(TextCard)

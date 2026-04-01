@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { pdfjs } from './pdf-worker-setup'
 import { useCanvasStore } from '../../store/canvas-store'
@@ -253,4 +253,4 @@ function PdfContent({
   )
 }
 
-export default PdfCard
+export default memo(PdfCard)

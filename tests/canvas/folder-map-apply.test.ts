@@ -79,4 +79,31 @@ describe('folder-map-apply', () => {
     applyFolderMapPlan(plan, commandStack)
     expect(getPendingApply()).toBeNull()
   })
+
+  it('undo removes edges that connect existing nodes', () => {
+    const existingA = createCanvasNode('project-file', { x: 0, y: 0 })
+    const existingB = createCanvasNode('project-file', { x: 200, y: 0 })
+    useCanvasStore.getState().addNodesAndEdges([existingA, existingB], [])
+
+    const edge = createCanvasEdge(existingA.id, existingB.id, 'right', 'left', 'connection')
+    const plan: CanvasMutationPlan = {
+      id: 'plan_existing_edge',
+      operationId: 'op_existing_edge',
+      source: 'folder-map',
+      ops: [{ type: 'add-edge', edge }],
+      summary: {
+        addedNodes: 0,
+        addedEdges: 1,
+        movedNodes: 0,
+        skippedFiles: 0,
+        unresolvedRefs: 0
+      }
+    }
+
+    applyFolderMapPlan(plan, commandStack)
+    expect(useCanvasStore.getState().edges).toHaveLength(1)
+
+    commandStack.undo()
+    expect(useCanvasStore.getState().edges).toHaveLength(0)
+  })
 })

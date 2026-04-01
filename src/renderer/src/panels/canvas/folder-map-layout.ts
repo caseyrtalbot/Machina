@@ -5,8 +5,8 @@
 
 import type { CanvasNode, CanvasEdge, CanvasNodeType } from '@shared/canvas-types'
 import { createCanvasNode, createCanvasEdge, getDefaultSize } from '@shared/canvas-types'
-import type { ProjectMapSnapshot } from '@shared/engine/project-map-types'
-import { computeOptimalEdgeSides } from './canvas-layout'
+import type { ProjectMapNode, ProjectMapSnapshot } from '@shared/engine/project-map-types'
+import { computeCardSize, computeOptimalEdgeSides } from './canvas-layout'
 import { computeOriginOffset } from './import-logic'
 
 export interface TreeLayoutOptions {
@@ -27,6 +27,7 @@ const DEFAULT_LAYOUT_OPTIONS: TreeLayoutOptions = {
 }
 
 const FOLDER_SIZE = { width: 260, height: 80 }
+const NOTE_BODY_CHARS_PER_LINE = 72
 
 // --- Internal tree node for layout computation ---
 
@@ -45,11 +46,19 @@ interface LayoutNode {
   y: number
 }
 
-function getNodeSize(
-  isDirectory: boolean,
-  nodeType: CanvasNodeType
-): { width: number; height: number } {
+function getNodeSize(pm: Pick<ProjectMapNode, 'isDirectory' | 'nodeType' | 'lineCount' | 'name'>): {
+  width: number
+  height: number
+} {
+  const { isDirectory, nodeType, lineCount, name } = pm
   if (isDirectory) return FOLDER_SIZE
+  if (nodeType === 'note') {
+    return computeCardSize({
+      titleLength: name.length,
+      bodyLength: lineCount * NOTE_BODY_CHARS_PER_LINE,
+      metadataCount: 0
+    })
+  }
   return getDefaultSize(nodeType)
 }
 
@@ -69,7 +78,7 @@ function buildLayoutTree(snapshot: ProjectMapSnapshot): LayoutNode | null {
     const pm = nodeMap.get(pmId)
     if (!pm) return null
 
-    const size = getNodeSize(pm.isDirectory, pm.nodeType)
+    const size = getNodeSize(pm)
     const children: LayoutNode[] = []
 
     if (pm.isDirectory) {
@@ -121,10 +130,11 @@ function leafNode(
     nodeType: CanvasNodeType
     relativePath: string
     depth: number
+    lineCount: number
   },
   rootPath: string
 ): LayoutNode {
-  const size = getNodeSize(pm.isDirectory, pm.nodeType)
+  const size = getNodeSize(pm)
   return {
     pmId: pm.id,
     name: pm.name,

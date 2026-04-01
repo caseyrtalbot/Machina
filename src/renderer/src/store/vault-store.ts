@@ -40,6 +40,9 @@ interface VaultStore {
   readonly parseErrors: readonly ParseError[]
   readonly fileToId: Readonly<Record<string, string>>
   readonly artifactPathById: Readonly<Record<string, string>>
+  readonly artifactById: Readonly<Record<string, Artifact>>
+  readonly edgeCountByArtifactId: Readonly<Record<string, number>>
+  readonly rawFileCount: number
   readonly discoveredTypes: readonly string[]
   readonly activeWorkspace: string | null
   readonly isLoading: boolean
@@ -66,6 +69,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   parseErrors: [],
   fileToId: {},
   artifactPathById: {},
+  artifactById: {},
+  edgeCountByArtifactId: {},
+  rawFileCount: 0,
   discoveredTypes: [],
   activeWorkspace: null,
   isLoading: false,
@@ -99,13 +105,37 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
 
   setWorkerResult: (result) => {
     const discoveredTypes = [...new Set(result.artifacts.map((a) => a.type))].sort()
+
+    const artifactById: Record<string, Artifact> = {}
+    for (const a of result.artifacts) {
+      artifactById[a.id] = a
+    }
+
+    const edgeCountByArtifactId: Record<string, number> = {}
+    for (const e of result.graph.edges) {
+      edgeCountByArtifactId[e.source] = (edgeCountByArtifactId[e.source] ?? 0) + 1
+      edgeCountByArtifactId[e.target] = (edgeCountByArtifactId[e.target] ?? 0) + 1
+    }
+
+    const rawFileCount = result.artifacts.filter(
+      (a) =>
+        a.connections.length === 0 &&
+        a.clusters_with.length === 0 &&
+        a.tensions_with.length === 0 &&
+        a.related.length === 0 &&
+        a.tags.length === 0
+    ).length
+
     set({
       artifacts: result.artifacts,
       graph: result.graph,
       parseErrors: result.errors,
       fileToId: result.fileToId,
       artifactPathById: result.artifactPathById,
-      discoveredTypes
+      discoveredTypes,
+      artifactById,
+      edgeCountByArtifactId,
+      rawFileCount
     })
   },
 

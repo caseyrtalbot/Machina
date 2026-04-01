@@ -52,6 +52,7 @@ export function applyFolderMapPlan(plan: CanvasMutationPlan, commandStack: Comma
     },
     undo: () => {
       const s = useCanvasStore.getState()
+      for (const edge of newEdges) s.removeEdge(edge.id)
       for (const node of newNodes) s.removeNode(node.id)
     }
   })

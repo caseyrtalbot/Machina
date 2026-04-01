@@ -32,11 +32,7 @@ describe('registerMcpIpc', () => {
 
   it('registers mcp:status handler', () => {
     registerMcpIpc(provider)
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'mcp:status',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-      expect.any(Function)
-    )
+    expect(ipcMain.handle).toHaveBeenCalledWith('mcp:status', expect.any(Function))
   })
 
   it('returns running: false when server is not started', async () => {

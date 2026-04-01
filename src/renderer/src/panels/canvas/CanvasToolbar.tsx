@@ -348,7 +348,7 @@ export function CanvasToolbar({
                 value={gridDotVisibility}
                 onChange={(e) => setEnv('gridDotVisibility', Number(e.target.value))}
                 className="graph-slider w-full"
-                style={{ accentColor: colors.accent.default }}
+                style={{ accentColor: 'var(--color-text-primary)' }}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -370,7 +370,7 @@ export function CanvasToolbar({
                 value={cardBlur}
                 onChange={(e) => setEnv('cardBlur', Number(e.target.value))}
                 className="graph-slider w-full"
-                style={{ accentColor: colors.accent.default }}
+                style={{ accentColor: 'var(--color-text-primary)' }}
               />
             </div>
           </div>

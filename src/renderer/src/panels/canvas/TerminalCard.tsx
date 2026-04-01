@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState, useMemo } from 'react'
+import { useRef, useEffect, useCallback, useState, useMemo, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeContext } from '../../hooks/useClaudeContext'
@@ -354,4 +354,4 @@ export function TerminalCard({ node }: TerminalCardProps) {
   )
 }
 
-export default TerminalCard
+export default memo(TerminalCard)

@@ -1,5 +1,19 @@
 import { useCallback, useRef, useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
+import { perfMark, perfMeasure } from '../../utils/perf-marks'
+
+let vpInteractionTimer: ReturnType<typeof setTimeout> | null = null
+
+function markViewportInteracting(active: boolean) {
+  if (vpInteractionTimer) clearTimeout(vpInteractionTimer)
+  if (active) {
+    useCanvasStore.getState().setInteracting(true)
+  } else {
+    vpInteractionTimer = setTimeout(() => {
+      useCanvasStore.getState().setInteracting(false)
+    }, 150)
+  }
+}
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 3.0
@@ -50,6 +64,8 @@ export function useCanvasViewport(
       }
 
       e.preventDefault()
+      perfMark('wheel-start')
+      markViewportInteracting(true)
       const { viewport, setViewport } = useCanvasStore.getState()
       const container = containerRef.current
       if (!container) return
@@ -78,6 +94,8 @@ export function useCanvasViewport(
           zoom: viewport.zoom
         })
       }
+      markViewportInteracting(false)
+      perfMeasure('canvas-wheel', 'wheel-start')
     },
     [containerRef]
   )
@@ -91,7 +109,9 @@ export function useCanvasViewport(
     if (!shouldPan) return
 
     e.preventDefault()
+    perfMark('pan-start')
     isPanning.current = true
+    markViewportInteracting(true)
     const { viewport } = useCanvasStore.getState()
     panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
 
@@ -108,8 +128,10 @@ export function useCanvasViewport(
 
     const onUp = () => {
       isPanning.current = false
+      markViewportInteracting(false)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      perfMeasure('canvas-pan', 'pan-start')
     }
 
     window.addEventListener('pointermove', onMove)

@@ -1,6 +1,21 @@
 import { useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { getMinSize, type CanvasNodeType } from '@shared/canvas-types'
+import { perfMark, perfMeasure } from '../../utils/perf-marks'
+
+/** Module-level interaction debounce to prevent timer stacking */
+let interactionTimer: ReturnType<typeof setTimeout> | null = null
+
+function markInteracting(active: boolean) {
+  if (interactionTimer) clearTimeout(interactionTimer)
+  if (active) {
+    useCanvasStore.getState().setInteracting(true)
+  } else {
+    interactionTimer = setTimeout(() => {
+      useCanvasStore.getState().setInteracting(false)
+    }, 150)
+  }
+}
 
 /** Grid size for Shift-snap (matches dot grid spacing in CanvasSurface) */
 export const SNAP_GRID_SIZE = 24
@@ -21,6 +36,7 @@ export function useNodeDrag(nodeId: string) {
 
   const onDragStart = useCallback(
     (e: React.PointerEvent) => {
+      perfMark('drag-start')
       e.stopPropagation()
       const { nodes, selectedNodeIds, viewport } = useCanvasStore.getState()
       const node = nodes.find((n) => n.id === nodeId)
@@ -46,17 +62,22 @@ export function useNodeDrag(nodeId: string) {
         ny: node.position.y,
         groupPositions
       }
+      markInteracting(true)
+
+      let latestSingleX = 0
+      let latestSingleY = 0
+      let latestMultiUpdates: Map<string, { x: number; y: number }> | null = null
+      let rafPending = false
 
       const onMove = (me: PointerEvent) => {
         if (!dragStart.current) return
         const dx = (me.clientX - dragStart.current.x) / zoom
         const dy = (me.clientY - dragStart.current.y) / zoom
 
-        const { moveNode } = useCanvasStore.getState()
+        const { moveNode, moveNodes } = useCanvasStore.getState()
         const positions = dragStart.current.groupPositions
 
         if (positions.size > 1) {
-          // Multi-node drag: compute delta from the primary node's start position
           let primaryX = dragStart.current.nx + dx
           let primaryY = dragStart.current.ny + dy
 
@@ -68,11 +89,22 @@ export function useNodeDrag(nodeId: string) {
           const deltaX = primaryX - dragStart.current.nx
           const deltaY = primaryY - dragStart.current.ny
 
+          const updates = new Map<string, { x: number; y: number }>()
           for (const [id, startPos] of positions) {
-            moveNode(id, { x: startPos.x + deltaX, y: startPos.y + deltaY })
+            updates.set(id, { x: startPos.x + deltaX, y: startPos.y + deltaY })
+          }
+          latestMultiUpdates = updates
+
+          if (!rafPending) {
+            rafPending = true
+            requestAnimationFrame(() => {
+              rafPending = false
+              if (latestMultiUpdates) {
+                moveNodes(latestMultiUpdates)
+              }
+            })
           }
         } else {
-          // Single node drag (existing behavior)
           let newX = dragStart.current.nx + dx
           let newY = dragStart.current.ny + dy
 
@@ -81,14 +113,34 @@ export function useNodeDrag(nodeId: string) {
             newY = snapToGrid(newY, SNAP_GRID_SIZE)
           }
 
-          moveNode(nodeId, { x: newX, y: newY })
+          latestSingleX = newX
+          latestSingleY = newY
+
+          if (!rafPending) {
+            rafPending = true
+            requestAnimationFrame(() => {
+              rafPending = false
+              moveNode(nodeId, { x: latestSingleX, y: latestSingleY })
+            })
+          }
         }
       }
 
       const onUp = () => {
+        markInteracting(false)
+        // Flush final position if a RAF is still pending
+        if (rafPending) {
+          const { moveNode: mv, moveNodes: mvs } = useCanvasStore.getState()
+          if (latestMultiUpdates) {
+            mvs(latestMultiUpdates)
+          } else {
+            mv(nodeId, { x: latestSingleX, y: latestSingleY })
+          }
+        }
         dragStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
+        perfMeasure('canvas-drag', 'drag-start')
       }
 
       window.addEventListener('pointermove', onMove)
@@ -105,6 +157,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
 
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
+      perfMark('resize-start')
       e.stopPropagation()
       const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId)
       if (!node) return
@@ -116,6 +169,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
         w: node.size.width,
         h: node.size.height
       }
+      markInteracting(true)
 
       const webviews = Array.from(document.querySelectorAll('webview')) as HTMLElement[]
       const previousPointerEvents = new Map<HTMLElement, string>()
@@ -137,6 +191,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
       }
 
       const onUp = () => {
+        markInteracting(false)
         resizeStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
@@ -148,6 +203,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
             detail: { nodeId }
           })
         )
+        perfMeasure('canvas-resize', 'resize-start')
       }
 
       window.addEventListener('pointermove', onMove)

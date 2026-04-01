@@ -222,6 +222,43 @@ describe('computeFolderMapLayout', () => {
     expect(importEdge!.hidden).toBe(true)
   })
 
+  it('uses note nodes and larger spacing for markdown files', () => {
+    const snapshot = makeSnapshot({
+      nodes: [
+        {
+          id: 'root',
+          relativePath: '.',
+          name: 'project',
+          isDirectory: true,
+          nodeType: 'project-folder',
+          depth: 0,
+          lineCount: 0,
+          children: ['note-1'],
+          childCount: 1
+        },
+        {
+          id: 'note-1',
+          relativePath: 'docs/guide.md',
+          name: 'guide.md',
+          isDirectory: false,
+          nodeType: 'note',
+          depth: 1,
+          lineCount: 24,
+          children: [],
+          childCount: 0
+        }
+      ],
+      edges: [{ source: 'root', target: 'note-1', kind: 'contains' }]
+    })
+
+    const result = computeFolderMapLayout(snapshot, { x: 0, y: 0 }, [])
+    const noteNode = result.nodes.find((node) => node.id === 'note-1')
+    expect(noteNode?.type).toBe('note')
+    expect(noteNode?.content).toBe('/project/docs/guide.md')
+    expect(noteNode?.size.width).toBeGreaterThan(300)
+    expect(noteNode?.size.height).toBeGreaterThan(220)
+  })
+
   it('produces deterministic output', () => {
     const snapshot = makeSnapshot({
       nodes: [

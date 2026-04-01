@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
@@ -177,4 +177,4 @@ function ImageContent({
   )
 }
 
-export default ImageCard
+export default memo(ImageCard)

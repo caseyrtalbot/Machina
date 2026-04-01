@@ -23,7 +23,7 @@ function MenuItem({ label, onClick }: MenuItemProps) {
         e.stopPropagation()
         onClick()
       }}
-      className="w-full text-left px-3 py-1.5 text-sm transition-colors"
+      className="w-full text-left px-3 py-1 text-xs transition-colors"
       style={{ color: colors.text.primary }}
       onMouseEnter={(e) => {
         ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted

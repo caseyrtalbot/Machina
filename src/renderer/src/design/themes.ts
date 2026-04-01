@@ -1,17 +1,7 @@
 // src/renderer/src/design/themes.ts
 
-export type ThemeId = 'dark' | 'light' | 'system'
-export type ResolvedThemeId = 'dark' | 'light'
-
-export type AccentColorId =
-  | 'matrix'
-  | 'laser'
-  | 'synthwave'
-  | 'hotpink'
-  | 'arcade'
-  | 'phosphor'
-  | 'plasma'
-  | 'neonmint'
+/** Hardcoded accent color -- neutral white (matches text-primary) */
+export const ACCENT_HEX = '#d9d9d9'
 
 export interface EnvironmentSettings {
   readonly canvasTranslucency: number
@@ -25,29 +15,16 @@ export interface EnvironmentSettings {
   readonly sidebarFontSize: number
 }
 
-export const ENV_DEFAULTS: Record<ResolvedThemeId, EnvironmentSettings> = {
-  dark: {
-    canvasTranslucency: 40,
-    cardOpacity: 94,
-    cardHeaderDarkness: 45,
-    cardBlur: 12,
-    gridDotVisibility: 20,
-    panelLightness: 5,
-    activityBarOpacity: 55,
-    cardTitleFontSize: 12,
-    sidebarFontSize: 13
-  },
-  light: {
-    canvasTranslucency: 45,
-    cardOpacity: 90,
-    cardHeaderDarkness: 4,
-    cardBlur: 8,
-    gridDotVisibility: 15,
-    panelLightness: 98,
-    activityBarOpacity: 12,
-    cardTitleFontSize: 12,
-    sidebarFontSize: 13
-  }
+export const ENV_DEFAULTS: EnvironmentSettings = {
+  canvasTranslucency: 40,
+  cardOpacity: 94,
+  cardHeaderDarkness: 45,
+  cardBlur: 12,
+  gridDotVisibility: 20,
+  panelLightness: 5,
+  activityBarOpacity: 55,
+  cardTitleFontSize: 12,
+  sidebarFontSize: 13
 }
 
 export interface BaseRgb {
@@ -61,15 +38,9 @@ export interface ThemeBaseColors {
   readonly cardBody: BaseRgb
 }
 
-export const BASE_COLORS: Record<ResolvedThemeId, ThemeBaseColors> = {
-  dark: {
-    canvasSurface: { r: 18, g: 18, b: 20 },
-    cardBody: { r: 16, g: 16, b: 20 }
-  },
-  light: {
-    canvasSurface: { r: 232, g: 236, b: 240 },
-    cardBody: { r: 255, g: 255, b: 255 }
-  }
+export const BASE_COLORS: ThemeBaseColors = {
+  canvasSurface: { r: 18, g: 18, b: 20 },
+  cardBody: { r: 16, g: 16, b: 20 }
 }
 
 export interface StructuralColors {
@@ -82,36 +53,17 @@ export interface StructuralColors {
   }
 }
 
-export const STRUCTURAL_COLORS: Record<ResolvedThemeId, StructuralColors> = {
-  dark: {
-    border: {
-      default: 'rgba(255, 255, 255, 0.10)',
-      subtle: 'rgba(255, 255, 255, 0.05)'
-    },
-    text: { primary: '#d9d9d9', secondary: '#808080', muted: '#525252' },
-    canvas: {
-      cardBorder: 'rgba(255, 255, 255, 0.06)',
-      textHeading: '#e8e8e8',
-      blockquoteBar: '#4a4a4a'
-    }
+export const STRUCTURAL_COLORS: StructuralColors = {
+  border: {
+    default: 'rgba(255, 255, 255, 0.10)',
+    subtle: 'rgba(255, 255, 255, 0.05)'
   },
-  light: {
-    border: {
-      default: '#e2e8f0',
-      subtle: 'color-mix(in srgb, black 6%, transparent)'
-    },
-    text: { primary: '#0f172a', secondary: '#475569', muted: '#94a3b8' },
-    canvas: {
-      cardBorder: 'rgba(0, 0, 0, 0.06)',
-      textHeading: '#0f172a',
-      blockquoteBar: '#cbd5e1'
-    }
+  text: { primary: '#d9d9d9', secondary: '#808080', muted: '#525252' },
+  canvas: {
+    cardBorder: 'rgba(255, 255, 255, 0.06)',
+    textHeading: '#e8e8e8',
+    blockquoteBar: '#4a4a4a'
   }
-}
-
-interface AccentDefinition {
-  readonly label: string
-  readonly value: string
 }
 
 function parseHex(hex: string): [number, number, number] {
@@ -140,25 +92,3 @@ export function computeAccentVariants(hex: string): {
     muted: `color-mix(in srgb, ${hex} 10%, transparent)`
   }
 }
-
-export const ACCENT_COLORS: Record<AccentColorId, AccentDefinition> = {
-  matrix: { label: 'Matrix', value: '#39ff14' },
-  laser: { label: 'Laser', value: '#ff3131' },
-  synthwave: { label: 'Synthwave', value: '#b026ff' },
-  hotpink: { label: 'Hot Pink', value: '#ff10f0' },
-  arcade: { label: 'Arcade', value: '#ffff33' },
-  phosphor: { label: 'Phosphor', value: '#00ff87' },
-  plasma: { label: 'Plasma', value: '#00d4ff' },
-  neonmint: { label: 'Neon Mint', value: '#00ffcc' }
-}
-
-export const ACCENT_ORDER: readonly AccentColorId[] = [
-  'matrix',
-  'laser',
-  'synthwave',
-  'hotpink',
-  'arcade',
-  'phosphor',
-  'plasma',
-  'neonmint'
-]

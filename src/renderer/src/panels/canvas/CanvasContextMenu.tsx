@@ -87,7 +87,7 @@ export function CanvasContextMenu({
 
         return (
           <div key={section.category}>
-            <div className="px-3 py-1 text-xs font-medium" style={{ color: colors.text.muted }}>
+            <div className="px-3 py-0.5 text-xs font-medium" style={{ color: colors.text.muted }}>
               {section.label}
             </div>
             {types.map(([type, info]) => (
@@ -109,7 +109,7 @@ export function CanvasContextMenu({
                     onAddCard(type)
                   }
                 }}
-                className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors"
+                className="w-full text-left px-3 py-1 text-xs flex items-center gap-1.5 transition-colors"
                 style={{ color: colors.text.primary }}
                 onMouseEnter={(e) => {
                   ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
@@ -121,8 +121,8 @@ export function CanvasContextMenu({
                 <span
                   className="inline-flex items-center justify-center text-xs font-mono"
                   style={{
-                    width: 20,
-                    height: 20,
+                    width: 18,
+                    height: 18,
                     borderRadius: 4,
                     backgroundColor: colors.bg.surface,
                     color: colors.text.secondary
@@ -150,7 +150,7 @@ export function CanvasContextMenu({
               onSpawnAgent()
               onClose()
             }}
-            className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors"
+            className="w-full text-left px-3 py-1 text-xs flex items-center gap-1.5 transition-colors"
             style={{ color: colors.text.primary }}
             onMouseEnter={(e) => {
               ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
@@ -162,8 +162,8 @@ export function CanvasContextMenu({
             <span
               className="inline-flex items-center justify-center text-xs font-mono"
               style={{
-                width: 20,
-                height: 20,
+                width: 18,
+                height: 18,
                 borderRadius: 4,
                 backgroundColor: colors.bg.surface,
                 color: colors.text.secondary

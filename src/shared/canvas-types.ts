@@ -1,3 +1,5 @@
+import type { OntologySnapshot, OntologyLayoutResult } from './engine/ontology-types'
+
 export type CanvasNodeType =
   | 'text'
   | 'note'
@@ -90,10 +92,13 @@ export interface CanvasViewport {
 }
 
 export interface CanvasFile {
+  readonly version?: number
   readonly nodes: readonly CanvasNode[]
   readonly edges: readonly CanvasEdge[]
   readonly viewport: CanvasViewport
   readonly focusFrames?: Readonly<Record<string, CanvasViewport>>
+  readonly ontologySnapshot?: OntologySnapshot
+  readonly ontologyLayout?: OntologyLayoutResult
 }
 
 // --- Min sizes per node type ---

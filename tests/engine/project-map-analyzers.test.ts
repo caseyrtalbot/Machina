@@ -141,6 +141,12 @@ describe('resolveImportPath', () => {
       )
     ).toBe('/project/src/readme.md')
   })
+
+  it('resolves an exact extensionless file before trying known extensions', () => {
+    expect(
+      resolveImportPath('./README', '/project/src/app.ts', new Set(['/project/src/README']), ROOT)
+    ).toBe('/project/src/README')
+  })
 })
 
 describe('extractMarkdownRefs', () => {
@@ -197,6 +203,18 @@ describe('buildProjectMapSnapshot', () => {
   const ROOT = '/project'
   const defaultOpts: ProjectMapOptions = { expandDepth: 2, maxNodes: 200 }
 
+  it('creates a root folder node even when the folder is empty', () => {
+    const snapshot = buildProjectMapSnapshot(ROOT, [], defaultOpts)
+    expect(snapshot.nodes).toHaveLength(1)
+    expect(snapshot.nodes[0]).toEqual(
+      expect.objectContaining({
+        relativePath: '.',
+        isDirectory: true,
+        childCount: 0
+      })
+    )
+  })
+
   it('builds nodes for a simple folder', () => {
     const files = [
       { path: '/project/src/app.ts', content: '' },
@@ -236,6 +254,13 @@ describe('buildProjectMapSnapshot', () => {
       buildProjectMapSnapshot(ROOT, files, defaultOpts).edges.filter((e) => e.kind === 'references')
         .length
     ).toBe(1)
+  })
+
+  it('renders markdown files as note nodes so the original markdown can be shown', () => {
+    const files = [{ path: '/project/docs/guide.md', content: '# Guide\n\nBody text' }]
+    const snapshot = buildProjectMapSnapshot(ROOT, files, defaultOpts)
+    const guideNode = snapshot.nodes.find((node) => node.relativePath === 'docs/guide.md')
+    expect(guideNode?.nodeType).toBe('note')
   })
 
   it('reports unresolved refs', () => {
@@ -278,5 +303,20 @@ describe('buildProjectMapSnapshot', () => {
       { path: '/project/app.ts', content: null as unknown as string, error: 'read failed' }
     ]
     expect(buildProjectMapSnapshot(ROOT, files, defaultOpts).skippedCount).toBe(1)
+  })
+
+  it('retains folder structure for skipped files', () => {
+    const files = [{ path: '/project/assets/logo.png', content: null, error: 'binary-skipped' }]
+    const snapshot = buildProjectMapSnapshot(ROOT, files, defaultOpts)
+    expect(snapshot.skippedCount).toBe(1)
+    expect(snapshot.totalFileCount).toBe(1)
+    expect(snapshot.nodes.map((node) => node.relativePath)).toEqual(['.', 'assets'])
+    expect(snapshot.edges).toEqual([
+      expect.objectContaining({
+        kind: 'contains',
+        source: snapshot.nodes[0].id,
+        target: snapshot.nodes[1].id
+      })
+    ])
   })
 })

@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, memo } from 'react'
 import { logError } from '../../utils/error-logger'
 import { CardShell } from '../canvas/CardShell'
 import { useCanvasStore } from '../../store/canvas-store'
@@ -182,4 +182,4 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
   )
 }
 
-export default SystemArtifactCard
+export default memo(SystemArtifactCard)

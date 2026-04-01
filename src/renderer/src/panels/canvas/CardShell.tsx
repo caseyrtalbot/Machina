@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
@@ -178,6 +178,7 @@ export function CardShell({
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
   const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
   const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
+  const isInteracting = useCanvasStore((s) => s.isInteracting)
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const setHoveredNode = useCanvasStore((s) => s.setHoveredNode)
@@ -194,15 +195,13 @@ export function CardShell({
   const isTerminalCard = node.type === 'terminal'
 
   // Edge count for note cards
-  const edges = useVaultStore((s) => s.graph.edges)
-  const fileToId = useVaultStore((s) => s.fileToId)
-  const edgeCount = useMemo(() => {
+  const edgeCount = useVaultStore((s) => {
     if (node.type !== 'note') return 0
     const fp = filePath ?? node.content
-    const artifactId = fp ? fileToId[fp] : undefined
+    const artifactId = fp ? s.fileToId[fp] : undefined
     if (!artifactId) return 0
-    return edges.filter((e) => e.source === artifactId || e.target === artifactId).length
-  }, [node.type, node.content, filePath, fileToId, edges])
+    return s.edgeCountByArtifactId[artifactId] ?? 0
+  })
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -290,8 +289,11 @@ export function CardShell({
               : '0 18px 36px rgba(0, 0, 0, 0.2)',
         overflow: 'hidden',
         contain: isTerminalCard ? undefined : 'layout style',
-        backdropFilter: isTerminalCard ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
-        WebkitBackdropFilter: isTerminalCard ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
+        backdropFilter:
+          isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
+        WebkitBackdropFilter:
+          isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
+        transition: 'backdrop-filter 150ms ease',
         ...(isActive
           ? ({
               '--activity-color': 'rgba(167, 139, 250, 0.3)',
@@ -483,7 +485,11 @@ export function CardShell({
       <div
         data-canvas-card-content
         className={`flex-1 relative${isTerminalCard ? '' : ' canvas-card-content'}`}
-        style={{ minHeight: 0, overflow: isTerminalCard ? 'hidden' : undefined }}
+        style={{
+          minHeight: 0,
+          overflow: isTerminalCard ? 'hidden' : undefined,
+          contain: isTerminalCard ? undefined : 'layout style paint'
+        }}
       >
         {children}
         {/* Pointer-events shield: blocks content interaction until card is focused.

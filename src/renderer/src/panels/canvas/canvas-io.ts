@@ -2,13 +2,27 @@ import type { CanvasFile } from '@shared/canvas-types'
 import { createCanvasFile } from '@shared/canvas-types'
 
 export function serializeCanvas(file: CanvasFile): string {
-  return JSON.stringify(file, null, 2)
+  const output: Record<string, unknown> = {
+    version: file.ontologySnapshot ? 2 : (file.version ?? 1),
+    nodes: file.nodes,
+    edges: file.edges,
+    viewport: file.viewport,
+    focusFrames: file.focusFrames
+  }
+  if (file.ontologySnapshot) {
+    output.ontologySnapshot = file.ontologySnapshot
+  }
+  if (file.ontologyLayout) {
+    output.ontologyLayout = file.ontologyLayout
+  }
+  return JSON.stringify(output, null, 2)
 }
 
 export function deserializeCanvas(json: string): CanvasFile {
   try {
     const parsed = JSON.parse(json)
-    return {
+    const result: CanvasFile = {
+      version: typeof parsed.version === 'number' ? parsed.version : 1,
       nodes: Array.isArray(parsed.nodes) ? parsed.nodes : [],
       edges: Array.isArray(parsed.edges) ? parsed.edges : [],
       viewport: {
@@ -21,8 +35,11 @@ export function deserializeCanvas(json: string): CanvasFile {
         typeof parsed.focusFrames === 'object' &&
         !Array.isArray(parsed.focusFrames)
           ? parsed.focusFrames
-          : {}
+          : {},
+      ...(parsed.ontologySnapshot ? { ontologySnapshot: parsed.ontologySnapshot } : {}),
+      ...(parsed.ontologyLayout ? { ontologyLayout: parsed.ontologyLayout } : {})
     }
+    return result
   } catch {
     return createCanvasFile()
   }

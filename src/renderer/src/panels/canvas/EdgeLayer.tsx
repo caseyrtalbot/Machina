@@ -1,3 +1,4 @@
+import { useMemo, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, EDGE_KIND_COLORS } from '../../design/tokens'
 import type { CanvasEdge, CanvasNode, CanvasSide } from '@shared/canvas-types'
@@ -34,21 +35,19 @@ function getControlOffset(side: CanvasSide, distance: number): { dx: number; dy:
 
 import { getEdgeStrokeDasharray, getEdgeStrokeWidth } from './edge-styling'
 
-function EdgePath({
-  edge,
-  nodes,
-  zoom
-}: {
-  edge: CanvasEdge
-  nodes: readonly CanvasNode[]
-  zoom: number
-}) {
+interface EdgePathProps {
+  readonly edge: CanvasEdge
+  readonly nodeMap: ReadonlyMap<string, CanvasNode>
+  readonly zoom: number
+}
+
+function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
   const isSelected = useCanvasStore((s) => s.selectedEdgeId === edge.id)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
   const hoveredNodeId = useCanvasStore((s) => s.hoveredNodeId)
 
-  const from_node = nodes.find((n) => n.id === edge.fromNode)
-  const to_node = nodes.find((n) => n.id === edge.toNode)
+  const from_node = nodeMap.get(edge.fromNode)
+  const to_node = nodeMap.get(edge.toNode)
   if (!from_node || !to_node) return null
 
   if (edge.hidden) {
@@ -102,10 +101,22 @@ function EdgePath({
   )
 }
 
+const MemoEdgePath = memo(
+  EdgePathInner,
+  (prev, next) =>
+    prev.edge === next.edge && prev.nodeMap === next.nodeMap && prev.zoom === next.zoom
+)
+
 export function EdgeLayer() {
   const nodes = useCanvasStore((s) => s.nodes)
   const edges = useCanvasStore((s) => s.edges)
   const zoom = useCanvasStore((s) => s.viewport.zoom)
+
+  const nodeMap = useMemo(() => {
+    const m = new Map<string, CanvasNode>()
+    for (const n of nodes) m.set(n.id, n)
+    return m
+  }, [nodes])
 
   return (
     <svg
@@ -129,7 +140,7 @@ export function EdgeLayer() {
       </defs>
       <g style={{ pointerEvents: 'all' }}>
         {edges.map((edge) => (
-          <EdgePath key={edge.id} edge={edge} nodes={nodes} zoom={zoom} />
+          <MemoEdgePath key={edge.id} edge={edge} nodeMap={nodeMap} zoom={zoom} />
         ))}
       </g>
     </svg>

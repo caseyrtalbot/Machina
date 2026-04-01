@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { useCanvasStore } from '../../store/canvas-store'
@@ -276,4 +276,4 @@ export function FileViewCard({ node }: FileViewCardProps) {
   )
 }
 
-export default FileViewCard
+export default memo(FileViewCard)
