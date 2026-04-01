@@ -2,6 +2,19 @@ import { useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import type { CanvasNode, CanvasViewport } from '@shared/canvas-types'
 
+let minimapInteractionTimer: ReturnType<typeof setTimeout> | null = null
+
+function markMinimapInteracting(active: boolean) {
+  if (minimapInteractionTimer) clearTimeout(minimapInteractionTimer)
+  if (active) {
+    useCanvasStore.getState().setInteracting(true)
+  } else {
+    minimapInteractionTimer = setTimeout(() => {
+      useCanvasStore.getState().setInteracting(false)
+    }, 150)
+  }
+}
+
 /** Type-based colors for minimap rectangles (mirrors CardLodPreview) */
 const LOD_COLORS: Record<string, string> = {
   text: '#94a3b8',
@@ -132,6 +145,7 @@ export function CanvasMinimap({
     (e: React.PointerEvent) => {
       e.stopPropagation()
       e.preventDefault()
+      markMinimapInteracting(true)
 
       const rect = minimapRef.current?.getBoundingClientRect()
       if (!rect) return
@@ -147,6 +161,7 @@ export function CanvasMinimap({
       }
 
       const onUp = () => {
+        markMinimapInteracting(false)
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
       }

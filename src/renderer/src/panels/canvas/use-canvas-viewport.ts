@@ -1,6 +1,19 @@
 import { useCallback, useRef, useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 
+let vpInteractionTimer: ReturnType<typeof setTimeout> | null = null
+
+function markViewportInteracting(active: boolean) {
+  if (vpInteractionTimer) clearTimeout(vpInteractionTimer)
+  if (active) {
+    useCanvasStore.getState().setInteracting(true)
+  } else {
+    vpInteractionTimer = setTimeout(() => {
+      useCanvasStore.getState().setInteracting(false)
+    }, 150)
+  }
+}
+
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 3.0
 const ZOOM_SENSITIVITY = 0.001
@@ -50,6 +63,7 @@ export function useCanvasViewport(
       }
 
       e.preventDefault()
+      markViewportInteracting(true)
       const { viewport, setViewport } = useCanvasStore.getState()
       const container = containerRef.current
       if (!container) return
@@ -78,6 +92,7 @@ export function useCanvasViewport(
           zoom: viewport.zoom
         })
       }
+      markViewportInteracting(false)
     },
     [containerRef]
   )
@@ -92,6 +107,7 @@ export function useCanvasViewport(
 
     e.preventDefault()
     isPanning.current = true
+    markViewportInteracting(true)
     const { viewport } = useCanvasStore.getState()
     panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
 
@@ -108,6 +124,7 @@ export function useCanvasViewport(
 
     const onUp = () => {
       isPanning.current = false
+      markViewportInteracting(false)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
