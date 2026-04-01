@@ -76,6 +76,17 @@ export function getArtifactColor(type: string): string {
   return CUSTOM_TYPE_PALETTE[hashString(type) % CUSTOM_TYPE_PALETTE.length]
 }
 
+export const ontologyColors = {
+  'ontology-green': '#8fbe8f', // oklch(0.75 0.15 145)
+  'ontology-blue': '#7bacd4', // oklch(0.75 0.15 230)
+  'ontology-orange': '#d4a67b', // oklch(0.75 0.15 30)
+  'ontology-purple': '#c78fbe', // oklch(0.75 0.15 320)
+  'ontology-yellow': '#beb87b', // oklch(0.75 0.15 80)
+  'ontology-red': '#d48f8f', // oklch(0.75 0.15 0)
+  'ontology-teal': '#7bc4be', // oklch(0.75 0.15 185)
+  'ontology-indigo': '#9b8fd4' // oklch(0.75 0.15 280)
+} as const
+
 export const spacing = {
   unit: 4,
   panelGap: 0,
@@ -162,7 +173,17 @@ export const canvasTokens = {
   cardRadius: 6,
   contentPadding: 24,
   badgeGreen: '#4caf50',
-  linkCyan: '#5cb8c4'
+  linkCyan: '#5cb8c4',
+  ontology: {
+    sectionFillOpacity: 0.06,
+    sectionStrokeOpacity: 0.25,
+    sectionBorderRadius: 14,
+    headerFillOpacity: 0.1,
+    childFillOpacity: 0.04,
+    childStrokeOpacity: 0.15,
+    connectionOpacity: 0.15,
+    headerDotRadius: 5
+  }
 } as const
 
 export const floatingPanel = {
