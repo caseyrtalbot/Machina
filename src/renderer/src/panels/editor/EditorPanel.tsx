@@ -28,10 +28,13 @@ import { useDocument } from '../../hooks/useDocument'
 
 interface EditorPanelProps {
   onNavigate: (id: string) => void
+  /** When provided, renders this file instead of the store's activeNotePath. */
+  filePath?: string | null
 }
 
-export function EditorPanel({ onNavigate }: EditorPanelProps) {
-  const activeNotePath = useEditorStore((s) => s.activeNotePath)
+export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
+  const storeNotePath = useEditorStore((s) => s.activeNotePath)
+  const activeNotePath = filePath !== undefined ? filePath : storeNotePath
   const mode = useEditorStore((s) => s.mode)
   const content = useEditorStore((s) => s.content)
   const setContent = useEditorStore((s) => s.setContent)
@@ -107,6 +110,12 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     [handleWikilinkNavigate]
   )
 
+  // Stable ref for the resolved path so callbacks don't go stale
+  const resolvedPathRef = useRef(activeNotePath)
+  resolvedPathRef.current = activeNotePath
+
+  const isSplitPane = filePath !== undefined
+
   const handleUpdate = useCallback(
     ({ editor: ed }: { editor: ReturnType<typeof useEditor> }) => {
       if (!ed) return
@@ -117,20 +126,20 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
         if (rawFm) {
           markdown = rawFm + markdown
         }
-        setContent(markdown)
+        if (!isSplitPane) setContent(markdown)
         // Push directly to DocumentManager from user action (not via effect)
-        const path = useEditorStore.getState().activeNotePath
+        const path = resolvedPathRef.current
         if (path && prevLoadedPathRef.current === path) {
           doc.update(markdown)
         }
       }
     },
-    [setContent, doc]
+    [setContent, doc, isSplitPane]
   )
 
   const handleSelectionUpdate = useCallback(
     ({ editor: ed }: { editor: ReturnType<typeof useEditor> }) => {
-      if (!ed) return
+      if (!ed || isSplitPane) return
       const { from } = ed.state.selection
       const resolved = ed.state.doc.resolve(from)
       const lineBlock = resolved.node(1)
@@ -140,7 +149,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       const colNumber = Math.max(1, offset + 1)
       setCursorPosition(lineNumber, Math.min(colNumber, lineText.length + 1))
     },
-    [setCursorPosition]
+    [setCursorPosition, isSplitPane]
   )
 
   // Right-click handler: show context menu for concept node linking
@@ -223,10 +232,14 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   useEffect(() => {
     if (!activeNotePath || !editor || doc.content === null || doc.loading) return
     // Skip if already loaded for this path and user is editing
-    if (activeNotePath === prevLoadedPathRef.current && useEditorStore.getState().isDirty) return
+    if (
+      activeNotePath === prevLoadedPathRef.current &&
+      (isSplitPane || useEditorStore.getState().isDirty)
+    )
+      return
 
     prevLoadedPathRef.current = activeNotePath
-    loadContent(doc.content)
+    if (!isSplitPane) loadContent(doc.content)
 
     // Parse frontmatter and sync to Tiptap immediately (same synchronous block)
     const parsed = parseFrontmatter(doc.content)
@@ -330,7 +343,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
             setFrontmatterData(parsed.data as Record<string, string | readonly string[]>)
             const currentParsed = parseFrontmatter(content ?? '')
             const fullContent = newRaw + currentParsed.body
-            setContent(fullContent)
+            if (!isSplitPane) setContent(fullContent)
             // Push directly to DocumentManager from user action (not via effect)
             if (activeNotePath && prevLoadedPathRef.current === activeNotePath) {
               doc.update(fullContent)

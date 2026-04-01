@@ -693,6 +693,140 @@ body {
 
 /* ─── Panels ─── */
 
+/* ─── Editor Tab Bar ─── */
+
+.editor-tabbed-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.editor-tab-bar {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  height: 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--chrome-panel-border);
+  z-index: 2;
+}
+
+/* Hide scrollbar but allow scroll */
+.editor-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-file-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  margin-bottom: -1px;
+  border-right: 1px solid var(--chrome-panel-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 120ms ease-out;
+}
+
+.editor-file-tab:first-child {
+  border-left: none;
+}
+
+.editor-file-tab:hover:not([data-active='true']) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Active tab: seamless bottom edge, no border between tab and content */
+.editor-file-tab[data-active='true'] {
+  background: var(--color-bg-base);
+  border-bottom: 1px solid var(--color-bg-base);
+}
+
+.editor-file-tab__title {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  color: var(--color-text-muted);
+  transition: color 120ms ease-out;
+}
+
+.editor-file-tab[data-active='true'] .editor-file-tab__title {
+  color: var(--color-text-primary);
+}
+
+.editor-file-tab:hover .editor-file-tab__title {
+  color: var(--color-text-secondary);
+}
+
+.editor-file-tab__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.editor-file-tab:hover .editor-file-tab__close {
+  opacity: 1;
+}
+
+.editor-file-tab__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+}
+
+/* Action buttons (+ and x) pinned to right of tab bar */
+.editor-tab-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+.editor-tab-bar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.editor-tab-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+}
+
+.editor-tab-content {
+  flex: 1;
+  overflow: hidden;
+}
+
 /* ─── Panel Divider ─── */
 
 .panel-divider {

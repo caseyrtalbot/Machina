@@ -13,6 +13,7 @@ interface ContextMenuAction {
 }
 
 const FILE_ACTIONS: readonly ContextMenuAction[] = [
+  { id: 'open-split', label: 'Open in Split', shortcut: '⌘\\', separator: true },
   { id: 'duplicate', label: 'Duplicate' },
   { id: 'copy-path', label: 'Copy path', separator: true },
   { id: 'open-default', label: 'Open in default app' },

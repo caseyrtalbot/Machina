@@ -11,6 +11,7 @@ interface KeyboardConfig {
   onCloseTab?: () => void
   onGoBack?: () => void
   onGoForward?: () => void
+  onSplitEditor?: () => void
   onEscape?: () => void
 }
 
@@ -24,7 +25,8 @@ const META_KEY_BINDINGS = [
   { key: 't', handler: 'onNewTerminalTab' },
   { key: 'w', handler: 'onCloseTab' },
   { key: '[', handler: 'onGoBack' },
-  { key: ']', handler: 'onGoForward' }
+  { key: ']', handler: 'onGoForward' },
+  { key: '\\', handler: 'onSplitEditor' }
 ] as const satisfies ReadonlyArray<{ key: string; handler: keyof KeyboardConfig }>
 
 export function useKeyboard(config: KeyboardConfig): void {

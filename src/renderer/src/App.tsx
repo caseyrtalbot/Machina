@@ -18,7 +18,7 @@ import { ThemeProvider } from './design/Theme'
 import { Sidebar } from './panels/sidebar/Sidebar'
 import type { SystemArtifactListItem } from './panels/sidebar/Sidebar'
 import { buildFileTree } from './panels/sidebar/buildFileTree'
-import { EditorPanel } from './panels/editor/EditorPanel'
+import { EditorSplitView } from './panels/editor/EditorSplitView'
 import { ActivityBar } from './components/ActivityBar'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
 import type { TabType } from './store/tab-store'
@@ -148,7 +148,7 @@ function ContentArea() {
     <div className="h-full overflow-hidden">
       {openTypes.has('editor') && (
         <KeepAliveSlot active={activeType === 'editor'}>
-          <EditorPanel onNavigate={handleNavigate} />
+          <EditorSplitView onNavigate={handleNavigate} />
         </KeepAliveSlot>
       )}
       {openTypes.has('canvas') && mountedTypes.has('canvas') && (
@@ -801,6 +801,16 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const goBack = useEditorStore((s) => s.goBack)
   const goForward = useEditorStore((s) => s.goForward)
 
+  const handleSplitEditor = useCallback(() => {
+    const { splitNotePath, closeSplit, openSplit, activeNotePath } = useEditorStore.getState()
+    if (splitNotePath) {
+      closeSplit()
+    } else if (activeNotePath) {
+      // Open split with the same file; user can navigate the split pane independently
+      openSplit(activeNotePath)
+    }
+  }, [])
+
   useKeyboard({
     onCommandPalette: () => setPaletteOpen(true),
     onCycleView: toggleView,
@@ -809,6 +819,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
     onCloseTab: handleCloseTab,
     onGoBack: goBack,
     onGoForward: goForward,
+    onSplitEditor: handleSplitEditor,
     onEscape: () => setPaletteOpen(false)
   })
 

@@ -17,6 +17,9 @@ interface EditorStore {
   readonly cursorLine: number
   readonly cursorCol: number
 
+  // Split pane
+  readonly splitNotePath: string | null
+
   // Tabs
   readonly openTabs: readonly Tab[]
 
@@ -31,6 +34,9 @@ interface EditorStore {
   setDirty: (dirty: boolean) => void
   markSaved: () => void
   setCursorPosition: (line: number, col: number) => void
+
+  openSplit: (path: string) => void
+  closeSplit: () => void
 
   openTab: (path: string, title?: string) => void
   closeTab: (path: string) => void
@@ -110,6 +116,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   content: '',
   cursorLine: 1,
   cursorCol: 1,
+  splitNotePath: null,
   openTabs: [],
   historyStack: [],
   historyIndex: -1,
@@ -143,6 +150,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setDirty: (dirty) => set({ isDirty: dirty }),
   markSaved: () => set({ isDirty: false }),
   setCursorPosition: (line, col) => set({ cursorLine: line, cursorCol: col }),
+
+  openSplit: (path) => set({ splitNotePath: path }),
+  closeSplit: () => set({ splitNotePath: null }),
 
   openTab: (path, title) => {
     const state = get()

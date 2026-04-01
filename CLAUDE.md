@@ -53,14 +53,16 @@ src/main/                       src/preload/               src/renderer/src/
     ├── vault-query-facade.ts  # Query layer for MCP
     ├── mcp-server.ts          # MCP tool definitions
     ├── mcp-lifecycle.ts       # MCP server lifecycle management
-    ├── hitl-gate.ts           # HITL dialog + write rate limiter
+    ├── hitl-gate.ts           # HITL dialog, timeout gate, write rate limiter
     ├── path-guard.ts          # Path traversal prevention
     ├── shell-service.ts
     ├── agent-spawner.ts       # Agent process spawning (tmux)
     ├── tmux-service.ts        # tmux session management
     ├── tmux-monitor.ts        # Live tmux observation
+    ├── tmux-paths.ts          # tmux socket/log path helpers
     ├── session-tailer.ts      # Tails agent session logs
     ├── session-router.ts      # Routes session events
+    ├── session-utils.ts       # Session parsing helpers
     ├── project-watcher.ts     # Project directory watching
     ├── project-session-parser.ts
     ├── session-milestone-grouper.ts
@@ -78,6 +80,7 @@ src/shared/                    ← importable from ALL three processes
 ├── agent-types.ts
 ├── system-artifacts.ts        # Session/pattern/tension artifact schemas
 ├── constants.ts               # TE_DIR (.machina / .machina-dev)
+├── format-elapsed.ts          # Duration formatting utility
 └── engine/                    # Pure domain kernel (no Electron/React deps)
     ├── parser.ts              # Markdown → Artifact
     ├── graph-builder.ts       # Artifacts → KnowledgeGraph
@@ -204,7 +207,7 @@ Structured markdown documents stored in `.machina/artifacts/{sessions,patterns,t
 ### MCP Server
 
 Exposes vault to AI agents via Model Context Protocol:
-- Six tools: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts` (reads); `vault.write_file`, `vault.create_file` (writes gated by ElectronHitlGate + WriteRateLimiter)
+- Six tools: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts` (reads); `vault.write_file`, `vault.create_file` (writes gated by TimeoutHitlGate → ElectronHitlGate + WriteRateLimiter). TimeoutHitlGate auto-denies after 30s when no user response (prevents agent stalls when app is backgrounded).
 - Read results wrapped in Spotlighting trust markers for prompt injection mitigation
 - `mcp-cli.ts` provides headless stdio mode for Claude Desktop integration
 - `mcp-lifecycle.ts` manages server start/stop lifecycle
@@ -295,7 +298,7 @@ Three-layer material model: canvas void (darkest), cards (semi-transparent with 
 
 ## Testing
 
-- **Unit**: Vitest with happy-dom (1600+ tests, 154 files). `tests/` mirrors `src/` for pure logic; `src/**/__tests__/` for colocated component tests.
+- **Unit**: Vitest with happy-dom (1650+ tests, 158 files). `tests/` mirrors `src/` for pure logic; `src/**/__tests__/` for colocated component tests.
 - **Integration**: Override with `// @vitest-environment node` at file top for tests needing real Node APIs.
 - **Store tests**: Reset via `store.setState(store.getInitialState())` in `beforeEach`.
 - **E2E**: Playwright with `workers:1`, `test.describe.serial`, `beforeAll/afterAll` lifecycle. Test vault at `e2e/fixtures/test-vault/`.
