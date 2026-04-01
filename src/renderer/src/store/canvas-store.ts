@@ -67,6 +67,7 @@ interface CanvasStore {
   addNode: (node: CanvasNode) => void
   removeNode: (id: string) => void
   moveNode: (id: string, position: { x: number; y: number }) => void
+  moveNodes: (updates: ReadonlyMap<string, { x: number; y: number }>) => void
   resizeNode: (id: string, size: { width: number; height: number }) => void
   updateNodeContent: (id: string, content: string) => void
   updateNodeMetadata: (id: string, partial: Partial<Record<string, unknown>>) => void
@@ -223,6 +224,16 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   moveNode: (id, position) =>
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, position } : n)),
+      clusterLabels: [],
+      isDirty: true
+    })),
+
+  moveNodes: (updates) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        const pos = updates.get(n.id)
+        return pos ? { ...n, position: pos } : n
+      }),
       clusterLabels: [],
       isDirty: true
     })),
