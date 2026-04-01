@@ -404,6 +404,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
 
         rateLimiter?.record()
 
+        // Ops validated by validateCanvasOp loop above; cast is safe post-validation
         opts?.dispatchCanvasPlan?.(plan as unknown as CanvasMutationPlan)
 
         return {

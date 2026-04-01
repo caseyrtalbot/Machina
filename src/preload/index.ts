@@ -103,8 +103,7 @@ const api = {
   },
   canvas: {
     getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    applyPlan: (canvasPath: string, expectedMtime: string, plan: any) =>
+    applyPlan: (canvasPath: string, expectedMtime: string, plan: CanvasMutationPlan) =>
       typedInvoke('canvas:apply-plan', { canvasPath, expectedMtime, plan })
   },
   document: {
