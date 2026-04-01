@@ -30,56 +30,52 @@ import { inferLanguage, type DragFileData } from './file-drop-utils'
 import { useViewportCulling } from './use-canvas-culling'
 import { getLodLevel } from './use-canvas-lod'
 import { findOpenPosition } from './canvas-layout'
-import { CanvasSplitEditor } from './CanvasSplitEditor'
+import { SplitDividerAndPanel } from './SplitDividerAndPanel'
 import { CanvasWelcomeCard, EmptyCanvasHint } from './CanvasEmptyStates'
 import { useTabStore } from '../../store/tab-store'
-import { mapFolderToCanvas, cancelFolderMap } from './folder-map-orchestrator'
-import type { FolderMapProgress } from './folder-map-orchestrator'
+import {
+  mapFolderToCanvas,
+  cancelFolderMap,
+  type FolderMapProgress
+} from './folder-map-orchestrator'
 import { FolderMapPreviewGhosts, FolderMapPreviewBar } from './FolderMapPreview'
+import { SectionOverlay } from './SectionOverlay'
+import { OntologyPreview } from './OntologyPreview'
+import { useOntologyOrchestrator } from './ontology-orchestrator'
 import { applyFolderMapPlan } from './folder-map-apply'
+import { augmentFolderMapWithVaultSemantics } from './folder-map-semantic'
 import {
   buildFolderMapPlan,
   filterCanvasAdditions,
   type CanvasMutationPlan
 } from '@shared/canvas-mutation-types'
 
-/** Draggable divider + editor panel. Separate component to isolate drag
- *  state from CanvasView and prevent canvas DOM remounts. */
-function SplitDividerAndPanel({ filePath }: { readonly filePath: string }) {
-  const [width, setWidth] = useState(480)
-  const dragging = useRef(false)
+const organizeButtonStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  zIndex: 20,
+  padding: '6px 12px',
+  borderRadius: 6,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: 'var(--color-text-secondary)',
+  fontSize: 13,
+  fontFamily: 'var(--font-mono, monospace)'
+}
 
-  const handleMouseDown = useCallback(() => {
-    dragging.current = true
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-
-    const onMove = (e: MouseEvent) => {
-      if (!dragging.current) return
-      const fromRight = window.innerWidth - e.clientX
-      setWidth(Math.max(250, Math.min(fromRight, window.innerWidth - 500)))
-    }
-
-    const onUp = () => {
-      dragging.current = false
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }, [])
-
-  return (
-    <>
-      <div className="panel-divider" onMouseDown={handleMouseDown} />
-      <div style={{ width, flexShrink: 0 }} className="h-full overflow-hidden">
-        <CanvasSplitEditor filePath={filePath} />
-      </div>
-    </>
-  )
+const folderMapProgressStyle: React.CSSProperties = {
+  position: 'absolute',
+  bottom: 16,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  padding: '8px 16px',
+  borderRadius: '8px',
+  background: 'var(--color-bg-elevated)',
+  border: '1px solid var(--color-border-subtle)',
+  fontSize: '13px',
+  color: 'var(--color-text-secondary)',
+  zIndex: 10
 }
 
 export function CanvasView(): React.ReactElement {
@@ -101,6 +97,7 @@ export function CanvasView(): React.ReactElement {
   const commandStack = useRef(new CommandStack())
   const [folderMapProgress, setFolderMapProgress] = useState<FolderMapProgress | null>(null)
   const [previewPlan, setPreviewPlan] = useState<CanvasMutationPlan | null>(null)
+  const ontology = useOntologyOrchestrator(commandStack)
   const rawFileCount = useVaultStore((s) => {
     const total = s.artifacts.length
     if (total === 0) return 0
@@ -115,6 +112,10 @@ export function CanvasView(): React.ReactElement {
   })
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
+  const artifacts = useVaultStore((s) => s.artifacts)
+  const graph = useVaultStore((s) => s.graph)
+  const fileToId = useVaultStore((s) => s.fileToId)
+  const artifactPathById = useVaultStore((s) => s.artifactPathById)
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
   const activeTabId = useTabStore((s) => s.activeTabId)
 
@@ -553,10 +554,19 @@ export function CanvasView(): React.ReactElement {
         const startState = useCanvasStore.getState()
         const result = await mapFolderToCanvas(path, startState.nodes, setFolderMapProgress)
         if (result) {
+          const semanticResult = augmentFolderMapWithVaultSemantics({
+            rootPath: path,
+            nodes: result.nodes,
+            edges: result.edges,
+            graph,
+            artifacts,
+            fileToId,
+            artifactPathById
+          })
           const currentState = useCanvasStore.getState()
           const additions = filterCanvasAdditions(
-            [...result.nodes],
-            [...result.edges],
+            [...semanticResult.nodes],
+            [...semanticResult.edges],
             currentState.nodes,
             currentState.edges
           )
@@ -580,7 +590,7 @@ export function CanvasView(): React.ReactElement {
         setFolderMapProgress(null)
       }
     })()
-  }, [pendingFolderMap])
+  }, [pendingFolderMap, graph, artifacts, fileToId, artifactPathById])
 
   // Folder-map: apply plan to canvas with undo support
   const handleApplyPlan = useCallback(() => {
@@ -602,6 +612,12 @@ export function CanvasView(): React.ReactElement {
     setPreviewPlan(null)
   }, [])
 
+  const ontologyGroups = ontology.pendingSnapshot
+    ? Object.values(ontology.pendingSnapshot.groupsById)
+    : []
+  const ontologyGroupCount = ontologyGroups.filter((g) => g.parentGroupId === null).length
+  const ontologyCardCount = ontologyGroups.reduce((sum, g) => sum + g.cardIds.length, 0)
+
   return (
     <div className="flex h-full w-full overflow-hidden">
       <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
@@ -620,6 +636,16 @@ export function CanvasView(): React.ReactElement {
           }}
           onOpenImport={() => setImportOpen(true)}
         />
+        <button
+          onClick={ontology.startOrganize}
+          disabled={ontology.phase === 'processing'}
+          style={{
+            ...organizeButtonStyle,
+            cursor: ontology.phase === 'processing' ? 'wait' : 'pointer'
+          }}
+        >
+          {ontology.phase === 'processing' ? 'Organizing...' : 'Organize'}
+        </button>
         <CanvasSurface
           onContextMenu={handleContextMenu}
           onBackgroundClick={handleBackgroundClick}
@@ -642,6 +668,19 @@ export function CanvasView(): React.ReactElement {
           {previewPlan && <FolderMapPreviewGhosts plan={previewPlan} />}
         </CanvasSurface>
 
+        <SectionOverlay viewport={viewport} />
+
+        {(ontology.phase === 'preview' || ontology.phase === 'error') && (
+          <OntologyPreview
+            phase={ontology.phase}
+            errorMessage={ontology.errorMessage ?? undefined}
+            groupCount={ontologyGroupCount}
+            cardCount={ontologyCardCount}
+            onApply={ontology.applyResult}
+            onCancel={ontology.cancel}
+          />
+        )}
+
         {previewPlan && (
           <FolderMapPreviewBar
             plan={previewPlan}
@@ -653,21 +692,7 @@ export function CanvasView(): React.ReactElement {
         {folderMapProgress &&
           folderMapProgress.phase !== 'idle' &&
           folderMapProgress.phase !== 'done' && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 16,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border-subtle)',
-                fontSize: '13px',
-                color: 'var(--color-text-secondary)',
-                zIndex: 10
-              }}
-            >
+            <div style={folderMapProgressStyle}>
               {folderMapProgress.phase === 'error'
                 ? `\u26A0 ${folderMapProgress.errorMessage ?? 'Mapping failed'}`
                 : `Mapping\u2026 ${folderMapProgress.filesProcessed}/${folderMapProgress.totalFiles} files`}
@@ -675,22 +700,15 @@ export function CanvasView(): React.ReactElement {
           )}
 
         <ConnectionDragOverlay />
-
         {nodes.length === 0 && !vaultPath && <CanvasWelcomeCard />}
-
         {nodes.length === 0 && vaultPath && <EmptyCanvasHint rawFileCount={rawFileCount} />}
-
         <ZoomIndicator />
-
         <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
-
         <ClusterLabels viewport={viewport} />
-
         <CanvasMinimap
           containerWidth={containerSize.width}
           containerHeight={containerSize.height}
         />
-
         <TerminalDock containerWidth={containerSize.width} containerHeight={containerSize.height} />
 
         <ImportPalette

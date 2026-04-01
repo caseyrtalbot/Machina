@@ -2,13 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { computeOntologyLayout } from '@shared/engine/ontology-layout'
 import { groupId, revisionId } from '@shared/engine/ontology-types'
-import type { OntologySnapshot, OntologyLayoutResult } from '@shared/engine/ontology-types'
-import {
-  GROUP_PADDING,
-  HEADER_HEIGHT,
-  GROUP_GAP_MIN,
-  CARD_GAP
-} from '@shared/engine/ontology-types'
+import type { OntologySnapshot } from '@shared/engine/ontology-types'
+import { GROUP_GAP_MIN } from '@shared/engine/ontology-types'
 
 function makeSnapshot(overrides: Partial<OntologySnapshot> = {}): OntologySnapshot {
   return {

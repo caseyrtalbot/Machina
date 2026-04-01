@@ -2,7 +2,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeOntologySnapshot } from '@shared/engine/ontology-grouping'
 import { computeOntologyLayout } from '@shared/engine/ontology-layout'
-import type { OntologySnapshot } from '@shared/engine/ontology-types'
 
 // --- Test fixtures ---
 
