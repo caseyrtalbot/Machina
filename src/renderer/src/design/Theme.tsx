@@ -1,21 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useLayoutEffect,
-  useMemo,
-  useSyncExternalStore,
-  type ReactNode
-} from 'react'
+import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from 'react'
 import { spacing, typography, transitions } from './tokens'
 import {
   STRUCTURAL_COLORS,
   BASE_COLORS,
+  ACCENT_HEX,
   computeAccentVariants,
-  ACCENT_COLORS,
-  type ResolvedThemeId,
   type EnvironmentSettings
 } from './themes'
-import { useSettingsStore, resolveTheme } from '../store/settings-store'
+import { useSettingsStore } from '../store/settings-store'
 
 interface EnvContext {
   readonly cardBlur: number
@@ -23,7 +15,6 @@ interface EnvContext {
   readonly activityBarOpacity: number
   readonly cardTitleFontSize: number
   readonly sidebarFontSize: number
-  readonly resolvedTheme: ResolvedThemeId
 }
 
 interface ThemeContextType {
@@ -42,43 +33,14 @@ const ThemeContext = createContext<ThemeContextType>({
     gridDotVisibility: 20,
     activityBarOpacity: 55,
     cardTitleFontSize: 12,
-    sidebarFontSize: 13,
-    resolvedTheme: 'dark'
+    sidebarFontSize: 13
   }
 })
 
-const SYSTEM_THEME_QUERY = '(prefers-color-scheme: dark)'
-
-function subscribeToSystemTheme(onStoreChange: () => void): () => void {
-  const mq = window.matchMedia(SYSTEM_THEME_QUERY)
-  const handler = () => onStoreChange()
-  mq.addEventListener('change', handler)
-  return () => mq.removeEventListener('change', handler)
-}
-
-function getSystemResolvedTheme(): ResolvedThemeId {
-  return window.matchMedia(SYSTEM_THEME_QUERY).matches ? 'dark' : 'light'
-}
-
-function subscribeToNothing(_onStoreChange: () => void): () => void {
-  return () => {}
-}
-
-function useResolvedTheme(): ResolvedThemeId {
-  const theme = useSettingsStore((s) => s.theme)
-  const systemResolved = useSyncExternalStore(
-    theme === 'system' ? subscribeToSystemTheme : subscribeToNothing,
-    getSystemResolvedTheme,
-    () => resolveTheme('dark')
-  )
-
-  return theme === 'system' ? systemResolved : theme
-}
-
-function applyEnvCssVars(resolved: ResolvedThemeId, env: EnvironmentSettings): void {
+function applyEnvCssVars(env: EnvironmentSettings): void {
   const root = document.documentElement
-  const base = BASE_COLORS[resolved]
-  const structural = STRUCTURAL_COLORS[resolved]
+  const base = BASE_COLORS
+  const structural = STRUCTURAL_COLORS
 
   const surfaceOpacity = (100 - env.canvasTranslucency) / 100
   root.style.setProperty(
@@ -131,37 +93,33 @@ function applyEnvCssVars(resolved: ResolvedThemeId, env: EnvironmentSettings): v
   )
 }
 
-function applyAccentCssVars(accentHex: string): void {
+function applyAccentCssVars(): void {
   const root = document.documentElement
-  const accent = computeAccentVariants(accentHex)
+  const accent = computeAccentVariants(ACCENT_HEX)
   root.style.setProperty('--color-accent-default', accent.default)
   root.style.setProperty('--color-accent-hover', accent.hover)
   root.style.setProperty('--color-accent-muted', accent.muted)
 
-  if (accentHex.startsWith('#') && accentHex.length === 7) {
-    const r = parseInt(accentHex.slice(1, 3), 16)
-    const g = parseInt(accentHex.slice(3, 5), 16)
-    const b = parseInt(accentHex.slice(5, 7), 16)
-    root.style.setProperty('--neon-glow', `0 0 8px rgba(${r}, ${g}, ${b}, 0.15)`)
-    root.style.setProperty('--color-accent-focus', `rgba(${r}, ${g}, ${b}, 0.3)`)
-    root.style.setProperty('--color-accent-subtle', `rgba(${r}, ${g}, ${b}, 0.15)`)
-  }
+  const [r, g, b] = [
+    parseInt(ACCENT_HEX.slice(1, 3), 16),
+    parseInt(ACCENT_HEX.slice(3, 5), 16),
+    parseInt(ACCENT_HEX.slice(5, 7), 16)
+  ]
+  root.style.setProperty('--neon-glow', `0 0 8px rgba(${r}, ${g}, ${b}, 0.15)`)
+  root.style.setProperty('--color-accent-focus', `rgba(${r}, ${g}, ${b}, 0.3)`)
+  root.style.setProperty('--color-accent-subtle', `rgba(${r}, ${g}, ${b}, 0.15)`)
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const resolved = useResolvedTheme()
-  const accentColor = useSettingsStore((s) => s.accentColor)
   const env = useSettingsStore((s) => s.env)
 
-  const accentHex = ACCENT_COLORS[accentColor].value
+  useLayoutEffect(() => {
+    applyEnvCssVars(env)
+  }, [env])
 
   useLayoutEffect(() => {
-    applyEnvCssVars(resolved, env)
-  }, [resolved, env])
-
-  useLayoutEffect(() => {
-    applyAccentCssVars(accentHex)
-  }, [accentHex])
+    applyAccentCssVars()
+  }, [])
 
   const ctx = useMemo<ThemeContextType>(
     () => ({
@@ -173,11 +131,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         gridDotVisibility: env.gridDotVisibility,
         activityBarOpacity: env.activityBarOpacity,
         cardTitleFontSize: env.cardTitleFontSize,
-        sidebarFontSize: env.sidebarFontSize,
-        resolvedTheme: resolved
+        sidebarFontSize: env.sidebarFontSize
       }
     }),
-    [env, resolved]
+    [env]
   )
 
   return <ThemeContext.Provider value={ctx}>{children}</ThemeContext.Provider>

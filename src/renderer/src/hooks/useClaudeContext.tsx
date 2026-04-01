@@ -105,7 +105,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
         style={{
           width: 6,
           height: 6,
-          backgroundColor: contextError ? '#f59e0b' : colors.accent.default
+          backgroundColor: contextError ? '#f59e0b' : colors.text.secondary
         }}
       />
       <span

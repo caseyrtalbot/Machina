@@ -137,7 +137,7 @@ export function ActivityBar({
           const isActive = activeTabId === view
           const def = TAB_DEFINITIONS[view]
           const isGhostTab = view === 'ghosts'
-          const ghostTint = isGhostTab ? (ghostCount > 0 ? '#f59e0b' : '#4ade80') : undefined
+          const ghostTint = isGhostTab && ghostCount > 0 ? colors.text.primary : undefined
           return (
             <button
               key={view}

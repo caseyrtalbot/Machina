@@ -127,7 +127,7 @@ export function TagBrowser() {
             {expanded ? '\u25BE' : '\u25B8'}
           </span>
           <span
-            className="uppercase font-medium tracking-[0.15em]"
+            className="uppercase font-medium tracking-[0.04em]"
             style={{ color: colors.text.muted, fontSize: 'var(--env-sidebar-tertiary-font-size)' }}
           >
             Tags
