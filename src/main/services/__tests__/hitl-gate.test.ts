@@ -4,9 +4,9 @@
  * The HITL gate blocks destructive MCP operations until the user
  * confirms via Electron dialog. Tests use injectable mock gates.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { HitlGate, HitlDecision } from '../hitl-gate'
-import { WriteRateLimiter } from '../hitl-gate'
+import { WriteRateLimiter, TimeoutHitlGate } from '../hitl-gate'
 
 /** A mock gate that always approves. */
 class AlwaysApproveGate implements HitlGate {
@@ -81,5 +81,50 @@ describe('WriteRateLimiter', () => {
       limiter.recordAt(oldTime)
     }
     expect(limiter.isExceeded(10)).toBe(false)
+  })
+})
+
+/** A mock gate that never resolves (simulates backgrounded app). */
+class NeverRespondGate implements HitlGate {
+  confirm(): Promise<HitlDecision> {
+    return new Promise(() => {}) // Never resolves
+  }
+}
+
+describe('TimeoutHitlGate', () => {
+  it('auto-denies after timeout', async () => {
+    vi.useFakeTimers()
+
+    const gate = new TimeoutHitlGate(new NeverRespondGate(), 100)
+    const promise = gate.confirm({
+      tool: 'vault.write_file',
+      path: '/vault/test.md',
+      description: 'Test write'
+    })
+
+    vi.advanceTimersByTime(101)
+
+    const decision = await promise
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('timeout')
+
+    vi.useRealTimers()
+  })
+
+  it('resolves normally when gate responds before timeout', async () => {
+    const gate = new TimeoutHitlGate(new AlwaysApproveGate(), 30_000)
+    const decision = await gate.confirm({
+      tool: 'vault.write_file',
+      path: '/vault/test.md',
+      description: 'Test write'
+    })
+
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('uses default 30s timeout when not specified', () => {
+    const gate = new TimeoutHitlGate(new AlwaysApproveGate())
+    // Just verify it constructs without error
+    expect(gate).toBeDefined()
   })
 })

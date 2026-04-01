@@ -12,7 +12,7 @@ import { createMcpServer } from './mcp-server'
 import { PathGuard } from './path-guard'
 import { AuditLogger } from './audit-logger'
 import { VaultQueryFacade, type VaultQueryDeps } from './vault-query-facade'
-import { ElectronHitlGate, WriteRateLimiter } from './hitl-gate'
+import { ElectronHitlGate, WriteRateLimiter, TimeoutHitlGate } from './hitl-gate'
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
@@ -49,7 +49,7 @@ export class McpLifecycle implements McpStatusProvider {
     const guard = new PathGuard(vaultRoot)
     const logger = new AuditLogger(join(app.getPath('userData'), 'audit'))
     const facade = new VaultQueryFacade(guard, logger, vaultRoot, deps)
-    const gate = new ElectronHitlGate()
+    const gate = new TimeoutHitlGate(new ElectronHitlGate())
     const rateLimiter = new WriteRateLimiter()
 
     const dispatchCanvasPlan = (plan: CanvasMutationPlan): void => {

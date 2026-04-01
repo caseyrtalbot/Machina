@@ -52,6 +52,35 @@ export class WriteRateLimiter {
 }
 
 /**
+ * Wraps any HitlGate with a timeout.
+ * If the inner gate does not respond within timeoutMs, auto-denies.
+ * Prevents agent operations from blocking indefinitely when the
+ * app is backgrounded or the user is away.
+ */
+export class TimeoutHitlGate implements HitlGate {
+  constructor(
+    private readonly inner: HitlGate,
+    private readonly timeoutMs: number = 30_000
+  ) {}
+
+  async confirm(opts: HitlConfirmOpts): Promise<HitlDecision> {
+    return Promise.race([
+      this.inner.confirm(opts),
+      new Promise<HitlDecision>((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              allowed: false,
+              reason: `Denied: HITL gate timeout (${this.timeoutMs}ms)`
+            }),
+          this.timeoutMs
+        )
+      )
+    ])
+  }
+}
+
+/**
  * Production HITL gate using Electron's native dialog.
  *
  * Shows a confirmation dialog to the user before allowing destructive
