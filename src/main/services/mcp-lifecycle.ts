@@ -13,6 +13,9 @@ import { PathGuard } from './path-guard'
 import { AuditLogger } from './audit-logger'
 import { VaultQueryFacade, type VaultQueryDeps } from './vault-query-facade'
 import { ElectronHitlGate, WriteRateLimiter } from './hitl-gate'
+import { typedSend } from '../typed-ipc'
+import { getMainWindow } from '../window-registry'
+import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import type { McpStatusProvider } from '../ipc/mcp'
 
 export class McpLifecycle implements McpStatusProvider {
@@ -49,7 +52,14 @@ export class McpLifecycle implements McpStatusProvider {
     const gate = new ElectronHitlGate()
     const rateLimiter = new WriteRateLimiter()
 
-    this.server = createMcpServer(facade, { gate, rateLimiter })
+    const dispatchCanvasPlan = (plan: CanvasMutationPlan): void => {
+      const window = getMainWindow()
+      if (window) {
+        typedSend(window, 'canvas:agent-plan-accepted', { plan })
+      }
+    }
+
+    this.server = createMcpServer(facade, { gate, rateLimiter, dispatchCanvasPlan })
     this._toolCount = 6 // 4 read + 2 write (gate always provided)
     this._created = true
     return this.server

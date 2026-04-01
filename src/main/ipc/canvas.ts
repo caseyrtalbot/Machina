@@ -1,4 +1,5 @@
-import { typedHandle } from '../typed-ipc'
+import { typedHandle, typedSend } from '../typed-ipc'
+import { getMainWindow } from '../window-registry'
 import { readFile, stat } from 'fs/promises'
 import type { CanvasFile } from '@shared/canvas-types'
 import type { CanvasMutationOp } from '@shared/canvas-mutation-types'
@@ -69,7 +70,12 @@ export function registerCanvasIpc(): void {
       }
     }
 
-    // Validation passed -- actual apply happens in the renderer via preview/apply flow
-    return { applied: true, mtime: currentMtime }
+    // Dispatch validated plan to renderer for store application
+    const window = getMainWindow()
+    if (window) {
+      typedSend(window, 'canvas:agent-plan-accepted', { plan: args.plan })
+    }
+
+    return { accepted: true, mtime: currentMtime }
   })
 }

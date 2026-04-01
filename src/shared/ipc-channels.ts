@@ -7,6 +7,7 @@ import type {
 } from './workbench-types'
 import type { SystemArtifactKind } from './system-artifacts'
 import type { AgentSidecarState, AgentSpawnRequest } from './agent-types'
+import type { CanvasMutationPlan } from './canvas-mutation-types'
 
 export interface IpcChannels {
   // --- Filesystem ---
@@ -158,10 +159,10 @@ export interface IpcChannels {
     request: {
       canvasPath: string
       expectedMtime: string
-      plan: import('./canvas-mutation-types').CanvasMutationPlan
+      plan: CanvasMutationPlan
     }
     response:
-      | { applied: boolean; mtime: string }
+      | { accepted: boolean; mtime: string }
       | { error: 'stale' | 'validation-failed'; message: string }
   }
 }
@@ -187,6 +188,9 @@ export interface IpcEvents {
 
   // Agent observation events (main -> renderer)
   'agent:states-changed': { states: readonly AgentSidecarState[] }
+
+  // Canvas agent plan dispatch (main -> renderer)
+  'canvas:agent-plan-accepted': { plan: CanvasMutationPlan }
 }
 
 export type IpcChannel = keyof IpcChannels

@@ -17,13 +17,14 @@ import type { VaultQueryFacade } from './vault-query-facade'
 import type { HitlGate } from './hitl-gate'
 import type { WriteRateLimiter } from './hitl-gate'
 import type { CanvasFile } from '@shared/canvas-types'
-import type { CanvasMutationOp } from '@shared/canvas-mutation-types'
+import type { CanvasMutationOp, CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import { DEFAULT_PROJECT_MAP_OPTIONS, isBinaryPath } from '@shared/engine/project-map-types'
 import { buildProjectMapSnapshot, type FileInput } from '@shared/engine/project-map-analyzers'
 
 export interface McpServerOpts {
   readonly gate?: HitlGate
   readonly rateLimiter?: WriteRateLimiter
+  readonly dispatchCanvasPlan?: (plan: CanvasMutationPlan) => void
 }
 
 /**
@@ -403,11 +404,13 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
 
         rateLimiter?.record()
 
+        opts?.dispatchCanvasPlan?.(plan as unknown as CanvasMutationPlan)
+
         return {
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify({ applied: true, mtime: currentMtime })
+              text: JSON.stringify({ accepted: true, mtime: currentMtime })
             }
           ]
         }

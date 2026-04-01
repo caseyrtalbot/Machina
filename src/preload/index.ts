@@ -11,6 +11,7 @@ import type {
 } from '../shared/workbench-types'
 
 import type { AgentSidecarState, AgentSpawnRequest } from '../shared/agent-types'
+import type { CanvasMutationPlan } from '../shared/canvas-mutation-types'
 
 const api = {
   window: {
@@ -141,6 +142,8 @@ const api = {
     docSaved: (callback: (data: { path: string }) => void) => typedOn('doc:saved', callback),
     agentStatesChanged: (callback: (data: { states: readonly AgentSidecarState[] }) => void) =>
       typedOn('agent:states-changed', callback),
+    canvasAgentPlanAccepted: (callback: (data: { plan: CanvasMutationPlan }) => void) =>
+      typedOn('canvas:agent-plan-accepted', callback),
     appWillQuit: (callback: (data: Record<string, never>) => void) =>
       typedOn('app:will-quit', callback)
   },
