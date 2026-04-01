@@ -1,4 +1,5 @@
 import { describe, bench, beforeEach } from 'vitest'
+import { markdownToHtml } from '../../src/renderer/src/panels/canvas/shared/markdown-html'
 import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { useVaultStore } from '../../src/renderer/src/store/vault-store'
 import { getLodLevel } from '../../src/renderer/src/panels/canvas/use-canvas-lod'
@@ -150,4 +151,34 @@ describe('vault-store: setWorkerResult', () => {
       }
     )
   }
+})
+
+// ---------------------------------------------------------------------------
+// markdownToHtml benchmarks
+// ---------------------------------------------------------------------------
+
+const SHORT_MD = '# Title\n\nA short paragraph with **bold** and *italic* text.'
+const MEDIUM_MD = Array(10)
+  .fill(
+    '## Section\n\nParagraph with a [[wikilink]] and `inline code`.\n\n- list item\n- another item'
+  )
+  .join('\n\n')
+const LONG_MD = Array(40)
+  .fill(
+    '### Heading\n\n> Blockquote with some content\n\n```js\nconst x = 1\n```\n\nMore text here.'
+  )
+  .join('\n\n')
+
+describe('markdownToHtml', () => {
+  bench('short (~100 chars)', () => {
+    markdownToHtml(SHORT_MD)
+  })
+
+  bench('medium (~500 chars)', () => {
+    markdownToHtml(MEDIUM_MD)
+  })
+
+  bench('long (~2000 chars)', () => {
+    markdownToHtml(LONG_MD)
+  })
 })
