@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { computeOntologySnapshot } from '@shared/engine/ontology-grouping'
+import { computeOntologyLayout } from '@shared/engine/ontology-layout'
 import type { OntologySnapshot } from '@shared/engine/ontology-types'
 
 // --- Test fixtures ---
@@ -382,5 +383,57 @@ describe('computeOntologySnapshot', () => {
       })
       expect(result.rootGroupIds).toHaveLength(1)
     })
+  })
+})
+
+describe('full pipeline integration', () => {
+  it('snapshot → layout → cards within frames', () => {
+    // Set up 6 cards across 2 tags with cross-group links
+    const cards = [
+      makeCard('c1'),
+      makeCard('c2'),
+      makeCard('c3'),
+      makeCard('c4'),
+      makeCard('c5'),
+      makeCard('c6')
+    ]
+    const fileToId: Record<string, string> = {
+      '/vault/c1.md': 'a1',
+      '/vault/c2.md': 'a2',
+      '/vault/c3.md': 'a3',
+      '/vault/c4.md': 'a4',
+      '/vault/c5.md': 'a5',
+      '/vault/c6.md': 'a6'
+    }
+    const artifacts: Record<string, TestArtifact> = {
+      a1: makeArtifact('a1', ['systems']),
+      a2: makeArtifact('a2', ['systems']),
+      a3: makeArtifact('a3', ['systems']),
+      a4: makeArtifact('a4', ['models']),
+      a5: makeArtifact('a5', ['models']),
+      a6: makeArtifact('a6', ['models'])
+    }
+    const graphEdges = [{ source: 'a1', target: 'a4', kind: 'connection' }]
+
+    const snapshot = computeOntologySnapshot({ cards, fileToId, artifacts, graphEdges })
+    const cardSizes = Object.fromEntries(cards.map((c) => [c.id, { width: 200, height: 100 }]))
+    const layout = computeOntologyLayout(snapshot, cardSizes, { x: 0, y: 0 })
+
+    // Verify every grouped card is inside its group frame
+    for (const group of Object.values(snapshot.groupsById)) {
+      const frame = layout.groupFrames[group.id]
+      if (!frame) continue
+
+      for (const cardId of group.cardIds) {
+        const pos = layout.cardPositions[cardId]
+        expect(pos).toBeDefined()
+        expect(pos.x).toBeGreaterThanOrEqual(frame.x)
+        expect(pos.y).toBeGreaterThanOrEqual(frame.y)
+      }
+    }
+
+    // Verify inter-group edge exists
+    expect(snapshot.interGroupEdges).toHaveLength(1)
+    expect(snapshot.interGroupEdges[0].weight).toBe(1)
   })
 })
