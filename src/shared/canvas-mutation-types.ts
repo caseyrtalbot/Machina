@@ -35,6 +35,59 @@ export interface CanvasMutationPlan {
   }
 }
 
+export function applyPlanOps(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  ops: readonly CanvasMutationOp[]
+): { readonly nodes: readonly CanvasNode[]; readonly edges: readonly CanvasEdge[] } {
+  let currentNodes = [...nodes]
+  let currentEdges = [...edges]
+
+  for (const op of ops) {
+    switch (op.type) {
+      case 'add-node':
+        currentNodes = [...currentNodes, op.node]
+        break
+
+      case 'add-edge':
+        currentEdges = [...currentEdges, op.edge]
+        break
+
+      case 'move-node':
+        currentNodes = currentNodes.map((n) =>
+          n.id === op.nodeId ? { ...n, position: { ...op.position } } : n
+        )
+        break
+
+      case 'resize-node':
+        currentNodes = currentNodes.map((n) =>
+          n.id === op.nodeId ? { ...n, size: { ...op.size } } : n
+        )
+        break
+
+      case 'update-metadata':
+        currentNodes = currentNodes.map((n) =>
+          n.id === op.nodeId ? { ...n, metadata: { ...n.metadata, ...op.metadata } } : n
+        )
+        break
+
+      case 'remove-node': {
+        currentNodes = currentNodes.filter((n) => n.id !== op.nodeId)
+        currentEdges = currentEdges.filter(
+          (e) => e.fromNode !== op.nodeId && e.toNode !== op.nodeId
+        )
+        break
+      }
+
+      case 'remove-edge':
+        currentEdges = currentEdges.filter((e) => e.id !== op.edgeId)
+        break
+    }
+  }
+
+  return { nodes: currentNodes, edges: currentEdges }
+}
+
 function edgeSignature(
   edge: Pick<
     CanvasEdge,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasNode, CanvasEdge } from '../canvas-types'
-import { buildFolderMapPlan, filterCanvasAdditions } from '../canvas-mutation-types'
+import { applyPlanOps, buildFolderMapPlan, filterCanvasAdditions } from '../canvas-mutation-types'
 import type { CanvasMutationOp, CanvasMutationPlan } from '../canvas-mutation-types'
 
 const makeNode = (id: string, type: CanvasNode['type'] = 'project-file'): CanvasNode => ({
@@ -146,5 +146,156 @@ describe('filterCanvasAdditions', () => {
     )
 
     expect(filtered.edges).toEqual([uniqueEdge])
+  })
+})
+
+describe('applyPlanOps', () => {
+  it('applies add-node ops', () => {
+    const newNode = makeNode('n1')
+    const ops: CanvasMutationOp[] = [{ type: 'add-node', node: newNode }]
+
+    const result = applyPlanOps([], [], ops)
+
+    expect(result.nodes).toEqual([newNode])
+    expect(result.edges).toEqual([])
+  })
+
+  it('applies add-edge ops', () => {
+    const nodes = [makeNode('n1'), makeNode('n2')]
+    const newEdge = makeEdge('e1', 'n1', 'n2')
+    const ops: CanvasMutationOp[] = [{ type: 'add-edge', edge: newEdge }]
+
+    const result = applyPlanOps(nodes, [], ops)
+
+    expect(result.edges).toEqual([newEdge])
+    expect(result.nodes).toEqual(nodes)
+  })
+
+  it('applies move-node ops', () => {
+    const nodes = [makeNode('n1'), makeNode('n2')]
+    const ops: CanvasMutationOp[] = [
+      { type: 'move-node', nodeId: 'n1', position: { x: 100, y: 200 } }
+    ]
+
+    const result = applyPlanOps(nodes, [], ops)
+
+    expect(result.nodes[0].position).toEqual({ x: 100, y: 200 })
+    expect(result.nodes[1].position).toEqual({ x: 0, y: 0 })
+  })
+
+  it('applies resize-node ops', () => {
+    const nodes = [makeNode('n1')]
+    const ops: CanvasMutationOp[] = [
+      { type: 'resize-node', nodeId: 'n1', size: { width: 500, height: 300 } }
+    ]
+
+    const result = applyPlanOps(nodes, [], ops)
+
+    expect(result.nodes[0].size).toEqual({ width: 500, height: 300 })
+  })
+
+  it('applies update-metadata ops (merges metadata)', () => {
+    const node: CanvasNode = {
+      ...makeNode('n1'),
+      metadata: { language: 'ts', existing: true }
+    }
+    const ops: CanvasMutationOp[] = [
+      { type: 'update-metadata', nodeId: 'n1', metadata: { language: 'rust', added: 42 } }
+    ]
+
+    const result = applyPlanOps([node], [], ops)
+
+    expect(result.nodes[0].metadata).toEqual({
+      language: 'rust',
+      existing: true,
+      added: 42
+    })
+  })
+
+  it('applies remove-node ops AND cleans up dangling edges', () => {
+    const nodes = [makeNode('n1'), makeNode('n2'), makeNode('n3')]
+    const edges = [
+      makeEdge('e1', 'n1', 'n2'),
+      makeEdge('e2', 'n2', 'n3'),
+      makeEdge('e3', 'n1', 'n3')
+    ]
+    const ops: CanvasMutationOp[] = [{ type: 'remove-node', nodeId: 'n1' }]
+
+    const result = applyPlanOps(nodes, edges, ops)
+
+    expect(result.nodes).toHaveLength(2)
+    expect(result.nodes.map((n) => n.id)).toEqual(['n2', 'n3'])
+    // e1 (n1->n2) and e3 (n1->n3) should be removed as dangling
+    expect(result.edges).toHaveLength(1)
+    expect(result.edges[0].id).toBe('e2')
+  })
+
+  it('applies remove-edge ops', () => {
+    const nodes = [makeNode('n1'), makeNode('n2')]
+    const edges = [makeEdge('e1', 'n1', 'n2'), makeEdge('e2', 'n2', 'n1')]
+    const ops: CanvasMutationOp[] = [{ type: 'remove-edge', edgeId: 'e1' }]
+
+    const result = applyPlanOps(nodes, edges, ops)
+
+    expect(result.edges).toHaveLength(1)
+    expect(result.edges[0].id).toBe('e2')
+  })
+
+  it('applies multiple ops in sequence', () => {
+    const ops: CanvasMutationOp[] = [
+      { type: 'add-node', node: makeNode('n1') },
+      { type: 'add-node', node: makeNode('n2') },
+      { type: 'add-edge', edge: makeEdge('e1', 'n1', 'n2') },
+      { type: 'move-node', nodeId: 'n1', position: { x: 50, y: 75 } },
+      { type: 'resize-node', nodeId: 'n2', size: { width: 400, height: 200 } },
+      { type: 'update-metadata', nodeId: 'n1', metadata: { tag: 'important' } }
+    ]
+
+    const result = applyPlanOps([], [], ops)
+
+    expect(result.nodes).toHaveLength(2)
+    expect(result.edges).toHaveLength(1)
+    expect(result.nodes[0].position).toEqual({ x: 50, y: 75 })
+    expect(result.nodes[1].size).toEqual({ width: 400, height: 200 })
+    expect(result.nodes[0].metadata).toEqual({ tag: 'important' })
+  })
+
+  it('does not mutate input arrays', () => {
+    const nodes = Object.freeze([makeNode('n1')]) as readonly CanvasNode[]
+    const edges = Object.freeze([makeEdge('e1', 'n1', 'n2')]) as readonly CanvasEdge[]
+    const ops: CanvasMutationOp[] = [
+      { type: 'add-node', node: makeNode('n2') },
+      { type: 'move-node', nodeId: 'n1', position: { x: 99, y: 99 } },
+      { type: 'remove-edge', edgeId: 'e1' }
+    ]
+
+    const result = applyPlanOps(nodes, edges, ops)
+
+    // Originals untouched
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].position).toEqual({ x: 0, y: 0 })
+    expect(edges).toHaveLength(1)
+    // Result has changes
+    expect(result.nodes).toHaveLength(2)
+    expect(result.nodes[0].position).toEqual({ x: 99, y: 99 })
+    expect(result.edges).toHaveLength(0)
+  })
+
+  it('skips ops for nonexistent nodes gracefully', () => {
+    const nodes = [makeNode('n1')]
+    const edges = [makeEdge('e1', 'n1', 'n2')]
+    const ops: CanvasMutationOp[] = [
+      { type: 'move-node', nodeId: 'ghost', position: { x: 1, y: 1 } },
+      { type: 'resize-node', nodeId: 'ghost', size: { width: 1, height: 1 } },
+      { type: 'update-metadata', nodeId: 'ghost', metadata: { x: 1 } },
+      { type: 'remove-node', nodeId: 'ghost' },
+      { type: 'remove-edge', edgeId: 'ghost-edge' }
+    ]
+
+    // Should not throw
+    const result = applyPlanOps(nodes, edges, ops)
+
+    expect(result.nodes).toEqual(nodes)
+    expect(result.edges).toEqual(edges)
   })
 })
