@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CanvasNode, CanvasEdge, CanvasViewport, CanvasFile } from '@shared/canvas-types'
 import { getDefaultMetadata } from '@shared/canvas-types'
+import type { OntologySnapshot, OntologyLayoutResult, GroupId } from '@shared/engine/ontology-types'
 import { spatialSort, nextCard, prevCard } from '../panels/canvas/canvas-spatial-nav'
 import {
   computeTileLayout,
@@ -44,6 +45,11 @@ interface CanvasStore {
 
   // Cluster labels from semantic organize
   readonly clusterLabels: readonly ClusterLabel[]
+
+  // Ontology: graphical grouping overlay
+  readonly ontologySnapshot: OntologySnapshot | null
+  readonly ontologyLayout: OntologyLayoutResult | null
+  readonly ontologyIsStale: boolean
 
   // Bridge: registered by CanvasView for accurate viewport centering
   readonly centerOnNode: ((nodeId: string) => void) | null
@@ -122,6 +128,13 @@ interface CanvasStore {
   // Bridge registration
   setCenterOnNode: (handler: ((nodeId: string) => void) | null) => void
 
+  // Ontology actions
+  applyOntology: (snapshot: OntologySnapshot, layout: OntologyLayoutResult) => void
+  clearOntology: () => void
+  moveCardToSection: (cardId: string, targetGroupId: GroupId) => void
+  removeSection: (groupId: GroupId) => void
+  updateSection: (groupId: GroupId, updates: { label?: string; colorToken?: string }) => void
+
   // Snapshot for persistence
   toCanvasFile: () => CanvasFile
 }
@@ -144,6 +157,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   cardContextMenu: null,
   splitFilePath: null,
   clusterLabels: [],
+  ontologySnapshot: null,
+  ontologyLayout: null,
+  ontologyIsStale: false,
   centerOnNode: null,
   pendingFolderMap: null,
   setPendingFolderMap: (path) => set({ pendingFolderMap: path }),
@@ -162,7 +178,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       lockedCardId: null,
       hoveredNodeId: null,
       focusedTerminalId: null,
-      cardContextMenu: null
+      cardContextMenu: null,
+      ontologySnapshot: data.ontologySnapshot ?? null,
+      ontologyLayout: data.ontologyLayout ?? null,
+      ontologyIsStale: false
     }),
 
   closeCanvas: () =>
@@ -179,7 +198,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       lockedCardId: null,
       hoveredNodeId: null,
       cardContextMenu: null,
-      focusedTerminalId: null
+      focusedTerminalId: null,
+      ontologySnapshot: null,
+      ontologyLayout: null,
+      ontologyIsStale: false
     }),
 
   markSaved: () => set({ isDirty: false }),
@@ -357,8 +379,147 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setCenterOnNode: (handler) => set({ centerOnNode: handler }),
 
+  applyOntology: (snapshot, layout) =>
+    set({ ontologySnapshot: snapshot, ontologyLayout: layout, ontologyIsStale: false }),
+
+  clearOntology: () =>
+    set({ ontologySnapshot: null, ontologyLayout: null, ontologyIsStale: false }),
+
+  moveCardToSection: (cardId, targetGroupId) => {
+    const { ontologySnapshot } = get()
+    if (!ontologySnapshot) return
+
+    // Find the source group containing this card
+    const sourceGroupId = Object.keys(ontologySnapshot.groupsById).find((gid) =>
+      ontologySnapshot.groupsById[gid].cardIds.includes(cardId)
+    )
+    if (!sourceGroupId || sourceGroupId === targetGroupId) return
+
+    const sourceGroup = ontologySnapshot.groupsById[sourceGroupId]
+    const targetGroup = ontologySnapshot.groupsById[targetGroupId]
+    if (!targetGroup) return
+
+    const updatedSourceGroup = {
+      ...sourceGroup,
+      cardIds: sourceGroup.cardIds.filter((id) => id !== cardId)
+    }
+    const updatedTargetGroup = {
+      ...targetGroup,
+      cardIds: [...targetGroup.cardIds, cardId]
+    }
+
+    let newGroupsById = {
+      ...ontologySnapshot.groupsById,
+      [sourceGroupId]: updatedSourceGroup,
+      [targetGroupId]: updatedTargetGroup
+    }
+
+    let newRootGroupIds = [...ontologySnapshot.rootGroupIds]
+
+    // Remove empty source group (no cards and no children)
+    if (updatedSourceGroup.cardIds.length === 0) {
+      const hasChildren = Object.values(newGroupsById).some(
+        (g) => g.id !== updatedSourceGroup.id && g.parentGroupId === updatedSourceGroup.id
+      )
+      if (!hasChildren) {
+        const { [sourceGroupId]: _removed, ...rest } = newGroupsById
+        newGroupsById = rest
+        newRootGroupIds = newRootGroupIds.filter((id) => id !== sourceGroupId)
+      }
+    }
+
+    set({
+      ontologySnapshot: {
+        ...ontologySnapshot,
+        groupsById: newGroupsById,
+        rootGroupIds: newRootGroupIds as GroupId[]
+      },
+      ontologyIsStale: true
+    })
+  },
+
+  removeSection: (groupId) => {
+    const { ontologySnapshot } = get()
+    if (!ontologySnapshot) return
+
+    // Collect all group ids to remove (the target + all descendants)
+    const idsToRemove = new Set<string>()
+    const collectDescendants = (id: string): void => {
+      idsToRemove.add(id)
+      for (const g of Object.values(ontologySnapshot.groupsById)) {
+        if (g.parentGroupId === id) {
+          collectDescendants(g.id)
+        }
+      }
+    }
+    collectDescendants(groupId)
+
+    // Gather all cards from removed groups
+    const movedCards: string[] = []
+    for (const id of idsToRemove) {
+      const group = ontologySnapshot.groupsById[id]
+      if (group) {
+        movedCards.push(...group.cardIds)
+      }
+    }
+
+    // Build new groupsById without removed groups
+    const newGroupsById: Record<string, (typeof ontologySnapshot.groupsById)[string]> = {}
+    for (const [id, group] of Object.entries(ontologySnapshot.groupsById)) {
+      if (!idsToRemove.has(id)) {
+        newGroupsById[id] = group
+      }
+    }
+
+    const newRootGroupIds = ontologySnapshot.rootGroupIds.filter((id) => !idsToRemove.has(id))
+
+    set({
+      ontologySnapshot: {
+        ...ontologySnapshot,
+        groupsById: newGroupsById,
+        rootGroupIds: newRootGroupIds,
+        ungroupedNoteIds: [...ontologySnapshot.ungroupedNoteIds, ...movedCards],
+        interGroupEdges: ontologySnapshot.interGroupEdges.filter(
+          (e) => !idsToRemove.has(e.fromGroupId) && !idsToRemove.has(e.toGroupId)
+        )
+      },
+      ontologyIsStale: true
+    })
+  },
+
+  updateSection: (groupId, updates) => {
+    const { ontologySnapshot } = get()
+    if (!ontologySnapshot) return
+
+    const group = ontologySnapshot.groupsById[groupId]
+    if (!group) return
+
+    const newGroupsById = { ...ontologySnapshot.groupsById }
+
+    // Apply updates to the target group
+    newGroupsById[groupId] = { ...group, ...updates }
+
+    // Cascade colorToken to child groups
+    if (updates.colorToken) {
+      const cascadeColor = (parentId: string, color: string): void => {
+        for (const [id, g] of Object.entries(newGroupsById)) {
+          if (g.parentGroupId === parentId) {
+            newGroupsById[id] = { ...g, colorToken: color }
+            cascadeColor(id, color)
+          }
+        }
+      }
+      cascadeColor(groupId, updates.colorToken)
+    }
+
+    set({
+      ontologySnapshot: { ...ontologySnapshot, groupsById: newGroupsById },
+      ontologyIsStale: true
+    })
+  },
+
   toCanvasFile: () => {
-    const { nodes, edges, viewport, focusFrames } = get()
+    const { nodes, edges, viewport, focusFrames, ontologySnapshot, ontologyLayout } = get()
     // Only strip isActive (runtime-only). initialCwd and initialCommand
     // persist to disk so terminal cards restore with correct cwd and command.
     const EPHEMERAL_KEYS = new Set(['isActive'])
@@ -372,7 +533,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       nodes: cleanNodes,
       edges: [...edges],
       viewport: { ...viewport },
-      focusFrames: { ...focusFrames }
+      focusFrames: { ...focusFrames },
+      ...(ontologySnapshot ? { ontologySnapshot } : {}),
+      ...(ontologyLayout ? { ontologyLayout } : {})
     }
   }
 }))
