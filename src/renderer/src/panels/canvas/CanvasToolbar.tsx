@@ -135,7 +135,7 @@ export function CanvasToolbar({
             <line x1="4.5" y1="3" x2="9.5" y2="3" />
           </svg>
         </button>
-        <Tip label="Import notes" shortcut="\u2318G" />
+        <Tip label="Import notes" shortcut="⌘G" />
       </div>
 
       <div className="canvas-toolrail__divider" />
@@ -182,7 +182,7 @@ export function CanvasToolbar({
             <path d="M6 7h4a2 2 0 0 1 0 4H8" />
           </svg>
         </button>
-        <Tip label="Undo" shortcut="\u2318Z" />
+        <Tip label="Undo" shortcut="⌘Z" />
       </div>
       <div className="canvas-toolbtn-wrap">
         <button
@@ -204,7 +204,7 @@ export function CanvasToolbar({
             <path d="M8 7H4a2 2 0 0 0 0 4h2" />
           </svg>
         </button>
-        <Tip label="Redo" shortcut="\u21E7\u2318Z" />
+        <Tip label="Redo" shortcut="⇧⌘Z" />
       </div>
 
       <div className="canvas-toolrail__divider" />
@@ -230,7 +230,7 @@ export function CanvasToolbar({
               <rect x="8" y="8" width="5" height="5" rx="0.5" />
             </svg>
           </button>
-          <Tip label="Tile layout" shortcut="\u2318L" />
+          <Tip label="Tile layout" shortcut="⌘L" />
         </div>
         {tileMenuOpen && (
           <div
@@ -479,7 +479,7 @@ export function CanvasToolbar({
             <button
               key={slot}
               onClick={() => useCanvasStore.getState().jumpToFocusFrame(String(slot))}
-              title={`Focus Frame ${slot} (\u2318${slot})`}
+              title={`Focus Frame ${slot} (⌘${slot})`}
               style={{
                 width: 8,
                 height: 8,
