@@ -262,7 +262,6 @@ export function CanvasView(): React.ReactElement {
 
   // Performance: only render nodes visible in the viewport
   const visibleNodes = useViewportCulling(nodes, viewport, containerSize, protectedIds)
-  const lod = getLodLevel(viewport.zoom)
 
   const addNodeWithUndo = useCallback(
     (node: CanvasNode) => {
@@ -653,9 +652,10 @@ export function CanvasView(): React.ReactElement {
         >
           <EdgeLayer />
           {visibleNodes.map((node) => {
+            const nodeLod = getLodLevel(viewport.zoom, node.type)
             // Terminal cards always render at full LOD to preserve PTY sessions
-            if ((lod === 'dot' || lod === 'preview') && node.type !== 'terminal') {
-              return <CardLodPreview key={node.id} node={node} lod={lod} />
+            if ((nodeLod === 'dot' || nodeLod === 'preview') && node.type !== 'terminal') {
+              return <CardLodPreview key={node.id} node={node} lod={nodeLod} />
             }
             const Card = LazyCards[node.type]
             if (!Card) return null

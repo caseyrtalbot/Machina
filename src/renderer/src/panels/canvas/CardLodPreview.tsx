@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { memo, useCallback } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, borderRadius } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNode } from '@shared/canvas-types'
@@ -25,7 +25,7 @@ const LOD_COLORS: Record<string, string> = {
  * - preview: colored rectangle with type label
  * - dot: small colored circle
  */
-export function CardLodPreview({ node, lod }: CardLodPreviewProps) {
+function CardLodPreviewInner({ node, lod }: CardLodPreviewProps) {
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
@@ -91,3 +91,8 @@ export function CardLodPreview({ node, lod }: CardLodPreviewProps) {
     </div>
   )
 }
+
+export const CardLodPreview = memo(
+  CardLodPreviewInner,
+  (prev, next) => prev.node === next.node && prev.lod === next.lod
+)
