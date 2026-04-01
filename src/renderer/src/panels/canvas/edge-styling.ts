@@ -10,8 +10,3 @@ export function getEdgeStrokeWidth(kind: string | undefined): number {
   if (kind === 'ontology') return 1
   return 1.5
 }
-
-export function getEdgeOpacity(kind: string | undefined, zoom: number): number {
-  if (kind === 'ontology') return zoom < 0.3 ? 0 : 0.15
-  return 1
-}

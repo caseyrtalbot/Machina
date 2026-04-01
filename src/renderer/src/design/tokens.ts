@@ -119,36 +119,7 @@ export const transitions = {
   commandPalette: '150ms ease-out'
 } as const
 
-export const typeScale = {
-  display: {
-    pageTitle: { size: '20px', weight: 600, color: colors.text.primary },
-    sectionHeading: { size: '15px', weight: 600, color: colors.text.primary },
-    body: { size: '13px', weight: 400, color: colors.text.primary },
-    secondary: { size: '12px', weight: 400, color: colors.text.secondary },
-    label: {
-      size: '12px',
-      weight: 400,
-      color: colors.text.muted,
-      textTransform: 'uppercase' as const,
-      letterSpacing: '0.05em'
-    }
-  },
-  mono: { terminal: { size: '13px' }, source: { size: '12px' }, inline: { size: '12px' } },
-  minSize: '12px'
-} as const
-
 export const borderRadius = { container: 6, inline: 4, card: 0, round: '50%' } as const
-
-/* ── Visual Language ──────────────────────────────────────────────────────
- * Edge-to-edge panel aesthetic with thin perpendicular divider lines.
- * Panels sit flush, separated by 1px lines. Depth via background contrast.
- * Tab bars use --border-subtle for their 1px bottom separator.
- */
-export const visualLanguage = {
-  panelGap: 0,
-  cardRadius: 0,
-  borderSubtle: 'color-mix(in srgb, white 8%, transparent)'
-} as const
 
 export const EDGE_KIND_COLORS: Record<string, string> = {
   connection: '#667383', // oklch(0.55 0.03 255) neutral slate
@@ -204,8 +175,4 @@ export const floatingPanel = {
       letterSpacing: '0.15em'
     }
   }
-} as const
-
-export const animations = {
-  spatialTransition: '250ms ease-out'
 } as const

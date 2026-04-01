@@ -4,11 +4,8 @@ import {
   ARTIFACT_COLORS,
   EDGE_KIND_COLORS,
   getArtifactColor,
-  typeScale,
   borderRadius,
-  transitions,
-  animations,
-  visualLanguage
+  transitions
 } from '../../src/renderer/src/design/tokens'
 
 describe('design tokens', () => {
@@ -39,31 +36,11 @@ describe('design tokens', () => {
 })
 
 describe('extended design tokens', () => {
-  it('has complete type scale with all roles', () => {
-    expect(typeScale.display.pageTitle.size).toBe('20px')
-    expect(typeScale.display.pageTitle.weight).toBe(600)
-    expect(typeScale.display.sectionHeading.size).toBe('15px')
-    expect(typeScale.display.body.size).toBe('13px')
-    expect(typeScale.display.secondary.size).toBe('12px')
-    expect(typeScale.display.label.size).toBe('12px')
-    expect(typeScale.display.label.textTransform).toBe('uppercase')
-    expect(typeScale.display.label.letterSpacing).toBe('0.05em')
-    expect(typeScale.mono.terminal.size).toBe('13px')
-    expect(typeScale.mono.source.size).toBe('12px')
-    expect(typeScale.mono.inline.size).toBe('12px')
-  })
-
   it('has border-radius constants', () => {
     expect(borderRadius.container).toBe(6)
     expect(borderRadius.inline).toBe(4)
     expect(borderRadius.card).toBe(0)
     expect(borderRadius.round).toBe('50%')
-  })
-
-  it('has visual language tokens', () => {
-    expect(visualLanguage.panelGap).toBe(0)
-    expect(visualLanguage.cardRadius).toBe(0)
-    expect(visualLanguage.borderSubtle).toBe('color-mix(in srgb, white 8%, transparent)')
   })
 
   it('has transition timing constants', () => {
@@ -75,13 +52,8 @@ describe('extended design tokens', () => {
     expect(transitions.commandPalette).toBe('150ms ease-out')
   })
 
-  it('has animation timing constants', () => {
-    expect(animations.spatialTransition).toBe('250ms ease-out')
-  })
-
   it('enforces max animation duration of 400ms', () => {
-    const allDurations = [...Object.values(transitions), ...Object.values(animations)]
-    for (const timing of allDurations) {
+    for (const timing of Object.values(transitions)) {
       const ms = parseInt(timing, 10)
       expect(ms).toBeLessThanOrEqual(400)
     }
