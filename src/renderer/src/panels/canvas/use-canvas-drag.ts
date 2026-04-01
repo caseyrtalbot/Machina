@@ -2,6 +2,20 @@ import { useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { getMinSize, type CanvasNodeType } from '@shared/canvas-types'
 
+/** Module-level interaction debounce to prevent timer stacking */
+let interactionTimer: ReturnType<typeof setTimeout> | null = null
+
+function markInteracting(active: boolean) {
+  if (interactionTimer) clearTimeout(interactionTimer)
+  if (active) {
+    useCanvasStore.getState().setInteracting(true)
+  } else {
+    interactionTimer = setTimeout(() => {
+      useCanvasStore.getState().setInteracting(false)
+    }, 150)
+  }
+}
+
 /** Grid size for Shift-snap (matches dot grid spacing in CanvasSurface) */
 export const SNAP_GRID_SIZE = 24
 
@@ -46,6 +60,7 @@ export function useNodeDrag(nodeId: string) {
         ny: node.position.y,
         groupPositions
       }
+      markInteracting(true)
 
       let latestSingleX = 0
       let latestSingleY = 0
@@ -110,6 +125,7 @@ export function useNodeDrag(nodeId: string) {
       }
 
       const onUp = () => {
+        markInteracting(false)
         // Flush final position if a RAF is still pending
         if (rafPending) {
           const { moveNode: mv, moveNodes: mvs } = useCanvasStore.getState()
@@ -149,6 +165,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
         w: node.size.width,
         h: node.size.height
       }
+      markInteracting(true)
 
       const webviews = Array.from(document.querySelectorAll('webview')) as HTMLElement[]
       const previousPointerEvents = new Map<HTMLElement, string>()
@@ -170,6 +187,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
       }
 
       const onUp = () => {
+        markInteracting(false)
         resizeStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)

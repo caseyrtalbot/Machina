@@ -32,6 +32,7 @@ interface CanvasStore {
   readonly lockedCardId: string | null
 
   // Interaction state
+  readonly isInteracting: boolean
   readonly hoveredNodeId: string | null
   readonly focusedTerminalId: string | null
   readonly cardContextMenu: {
@@ -93,6 +94,9 @@ interface CanvasStore {
   saveFocusFrame: (slot: string) => void
   jumpToFocusFrame: (slot: string) => void
 
+  // Interaction blur toggle
+  setInteracting: (v: boolean) => void
+
   // Hover
   setHoveredNode: (id: string | null) => void
 
@@ -153,6 +157,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   selectedEdgeId: null,
   focusedCardId: null,
   lockedCardId: null,
+  isInteracting: false,
   hoveredNodeId: null,
   focusedTerminalId: null,
   cardContextMenu: null,
@@ -313,6 +318,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     // intentionally does NOT set isDirty
   },
 
+  setInteracting: (v) => set({ isInteracting: v }),
   setHoveredNode: (id) => set({ hoveredNodeId: id }),
 
   setFocusedTerminal: (id) => set({ focusedTerminalId: id }),

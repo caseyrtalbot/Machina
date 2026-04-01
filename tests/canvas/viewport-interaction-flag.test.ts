@@ -14,7 +14,7 @@ describe('viewport interaction flagging', () => {
   describe('markViewportInteracting', () => {
     it('sets isInteracting true immediately when active', async () => {
       // Import the module to get the function (it's module-scoped)
-      const mod = await import('../../src/renderer/src/panels/canvas/use-canvas-viewport')
+      await import('../../src/renderer/src/panels/canvas/use-canvas-viewport')
       // The function is not exported, so we test via the store side-effect
       // We need to verify the store behavior indirectly through the hook
       // Since markViewportInteracting is module-private, we verify it through
@@ -58,13 +58,13 @@ describe('viewport interaction flagging', () => {
 
   describe('module-level interaction helpers exist', () => {
     it('use-canvas-viewport module imports without error', async () => {
-      const mod = await import('../../src/renderer/src/panels/canvas/use-canvas-viewport')
-      expect(mod.useCanvasViewport).toBeDefined()
+      const vpMod = await import('../../src/renderer/src/panels/canvas/use-canvas-viewport')
+      expect(vpMod.useCanvasViewport).toBeDefined()
     })
 
     it('CanvasMinimap module imports without error', async () => {
-      const mod = await import('../../src/renderer/src/panels/canvas/CanvasMinimap')
-      expect(mod.CanvasMinimap).toBeDefined()
+      const mmMod = await import('../../src/renderer/src/panels/canvas/CanvasMinimap')
+      expect(mmMod.CanvasMinimap).toBeDefined()
     })
   })
 })

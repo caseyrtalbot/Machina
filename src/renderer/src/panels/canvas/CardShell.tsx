@@ -178,6 +178,7 @@ export function CardShell({
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
   const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
   const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
+  const isInteracting = useCanvasStore((s) => s.isInteracting)
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const setHoveredNode = useCanvasStore((s) => s.setHoveredNode)
@@ -290,8 +291,11 @@ export function CardShell({
               : '0 18px 36px rgba(0, 0, 0, 0.2)',
         overflow: 'hidden',
         contain: isTerminalCard ? undefined : 'layout style',
-        backdropFilter: isTerminalCard ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
-        WebkitBackdropFilter: isTerminalCard ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
+        backdropFilter:
+          isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
+        WebkitBackdropFilter:
+          isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
+        transition: 'backdrop-filter 150ms ease',
         ...(isActive
           ? ({
               '--activity-color': 'rgba(167, 139, 250, 0.3)',
