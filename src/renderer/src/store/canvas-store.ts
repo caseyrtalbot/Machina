@@ -34,6 +34,8 @@ interface CanvasStore {
   // Interaction state
   readonly isInteracting: boolean
   readonly hoveredNodeId: string | null
+  // Edge visibility: session-only, not persisted
+  readonly showAllEdges: boolean
   readonly focusedTerminalId: string | null
   readonly cardContextMenu: {
     readonly x: number
@@ -100,6 +102,9 @@ interface CanvasStore {
   // Hover
   setHoveredNode: (id: string | null) => void
 
+  // Edge visibility
+  toggleShowAllEdges: () => void
+
   // Terminal focus
   setFocusedTerminal: (id: string | null) => void
 
@@ -159,6 +164,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   lockedCardId: null,
   isInteracting: false,
   hoveredNodeId: null,
+  showAllEdges: false,
   focusedTerminalId: null,
   cardContextMenu: null,
   splitFilePath: null,
@@ -183,6 +189,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       focusedCardId: null,
       lockedCardId: null,
       hoveredNodeId: null,
+      showAllEdges: false,
       focusedTerminalId: null,
       cardContextMenu: null,
       ontologySnapshot: data.ontologySnapshot ?? null,
@@ -320,6 +327,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setInteracting: (v) => set({ isInteracting: v }),
   setHoveredNode: (id) => set({ hoveredNodeId: id }),
+
+  toggleShowAllEdges: () => set((s) => ({ showAllEdges: !s.showAllEdges })),
 
   setFocusedTerminal: (id) => set({ focusedTerminalId: id }),
 
