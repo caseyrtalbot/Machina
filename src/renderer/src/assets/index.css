@@ -132,6 +132,11 @@ h6 {
   }
 }
 
+@keyframes te-edge-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes te-zoom-fade {
   0%,
   75% {

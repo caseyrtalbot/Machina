@@ -27,6 +27,8 @@ export function CanvasToolbar({
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
   const focusFrames = useCanvasStore((s) => s.focusFrames)
+  const showAllEdges = useCanvasStore((s) => s.showAllEdges)
+  const toggleShowAllEdges = useCanvasStore((s) => s.toggleShowAllEdges)
   const gridDotVisibility = useSettingsStore((s) => s.env.gridDotVisibility)
   const cardBlur = useSettingsStore((s) => s.env.cardBlur)
   const setEnv = useSettingsStore((s) => s.setEnv)
@@ -253,6 +255,28 @@ export function CanvasToolbar({
           </div>
         )}
       </div>
+
+      <div className="canvas-toolrail__divider" />
+
+      <button
+        onClick={toggleShowAllEdges}
+        className={`canvas-toolbtn${showAllEdges ? ' canvas-toolbtn--active' : ''}`}
+        title={showAllEdges ? 'Hide edges (show on hover)' : 'Show all edges'}
+      >
+        <svg
+          width={14}
+          height={14}
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
+          <circle cx="4" cy="4" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <line x1="5.5" y1="5.5" x2="10.5" y2="10.5" />
+        </svg>
+      </button>
 
       <div className="canvas-toolrail__divider" />
 
