@@ -16,7 +16,7 @@ export function groupByFrequency(ghosts: readonly GhostEntry[]): GhostSection[] 
 
   const maxCount = ghosts[0]?.referenceCount ?? 1
 
-  return BANDS.map(({ label, min }) => ({
+  return BANDS.map(({ label, min: _min }) => ({
     label,
     ghosts: ghosts.filter((g) => {
       const ratio = g.referenceCount / maxCount

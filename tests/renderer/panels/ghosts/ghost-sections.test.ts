@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  groupByFrequency,
-  type GhostSection
-} from '../../../../src/renderer/src/panels/ghosts/ghost-sections'
+import { groupByFrequency } from '../../../../src/renderer/src/panels/ghosts/ghost-sections'
 import type { GhostEntry } from '@shared/engine/ghost-index'
 
 function ghost(id: string, referenceCount: number): GhostEntry {
