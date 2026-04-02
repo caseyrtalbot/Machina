@@ -11,6 +11,7 @@ import type {
 } from '../shared/workbench-types'
 
 import type { AgentSidecarState, AgentSpawnRequest } from '../shared/agent-types'
+import type { AgentActionRequest, AgentActionResponse } from '../shared/agent-action-types'
 import type { CanvasMutationPlan } from '../shared/canvas-mutation-types'
 
 const api = {
@@ -100,6 +101,10 @@ const api = {
   agent: {
     getStates: () => typedInvoke('agent:get-states'),
     spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request)
+  },
+  agentAction: {
+    compute: (request: AgentActionRequest): Promise<AgentActionResponse> =>
+      typedInvoke('agent-action:compute', request)
   },
   canvas: {
     getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
