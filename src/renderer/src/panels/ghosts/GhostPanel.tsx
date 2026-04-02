@@ -1,75 +1,403 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useUiStore } from '../../store/ui-store'
 import { useTabStore, TAB_DEFINITIONS } from '../../store/tab-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
-import { colors, floatingPanel, typography } from '../../design/tokens'
+import { colors, typography } from '../../design/tokens'
+import { groupByFrequency } from './ghost-sections'
 import type { Artifact } from '@shared/types'
 
-export function GhostPanel() {
-  const graph = useVaultStore((s) => s.graph)
-  const artifacts = useVaultStore((s) => s.artifacts)
-  const dismissedGhosts = useUiStore((s) => s.dismissedGhosts)
-  const dismissGhost = useUiStore((s) => s.dismissGhost)
+// ---------------------------------------------------------------------------
+// SVG Icons (14x14 viewBox 0 0 16 16)
+// ---------------------------------------------------------------------------
 
-  const allGhosts = useMemo(() => buildGhostIndex(graph, artifacts), [graph, artifacts])
-
-  const visibleGhosts = useMemo(
-    () => allGhosts.filter((g) => !dismissedGhosts.includes(g.id)),
-    [allGhosts, dismissedGhosts]
+function IconPlus() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    >
+      <line x1="8" y1="3" x2="8" y2="13" />
+      <line x1="3" y1="8" x2="13" y2="8" />
+    </svg>
   )
+}
 
-  if (visibleGhosts.length === 0) {
-    return <EmptyState hasDismissed={dismissedGhosts.length > 0} />
-  }
+function IconGraph() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    >
+      <circle cx="8" cy="8" r="4.5" />
+      <circle cx="8" cy="8" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function IconThinking() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="6.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="9.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
+      <path d="M6 9.5c.5.8 1.2 1.2 2 1.2s1.5-.4 2-1.2" />
+    </svg>
+  )
+}
+
+function IconDismiss() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    >
+      <line x1="4" y1="4" x2="12" y2="12" />
+      <line x1="12" y1="4" x2="4" y2="12" />
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Context Popup
+// ---------------------------------------------------------------------------
+
+interface ContextPopupProps {
+  readonly ghost: GhostEntry
+  readonly anchorRef: React.RefObject<HTMLButtonElement | null>
+  readonly onClose: () => void
+}
+
+function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose()
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [anchorRef, onClose])
 
   return (
     <div
-      className="h-full overflow-y-auto"
+      ref={popupRef}
+      role="dialog"
+      aria-label={`${ghost.id} references`}
       style={{
-        padding: '18px 16px 28px',
-        fontFamily: typography.fontFamily.body
+        position: 'absolute',
+        bottom: 'calc(100% + 8px)',
+        right: -8,
+        width: 320,
+        background: 'rgba(14, 16, 22, 0.96)',
+        backdropFilter: 'blur(20px) saturate(1.3)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: 10,
+        padding: '14px 16px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
+        zIndex: 100
       }}
     >
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <div
-            className="text-[10px] uppercase tracking-[0.16em] mb-1"
-            style={{ color: colors.text.muted }}
-          >
-            Ghosts
-          </div>
-          <div className="text-sm" style={{ color: colors.text.secondary, lineHeight: 1.5 }}>
-            {visibleGhosts.length} unresolved reference{visibleGhosts.length !== 1 ? 's' : ''}
-          </div>
-        </div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: colors.text.primary,
+          marginBottom: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}
+      >
+        <span style={{ opacity: 0.5 }}>
+          <IconThinking />
+        </span>
+        {ghost.id} &middot; {ghost.referenceCount} reference
+        {ghost.referenceCount !== 1 ? 's' : ''}
+      </div>
+      {ghost.references.map((ref, i) => (
         <div
-          className="text-[11px] px-3 py-1.5 rounded-full"
+          key={i}
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            color: colors.text.muted,
-            fontFamily: typography.fontFamily.mono
+            padding: '6px 0',
+            borderBottom:
+              i < ghost.references.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none'
           }}
         >
-          Create notes for already-mentioned ideas
+          <div style={{ fontSize: 12, fontWeight: 500, color: '#c0c7d0', marginBottom: 2 }}>
+            {ref.fileTitle}
+          </div>
+          <div style={{ fontSize: 11, color: '#5a6070', lineHeight: 1.45 }}>{ref.context}</div>
         </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        {visibleGhosts.map((ghost) => (
-          <GhostCard
-            key={ghost.id}
-            ghost={ghost}
-            artifacts={artifacts}
-            onDismiss={() => dismissGhost(ghost.id)}
-          />
-        ))}
-      </div>
+      ))}
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Action Icon Button
+// ---------------------------------------------------------------------------
+
+interface ActionIconProps {
+  readonly label: string
+  readonly onClick: (e: React.MouseEvent) => void
+  readonly children: React.ReactNode
+  readonly buttonRef?: React.RefObject<HTMLButtonElement | null>
+}
+
+function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: 22,
+        height: 22,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 5,
+        border: 'none',
+        background: hovered ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+        color: hovered ? '#c0c7d0' : '#5a6070',
+        cursor: 'pointer',
+        transition: 'background 100ms ease, color 100ms ease',
+        position: 'relative',
+        padding: 0
+      }}
+    >
+      {children}
+      <span
+        style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 6px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 11,
+          color: '#c0c7d0',
+          background: 'rgba(20, 22, 28, 0.95)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '3px 8px',
+          borderRadius: 5,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 100ms ease',
+          backdropFilter: 'blur(8px)',
+          zIndex: 50
+        }}
+      >
+        {label}
+      </span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Ghost Row
+// ---------------------------------------------------------------------------
+
+interface GhostRowProps {
+  readonly ghost: GhostEntry
+  readonly maxCount: number
+  readonly artifacts: readonly Artifact[]
+  readonly onDismiss: () => void
+}
+
+function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
+  const [hovered, setHovered] = useState(false)
+  const [contextOpen, setContextOpen] = useState(false)
+  const contextBtnRef = useRef<HTMLButtonElement>(null)
+  const { emerge, isEmerging } = useGhostEmerge()
+
+  const barWidth = `${Math.round((ghost.referenceCount / maxCount) * 100)}%`
+
+  const handleCreate = useCallback(async () => {
+    if (isEmerging) return
+
+    const refPaths = artifacts
+      .filter((a) => ghost.references.some((r) => r.fileTitle === a.title))
+      .map((a) => {
+        const pathById = useVaultStore.getState().artifactPathById
+        return pathById[a.id] ?? ''
+      })
+      .filter(Boolean)
+
+    await emerge(ghost.id, ghost.id, refPaths)
+  }, [ghost, artifacts, emerge, isEmerging])
+
+  const handleShowGraph = useCallback(() => {
+    const def = TAB_DEFINITIONS.graph
+    useTabStore.getState().openTab({
+      id: 'graph',
+      type: 'graph',
+      label: def.label,
+      closeable: true
+    })
+    useGraphViewStore.getState().setSelectedNode(ghost.id)
+  }, [ghost.id])
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '8px 0',
+        gap: 10,
+        cursor: 'pointer',
+        position: 'relative'
+      }}
+    >
+      {/* Frequency bar */}
+      <div
+        style={{
+          width: 32,
+          height: 3,
+          background: 'rgba(255, 255, 255, 0.04)',
+          borderRadius: 2,
+          overflow: 'hidden',
+          flexShrink: 0
+        }}
+      >
+        <div
+          style={{
+            width: barWidth,
+            height: '100%',
+            background: colors.accent.default,
+            borderRadius: 2,
+            opacity: 0.5
+          }}
+        />
+      </div>
+
+      {/* Name */}
+      <span
+        style={{
+          flex: 1,
+          fontSize: 13,
+          color: hovered ? colors.text.primary : '#a0a8b5',
+          fontWeight: 400,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          transition: 'color 120ms ease'
+        }}
+      >
+        {ghost.id}
+      </span>
+
+      {/* Actions (hover-reveal) */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 4,
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 100ms ease',
+          position: 'absolute',
+          right: 0,
+          background: 'linear-gradient(90deg, transparent, var(--color-bg-base) 12px)',
+          paddingLeft: 16
+        }}
+      >
+        <ActionIcon label="Create note" onClick={handleCreate}>
+          <IconPlus />
+        </ActionIcon>
+        <ActionIcon label="Show in graph" onClick={handleShowGraph}>
+          <IconGraph />
+        </ActionIcon>
+        <ActionIcon
+          label="See references"
+          buttonRef={contextBtnRef}
+          onClick={(e) => {
+            e.stopPropagation()
+            setContextOpen((prev) => !prev)
+          }}
+        >
+          <IconThinking />
+        </ActionIcon>
+        <ActionIcon label="Dismiss" onClick={onDismiss}>
+          <IconDismiss />
+        </ActionIcon>
+      </div>
+
+      {/* Count (hidden on hover) */}
+      <span
+        style={{
+          fontSize: 11,
+          color: '#3e4550',
+          fontVariantNumeric: 'tabular-nums',
+          minWidth: 18,
+          textAlign: 'right' as const,
+          opacity: hovered ? 0 : 1,
+          transition: 'opacity 100ms ease'
+        }}
+      >
+        {ghost.referenceCount}
+      </span>
+
+      {/* Context popup */}
+      {contextOpen && (
+        <ContextPopup
+          ghost={ghost}
+          anchorRef={contextBtnRef}
+          onClose={() => setContextOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Empty State
+// ---------------------------------------------------------------------------
 
 function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
   return (
@@ -105,145 +433,88 @@ function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
   )
 }
 
-function GhostCard({
-  ghost,
-  artifacts,
-  onDismiss
-}: {
-  readonly ghost: GhostEntry
-  readonly artifacts: readonly Artifact[]
-  readonly onDismiss: () => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const { emerge, isEmerging } = useGhostEmerge()
+// ---------------------------------------------------------------------------
+// GhostPanel (Main Export)
+// ---------------------------------------------------------------------------
 
-  const handleCreate = useCallback(async () => {
-    const refPaths = artifacts
-      .filter((a) => ghost.references.some((r) => r.fileTitle === a.title))
-      .map((a) => {
-        const pathById = useVaultStore.getState().artifactPathById
-        return pathById[a.id] ?? ''
-      })
-      .filter(Boolean)
+export function GhostPanel() {
+  const graph = useVaultStore((s) => s.graph)
+  const artifacts = useVaultStore((s) => s.artifacts)
+  const dismissedGhosts = useUiStore((s) => s.dismissedGhosts)
+  const dismissGhost = useUiStore((s) => s.dismissGhost)
 
-    await emerge(ghost.id, ghost.id, refPaths)
-  }, [ghost, artifacts, emerge])
+  const allGhosts = useMemo(() => buildGhostIndex(graph, artifacts), [graph, artifacts])
+
+  const visibleGhosts = useMemo(
+    () => allGhosts.filter((g) => !dismissedGhosts.includes(g.id)),
+    [allGhosts, dismissedGhosts]
+  )
+
+  const sections = useMemo(() => groupByFrequency(visibleGhosts), [visibleGhosts])
+  const totalCount = visibleGhosts.length
+  const maxCount = visibleGhosts[0]?.referenceCount ?? 1
+
+  if (visibleGhosts.length === 0) {
+    return <EmptyState hasDismissed={dismissedGhosts.length > 0} />
+  }
 
   return (
     <div
+      className="h-full overflow-y-auto"
       style={{
-        backgroundColor: floatingPanel.glass.bg,
-        borderRadius: 14,
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        overflow: 'hidden',
-        boxShadow: floatingPanel.shadowCompact
+        padding: '24px 22px 28px',
+        fontFamily: typography.fontFamily.body
       }}
     >
-      <button
-        className="w-full flex items-center gap-2 px-3 py-2 cursor-pointer"
-        style={{
-          background: expanded
-            ? 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))'
-            : 'transparent',
-          color: colors.text.primary,
-          borderBottom: expanded ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent'
-        }}
-        onClick={() => setExpanded(!expanded)}
-      >
-        <span
-          className="text-xs"
-          style={{
-            color: colors.text.muted,
-            transform: expanded ? 'rotate(90deg)' : 'rotate(0)',
-            transition: 'transform 150ms ease-out'
-          }}
-        >
-          {'\u25B6'}
-        </span>
-        <span className="text-sm font-medium flex-1 text-left">{ghost.id}</span>
-        <span
-          className="text-xs px-1.5 py-0.5 rounded-full"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.06)',
-            color: colors.text.secondary
-          }}
-        >
-          {ghost.referenceCount}
-        </span>
-      </button>
-
-      {expanded && (
-        <div className="px-3 pb-3">
-          <div className="flex flex-col gap-1.5 mb-3">
-            {ghost.references.map((ref, i) => (
-              <div
-                key={i}
-                className="text-xs rounded px-2 py-1.5"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  color: colors.text.secondary
-                }}
-              >
-                <div className="font-medium mb-0.5" style={{ color: colors.text.primary }}>
-                  {ref.fileTitle}
-                </div>
-                <div style={{ opacity: 0.7, lineHeight: 1.4 }}>{ref.context}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="text-xs px-2.5 py-1 rounded cursor-pointer"
-              style={{
-                backgroundColor: colors.accent.default,
-                color: '#0b0c10',
-                fontWeight: 600,
-                opacity: isEmerging ? 0.5 : 1
-              }}
-              onClick={handleCreate}
-              disabled={isEmerging}
-            >
-              {isEmerging ? 'Creating...' : 'Create File'}
-            </button>
-            <button
-              type="button"
-              className="text-xs px-2.5 py-1 rounded cursor-pointer"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: colors.text.secondary
-              }}
-              onClick={() => {
-                const def = TAB_DEFINITIONS.graph
-                useTabStore.getState().openTab({
-                  id: 'graph',
-                  type: 'graph',
-                  label: def.label,
-                  closeable: true
-                })
-                useGraphViewStore.getState().setSelectedNode(ghost.id)
-              }}
-            >
-              Show on graph
-            </button>
-            <button
-              type="button"
-              className="text-xs px-2.5 py-1 rounded cursor-pointer"
-              style={{
-                backgroundColor: 'transparent',
-                color: colors.text.muted,
-                border: '1px solid rgba(255, 255, 255, 0.08)'
-              }}
-              onClick={onDismiss}
-            >
-              Dismiss
-            </button>
-          </div>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 300, color: colors.text.primary, marginBottom: 2 }}>
+          Unresolved References
         </div>
-      )}
+        <div
+          style={{
+            fontSize: 48,
+            fontWeight: 200,
+            color: colors.text.primary,
+            letterSpacing: '-0.03em',
+            lineHeight: 1.1
+          }}
+        >
+          {totalCount}
+        </div>
+        <div style={{ fontSize: 12, color: colors.text.muted }}>
+          ghost{totalCount !== 1 ? 's' : ''} across your vault
+        </div>
+      </div>
+
+      {/* Sections */}
+      {sections.map((section) => (
+        <div key={section.label}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase' as const,
+              color: colors.text.muted,
+              padding: '14px 0 6px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              marginBottom: 2
+            }}
+          >
+            {section.label}
+          </div>
+          {section.ghosts.map((ghost) => (
+            <GhostRow
+              key={ghost.id}
+              ghost={ghost}
+              maxCount={maxCount}
+              artifacts={artifacts}
+              onDismiss={() => dismissGhost(ghost.id)}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   )
 }
