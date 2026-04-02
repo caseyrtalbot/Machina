@@ -418,7 +418,7 @@ function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
   return (
     <div
       className="h-full flex flex-col items-center justify-center gap-3"
-      style={{ color: colors.text.muted }}
+      style={{ color: colors.text.muted, backgroundColor: colors.bg.base }}
     >
       <svg
         width={32}
@@ -474,7 +474,13 @@ export function GhostPanel() {
   }
 
   return (
-    <div className="h-full overflow-y-auto" style={{ fontFamily: typography.fontFamily.body }}>
+    <div
+      className="h-full overflow-y-auto"
+      style={{
+        fontFamily: typography.fontFamily.body,
+        backgroundColor: colors.bg.base
+      }}
+    >
       <div
         style={{
           maxWidth: '52rem',
