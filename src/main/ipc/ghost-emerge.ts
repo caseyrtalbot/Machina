@@ -112,13 +112,20 @@ function quickParseRef(content: string, filePath: string): ReferenceNote {
     ? titleMatch[1].trim()
     : (filePath.split('/').pop()?.replace('.md', '') ?? 'Untitled')
 
-  const tagsMatch = /^tags:\s*\[([^\]]*)\]/m.exec(content)
-  const tags = tagsMatch
-    ? tagsMatch[1]
+  // Handle both inline [a, b] and multiline YAML list formats
+  const inlineMatch = /^tags:\s*\[([^\]]*)\]/m.exec(content)
+  const multilineMatch = /^tags:\s*\n((?:\s+-\s+.+\n?)*)/m.exec(content)
+  const tags = inlineMatch
+    ? inlineMatch[1]
         .split(',')
         .map((t) => t.trim().replace(/['"]/g, ''))
         .filter(Boolean)
-    : []
+    : multilineMatch
+      ? multilineMatch[1]
+          .split('\n')
+          .map((l) => l.replace(/^\s+-\s+/, '').trim())
+          .filter(Boolean)
+      : []
 
   // Extract body: everything after the closing ---
   const fmEnd = content.indexOf('---', content.indexOf('---') + 3)
@@ -154,7 +161,6 @@ function buildArtifact(
     type: 'note',
     created: today,
     modified: today,
-    source: origin,
     signal: 'untested',
     tags,
     connections,
@@ -165,7 +171,7 @@ function buildArtifact(
     concepts: [],
     bodyLinks: [],
     body,
-    frontmatter: {}
+    frontmatter: origin ? { origin } : {}
   }
 }
 
