@@ -697,18 +697,19 @@ body {
   overflow: hidden;
 }
 
+/* Tab bar: slightly darker than content so active tab punches through */
 .editor-tab-bar {
   display: flex;
   align-items: stretch;
   flex-shrink: 0;
-  height: 28px;
+  height: 32px;
   overflow-x: auto;
-  background: var(--color-bg-base);
+  background: rgba(0, 0, 0, 0.15);
   position: relative;
   -webkit-app-region: no-drag;
 }
 
-/* Border as pseudo-element so active tab can sit above it via z-index */
+/* Bottom border breaks under the active tab (active tab z-index sits above) */
 .editor-tab-bar::after {
   content: '';
   position: absolute;
@@ -731,23 +732,19 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 12px;
-  border-right: 1px solid var(--chrome-panel-border);
+  padding: 0 14px;
+  border-right: none;
   cursor: pointer;
   flex-shrink: 0;
   z-index: 1;
   transition: background-color 120ms ease-out;
 }
 
-.editor-file-tab:first-child {
-  border-left: none;
-}
-
 .editor-file-tab:hover:not([data-active='true']) {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-/* Active tab: background matches content, z-index sits above the ::after border line */
+/* Active tab: matches content bg, sits above bottom border to break it */
 .editor-file-tab[data-active='true'] {
   background: var(--color-bg-base);
   z-index: 2;
