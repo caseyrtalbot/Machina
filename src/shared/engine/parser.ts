@@ -120,5 +120,30 @@ export function serializeArtifact(artifact: Artifact): string {
   if (artifact.appears_in.length > 0) frontmatter.appears_in = artifact.appears_in
   if (artifact.related.length > 0) frontmatter.related = artifact.related
 
+  // Preserve custom frontmatter keys not handled explicitly above
+  const EXPLICIT_KEYS = new Set([
+    'id',
+    'title',
+    'type',
+    'created',
+    'modified',
+    'source',
+    'frame',
+    'signal',
+    'tags',
+    'connections',
+    'clusters_with',
+    'tensions_with',
+    'appears_in',
+    'related',
+    'concepts'
+  ])
+
+  for (const [key, value] of Object.entries(artifact.frontmatter)) {
+    if (!EXPLICIT_KEYS.has(key)) {
+      frontmatter[key] = value
+    }
+  }
+
   return matter.stringify(artifact.body, frontmatter)
 }

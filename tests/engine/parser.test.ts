@@ -385,6 +385,62 @@ Check [[archive/MyNote]] for context.`
 })
 
 describe('serializeArtifact', () => {
+  it('preserves custom frontmatter keys through round-trip', () => {
+    const md = `---
+id: e01
+title: Emergent Idea
+type: note
+created: 2026-03-20
+modified: 2026-03-20
+origin: emerge
+custom_field: hello
+---
+
+An idea that emerged from observation.`
+
+    const parsed = parseArtifact(md, 'emergent.md')
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    expect(parsed.value.frontmatter.origin).toBe('emerge')
+    expect(parsed.value.frontmatter.custom_field).toBe('hello')
+
+    const serialized = serializeArtifact(parsed.value)
+    const reparsed = parseArtifact(serialized, 'emergent.md')
+    expect(reparsed.ok).toBe(true)
+    if (!reparsed.ok) return
+
+    expect(reparsed.value.frontmatter.origin).toBe('emerge')
+    expect(reparsed.value.frontmatter.custom_field).toBe('hello')
+  })
+
+  it('does not duplicate explicit fields from frontmatter spread', () => {
+    const md = `---
+id: d01
+title: Duplicate Test
+type: gene
+created: 2026-03-20
+modified: 2026-03-20
+tags: [alpha, beta]
+origin: emerge
+---
+
+Body text.`
+
+    const parsed = parseArtifact(md, 'dup-test.md')
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    const serialized = serializeArtifact(parsed.value)
+
+    // Tags should appear exactly once in the serialized output
+    const tagMatches = serialized.match(/^tags:/gm)
+    expect(tagMatches).toHaveLength(1)
+
+    // origin should be present
+    expect(serialized).toContain('origin: emerge')
+  })
+
   it('round-trips a valid artifact', () => {
     const parsed = parseArtifact(VALID_MD, 'test.md')
     expect(parsed.ok).toBe(true)
