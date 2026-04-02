@@ -4,9 +4,9 @@ import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useEditorStore } from '@renderer/store/editor-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useViewStore } from '@renderer/store/view-store'
+import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { colors, floatingPanel, getArtifactColor, transitions } from '../../design/tokens'
-import { buildGhostIndex, inferFolder } from '../../engine/ghost-index'
-import { serializeArtifact } from '../../engine/parser'
+import { buildGhostIndex } from '../../engine/ghost-index'
 import type { Artifact } from '@shared/types'
 
 const DRAWER_WIDTH = 340
@@ -228,9 +228,8 @@ function GhostDrawerContent({
 }) {
   const graph = useVaultStore((s) => s.graph)
   const artifacts = useVaultStore((s) => s.artifacts)
-  const vaultPath = useVaultStore((s) => s.vaultPath)
   const dismissGhost = useUiStore((s) => s.dismissGhost)
-  const [creating, setCreating] = useState(false)
+  const { emerge, isEmerging } = useGhostEmerge()
 
   const ghostEntry = useMemo(() => {
     const index = buildGhostIndex(graph, artifacts)
@@ -238,51 +237,13 @@ function GhostDrawerContent({
   }, [graph, artifacts, ghostId])
 
   const handleCreate = useCallback(async () => {
-    if (!vaultPath || creating) return
-    setCreating(true)
-    try {
-      const refPaths = artifacts
-        .filter((a) => ghostEntry?.references.some((r) => r.fileTitle === a.title))
-        .map((a) => useVaultStore.getState().artifactPathById[a.id] ?? '')
-        .filter(Boolean)
+    const refPaths = artifacts
+      .filter((a) => ghostEntry?.references.some((r) => r.fileTitle === a.title))
+      .map((a) => useVaultStore.getState().artifactPathById[a.id] ?? '')
+      .filter(Boolean)
 
-      const folder = inferFolder(ghostId, refPaths, vaultPath)
-      const filePath = `${folder}/${ghostId}.md`
-
-      const sourceIds = (ghostEntry?.references ?? [])
-        .map((r) => artifacts.find((a) => a.title === r.fileTitle)?.id ?? '')
-        .filter(Boolean)
-
-      const artifact: Artifact = {
-        id: ghostId,
-        title: ghostId,
-        type: 'note',
-        created: new Date().toISOString().split('T')[0],
-        modified: new Date().toISOString().split('T')[0],
-        signal: 'untested',
-        tags: [],
-        connections: sourceIds,
-        clusters_with: [],
-        tensions_with: [],
-        appears_in: [],
-        related: [],
-        concepts: [],
-        bodyLinks: [],
-        body: '',
-        frontmatter: {}
-      }
-
-      const content = serializeArtifact(artifact)
-      const exists = await window.api.fs.fileExists(filePath)
-      if (exists) return
-
-      await window.api.fs.writeFile(filePath, content)
-      useEditorStore.getState().setActiveNote(filePath)
-      useViewStore.getState().setContentView('editor')
-    } finally {
-      setCreating(false)
-    }
-  }, [ghostId, vaultPath, artifacts, ghostEntry, creating])
+    await emerge(ghostId, ghostId, refPaths)
+  }, [ghostId, artifacts, ghostEntry, emerge])
 
   return (
     <>
@@ -339,16 +300,16 @@ function GhostDrawerContent({
         <button
           type="button"
           onClick={handleCreate}
-          disabled={creating}
+          disabled={isEmerging}
           className="text-xs px-2.5 py-1 rounded interactive-hover"
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.08)',
             color: colors.text.primary,
-            opacity: creating ? 0.5 : 1,
+            opacity: isEmerging ? 0.5 : 1,
             transition: transitions.hover
           }}
         >
-          {creating ? 'Creating...' : 'Create File'}
+          {isEmerging ? 'Creating...' : 'Create File'}
         </button>
         <button
           type="button"

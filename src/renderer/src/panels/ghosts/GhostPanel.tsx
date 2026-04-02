@@ -1,18 +1,16 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useUiStore } from '../../store/ui-store'
-import { useEditorStore } from '../../store/editor-store'
 import { useTabStore, TAB_DEFINITIONS } from '../../store/tab-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
-import { buildGhostIndex, inferFolder, type GhostEntry } from '../../engine/ghost-index'
-import { serializeArtifact } from '../../engine/parser'
+import { useGhostEmerge } from '../../hooks/useGhostEmerge'
+import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
 import { colors, floatingPanel, typography } from '../../design/tokens'
 import type { Artifact } from '@shared/types'
 
 export function GhostPanel() {
   const graph = useVaultStore((s) => s.graph)
   const artifacts = useVaultStore((s) => s.artifacts)
-  const vaultPath = useVaultStore((s) => s.vaultPath)
   const dismissedGhosts = useUiStore((s) => s.dismissedGhosts)
   const dismissGhost = useUiStore((s) => s.dismissGhost)
 
@@ -64,7 +62,6 @@ export function GhostPanel() {
           <GhostCard
             key={ghost.id}
             ghost={ghost}
-            vaultPath={vaultPath}
             artifacts={artifacts}
             onDismiss={() => dismissGhost(ghost.id)}
           />
@@ -110,75 +107,27 @@ function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
 
 function GhostCard({
   ghost,
-  vaultPath,
   artifacts,
   onDismiss
 }: {
   readonly ghost: GhostEntry
-  readonly vaultPath: string | null
   readonly artifacts: readonly Artifact[]
   readonly onDismiss: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const setActiveNote = useEditorStore((s) => s.setActiveNote)
+  const { emerge, isEmerging } = useGhostEmerge()
 
   const handleCreate = useCallback(async () => {
-    if (!vaultPath || creating) return
-    setCreating(true)
+    const refPaths = artifacts
+      .filter((a) => ghost.references.some((r) => r.fileTitle === a.title))
+      .map((a) => {
+        const pathById = useVaultStore.getState().artifactPathById
+        return pathById[a.id] ?? ''
+      })
+      .filter(Boolean)
 
-    try {
-      const refPaths = artifacts
-        .filter((a) => ghost.references.some((r) => r.fileTitle === a.title))
-        .map((a) => {
-          const pathById = useVaultStore.getState().artifactPathById
-          return pathById[a.id] ?? ''
-        })
-        .filter(Boolean)
-
-      const folder = inferFolder(ghost.id, refPaths, vaultPath)
-      const filePath = `${folder}/${ghost.id}.md`
-
-      const sourceIds = ghost.references
-        .map((r) => {
-          const a = artifacts.find((art) => art.title === r.fileTitle)
-          return a?.id ?? ''
-        })
-        .filter(Boolean)
-
-      const artifact: Artifact = {
-        id: ghost.id,
-        title: ghost.id,
-        type: 'note',
-        created: new Date().toISOString().split('T')[0],
-        modified: new Date().toISOString().split('T')[0],
-        signal: 'untested',
-        tags: [],
-        connections: sourceIds,
-        clusters_with: [],
-        tensions_with: [],
-        appears_in: [],
-        related: [],
-        concepts: [],
-        bodyLinks: [],
-        body: '',
-        frontmatter: {}
-      }
-
-      const content = serializeArtifact(artifact)
-
-      const exists = await window.api.fs.fileExists(filePath)
-      if (exists) {
-        setCreating(false)
-        return
-      }
-
-      await window.api.fs.writeFile(filePath, content)
-      setActiveNote(filePath)
-    } finally {
-      setCreating(false)
-    }
-  }, [ghost, vaultPath, artifacts, creating, setActiveNote])
+    await emerge(ghost.id, ghost.id, refPaths)
+  }, [ghost, artifacts, emerge])
 
   return (
     <div
@@ -252,12 +201,12 @@ function GhostCard({
                 backgroundColor: colors.accent.default,
                 color: '#0b0c10',
                 fontWeight: 600,
-                opacity: creating ? 0.5 : 1
+                opacity: isEmerging ? 0.5 : 1
               }}
               onClick={handleCreate}
-              disabled={creating}
+              disabled={isEmerging}
             >
-              {creating ? 'Creating...' : 'Create File'}
+              {isEmerging ? 'Creating...' : 'Create File'}
             </button>
             <button
               type="button"
