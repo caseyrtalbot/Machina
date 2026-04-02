@@ -23,6 +23,7 @@ import { ActivityBar } from './components/ActivityBar'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
 import type { TabType } from './store/tab-store'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
+import { AGENT_ACTIONS, type AgentActionName } from '@shared/agent-action-types'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from './hooks/useCanvasAwareness'
 import { useVaultStore } from './store/vault-store'
@@ -606,7 +607,14 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
     category: 'command',
     description: 'Analyze vault structure and visualize it on the canvas.',
     keywords: ['folder', 'project', 'map', 'canvas']
-  }
+  },
+  ...AGENT_ACTIONS.map((action) => ({
+    id: `cmd:agent-${action.id}`,
+    label: action.label,
+    category: 'command' as const,
+    description: action.description,
+    keywords: [...action.keywords, 'agent']
+  }))
 ]
 
 function ResizableSidebar({
@@ -997,6 +1005,16 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
   const handlePaletteSelect = useCallback(
     async (item: CommandItem) => {
+      // Agent actions — dispatch to canvas orchestrator via custom event
+      if (item.id.startsWith('cmd:agent-')) {
+        const actionName = item.id.replace('cmd:agent-', '') as AgentActionName
+        window.dispatchEvent(
+          new CustomEvent('agent-action-trigger', { detail: { action: actionName } })
+        )
+        setPaletteOpen(false)
+        return
+      }
+
       if (item.id.startsWith('card:')) {
         const nodeId = item.id.slice(5)
         setContentView('canvas')
