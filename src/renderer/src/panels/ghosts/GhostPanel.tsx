@@ -96,6 +96,19 @@ interface ContextPopupProps {
 
 function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      const popupHeight = 240 // estimated max
+      const fitsAbove = rect.top > popupHeight + 8
+      setPos({
+        top: fitsAbove ? rect.top - popupHeight - 8 : rect.bottom + 8,
+        left: Math.max(8, rect.right - 320)
+      })
+    }
+  }, [anchorRef])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -125,10 +138,12 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
       role="dialog"
       aria-label={`${ghost.id} references`}
       style={{
-        position: 'absolute',
-        bottom: 'calc(100% + 8px)',
-        right: -8,
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
         width: 320,
+        maxHeight: 'calc(100vh - 40px)',
+        overflowY: 'auto',
         background: 'rgba(14, 16, 22, 0.96)',
         backdropFilter: 'blur(20px) saturate(1.3)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -485,7 +500,7 @@ export function GhostPanel() {
           >
             {totalCount}
           </div>
-          <div style={{ fontSize: 12, color: colors.text.muted }}>
+          <div style={{ fontSize: 12, color: colors.text.primary }}>
             ghost{totalCount !== 1 ? 's' : ''} across your vault
           </div>
         </div>
@@ -499,7 +514,7 @@ export function GhostPanel() {
                 fontWeight: 600,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase' as const,
-                color: colors.text.muted,
+                color: colors.text.primary,
                 padding: '14px 0 6px',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
                 marginBottom: 2
