@@ -360,12 +360,8 @@ function ConnectedSidebar({
         return
       }
 
-      // When on a canvas view, single-clicks should not navigate away.
-      const view = useViewStore.getState().contentView
-      if (view === 'canvas' || view === 'workbench') return
-
-      const file = files.find((f) => f.path === path)
-      void openEditorPath(path, file?.title)
+      // Single-click only pans canvas; double-click opens in editor
+      return
     },
     [files, openEditorPath]
   )
