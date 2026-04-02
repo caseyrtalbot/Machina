@@ -240,6 +240,19 @@ function ConnectedSidebar({
     return map
   }, [artifacts, fileToId])
 
+  const artifactOrigins = useMemo(() => {
+    const map = new Map<string, string>()
+    const artifactById = new Map(artifacts.map((a) => [a.id, a]))
+    for (const [filePath, artifactId] of Object.entries(fileToId)) {
+      const artifact = artifactById.get(artifactId)
+      const origin = artifact?.frontmatter?.origin
+      if (typeof origin === 'string') {
+        map.set(filePath, origin)
+      }
+    }
+    return map
+  }, [artifacts, fileToId])
+
   const allTreeNodes = useMemo(() => {
     return buildFileTree(
       files.map((file) => ({ path: file.path, modified: file.modified })),
@@ -505,6 +518,7 @@ function ConnectedSidebar({
       activeFilePath={activeNotePath}
       collapsedPaths={searchQuery.trim() ? EMPTY_SET : collapsedPaths}
       artifactTypes={artifactTypes}
+      artifactOrigins={artifactOrigins}
       onCanvasPaths={onCanvasPaths}
       canvasConnectionCounts={canvasConnectionCounts}
       sortMode={sortMode}

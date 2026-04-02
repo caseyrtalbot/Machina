@@ -87,12 +87,16 @@ function formatDateLabel(timestamp?: string): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+export const ORIGIN_FILE_COLOR = '#4ade80'
+export const ORIGIN_FOLDER_COLOR = '#60a5fa'
+
 interface FileTreeProps {
   nodes: FlatTreeNode[]
   activeFilePath: string | null
   collapsedPaths: Set<string>
   sortMode?: TreeSortMode
   artifactTypes?: Map<string, ArtifactType>
+  artifactOrigins?: Map<string, string>
   onCanvasPaths?: ReadonlySet<string>
   canvasConnectionCounts?: ReadonlyMap<string, number>
   onFileSelect: (path: string) => void
@@ -219,14 +223,26 @@ function getFileIconKind(filename: string): FileIconKind {
   return 'generic'
 }
 
-function FileIcon({ filename }: { readonly filename: string }) {
+function FileIcon({ filename, origin }: { readonly filename: string; readonly origin?: string }) {
   const kind = getFileIconKind(filename)
   const Icon = ICON_COMPONENT[kind]
-  return <Icon size={14} color={ICON_COLORS[kind]} weight="duotone" />
+  const color = origin ? ORIGIN_FILE_COLOR : ICON_COLORS[kind]
+  return <Icon size={14} color={color} weight="duotone" />
 }
 
-function FolderIcon() {
-  return <FolderSimple size={14} color="#a1a1aa" weight="duotone" />
+function FolderIcon({ isOriginFolder }: { readonly isOriginFolder?: boolean }) {
+  const color = isOriginFolder ? ORIGIN_FOLDER_COLOR : '#a1a1aa'
+  return <FolderSimple size={14} color={color} weight="duotone" />
+}
+
+export function isFolderOrigin(
+  folderPath: string,
+  origins: Map<string, string> | undefined,
+  nodes: FlatTreeNode[]
+): boolean {
+  if (!origins || origins.size === 0) return false
+  const children = nodes.filter((n) => !n.isDirectory && n.parentPath === folderPath)
+  return children.length > 0 && children.every((c) => origins.has(c.path))
 }
 
 /** Inline SVG chevron pointing right, rotated via CSS when expanded */
@@ -261,6 +277,7 @@ export const FileTree = memo(function FileTree({
   collapsedPaths,
   sortMode,
   artifactTypes,
+  artifactOrigins,
   onCanvasPaths,
   canvasConnectionCounts,
   onFileSelect,
@@ -311,6 +328,7 @@ export const FileTree = memo(function FileTree({
               <DirectoryRow
                 node={node}
                 isCollapsed={collapsedPaths.has(node.path)}
+                isOriginFolder={isFolderOrigin(node.path, artifactOrigins, nodes)}
                 onToggleDirectory={onToggleDirectory}
                 onContextMenu={onContextMenu}
                 isRenaming={renamingPath === node.path}
@@ -324,6 +342,7 @@ export const FileTree = memo(function FileTree({
                 node={node}
                 isActive={node.path === activeFilePath}
                 artifactType={artifactTypes?.get(node.path)}
+                origin={artifactOrigins?.get(node.path)}
                 isOnCanvas={onCanvasPaths?.has(node.path) ?? false}
                 canvasConnectionCount={canvasConnectionCounts?.get(node.path) ?? 0}
                 onFileSelect={onFileSelect}
@@ -346,6 +365,7 @@ export const FileTree = memo(function FileTree({
 function DirectoryRow({
   node,
   isCollapsed,
+  isOriginFolder,
   onToggleDirectory,
   onContextMenu,
   isRenaming,
@@ -356,6 +376,7 @@ function DirectoryRow({
 }: {
   node: FlatTreeNode
   isCollapsed: boolean
+  isOriginFolder?: boolean
   onToggleDirectory: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string, isDirectory: boolean) => void
   isRenaming?: boolean
@@ -386,7 +407,7 @@ function DirectoryRow({
         <Chevron isExpanded={!isCollapsed} />
       </span>
       <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
-        <FolderIcon />
+        <FolderIcon isOriginFolder={isOriginFolder} />
       </span>
       {isRenaming ? (
         <RenameInput
@@ -417,6 +438,7 @@ function FileRow({
   node,
   isActive,
   artifactType: _artifactType,
+  origin,
   isOnCanvas,
   canvasConnectionCount,
   onFileSelect,
@@ -431,6 +453,7 @@ function FileRow({
   node: FlatTreeNode
   isActive: boolean
   artifactType?: ArtifactType
+  origin?: string
   isOnCanvas: boolean
   canvasConnectionCount: number
   onFileSelect: (path: string) => void
@@ -479,7 +502,7 @@ function FileRow({
         className="mr-1.5 flex items-center shrink-0 relative"
         style={{ opacity: isActive ? 1 : isOnCanvas ? 0.8 : 0.5 }}
       >
-        <FileIcon filename={node.name} />
+        <FileIcon filename={node.name} origin={origin} />
         {isOnCanvas && (
           <span
             style={{

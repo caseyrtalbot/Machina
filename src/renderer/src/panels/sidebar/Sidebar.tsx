@@ -38,6 +38,7 @@ interface SidebarProps {
   activeFilePath: string | null
   collapsedPaths: Set<string>
   artifactTypes?: Map<string, ArtifactType>
+  artifactOrigins?: Map<string, string>
   onCanvasPaths?: ReadonlySet<string>
   canvasConnectionCounts?: ReadonlyMap<string, number>
   sortMode?: SortMode
@@ -298,6 +299,7 @@ export function Sidebar({
   activeFilePath,
   collapsedPaths,
   artifactTypes,
+  artifactOrigins,
   onCanvasPaths,
   canvasConnectionCounts,
   sortMode = 'modified',
@@ -428,6 +430,7 @@ export function Sidebar({
               collapsedPaths={collapsedPaths}
               sortMode={sortMode}
               artifactTypes={artifactTypes}
+              artifactOrigins={artifactOrigins}
               onCanvasPaths={onCanvasPaths}
               canvasConnectionCounts={canvasConnectionCounts}
               onFileSelect={onFileSelect}
