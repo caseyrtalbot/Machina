@@ -340,7 +340,7 @@ Respond with a JSON object containing an "ops" array. Each op must be one of:
 - {"type": "remove-node", "nodeId": "id"}
 - {"type": "remove-edge", "edgeId": "id"}
 
-Valid node types: text, note, code, markdown, image, terminal, pdf, project-file, system-artifact.
+Valid node types: text, note, code, markdown, image, terminal, pdf, project-file, system-artifact, file-view, agent-session, project-folder.
 Valid sides: top, right, bottom, left.
 
 Wrap your JSON in a \`\`\`json code fence.`

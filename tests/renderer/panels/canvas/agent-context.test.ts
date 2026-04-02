@@ -40,7 +40,7 @@ describe('extractAgentContext', () => {
     expect(ctx.selectedCards[0].body).toBe('Hello world')
   })
 
-  it('extracts 1-hop neighbors connected by edges', () => {
+  it('extracts 1-hop neighbors connected by edges with correct edgeKind', () => {
     const nodes = [makeNode({ id: 'a' }), makeNode({ id: 'b' }), makeNode({ id: 'c' })]
     const edges = [makeEdge('a', 'b', 'connection'), makeEdge('c', 'a', 'tension')]
     const selectedIds = new Set(['a'])
@@ -48,9 +48,10 @@ describe('extractAgentContext', () => {
     const ctx = extractAgentContext('challenge', nodes, edges, selectedIds, viewport, containerSize)
 
     expect(ctx.neighbors).toHaveLength(2)
-    const neighborIds = ctx.neighbors.map((n) => n.id)
-    expect(neighborIds).toContain('b')
-    expect(neighborIds).toContain('c')
+    const neighborB = ctx.neighbors.find((n) => n.id === 'b')!
+    const neighborC = ctx.neighbors.find((n) => n.id === 'c')!
+    expect(neighborB.edgeKind).toBe('connection')
+    expect(neighborC.edgeKind).toBe('tension')
   })
 
   it('does not include selected cards in neighbors', () => {
@@ -123,5 +124,24 @@ describe('extractAgentContext', () => {
     const ctx = extractAgentContext('tidy', nodes, [], selectedIds, viewport, containerSize)
 
     expect(ctx.selectedCards).toHaveLength(2)
+  })
+
+  it('extracts filename stem as title for note-type cards', () => {
+    const nodes = [makeNode({ id: 'a', type: 'note', content: 'path/to/my-idea.md' })]
+    const selectedIds = new Set(['a'])
+
+    const ctx = extractAgentContext('challenge', nodes, [], selectedIds, viewport, containerSize)
+
+    expect(ctx.selectedCards[0].title).toBe('my-idea')
+  })
+
+  it('extracts first line truncated to 100 chars as title for text cards', () => {
+    const longLine = 'A'.repeat(120) + '\nSecond line'
+    const nodes = [makeNode({ id: 'a', type: 'text', content: longLine })]
+    const selectedIds = new Set(['a'])
+
+    const ctx = extractAgentContext('challenge', nodes, [], selectedIds, viewport, containerSize)
+
+    expect(ctx.selectedCards[0].title).toBe('A'.repeat(100))
   })
 })

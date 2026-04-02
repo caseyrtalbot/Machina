@@ -4,9 +4,10 @@ import {
   extractJsonFromResponse,
   validateAgentOps,
   buildPlanFromOps,
-  buildPrompt
+  buildPrompt,
+  runAgentAction
 } from '../../../src/main/services/agent-action-runner'
-import type { AgentContext } from '@shared/agent-action-types'
+import type { AgentContext, AgentActionRequest } from '@shared/agent-action-types'
 import type { CanvasMutationOp } from '@shared/canvas-mutation-types'
 
 describe('extractJsonFromResponse', () => {
@@ -192,6 +193,74 @@ describe('buildPrompt', () => {
     for (const action of ['challenge', 'emerge', 'organize', 'tidy'] as const) {
       const prompt = buildPrompt(action, { ...minimalContext, action })
       expect(prompt.length).toBeGreaterThan(100)
+    }
+  })
+})
+
+describe('runAgentAction', () => {
+  const minimalContext: AgentContext = {
+    action: 'challenge',
+    selectedCards: [
+      {
+        id: 'a',
+        type: 'text',
+        title: 'Test Card',
+        body: 'Content',
+        tags: [],
+        position: { x: 0, y: 0 },
+        size: { width: 200, height: 100 }
+      }
+    ],
+    neighbors: [],
+    edges: [],
+    canvasMeta: { viewportBounds: { x: 0, y: 0, width: 1200, height: 800 }, totalCardCount: 1 }
+  }
+
+  const request: AgentActionRequest = { action: 'challenge', context: minimalContext }
+
+  it('returns a plan when CLI returns valid JSON', async () => {
+    const mockClaude = async () =>
+      '```json\n{"ops": [{"type": "add-node", "node": {"id": "q1", "type": "text", "position": {"x": 300, "y": 200}, "size": {"width": 250, "height": 120}, "content": "A question", "metadata": {}}}]}\n```'
+
+    const result = await runAgentAction(request, mockClaude)
+    expect('plan' in result).toBe(true)
+    if ('plan' in result) {
+      expect(result.plan.ops).toHaveLength(1)
+      expect(result.plan.ops[0].type).toBe('add-node')
+      expect(result.plan.source).toBe('agent')
+      expect(result.plan.summary.addedNodes).toBe(1)
+    }
+  })
+
+  it('returns error when CLI returns invalid JSON', async () => {
+    const mockClaude = async () => 'Sorry, I cannot help with that.'
+    const result = await runAgentAction(request, mockClaude)
+    expect('error' in result).toBe(true)
+  })
+
+  it('returns error when CLI returns invalid ops', async () => {
+    const mockClaude = async () => '{"ops": [{"type": "fly-away"}]}'
+    const result = await runAgentAction(request, mockClaude)
+    expect('error' in result).toBe(true)
+  })
+
+  it('returns error when CLI throws', async () => {
+    const mockClaude = async () => {
+      throw new Error('claude not found')
+    }
+    const result = await runAgentAction(request, mockClaude)
+    expect('error' in result).toBe(true)
+    if ('error' in result) {
+      expect(result.error).toContain('claude not found')
+    }
+  })
+
+  it('returns a plan with empty ops when CLI returns no operations', async () => {
+    const mockClaude = async () => '{"ops": []}'
+    const result = await runAgentAction(request, mockClaude)
+    expect('plan' in result).toBe(true)
+    if ('plan' in result) {
+      expect(result.plan.ops).toHaveLength(0)
     }
   })
 })

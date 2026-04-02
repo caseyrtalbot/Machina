@@ -44,7 +44,7 @@ export const AGENT_ACTIONS = [
   }
 ] as const satisfies readonly AgentActionDef[]
 
-export const AGENT_ACTION_NAMES = AGENT_ACTIONS.map((a) => a.id)
+export const AGENT_ACTION_NAMES = AGENT_ACTIONS.map((a) => a.id) as AgentActionName[]
 
 export type AgentActionName = (typeof AGENT_ACTIONS)[number]['id']
 
