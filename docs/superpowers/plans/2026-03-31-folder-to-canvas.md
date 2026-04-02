@@ -16,38 +16,7 @@
 
 ### New Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `src/shared/engine/project-map-types.ts` | ~90 | Shared types: ProjectMapNode, ProjectMapEdge, ProjectMapSnapshot |
-| `src/shared/engine/project-map-analyzers.ts` | ~250 | Pure import/wikilink/ref extraction + deterministic resolution |
-| `src/renderer/src/panels/canvas/folder-map-layout.ts` | ~280 | Reingold-Tilford tree layout, collision resolution |
-| `src/renderer/src/workers/project-map-worker.ts` | ~200 | Web Worker: append-files/finalize protocol |
-| `src/renderer/src/panels/canvas/folder-map-orchestrator.ts` | ~180 | Chunked IPC reads, worker coordination, progress state |
-| `src/renderer/src/panels/canvas/ProjectFolderCard.tsx` | ~120 | Folder card component |
-| `src/shared/canvas-mutation-types.ts` | ~70 | CanvasMutationOp, CanvasMutationPlan types |
-| `src/renderer/src/panels/canvas/FolderMapPreview.tsx` | ~120 | SVG preview layer |
-| `src/renderer/src/panels/canvas/folder-map-apply.ts` | ~80 | Pending-apply safety, undo wrapping |
-| `tests/engine/project-map-analyzers.test.ts` | ~300 | Analyzer unit tests |
-| `tests/canvas/folder-map-layout.test.ts` | ~200 | Layout unit tests |
-| `tests/canvas/project-map-worker.test.ts` | ~200 | Worker protocol tests |
-| `tests/canvas/folder-map-apply.test.ts` | ~150 | Apply/undo/rollback tests |
-
 ### Modified Files
-
-| File | Change |
-|------|--------|
-| `src/shared/canvas-types.ts` | Add `'project-folder'` to CanvasNodeType, sizes, metadata |
-| `src/shared/ipc-channels.ts` | Add `fs:read-files-batch` channel |
-| `src/preload/index.ts` | Add `fs.readFilesBatch` method |
-| `src/main/ipc/filesystem.ts` | Add `fs:read-files-batch` handler |
-| `src/renderer/src/panels/canvas/card-registry.ts` | Add ProjectFolderCard lazy import |
-| `src/renderer/src/panels/canvas/EdgeLayer.tsx` | Style new edge kinds, zoom threshold, viewport filtering |
-| `src/renderer/src/panels/sidebar/FileContextMenu.tsx` | Add 'map-to-canvas' to FOLDER_ACTIONS |
-| `src/renderer/src/design/components/CommandPalette.tsx` | Add "Map Vault Root" command |
-| `src/renderer/src/App.tsx` | Handle 'map-to-canvas' file action |
-| `src/renderer/src/panels/canvas/CanvasView.tsx` | Wire orchestrator, preview, apply |
-| `src/renderer/src/panels/canvas/CanvasSurface.tsx` | Mount preview layer |
-| `src/renderer/src/design/tokens.ts` | Add edge kind colors for contains/imports/references |
 
 ---
 
@@ -56,6 +25,7 @@
 ### Task 1: Project-Map Types
 
 **Files:**
+
 - Create: `src/shared/engine/project-map-types.ts`
 
 - [ ] **Step 1: Create the types file**
@@ -160,6 +130,7 @@ git commit -m "feat: add project-map shared types"
 ### Task 2: Import Extraction Analyzer
 
 **Files:**
+
 - Create: `src/shared/engine/project-map-analyzers.ts`
 - Create: `tests/engine/project-map-analyzers.test.ts`
 
@@ -305,6 +276,7 @@ git commit -m "feat: add import specifier extraction analyzer"
 ### Task 3: Path Resolution
 
 **Files:**
+
 - Modify: `src/shared/engine/project-map-analyzers.ts`
 - Modify: `tests/engine/project-map-analyzers.test.ts`
 
@@ -457,6 +429,7 @@ git commit -m "feat: add deterministic import path resolution"
 ### Task 4: Markdown + Config Ref Analyzers
 
 **Files:**
+
 - Modify: `src/shared/engine/project-map-analyzers.ts`
 - Modify: `tests/engine/project-map-analyzers.test.ts`
 
@@ -604,6 +577,7 @@ git commit -m "feat: add markdown and config path reference analyzers"
 ### Task 5: Snapshot Builder (buildProjectMapSnapshot)
 
 **Files:**
+
 - Modify: `src/shared/engine/project-map-analyzers.ts`
 - Modify: `tests/engine/project-map-analyzers.test.ts`
 
@@ -970,6 +944,7 @@ export function buildProjectMapSnapshot(
 ```
 
 Note: You will need to add the `CanvasNodeType` import at the top of the file:
+
 ```typescript
 import type { CanvasNodeType } from '../canvas-types'
 ```
@@ -998,6 +973,7 @@ Expected: No errors
 ### Task 6: Reingold-Tilford Tree Layout
 
 **Files:**
+
 - Create: `src/renderer/src/panels/canvas/folder-map-layout.ts`
 - Create: `tests/canvas/folder-map-layout.test.ts`
 
@@ -1509,6 +1485,7 @@ git commit -m "feat: add Reingold-Tilford tree layout for folder maps"
 ### Task 7: Batch File Read IPC Channel
 
 **Files:**
+
 - Modify: `src/shared/ipc-channels.ts`
 - Modify: `src/main/ipc/filesystem.ts`
 - Modify: `src/preload/index.ts`
@@ -1591,6 +1568,7 @@ git commit -m "feat: add fs:read-files-batch IPC channel with PathGuard and p-li
 ### Task 8: Project-Map Worker
 
 **Files:**
+
 - Create: `src/renderer/src/workers/project-map-worker.ts`
 - Create: `tests/canvas/project-map-worker.test.ts`
 
@@ -1854,6 +1832,7 @@ git commit -m "feat: add project-map worker with append/finalize/cancel protocol
 ### Task 9: Add project-folder Node Type
 
 **Files:**
+
 - Modify: `src/shared/canvas-types.ts`
 
 - [ ] **Step 1: Add project-folder to CanvasNodeType union**
@@ -1861,6 +1840,7 @@ git commit -m "feat: add project-map worker with append/finalize/cancel protocol
 In `src/shared/canvas-types.ts`, update the `CanvasNodeType` union (around line 3):
 
 Change:
+
 ```typescript
 export type CanvasNodeType =
   | 'text' | 'note' | 'terminal' | 'code' | 'markdown'
@@ -1869,6 +1849,7 @@ export type CanvasNodeType =
 ```
 
 To:
+
 ```typescript
 export type CanvasNodeType =
   | 'text' | 'note' | 'terminal' | 'code' | 'markdown'
@@ -1880,11 +1861,13 @@ export type CanvasNodeType =
 - [ ] **Step 2: Add size entries**
 
 Add to `MIN_SIZES` (around line 100):
+
 ```typescript
 'project-folder': { width: 200, height: 60 },
 ```
 
 Add to `DEFAULT_SIZES` (around line 114):
+
 ```typescript
 'project-folder': { width: 260, height: 80 },
 ```
@@ -1892,6 +1875,7 @@ Add to `DEFAULT_SIZES` (around line 114):
 - [ ] **Step 3: Add CARD_TYPE_INFO entry**
 
 Add to `CARD_TYPE_INFO` (around line 144):
+
 ```typescript
 'project-folder': { label: 'Folder', icon: '\u{1F4C1}', category: 'tools' },
 ```
@@ -1899,6 +1883,7 @@ Add to `CARD_TYPE_INFO` (around line 144):
 - [ ] **Step 4: Add getDefaultMetadata case**
 
 Add to the switch in `getDefaultMetadata` (around line 160):
+
 ```typescript
 case 'project-folder':
   return { relativePath: '', rootPath: '', childCount: 0, collapsed: false }
@@ -1922,6 +1907,7 @@ git commit -m "feat: add project-folder canvas node type with sizes and metadata
 ### Task 10: ProjectFolderCard Component + Card Registry
 
 **Files:**
+
 - Create: `src/renderer/src/panels/canvas/ProjectFolderCard.tsx`
 - Modify: `src/renderer/src/panels/canvas/card-registry.ts`
 
@@ -2042,6 +2028,7 @@ git commit -m "feat: add ProjectFolderCard component and register in card regist
 ### Task 11: Edge Styling for New Edge Kinds
 
 **Files:**
+
 - Modify: `src/renderer/src/design/tokens.ts`
 - Modify: `src/renderer/src/panels/canvas/EdgeLayer.tsx`
 
@@ -2146,6 +2133,7 @@ git commit -m "feat: add edge styling for contains/imports/references kinds with
 ### Task 12: Folder-Map Orchestrator
 
 **Files:**
+
 - Create: `src/renderer/src/panels/canvas/folder-map-orchestrator.ts`
 
 - [ ] **Step 1: Implement the orchestrator**
@@ -2352,6 +2340,7 @@ git commit -m "feat: add folder-map orchestrator with chunked reads and worker c
 ### Task 13: Entry Points (Sidebar + Command Palette + App.tsx)
 
 **Files:**
+
 - Modify: `src/renderer/src/panels/sidebar/FileContextMenu.tsx`
 - Modify: `src/renderer/src/design/components/CommandPalette.tsx`
 - Modify: `src/renderer/src/App.tsx`
@@ -2436,6 +2425,7 @@ git commit -m "feat: add Map to Canvas entry points in sidebar and command palet
 ### Task 14: Wire Orchestrator into CanvasView
 
 **Files:**
+
 - Modify: `src/renderer/src/panels/canvas/CanvasView.tsx`
 
 - [ ] **Step 1: Add folder map orchestration to CanvasView**
@@ -2443,12 +2433,14 @@ git commit -m "feat: add Map to Canvas entry points in sidebar and command palet
 In `src/renderer/src/panels/canvas/CanvasView.tsx`, add the following:
 
 1. Import the orchestrator:
+
 ```typescript
 import { mapFolderToCanvas, cancelFolderMap } from './folder-map-orchestrator'
 import type { FolderMapProgress } from './folder-map-orchestrator'
 ```
 
 2. Add props for the pending folder map:
+
 ```typescript
 // In the component props (or receive via a store/callback pattern)
 pendingFolderMap?: string | null
@@ -2456,11 +2448,13 @@ onFolderMapConsumed?: () => void
 ```
 
 3. Add state for progress:
+
 ```typescript
 const [folderMapProgress, setFolderMapProgress] = useState<FolderMapProgress | null>(null)
 ```
 
 4. Add an effect to trigger mapping when `pendingFolderMap` changes:
+
 ```typescript
 useEffect(() => {
   if (!pendingFolderMap) return
@@ -2510,6 +2504,7 @@ useEffect(() => {
 ```
 
 5. Render a progress indicator when mapping is in progress (simple overlay):
+
 ```typescript
 {folderMapProgress && folderMapProgress.phase !== 'idle' && folderMapProgress.phase !== 'done' && (
   <div style={{
@@ -2573,6 +2568,7 @@ Expected: Clean
 ### Task 16: Canvas Mutation Types
 
 **Files:**
+
 - Create: `src/shared/canvas-mutation-types.ts`
 
 - [ ] **Step 1: Create mutation types**
@@ -2651,6 +2647,7 @@ git commit -m "feat: add canvas mutation types and folder-map plan builder"
 ### Task 17: Preview Layer
 
 **Files:**
+
 - Create: `src/renderer/src/panels/canvas/FolderMapPreview.tsx`
 - Modify: `src/renderer/src/panels/canvas/CanvasSurface.tsx`
 
@@ -2854,6 +2851,7 @@ git commit -m "feat: add lightweight SVG preview layer with confirmation bar"
 ### Task 18: Pending-Apply Safety + Undo
 
 **Files:**
+
 - Create: `src/renderer/src/panels/canvas/folder-map-apply.ts`
 - Create: `tests/canvas/folder-map-apply.test.ts`
 
@@ -3045,6 +3043,7 @@ git commit -m "feat: add folder-map apply with pending-apply safety and undo int
 ### Task 19: Wire Preview/Apply Flow into CanvasView
 
 **Files:**
+
 - Modify: `src/renderer/src/panels/canvas/CanvasView.tsx`
 - Modify: `src/renderer/src/panels/canvas/folder-map-orchestrator.ts`
 
@@ -3086,6 +3085,7 @@ case 'result':
 - [ ] **Step 2: Update CanvasView to show preview before applying**
 
 In `CanvasView.tsx`, update the folder map effect to:
+
 1. Store the plan in state: `const [previewPlan, setPreviewPlan] = useState<CanvasMutationPlan | null>(null)`
 2. When `mapFolderToCanvas` completes, set the preview plan instead of applying immediately
 3. Render `<FolderMapPreview>` when `previewPlan` is set
@@ -3172,6 +3172,7 @@ Expected: lint + typecheck + test all pass clean
 ### Task 21: Canvas Snapshot/Apply IPC
 
 **Files:**
+
 - Modify: `src/shared/ipc-channels.ts`
 - Modify: `src/preload/index.ts`
 - Create or modify: `src/main/ipc/canvas.ts` (new file for canvas IPC handlers)
@@ -3302,6 +3303,7 @@ git commit -m "feat: add canvas:get-snapshot and canvas:apply-plan IPC with vali
 ### Task 22: MCP Tools
 
 **Files:**
+
 - Modify: `src/main/services/mcp-server.ts`
 
 - [ ] **Step 1: Add three MCP tools**
