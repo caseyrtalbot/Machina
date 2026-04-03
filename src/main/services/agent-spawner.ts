@@ -31,6 +31,40 @@ function readLibrarianPrompt(vaultRoot: string): string | null {
   return null
 }
 
+/** Curator mode descriptions, keyed by mode ID. */
+const CURATOR_MODES: Record<string, string> = {
+  challenge:
+    'Stress-test ideas from the librarian report. For each proposal, add a "## Challenge" ' +
+    'section to the relevant vault file examining assumptions, contradictions, and missing perspectives.',
+  emerge:
+    'Surface hidden connections identified in the librarian report. Add "## Connections" ' +
+    'sections with wikilinks and synthesis notes to relevant vault files.',
+  research:
+    'Address gaps and forward questions from the librarian report. Add "## Research" ' +
+    'sections with findings, citations, and proposed directions.',
+  learn:
+    'Extract learning points from the librarian report. Add "## Key Learnings" ' +
+    'sections summarizing insights and creating study-oriented content.'
+}
+
+/** Read the curator system prompt, preferring a user-customized file over the bundled default. */
+function readCuratorPrompt(vaultRoot: string): string | null {
+  const userCustomized = join(vaultRoot, TE_DIR, 'curator-prompt.md')
+  if (existsSync(userCustomized)) {
+    return readFileSync(userCustomized, 'utf-8')
+  }
+
+  const bundledDefault = __dirname.includes('.asar')
+    ? join(process.resourcesPath, 'services', 'default-curator-prompt.md')
+    : join(__dirname, 'default-curator-prompt.md')
+
+  if (existsSync(bundledDefault)) {
+    return readFileSync(bundledDefault, 'utf-8')
+  }
+
+  return null
+}
+
 /** Read the agent system prompt, preferring a user-customized file over the bundled default. */
 function readAgentPrompt(vaultRoot: string): string | null {
   const userCustomized = join(vaultRoot, TE_DIR, 'agent-prompt.md')
@@ -114,6 +148,74 @@ export class AgentSpawner {
 
     child.on('error', (err) => {
       console.error(`Librarian process error: ${err.message}`)
+      this.librarianMonitor?.complete(sessionId, 1)
+    })
+
+    return { sessionId }
+  }
+
+  /** Spawn a curator as a direct child process. */
+  spawnCurator(vaultPath: string, mode: string): { sessionId: string } {
+    const sessionId = randomUUID()
+    let systemPrompt = readCuratorPrompt(this.vaultRoot)
+
+    const modeDescription =
+      CURATOR_MODES[mode] ??
+      `Apply the "${mode}" workflow to the vault based on the librarian report.`
+
+    if (systemPrompt) {
+      systemPrompt = systemPrompt
+        .replace('{{MODE}}', mode.charAt(0).toUpperCase() + mode.slice(1))
+        .replace('{{MODE_DESCRIPTION}}', modeDescription)
+    }
+
+    const args = [
+      '-p',
+      '--dangerously-skip-permissions',
+      '--allowedTools',
+      'Read,Write,Edit,Glob,Grep,Bash',
+      '--model',
+      'sonnet',
+      `Run the curator ${mode} workflow on this vault using the librarian reports in _librarian/.`
+    ]
+
+    if (systemPrompt) {
+      args.unshift('--system-prompt', systemPrompt)
+    }
+
+    const child = cpSpawn('claude', args, {
+      cwd: vaultPath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env }
+    })
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      this.librarianMonitor?.setLastOutput(sessionId, chunk.toString())
+    })
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      this.librarianMonitor?.setLastOutput(sessionId, chunk.toString())
+    })
+
+    const killFn = () => {
+      try {
+        child.kill('SIGTERM')
+      } catch {
+        /* already dead */
+      }
+    }
+
+    this.librarianMonitor?.register(sessionId, child.pid ?? 0, vaultPath, killFn, 'curator')
+
+    child.on('exit', (code) => {
+      this.librarianMonitor?.complete(sessionId, code ?? 0)
+      setTimeout(() => {
+        this.librarianMonitor?.cleanup(sessionId)
+      }, 5000)
+    })
+
+    child.on('error', (err) => {
+      console.error(`Curator process error: ${err.message}`)
       this.librarianMonitor?.complete(sessionId, 1)
     })
 

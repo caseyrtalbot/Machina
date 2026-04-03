@@ -83,7 +83,8 @@ export interface AgentSpawnConfig {
 export interface AgentSpawnRequest {
   readonly cwd: string
   readonly prompt?: string
-  readonly type?: 'librarian'
+  readonly type?: 'librarian' | 'curator'
+  readonly curatorMode?: string
 }
 
 // ---------------------------------------------------------------------------

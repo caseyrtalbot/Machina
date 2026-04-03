@@ -23,6 +23,11 @@ export function registerAgentIpc(): void {
       return activeSpawner.spawnLibrarian(request.cwd)
     }
 
+    // Dispatch curator spawns to the direct child_process path
+    if (request.type === 'curator') {
+      return activeSpawner.spawnCurator(request.cwd, request.curatorMode ?? 'emerge')
+    }
+
     const sessionId = activeSpawner.spawn(request)
     return { sessionId }
   })
