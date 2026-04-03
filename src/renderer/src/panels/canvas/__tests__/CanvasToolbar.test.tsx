@@ -66,7 +66,9 @@ const baseProps = {
   onOrganize: vi.fn(),
   organizePhase: 'idle',
   librarianActive: false,
-  onLibrarian: vi.fn()
+  onLibrarian: vi.fn(),
+  curatorActive: false,
+  onCurator: vi.fn()
 }
 
 describe('CanvasToolbar librarian button', () => {

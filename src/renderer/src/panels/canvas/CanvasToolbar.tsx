@@ -18,6 +18,8 @@ interface CanvasToolbarProps {
   readonly organizePhase: string
   readonly librarianActive: boolean
   readonly onLibrarian: () => void
+  readonly curatorActive: boolean
+  readonly onCurator: (mode: string) => void
 }
 
 function Tip({
@@ -45,7 +47,9 @@ export function CanvasToolbar({
   onOrganize,
   organizePhase,
   librarianActive,
-  onLibrarian
+  onLibrarian,
+  curatorActive,
+  onCurator
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
@@ -57,11 +61,13 @@ export function CanvasToolbar({
   const setEnv = useSettingsStore((s) => s.setEnv)
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
+  const [curatorMenuOpen, setCuratorMenuOpen] = useState(false)
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
+  const curatorMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!tileMenuOpen && !envMenuOpen) return
+    if (!tileMenuOpen && !envMenuOpen && !curatorMenuOpen) return
 
     const handlePointerDown = (event: MouseEvent) => {
       if (tileMenuRef.current && !tileMenuRef.current.contains(event.target as Node)) {
@@ -70,12 +76,16 @@ export function CanvasToolbar({
       if (envMenuRef.current && !envMenuRef.current.contains(event.target as Node)) {
         setEnvMenuOpen(false)
       }
+      if (curatorMenuRef.current && !curatorMenuRef.current.contains(event.target as Node)) {
+        setCuratorMenuOpen(false)
+      }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setTileMenuOpen(false)
         setEnvMenuOpen(false)
+        setCuratorMenuOpen(false)
       }
     }
 
@@ -85,7 +95,7 @@ export function CanvasToolbar({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [tileMenuOpen, envMenuOpen])
+  }, [tileMenuOpen, envMenuOpen, curatorMenuOpen])
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -371,6 +381,81 @@ export function CanvasToolbar({
           </svg>
         </button>
         <Tip label={librarianActive ? 'Stop Librarian' : 'Librarian'} />
+      </div>
+
+      <div ref={curatorMenuRef} style={{ position: 'relative' }}>
+        <div className="canvas-toolbtn-wrap">
+          <button
+            onClick={() => {
+              if (curatorActive) return
+              setCuratorMenuOpen((prev) => !prev)
+            }}
+            className={`canvas-toolbtn${curatorActive ? ' canvas-toolbtn--active' : ''}`}
+            data-testid="canvas-curator"
+          >
+            <svg
+              width={14}
+              height={14}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={curatorActive ? { animation: 'te-pulse 2s ease-in-out infinite' } : undefined}
+            >
+              {/* Stamp/seal icon */}
+              <rect x="4" y="1" width="8" height="4" rx="1" />
+              <line x1="8" y1="5" x2="8" y2="9" />
+              <rect x="2" y="9" width="12" height="5" rx="1" />
+            </svg>
+          </button>
+          <Tip label={curatorActive ? 'Curator running\u2026' : 'Curator'} />
+        </div>
+        {curatorMenuOpen && (
+          <div
+            className="sidebar-popover absolute flex flex-col gap-1 p-2"
+            style={{
+              top: 0,
+              left: '100%',
+              marginLeft: 8,
+              minWidth: 160,
+              zIndex: 100
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--color-text-tertiary)',
+                padding: '2px 8px',
+                marginBottom: 2
+              }}
+            >
+              Select mode
+            </div>
+            {(
+              [
+                { id: 'challenge', label: 'Challenge', desc: 'Stress-test ideas' },
+                { id: 'emerge', label: 'Emerge', desc: 'Surface connections' },
+                { id: 'research', label: 'Research', desc: 'Address gaps' },
+                { id: 'learn', label: 'Learn', desc: 'Extract learnings' }
+              ] as const
+            ).map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => {
+                  onCurator(mode.id)
+                  setCuratorMenuOpen(false)
+                }}
+                className="sidebar-popover__item"
+                style={{ textAlign: 'left', padding: '4px 8px', borderRadius: 4 }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>{mode.label}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{mode.desc}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="canvas-toolrail__divider" />

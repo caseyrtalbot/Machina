@@ -50,9 +50,10 @@ export function useAgentOrchestrator(
   // Ref mirrors state.phase so the trigger guard is never stale
   const phaseRef = useRef<AgentPhase>('idle')
 
-  // Track spawned librarian session ID so the action bar can show running state.
+  // Track spawned librarian/curator session IDs so the toolbar can show running state.
   // Set on spawn, cleared when the session exits (via agent:states-changed).
   const [librarianSessionId, setLibrarianSessionId] = useState<string | null>(null)
+  const [curatorSessionId, setCuratorSessionId] = useState<string | null>(null)
 
   const setPhase = useCallback((next: AgentOrchestratorState) => {
     phaseRef.current = next.phase
@@ -152,6 +153,8 @@ export function useAgentOrchestrator(
     ...state,
     librarianSessionId,
     setLibrarianSessionId,
+    curatorSessionId,
+    setCuratorSessionId,
     trigger,
     apply,
     cancel

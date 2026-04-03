@@ -121,6 +121,24 @@ export function CanvasView(): React.ReactElement {
     return true
   }, [agent.librarianSessionId, agentStates, agent.setLibrarianSessionId])
 
+  const curatorSeenRef = useRef(false)
+  const curatorActive = useMemo(() => {
+    if (!agent.curatorSessionId) {
+      curatorSeenRef.current = false
+      return false
+    }
+    const session = agentStates.find((s) => s.sessionId === agent.curatorSessionId)
+    if (session && session.status !== 'exited') {
+      curatorSeenRef.current = true
+      return true
+    }
+    if (curatorSeenRef.current) {
+      queueMicrotask(() => agent.setCuratorSessionId(null))
+      return false
+    }
+    return true
+  }, [agent.curatorSessionId, agentStates, agent.setCuratorSessionId])
+
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
   const graph = useVaultStore((s) => s.graph)
@@ -650,6 +668,32 @@ export function CanvasView(): React.ReactElement {
     }
   }, [librarianActive, agent])
 
+  const handleCurator = useCallback(
+    (mode: string) => {
+      if (curatorActive && agent.curatorSessionId) {
+        agent.setCuratorSessionId(null)
+      } else {
+        const vp = useVaultStore.getState().vaultPath
+        if (!vp) return
+        void (async () => {
+          try {
+            const result = await window.api.agent.spawn({
+              cwd: vp,
+              type: 'curator',
+              curatorMode: mode
+            })
+            if ('sessionId' in result) {
+              agent.setCuratorSessionId(result.sessionId)
+            }
+          } catch (err) {
+            console.error('Curator spawn failed:', err)
+          }
+        })()
+      }
+    },
+    [curatorActive, agent]
+  )
+
   const ontologyGroups = ontology.pendingSnapshot
     ? Object.values(ontology.pendingSnapshot.groupsById)
     : []
@@ -677,6 +721,8 @@ export function CanvasView(): React.ReactElement {
           organizePhase={ontology.phase}
           librarianActive={librarianActive}
           onLibrarian={handleLibrarian}
+          curatorActive={curatorActive}
+          onCurator={handleCurator}
         />
         <CanvasActionBar
           onTriggerAction={agent.trigger}
