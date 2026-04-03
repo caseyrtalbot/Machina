@@ -52,4 +52,25 @@ describe('LibrarianMonitor', () => {
     monitor.kill('session-1')
     expect(killFn).toHaveBeenCalledOnce()
   })
+
+  it('tracks a registered session with a custom label', () => {
+    monitor.register('session-1', 12345, '/vault/path', undefined, 'curator')
+    const states = monitor.getStates()
+    expect(states[0].label).toBe('curator')
+    expect(states[0].tmuxName).toBe('curator-session-')
+  })
+
+  it('tracks last output via sidecar.currentTask', () => {
+    monitor.register('session-1', 12345, '/vault/path')
+    monitor.setLastOutput('session-1', 'Processing Pass 1: Contradictions...')
+    const states = monitor.getStates()
+    expect(states[0].sidecar?.currentTask).toBe('Processing Pass 1: Contradictions...')
+  })
+
+  it('truncates lastOutput to 200 chars', () => {
+    monitor.register('session-1', 12345, '/vault/path')
+    monitor.setLastOutput('session-1', 'x'.repeat(300))
+    const states = monitor.getStates()
+    expect(states[0].sidecar?.currentTask).toHaveLength(200)
+  })
 })

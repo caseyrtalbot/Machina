@@ -86,6 +86,14 @@ export class AgentSpawner {
       env: { ...process.env }
     })
 
+    child.stdout?.on('data', (chunk: Buffer) => {
+      this.librarianMonitor?.setLastOutput(sessionId, chunk.toString())
+    })
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      this.librarianMonitor?.setLastOutput(sessionId, chunk.toString())
+    })
+
     const killFn = () => {
       try {
         child.kill('SIGTERM')
