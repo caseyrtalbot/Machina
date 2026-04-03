@@ -78,6 +78,7 @@ export function useOntologyOrchestrator(commandStack: React.RefObject<CommandSta
         connections: readonly string[]
         concepts: readonly string[]
         title: string
+        origin?: 'human' | 'source' | 'agent'
       }
     > = {}
     for (const a of artifacts) {
@@ -87,7 +88,8 @@ export function useOntologyOrchestrator(commandStack: React.RefObject<CommandSta
         bodyLinks: a.bodyLinks ?? [],
         connections: a.connections ?? [],
         concepts: a.concepts ?? [],
-        title: a.title
+        title: a.title,
+        origin: a.origin
       }
     }
 

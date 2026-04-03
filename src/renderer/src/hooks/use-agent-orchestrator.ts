@@ -16,11 +16,14 @@
 import { useCallback, useRef, useState } from 'react'
 import { useCanvasStore } from '../store/canvas-store'
 import { useVaultStore } from '../store/vault-store'
-import { extractAgentContext } from '../panels/canvas/agent-context'
+import { extractAgentContext, buildVaultScopeContext } from '../panels/canvas/agent-context'
+import type { ArtifactSummary } from '../panels/canvas/agent-context'
 import { applyAgentResult } from '../panels/canvas/agent-apply'
 import type { AgentActionName } from '@shared/agent-action-types'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import type { CommandStack } from '../panels/canvas/canvas-commands'
+import { buildTagIndex } from '@shared/engine/tag-index'
+import { buildGhostIndex } from '@shared/engine/ghost-index'
 
 export type AgentPhase = 'idle' | 'computing' | 'preview' | 'error'
 
@@ -47,6 +50,10 @@ export function useAgentOrchestrator(
   // Ref mirrors state.phase so the trigger guard is never stale
   const phaseRef = useRef<AgentPhase>('idle')
 
+  // Track spawned librarian session ID so the action bar can show running state.
+  // Set on spawn, cleared when the session exits (via agent:states-changed).
+  const [librarianSessionId, setLibrarianSessionId] = useState<string | null>(null)
+
   const setPhase = useCallback((next: AgentOrchestratorState) => {
     phaseRef.current = next.phase
     setState(next)
@@ -57,11 +64,15 @@ export function useAgentOrchestrator(
       // Single agent lock — ref is always current, no stale closure risk
       if (phaseRef.current !== 'idle') return
 
-      // Librarian is a long-running tmux session, not a single-shot action
+      // Librarian is a long-running tmux session, not a single-shot action.
+      // Track its session ID so the action bar can show running state.
       if (action === 'librarian') {
         const vaultPath = useVaultStore.getState().vaultPath
         if (!vaultPath) return
-        window.api.agent.spawn({ cwd: vaultPath, prompt: '/librarian' })
+        const result = await window.api.agent.spawn({ cwd: vaultPath, prompt: '/librarian' })
+        if ('sessionId' in result) {
+          setLibrarianSessionId(result.sessionId)
+        }
         return
       }
 
@@ -74,14 +85,36 @@ export function useAgentOrchestrator(
         errorMessage: null
       })
 
-      const context = extractAgentContext(
-        action,
-        nodes,
-        edges,
-        selectedNodeIds,
-        viewport,
-        containerSize
-      )
+      // For challenge/emerge with no selection, use vault-scope context
+      // instead of sending empty card arrays
+      const useVaultScope =
+        (action === 'challenge' || action === 'emerge') && selectedNodeIds.size === 0
+
+      const context = useVaultScope
+        ? (() => {
+            const { artifacts, graph } = useVaultStore.getState()
+            const summaries: readonly ArtifactSummary[] = artifacts.map((a) => ({
+              id: a.id,
+              title: a.title,
+              type: a.type,
+              signal: a.signal,
+              tags: a.tags,
+              origin: a.origin
+            }))
+            const tagTree = buildTagIndex(artifacts)
+            const ghosts = buildGhostIndex(graph, artifacts)
+            const viewportBounds = {
+              x: -viewport.x / viewport.zoom,
+              y: -viewport.y / viewport.zoom,
+              width: containerSize.width / viewport.zoom,
+              height: containerSize.height / viewport.zoom
+            }
+            return buildVaultScopeContext(action, summaries, tagTree, ghosts, {
+              viewportBounds,
+              totalCardCount: nodes.length
+            })
+          })()
+        : extractAgentContext(action, nodes, edges, selectedNodeIds, viewport, containerSize)
 
       try {
         const response = await window.api.agentAction.compute({ action, context })
@@ -129,6 +162,8 @@ export function useAgentOrchestrator(
 
   return {
     ...state,
+    librarianSessionId,
+    setLibrarianSessionId,
     trigger,
     apply,
     cancel

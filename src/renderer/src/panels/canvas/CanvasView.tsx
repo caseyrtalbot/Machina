@@ -46,6 +46,7 @@ import { OntologyPreview } from './OntologyPreview'
 import { useOntologyOrchestrator } from './ontology-orchestrator'
 import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
 import { useAgentOrchestrator } from '../../hooks/use-agent-orchestrator'
+import { useAgentStates } from '../../hooks/use-agent-states'
 import { AgentPreview } from './AgentPreview'
 import { computeGhostNodes } from './agent-ghost-layer'
 import type { AgentActionName } from '@shared/agent-action-types'
@@ -95,6 +96,20 @@ export function CanvasView(): React.ReactElement {
   const agent = useAgentOrchestrator(commandStack, containerSize)
   useAgentPlanListener()
   const rawFileCount = useVaultStore((s) => s.rawFileCount)
+
+  // Track librarian running state via the tmux agent state system.
+  // When the librarian session exits or disappears, clear the tracked ID.
+  const agentStates = useAgentStates()
+  const librarianActive = useMemo(() => {
+    if (!agent.librarianSessionId) return false
+    const session = agentStates.find((s) => s.sessionId === agent.librarianSessionId)
+    if (!session || session.status === 'exited') {
+      // Clear tracked ID when session ends (deferred to avoid render-during-render)
+      queueMicrotask(() => agent.setLibrarianSessionId(null))
+      return false
+    }
+    return true
+  }, [agent.librarianSessionId, agentStates, agent.setLibrarianSessionId])
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
@@ -637,6 +652,7 @@ export function CanvasView(): React.ReactElement {
           onStop={agent.cancel}
           activeAction={agent.activeAction}
           phase={agent.phase}
+          librarianActive={librarianActive}
         />
         <CanvasSurface
           onContextMenu={handleContextMenu}

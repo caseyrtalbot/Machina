@@ -32,6 +32,7 @@ export interface OntologyWorkerRequest {
         readonly connections: readonly string[]
         readonly concepts: readonly string[]
         readonly title: string
+        readonly origin?: 'human' | 'source' | 'agent'
       }
     >
   >
