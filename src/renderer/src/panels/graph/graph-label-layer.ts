@@ -41,7 +41,8 @@ export class LabelLayer {
     hoveredIndex: number | null,
     neighborSet: Set<number> | null,
     showLabels = true,
-    labelScale = 1.0
+    labelScale = 1.0,
+    brightness = 1.0
   ): void {
     const { ctx, dpr } = this
     const w = this.canvas.width
@@ -89,7 +90,7 @@ export class LabelLayer {
       const label =
         nodes[i].title.length > 30 ? nodes[i].title.slice(0, 30) + '\u2026' : nodes[i].title
 
-      ctx.globalAlpha = alpha
+      ctx.globalAlpha = Math.min(alpha * brightness, 1)
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)'
       ctx.lineWidth = 4
       ctx.strokeText(label, sx, sy + yOffset)

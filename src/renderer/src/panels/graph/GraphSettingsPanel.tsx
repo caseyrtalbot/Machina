@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
+import { useSettingsStore } from '@renderer/store/settings-store'
 import { colors } from '@renderer/design/tokens'
 import type { ForceParams } from './graph-types'
 import { DEFAULT_FORCE_PARAMS } from './graph-types'
@@ -133,6 +134,11 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
   const setForceParams = useGraphViewStore((s) => s.setForceParams)
   const resetForceParams = useGraphViewStore((s) => s.resetForceParams)
 
+  const edgeBrightness = useSettingsStore((s) => s.edgeBrightness)
+  const nodeBrightness = useSettingsStore((s) => s.nodeBrightness)
+  const setEdgeBrightness = useSettingsStore((s) => s.setEdgeBrightness)
+  const setNodeBrightness = useSettingsStore((s) => s.setNodeBrightness)
+
   const handleForceChange = useCallback(
     (key: keyof ForceParams, value: number) => {
       const update = { [key]: value }
@@ -200,6 +206,24 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
           max={2}
           step={0.1}
           onChange={setLabelScale}
+        />
+        <Slider
+          label="Edge brightness"
+          value={edgeBrightness}
+          min={0.2}
+          max={2}
+          step={0.1}
+          displayValue={`${edgeBrightness.toFixed(1)}x`}
+          onChange={setEdgeBrightness}
+        />
+        <Slider
+          label="Node brightness"
+          value={nodeBrightness}
+          min={0.2}
+          max={2}
+          step={0.1}
+          displayValue={`${nodeBrightness.toFixed(1)}x`}
+          onChange={setNodeBrightness}
         />
       </Section>
 

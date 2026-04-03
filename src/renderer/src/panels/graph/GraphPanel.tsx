@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
+import { useSettingsStore } from '@renderer/store/settings-store'
 import { GraphRenderer } from './graph-renderer'
 import { LabelLayer } from './graph-label-layer'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
@@ -275,7 +276,8 @@ export function GraphPanel() {
             focusIdx,
             ns,
             showLabels,
-            labelScale
+            labelScale,
+            useSettingsStore.getState().nodeBrightness
           )
         }
       }
@@ -327,7 +329,8 @@ export function GraphPanel() {
           focusIdx,
           neighborSet,
           showLabels,
-          labelScale
+          labelScale,
+          useSettingsStore.getState().nodeBrightness
         )
       }
     }
@@ -404,12 +407,17 @@ export function GraphPanel() {
   const showLabels = useGraphViewStore((s) => s.showLabels)
   const labelScale = useGraphViewStore((s) => s.labelScale)
 
+  const edgeBrightness = useSettingsStore((s) => s.edgeBrightness)
+  const nodeBrightness = useSettingsStore((s) => s.nodeBrightness)
+
   useEffect(() => {
     rendererRef.current?.setDisplayOptions({
       showEdges,
       showGhostNodes,
       showOrphanNodes,
-      nodeScale
+      nodeScale,
+      edgeBrightness,
+      nodeBrightness
     })
 
     // Re-render labels immediately when display settings change
@@ -427,7 +435,8 @@ export function GraphPanel() {
         focusIdx,
         ns,
         showLabels,
-        labelScale
+        labelScale,
+        nodeBrightness
       )
     }
   }, [
@@ -437,6 +446,8 @@ export function GraphPanel() {
     nodeScale,
     showLabels,
     labelScale,
+    edgeBrightness,
+    nodeBrightness,
     getNeighborSet
   ])
 

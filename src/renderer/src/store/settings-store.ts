@@ -10,6 +10,8 @@ interface SettingsState {
   readonly defaultEditorMode: 'rich' | 'source'
   readonly autosaveInterval: number
   readonly spellCheck: boolean
+  readonly edgeBrightness: number
+  readonly nodeBrightness: number
 }
 
 interface SettingsActions {
@@ -21,6 +23,8 @@ interface SettingsActions {
   setDefaultEditorMode: (value: 'rich' | 'source') => void
   setAutosaveInterval: (value: number) => void
   setSpellCheck: (value: boolean) => void
+  setEdgeBrightness: (value: number) => void
+  setNodeBrightness: (value: number) => void
 }
 
 type SettingsStore = SettingsState & SettingsActions
@@ -35,6 +39,8 @@ export const useSettingsStore = create<SettingsStore>()(
       defaultEditorMode: 'rich',
       autosaveInterval: 1500,
       spellCheck: false,
+      edgeBrightness: 1.0,
+      nodeBrightness: 1.0,
 
       setEnv: (key, value) => set((state) => ({ env: { ...state.env, [key]: value } })),
       resetEnv: () => set({ env: { ...ENV_DEFAULTS } }),
@@ -43,11 +49,13 @@ export const useSettingsStore = create<SettingsStore>()(
       setMonoFont: (value) => set({ monoFont: value }),
       setDefaultEditorMode: (value) => set({ defaultEditorMode: value }),
       setAutosaveInterval: (value) => set({ autosaveInterval: value }),
-      setSpellCheck: (value) => set({ spellCheck: value })
+      setSpellCheck: (value) => set({ spellCheck: value }),
+      setEdgeBrightness: (value) => set({ edgeBrightness: value }),
+      setNodeBrightness: (value) => set({ nodeBrightness: value })
     }),
     {
       name: 'machina-settings',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -81,6 +89,12 @@ export const useSettingsStore = create<SettingsStore>()(
           } else {
             state.env = { ...ENV_DEFAULTS }
           }
+        }
+
+        if (version < 5) {
+          // v4 → v5: add graph brightness defaults
+          if (typeof state.edgeBrightness !== 'number') state.edgeBrightness = 1.0
+          if (typeof state.nodeBrightness !== 'number') state.nodeBrightness = 1.0
         }
 
         return state as unknown as SettingsState & SettingsActions

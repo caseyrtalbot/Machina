@@ -94,6 +94,8 @@ interface DisplayOptions {
   readonly showGhostNodes: boolean
   readonly showOrphanNodes: boolean
   readonly nodeScale: number
+  readonly edgeBrightness: number
+  readonly nodeBrightness: number
 }
 
 export class GraphRenderer {
@@ -114,7 +116,9 @@ export class GraphRenderer {
     showEdges: true,
     showGhostNodes: true,
     showOrphanNodes: true,
-    nodeScale: 1.0
+    nodeScale: 1.0,
+    edgeBrightness: 1.0,
+    nodeBrightness: 1.0
   }
 
   // Viewport
@@ -500,6 +504,9 @@ export class GraphRenderer {
         }
       }
 
+      // Apply brightness multiplier
+      alpha = Math.min(alpha * this.displayOptions.edgeBrightness, 1)
+
       // Compute curve control point
       const mx = (sx + tx) / 2
       const my = (sy + ty) / 2
@@ -575,12 +582,12 @@ export class GraphRenderer {
       // Compute alpha
       const baseAlpha = node.isGhost ? GHOST_ALPHA : SIGNAL_OPACITY[node.signal]
 
+      let finalAlpha = baseAlpha
       if (neighborSet !== null) {
         const isNeighbor = neighborSet.has(i)
-        g.alpha = isHighlighted || isNeighbor ? baseAlpha : baseAlpha * NEIGHBOR_DIM_FACTOR
-      } else {
-        g.alpha = baseAlpha
+        finalAlpha = isHighlighted || isNeighbor ? baseAlpha : baseAlpha * NEIGHBOR_DIM_FACTOR
       }
+      g.alpha = Math.min(finalAlpha * this.displayOptions.nodeBrightness, 1)
     }
 
     // Update selection ring
