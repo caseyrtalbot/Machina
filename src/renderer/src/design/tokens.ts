@@ -71,6 +71,7 @@ function hashString(str: string): number {
 
 export function getArtifactColor(type: string): string {
   if (type === 'tag') return '#dfa11a'
+  if (type === 'librarian') return '#60b8d6' // oklch(0.75 0.12 220) distinct cyan
   const builtIn = (ARTIFACT_COLORS as Record<string, string>)[type]
   if (builtIn) return builtIn
   return CUSTOM_TYPE_PALETTE[hashString(type) % CUSTOM_TYPE_PALETTE.length]
