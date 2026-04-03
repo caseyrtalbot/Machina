@@ -16,6 +16,8 @@ interface CanvasToolbarProps {
   readonly onOpenImport: () => void
   readonly onOrganize: () => void
   readonly organizePhase: string
+  readonly librarianActive: boolean
+  readonly onLibrarian: () => void
 }
 
 function Tip({
@@ -41,7 +43,9 @@ export function CanvasToolbar({
   onAddCard,
   onOpenImport,
   onOrganize,
-  organizePhase
+  organizePhase,
+  librarianActive,
+  onLibrarian
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
@@ -341,6 +345,32 @@ export function CanvasToolbar({
           </svg>
         </button>
         <Tip label={showAllEdges ? 'Hide edges' : 'Show edges'} />
+      </div>
+
+      <div className="canvas-toolbtn-wrap">
+        <button
+          onClick={onLibrarian}
+          className={`canvas-toolbtn${librarianActive ? ' canvas-toolbtn--active' : ''}`}
+          data-testid="canvas-librarian"
+        >
+          <svg
+            width={14}
+            height={14}
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={librarianActive ? { animation: 'te-pulse 2s ease-in-out infinite' } : undefined}
+          >
+            {/* Open book icon */}
+            <path d="M8 3C6.5 2 4.5 1.5 2 2v10c2.5-.5 4.5 0 6 1" />
+            <path d="M8 3c1.5-1 3.5-1.5 6-1v10c-2.5-.5-4.5 0-6 1" />
+            <line x1="8" y1="3" x2="8" y2="13" />
+          </svg>
+        </button>
+        <Tip label={librarianActive ? 'Stop Librarian' : 'Librarian'} />
       </div>
 
       <div className="canvas-toolrail__divider" />

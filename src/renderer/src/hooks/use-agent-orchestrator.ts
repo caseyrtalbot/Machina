@@ -61,34 +61,6 @@ export function useAgentOrchestrator(
 
   const trigger = useCallback(
     async (action: AgentActionName) => {
-      // Librarian is a long-running tmux session, not a single-shot action.
-      // Bypasses the phase machine — can spawn even while a canvas action is in preview/error.
-      if (action === 'librarian') {
-        const vaultPath = useVaultStore.getState().vaultPath
-        if (!vaultPath) return
-        try {
-          const result = await window.api.agent.spawn({ cwd: vaultPath, prompt: '/librarian' })
-          if ('sessionId' in result) {
-            setLibrarianSessionId(result.sessionId)
-          } else if ('error' in result) {
-            setPhase({
-              phase: 'error',
-              activeAction: 'librarian',
-              pendingPlan: null,
-              errorMessage: result.error
-            })
-          }
-        } catch (err) {
-          setPhase({
-            phase: 'error',
-            activeAction: 'librarian',
-            pendingPlan: null,
-            errorMessage: (err as Error).message
-          })
-        }
-        return
-      }
-
       // Single agent lock — ref is always current, no stale closure risk
       if (phaseRef.current !== 'idle') return
 

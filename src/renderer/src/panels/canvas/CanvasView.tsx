@@ -631,6 +631,25 @@ export function CanvasView(): React.ReactElement {
     setPreviewPlan(null)
   }, [])
 
+  const handleLibrarian = useCallback(() => {
+    if (librarianActive && agent.librarianSessionId) {
+      agent.setLibrarianSessionId(null)
+    } else {
+      const vp = useVaultStore.getState().vaultPath
+      if (!vp) return
+      void (async () => {
+        try {
+          const result = await window.api.agent.spawn({ cwd: vp, type: 'librarian' })
+          if ('sessionId' in result) {
+            agent.setLibrarianSessionId(result.sessionId)
+          }
+        } catch (err) {
+          console.error('Librarian spawn failed:', err)
+        }
+      })()
+    }
+  }, [librarianActive, agent])
+
   const ontologyGroups = ontology.pendingSnapshot
     ? Object.values(ontology.pendingSnapshot.groupsById)
     : []
@@ -656,6 +675,8 @@ export function CanvasView(): React.ReactElement {
           onOpenImport={() => setImportOpen(true)}
           onOrganize={ontology.startOrganize}
           organizePhase={ontology.phase}
+          librarianActive={librarianActive}
+          onLibrarian={handleLibrarian}
         />
         <CanvasActionBar
           onTriggerAction={agent.trigger}
