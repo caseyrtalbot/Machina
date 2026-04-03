@@ -7,6 +7,7 @@ import { generateClaudeMd } from '../../engine/claude-md-template'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { colors } from '../../design/tokens'
 import { useAgentStates } from '../../hooks/use-agent-states'
+import { useClaudeStatus } from '../../hooks/use-claude-status'
 import { VaultAgentFlyout } from './VaultAgentFlyout'
 
 interface CanvasToolbarProps {
@@ -106,6 +107,7 @@ export function CanvasToolbar({
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
   const [agentFlyoutOpen, setAgentFlyoutOpen] = useState(false)
+  const claudeStatus = useClaudeStatus()
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
   const agentFlyoutRef = useRef<HTMLDivElement>(null)
@@ -479,9 +481,10 @@ export function CanvasToolbar({
 
       <div className="canvas-toolrail__divider" />
 
-      <div className="canvas-toolbtn-wrap">
+      <div className="canvas-toolbtn-wrap" style={{ position: 'relative' }}>
         <button
           onClick={async () => {
+            if (!claudeStatus.installed) return
             const vaultPath = useVaultStore.getState().vaultPath
             if (!vaultPath) return
 
@@ -502,7 +505,9 @@ export function CanvasToolbar({
             )
             useCanvasStore.getState().addNode(node)
           }}
-          className="canvas-toolbtn canvas-toolbtn--accent"
+          className={`canvas-toolbtn ${claudeStatus.installed ? 'canvas-toolbtn--accent' : ''}`}
+          disabled={!claudeStatus.installed}
+          style={!claudeStatus.installed ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
         >
           <svg
             width={14}
@@ -516,7 +521,27 @@ export function CanvasToolbar({
             <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
           </svg>
         </button>
-        <Tip label="Start Claude" />
+        {claudeStatus.installed && !claudeStatus.authenticated && (
+          <span
+            className="absolute rounded-full"
+            style={{
+              top: 2,
+              right: 2,
+              width: 6,
+              height: 6,
+              backgroundColor: colors.claude.warning
+            }}
+          />
+        )}
+        <Tip
+          label={
+            !claudeStatus.installed
+              ? 'Claude Code not installed'
+              : !claudeStatus.authenticated
+                ? 'Start Claude (not signed in)'
+                : 'Start Claude'
+          }
+        />
       </div>
 
       <div className="canvas-toolrail__divider" />

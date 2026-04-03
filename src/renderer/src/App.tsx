@@ -21,6 +21,7 @@ import { buildFileTree } from './panels/sidebar/buildFileTree'
 import type { ArtifactOrigin } from './panels/sidebar/origin-utils'
 import { useSidebarSelectionStore } from './store/sidebar-selection-store'
 import { useAgentStates } from './hooks/use-agent-states'
+import { useClaudeStatusInit } from './hooks/use-claude-status'
 import { EditorSplitView } from './panels/editor/EditorSplitView'
 import { ActivityBar } from './components/ActivityBar'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
@@ -35,6 +36,7 @@ import { useViewStore } from './store/view-store'
 import { useWorkbenchActionStore } from './store/workbench-actions-store'
 import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
+import { OnboardingOverlay } from './components/OnboardingOverlay'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
 import pLimit from 'p-limit'
 import { SearchEngine } from './engine/search-engine'
@@ -540,6 +542,9 @@ function ConnectedSidebar({
     },
     [files]
   )
+
+  // Claude CLI status detection (install + auth)
+  useClaudeStatusInit()
 
   // Ground-truth: any vault agent (librarian/curator) alive?
   const allAgentStates = useAgentStates()
@@ -1243,6 +1248,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         onClose={() => setSettingsOpen(false)}
         onChangeVault={handleChangeVault}
       />
+      <OnboardingOverlay />
     </div>
   )
 }

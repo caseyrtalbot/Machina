@@ -9,6 +9,7 @@ import type { SystemArtifactKind } from './system-artifacts'
 import type { AgentSidecarState, AgentSpawnRequest } from './agent-types'
 import type { AgentActionRequest, AgentActionResponse } from './agent-action-types'
 import type { CanvasMutationPlan } from './canvas-mutation-types'
+import type { ClaudeStatus } from './claude-status-types'
 
 export interface IpcChannels {
   // --- Filesystem ---
@@ -173,6 +174,10 @@ export interface IpcChannels {
     response: void
   }
 
+  // --- Claude Status ---
+  'claude:get-status': { request: void; response: ClaudeStatus }
+  'claude:recheck': { request: void; response: ClaudeStatus }
+
   // --- Canvas ---
   'canvas:get-snapshot': {
     request: { canvasPath: string }
@@ -214,6 +219,9 @@ export interface IpcEvents {
 
   // Canvas agent plan dispatch (main -> renderer)
   'canvas:agent-plan-accepted': { plan: CanvasMutationPlan }
+
+  // Claude status events (main -> renderer)
+  'claude:status-changed': ClaudeStatus
 }
 
 export type IpcChannel = keyof IpcChannels

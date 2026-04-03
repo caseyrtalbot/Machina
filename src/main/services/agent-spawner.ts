@@ -6,6 +6,7 @@ import type { ShellService } from './shell-service'
 import type { AgentSpawnRequest } from '@shared/agent-types'
 import type { SessionId } from '@shared/types'
 import type { LibrarianMonitor } from './librarian-monitor'
+import type { ClaudeStatusService } from './claude-status-service'
 import { TE_DIR } from '@shared/constants'
 import bundledLibrarianPrompt from './default-librarian-prompt.md?raw'
 import bundledCuratorPrompt from './default-curator-prompt.md?raw'
@@ -75,15 +76,31 @@ export class AgentSpawner {
 
   constructor(
     private readonly shellService: ShellService,
-    private readonly vaultRoot: string
+    private readonly vaultRoot: string,
+    private readonly claudeStatus?: ClaudeStatusService
   ) {}
+
+  /** Check if Claude CLI is available and authenticated. Returns error string or null. */
+  private checkClaudeAvailability(): string | null {
+    if (!this.claudeStatus) return null
+    const status = this.claudeStatus.getStatus()
+    if (!status.installed) return 'Claude Code CLI is not installed'
+    if (!status.authenticated) return 'Claude is not signed in. Run "claude auth login" first.'
+    return null
+  }
 
   setLibrarianMonitor(monitor: LibrarianMonitor): void {
     this.librarianMonitor = monitor
   }
 
   /** Spawn a librarian as a direct child process (no tmux, no wrapper script). */
-  spawnLibrarian(vaultPath: string, selectedFiles?: readonly string[]): { sessionId: string } {
+  spawnLibrarian(
+    vaultPath: string,
+    selectedFiles?: readonly string[]
+  ): { sessionId: string } | { error: string } {
+    const claudeError = this.checkClaudeAvailability()
+    if (claudeError) return { error: claudeError }
+
     const sessionId = randomUUID()
     const systemPrompt = readLibrarianPrompt(this.vaultRoot)
 
@@ -149,7 +166,10 @@ export class AgentSpawner {
     vaultPath: string,
     mode: string,
     selectedFiles?: readonly string[]
-  ): { sessionId: string } {
+  ): { sessionId: string } | { error: string } {
+    const claudeError = this.checkClaudeAvailability()
+    if (claudeError) return { error: claudeError }
+
     const sessionId = randomUUID()
     let systemPrompt = readCuratorPrompt(this.vaultRoot)
 

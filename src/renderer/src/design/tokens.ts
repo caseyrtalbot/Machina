@@ -23,6 +23,11 @@ export const colors = {
   semantic: {
     cluster: '#3dca8d',
     tension: '#ecaa0b'
+  },
+  claude: {
+    ready: '#4ec983', // ARTIFACT_COLORS.session emerald
+    warning: '#dfa11a', // ARTIFACT_COLORS.pattern amber
+    error: '#ff847d' // ARTIFACT_COLORS.constraint red
   }
 } as const
 

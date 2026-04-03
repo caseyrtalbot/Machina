@@ -15,10 +15,12 @@ import { registerAgentIpc, setAgentServices, stopAgentServices } from './ipc/age
 import { registerCanvasIpc } from './ipc/canvas'
 import { registerAgentActionIpc } from './ipc/agent-actions'
 import { registerGhostEmergeIpc } from './ipc/ghost-emerge'
+import { registerClaudeStatusIpc } from './ipc/claude-status'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { TmuxMonitor } from './services/tmux-monitor'
 import { AgentSpawner } from './services/agent-spawner'
 import { initVaultIndex } from './services/vault-indexing'
+import { ClaudeStatusService } from './services/claude-status-service'
 import { typedHandle } from './typed-ipc'
 import { getMainWindow, setMainWindow } from './window-registry'
 import { QuitCoordinator } from './services/quit-coordinator'
@@ -61,6 +63,7 @@ if (!process.env.LANG) {
 
 const mcpLifecycle = new McpLifecycle()
 const quitCoordinator = new QuitCoordinator()
+const claudeStatus = new ClaudeStatusService()
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -154,6 +157,8 @@ app.whenReady().then(() => {
   registerConfigIpc()
   registerWindowIpc()
   registerFilesystemIpc()
+  registerClaudeStatusIpc(claudeStatus)
+  claudeStatus.start()
   quitCoordinator.registerIpc()
 
   // Wire MCP server creation and agent monitoring to vault initialization.
@@ -169,7 +174,7 @@ app.whenReady().then(() => {
     })
 
     const monitor = TmuxMonitor.tryCreate(vaultPath)
-    const spawner = new AgentSpawner(getShellService(), vaultPath)
+    const spawner = new AgentSpawner(getShellService(), vaultPath, claudeStatus)
     setAgentServices(monitor, spawner)
   })
 
@@ -206,6 +211,7 @@ app.on('before-quit', (event) => {
     await getDocumentManager().flushAll()
 
     // Step 3: Clean up services
+    claudeStatus.stop()
     stopAgentServices()
     await mcpLifecycle.stop()
     getShellService().shutdown()

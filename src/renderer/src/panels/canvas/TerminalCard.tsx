@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState, useMemo, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeContext } from '../../hooks/useClaudeContext'
+import { useClaudeStatus } from '../../hooks/use-claude-status'
 import { buildCanvasContext } from '../../engine/context-serializer'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
@@ -63,6 +64,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
   const isClaudeCard = node.metadata?.initialCommand === 'claude'
   const { contextBadge, markError: _markError } = useClaudeContext(node, isClaudeCard)
+  const claudeStatus = useClaudeStatus()
 
   const removeNode = useCanvasStore((s) => s.removeNode)
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
@@ -311,7 +313,22 @@ export function TerminalCard({ node }: TerminalCardProps) {
       title={displayTitle}
       onClose={handleClose}
       onActivateContentClick={handleActivateContentClick}
-      titleExtra={contextBadge}
+      titleExtra={
+        isClaudeCard && (!claudeStatus.installed || !claudeStatus.authenticated) ? (
+          <span
+            className="flex items-center gap-1 text-[10px]"
+            style={{ color: colors.claude.warning }}
+          >
+            <span
+              className="inline-block rounded-full"
+              style={{ width: 5, height: 5, backgroundColor: colors.claude.warning }}
+            />
+            {!claudeStatus.installed ? 'CLI not found' : 'Not signed in'}
+          </span>
+        ) : (
+          contextBadge
+        )
+      }
     >
       {sessionDead ? (
         <div

@@ -13,6 +13,7 @@ import type {
 import type { AgentSidecarState, AgentSpawnRequest } from '../shared/agent-types'
 import type { AgentActionRequest, AgentActionResponse } from '../shared/agent-action-types'
 import type { CanvasMutationPlan } from '../shared/canvas-mutation-types'
+import type { ClaudeStatus } from '../shared/claude-status-types'
 
 const api = {
   window: {
@@ -104,6 +105,10 @@ const api = {
     reconnect: (sessionId: SessionId, cols: number, rows: number) =>
       typedInvoke('terminal:reconnect', { sessionId, cols, rows })
   },
+  claude: {
+    getStatus: () => typedInvoke('claude:get-status'),
+    recheck: () => typedInvoke('claude:recheck')
+  },
   agent: {
     getStates: () => typedInvoke('agent:get-states'),
     spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request),
@@ -157,7 +162,9 @@ const api = {
     canvasAgentPlanAccepted: (callback: (data: { plan: CanvasMutationPlan }) => void) =>
       typedOn('canvas:agent-plan-accepted', callback),
     appWillQuit: (callback: (data: Record<string, never>) => void) =>
-      typedOn('app:will-quit', callback)
+      typedOn('app:will-quit', callback),
+    claudeStatusChanged: (callback: (data: ClaudeStatus) => void) =>
+      typedOn('claude:status-changed', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path })
