@@ -112,6 +112,9 @@ export function useAgentOrchestrator(
   }, [state.pendingPlan, commandStack, setPhase])
 
   const cancel = useCallback(() => {
+    if (phaseRef.current === 'computing') {
+      window.api.agentAction.cancel()
+    }
     setPhase(IDLE_STATE)
   }, [setPhase])
 

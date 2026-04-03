@@ -634,7 +634,9 @@ export function CanvasView(): React.ReactElement {
         />
         <CanvasActionBar
           onTriggerAction={agent.trigger}
-          librarianRunning={agent.phase === 'computing' && agent.activeAction === 'librarian'}
+          onStop={agent.cancel}
+          activeAction={agent.activeAction}
+          phase={agent.phase}
         />
         <CanvasSurface
           onContextMenu={handleContextMenu}

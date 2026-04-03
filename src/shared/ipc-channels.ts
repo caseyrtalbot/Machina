@@ -167,6 +167,10 @@ export interface IpcChannels {
     request: AgentActionRequest
     response: AgentActionResponse
   }
+  'agent-action:cancel': {
+    request: void
+    response: void
+  }
 
   // --- Canvas ---
   'canvas:get-snapshot': {

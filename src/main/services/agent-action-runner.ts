@@ -393,11 +393,24 @@ Wrap your JSON in a \`\`\`json code fence.`
 
 export type CallClaudeFn = (prompt: string) => Promise<string>
 
+/** The currently running Claude subprocess, if any. Allows cancellation. */
+let _activeProc: ReturnType<typeof spawn> | null = null
+
+/** Kill the active Claude subprocess, if one is running. */
+export function cancelAgentAction(): void {
+  if (_activeProc) {
+    _activeProc.kill('SIGTERM')
+    _activeProc = null
+  }
+}
+
 export async function callClaude(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(CLAUDE_BIN, ['--print'], {
       stdio: ['pipe', 'pipe', 'pipe']
     })
+
+    _activeProc = proc
 
     let stdout = ''
     let stderr = ''
@@ -412,6 +425,7 @@ export async function callClaude(prompt: string): Promise<string> {
     proc.on('error', (err) => reject(new Error(`Failed to spawn claude: ${err.message}`)))
 
     proc.on('close', (code) => {
+      if (_activeProc === proc) _activeProc = null
       if (code !== 0) {
         reject(new Error(`claude exited with code ${code}: ${stderr}`))
       } else {

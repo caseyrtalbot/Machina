@@ -3,10 +3,13 @@ import { useVaultStore } from '../../store/vault-store'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors } from '../../design/tokens'
 import type { AgentActionName } from '@shared/agent-action-types'
+import type { AgentPhase } from '../../hooks/use-agent-orchestrator'
 
 interface CanvasActionBarProps {
   readonly onTriggerAction: (action: AgentActionName) => void
-  readonly librarianRunning: boolean
+  readonly onStop: () => void
+  readonly activeAction: AgentActionName | null
+  readonly phase: AgentPhase
 }
 
 const actionLabelStyle: React.CSSProperties = {
@@ -25,11 +28,15 @@ const actionLabelStyle: React.CSSProperties = {
 
 export function CanvasActionBar({
   onTriggerAction,
-  librarianRunning
+  onStop,
+  activeAction,
+  phase
 }: CanvasActionBarProps): React.ReactElement | null {
   const artifacts = useVaultStore((s) => s.artifacts)
   const graph = useVaultStore((s) => s.graph)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
+
+  const isComputing = phase === 'computing'
 
   const unprocessedSourceCount = useMemo(() => {
     if (!graph) return 0
@@ -68,80 +75,117 @@ export function CanvasActionBar({
       }}
     >
       {showCompile && (
-        <button
-          type="button"
-          style={actionLabelStyle}
-          onClick={() => onTriggerAction('compile')}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = colors.text.primary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = colors.text.muted
-          }}
-        >
-          Compile
-          {unprocessedSourceCount > 0 && (
-            <span
-              style={{
-                color: 'var(--color-accent-default)',
-                marginLeft: '0.35rem',
-                fontSize: '10px'
-              }}
-            >
-              {unprocessedSourceCount}
-            </span>
-          )}
-        </button>
+        <ActionButton
+          label="Compile"
+          action="compile"
+          isRunning={isComputing && activeAction === 'compile'}
+          isBusy={isComputing && activeAction !== 'compile'}
+          badge={unprocessedSourceCount > 0 ? unprocessedSourceCount : undefined}
+          onTrigger={onTriggerAction}
+          onStop={onStop}
+        />
       )}
 
       {hasAnyContent && (
-        <button
-          type="button"
-          style={actionLabelStyle}
-          onClick={() => onTriggerAction('challenge')}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = colors.text.primary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = colors.text.muted
-          }}
-        >
-          Think
-        </button>
+        <ActionButton
+          label="Think"
+          action="challenge"
+          isRunning={isComputing && activeAction === 'challenge'}
+          isBusy={isComputing && activeAction !== 'challenge'}
+          onTrigger={onTriggerAction}
+          onStop={onStop}
+        />
       )}
 
       {hasAnyContent && (
-        <button
-          type="button"
-          style={{
-            ...actionLabelStyle,
-            ...(librarianRunning ? { color: 'var(--color-accent-default)' } : {})
-          }}
-          onClick={() => onTriggerAction('librarian')}
-          onMouseEnter={(e) => {
-            if (!librarianRunning) e.currentTarget.style.color = colors.text.primary
-          }}
-          onMouseLeave={(e) => {
-            if (!librarianRunning) e.currentTarget.style.color = colors.text.muted
-          }}
-        >
-          Librarian
-          {librarianRunning && (
-            <span
-              style={{
-                display: 'inline-block',
-                width: '100%',
-                height: '1px',
-                background: 'var(--color-accent-default)',
-                position: 'absolute' as const,
-                bottom: 0,
-                left: 0,
-                animation: 'te-pulse 2s ease-in-out infinite'
-              }}
-            />
-          )}
-        </button>
+        <ActionButton
+          label="Librarian"
+          action="librarian"
+          isRunning={isComputing && activeAction === 'librarian'}
+          isBusy={isComputing && activeAction !== 'librarian'}
+          onTrigger={onTriggerAction}
+          onStop={onStop}
+        />
       )}
     </div>
+  )
+}
+
+function ActionButton({
+  label,
+  action,
+  isRunning,
+  isBusy,
+  badge,
+  onTrigger,
+  onStop
+}: {
+  readonly label: string
+  readonly action: AgentActionName
+  readonly isRunning: boolean
+  readonly isBusy: boolean
+  readonly badge?: number
+  readonly onTrigger: (action: AgentActionName) => void
+  readonly onStop: () => void
+}): React.ReactElement {
+  const displayLabel = isRunning ? 'Stop' : label
+
+  return (
+    <button
+      type="button"
+      style={{
+        ...actionLabelStyle,
+        ...(isRunning ? { color: '#f87171' } : {}),
+        ...(isBusy ? { opacity: 0.4, cursor: 'default' } : {})
+      }}
+      onClick={() => {
+        if (isRunning) {
+          onStop()
+        } else if (!isBusy) {
+          onTrigger(action)
+        }
+      }}
+      onMouseEnter={(e) => {
+        if (isRunning) {
+          e.currentTarget.style.color = '#fca5a5'
+        } else if (!isBusy) {
+          e.currentTarget.style.color = colors.text.primary
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (isRunning) {
+          e.currentTarget.style.color = '#f87171'
+        } else if (!isBusy) {
+          e.currentTarget.style.color = colors.text.muted
+        }
+      }}
+    >
+      {displayLabel}
+      {badge !== undefined && !isRunning && (
+        <span
+          style={{
+            color: 'var(--color-accent-default)',
+            marginLeft: '0.35rem',
+            fontSize: '10px'
+          }}
+        >
+          {badge}
+        </span>
+      )}
+      {isRunning && (
+        <span
+          style={{
+            display: 'inline-block',
+            width: '100%',
+            height: '1px',
+            background: '#f87171',
+            position: 'absolute' as const,
+            bottom: 0,
+            left: 0,
+            animation: 'te-pulse 2s ease-in-out infinite'
+          }}
+        />
+      )}
+    </button>
   )
 }

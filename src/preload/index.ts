@@ -110,7 +110,8 @@ const api = {
   },
   agentAction: {
     compute: (request: AgentActionRequest): Promise<AgentActionResponse> =>
-      typedInvoke('agent-action:compute', request)
+      typedInvoke('agent-action:compute', request),
+    cancel: (): Promise<void> => typedInvoke('agent-action:cancel')
   },
   canvas: {
     getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
