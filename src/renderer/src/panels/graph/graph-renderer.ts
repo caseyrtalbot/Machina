@@ -1,5 +1,5 @@
 import { Application, Container, Graphics } from 'pixi.js'
-import { quadtree as d3Quadtree } from 'd3-quadtree'
+import { quadtree as d3Quadtree, type Quadtree } from 'd3-quadtree'
 import type { SimNode, GraphViewport, LodLevel } from './graph-types'
 import type { RelationshipKind } from '@shared/types'
 import { SIGNAL_OPACITY } from '@shared/types'
@@ -137,6 +137,10 @@ export class GraphRenderer {
   private paused = true
   private mounted = false
   private destroyed = false
+  private dirty = true
+
+  // Cached spatial index (invalidated on position/graph data update)
+  private cachedQuadtree: Quadtree<number> | null = null
 
   // Callbacks
   private readonly callbacks: RendererCallbacks
@@ -246,6 +250,7 @@ export class GraphRenderer {
     this.edgeGraphics = null
     this.selectionRing = null
     this.nodeGraphics = []
+    this.cachedQuadtree = null
   }
 
   pause(): void {
@@ -256,7 +261,7 @@ export class GraphRenderer {
     if (!this.paused) return
     this.paused = false
     if (this.mounted) {
-      this.startRenderLoop()
+      this.markDirty()
     }
   }
 
@@ -272,6 +277,7 @@ export class GraphRenderer {
     this.nodes = nodes
     this.edges = edges
     this.adjacency = buildAdjacency(nodes.length, edges)
+    this.cachedQuadtree = null
 
     if (this.mounted) {
       this.rebuildNodeGraphics()
@@ -280,6 +286,8 @@ export class GraphRenderer {
 
   setPositions(buffer: Float32Array): void {
     this.positions = buffer
+    this.cachedQuadtree = null
+    this.markDirty()
   }
 
   getNodeCount(): number {
@@ -293,15 +301,18 @@ export class GraphRenderer {
   setHighlightedNode(nodeIndex: number | null): void {
     this.highlightedNode = nodeIndex
     this.updateCursor()
+    this.markDirty()
   }
 
   setSelectedNode(nodeIndex: number | null): void {
     this.selectedNodeIndex = nodeIndex
+    this.markDirty()
   }
 
   setViewport(viewport: GraphViewport): void {
     this.viewport = viewport
     this.callbacks.onViewportChange(viewport)
+    this.markDirty()
   }
 
   getPositions(): Float32Array {
@@ -376,6 +387,7 @@ export class GraphRenderer {
     if (this.selectionRing) {
       world.addChild(this.selectionRing)
     }
+    this.markDirty()
   }
 
   // -------------------------------------------------------------------------
@@ -390,10 +402,22 @@ export class GraphRenderer {
         this.animFrameId = null
         return
       }
+      if (!this.dirty) {
+        this.animFrameId = null
+        return
+      }
+      this.dirty = false
       this.renderFrame()
       this.animFrameId = requestAnimationFrame(loop)
     }
     this.animFrameId = requestAnimationFrame(loop)
+  }
+
+  private markDirty(): void {
+    this.dirty = true
+    if (!this.paused && this.mounted && this.animFrameId === null) {
+      this.startRenderLoop()
+    }
   }
 
   private renderFrame(): void {
@@ -436,6 +460,17 @@ export class GraphRenderer {
     const neighborSet =
       focusNode !== null ? (this.adjacency.get(focusNode) ?? new Set<number>()) : null
 
+    // Compute visible world-space bounds for edge culling.
+    // Margin accounts for max Bézier curvature deviation (30px world).
+    const { scale } = this.viewport
+    const centerX = this.canvasWidth / 2
+    const centerY = this.canvasHeight / 2
+    const margin = 30
+    const worldLeft = (0 - centerX - this.viewport.x) / scale - margin
+    const worldRight = (this.canvasWidth - centerX - this.viewport.x) / scale + margin
+    const worldTop = (0 - centerY - this.viewport.y) / scale - margin
+    const worldBottom = (this.canvasHeight - centerY - this.viewport.y) / scale + margin
+
     for (const edge of this.edges) {
       const sx = this.positions[edge.sourceIndex * 2]
       const sy = this.positions[edge.sourceIndex * 2 + 1]
@@ -443,6 +478,12 @@ export class GraphRenderer {
       const ty = this.positions[edge.targetIndex * 2 + 1]
 
       if (sx === undefined || sy === undefined || tx === undefined || ty === undefined) continue
+
+      // Skip edges entirely outside the viewport (both endpoints off the same side)
+      if (sx < worldLeft && tx < worldLeft) continue
+      if (sx > worldRight && tx > worldRight) continue
+      if (sy < worldTop && ty < worldTop) continue
+      if (sy > worldBottom && ty > worldBottom) continue
 
       let color = buildEdgeColor(edge.kind)
       let alpha = edgeOpacity(edge.kind)
@@ -618,12 +659,14 @@ export class GraphRenderer {
     const world = this.screenToWorld(screenX, screenY)
     const hitRadius = HIT_RADIUS / this.viewport.scale
 
-    const tree = d3Quadtree<number>()
-      .x((i) => this.positions[i * 2])
-      .y((i) => this.positions[i * 2 + 1])
-      .addAll(Array.from({ length: this.nodes.length }, (_, i) => i))
+    if (!this.cachedQuadtree) {
+      this.cachedQuadtree = d3Quadtree<number>()
+        .x((i) => this.positions[i * 2])
+        .y((i) => this.positions[i * 2 + 1])
+        .addAll(Array.from({ length: this.nodes.length }, (_, i) => i))
+    }
 
-    const found = tree.find(world.x, world.y, hitRadius)
+    const found = this.cachedQuadtree.find(world.x, world.y, hitRadius)
     return found ?? null
   }
 
@@ -651,6 +694,7 @@ export class GraphRenderer {
 
     this.viewport = { x: newX, y: newY, scale: newScale }
     this.callbacks.onViewportChange(this.viewport)
+    this.markDirty()
   }
 
   private handlePointerDown(e: PointerEvent): void {
@@ -699,6 +743,7 @@ export class GraphRenderer {
         scale: this.viewport.scale
       }
       this.callbacks.onViewportChange(this.viewport)
+      this.markDirty()
     } else {
       // Hover detection
       const hitNode = this.findNodeAtScreen(screenX, screenY)
@@ -706,6 +751,7 @@ export class GraphRenderer {
         this.highlightedNode = hitNode
         this.callbacks.onNodeHover(hitNode)
         this.updateCursor()
+        this.markDirty()
       }
     }
   }
