@@ -6,6 +6,22 @@ The Librarian button on the canvas action bar was unwired — a race condition c
 
 This redesign rewires the Librarian as a vault-level operation that runs Claude directly in the vault folder using native file tools. Inspired by Andrej Karpathy's LLM knowledge base workflow where the LLM owns the wiki — compiling sources, linting for consistency, maintaining connections, and keeping the index current.
 
+## Council Review (2026-04-02)
+
+A 3-member council (Technical Engineer, First Principles Architect, AK Vision Advocate) reviewed the original spec. Key findings:
+
+**Convergence (all 3 agreed):**
+- Prompt must not travel as a shell argument. Write to temp file.
+- Fan-out should not ship in v1. Defer until real usage data exists.
+- Session ID mismatch between AgentSpawner and ShellService is a real bug.
+
+**Key changes from original spec:**
+- Drop tmux for the Librarian. Use `child_process.spawn` directly. The Librarian is a headless batch job, not an interactive terminal session.
+- Drop the wrapper script. Status tracking is ~50 lines of Node.js.
+- Drop fan-out from v1. Single agent, cold-start, full vault scan.
+- No new IPC channel. Use existing `agent:spawn` with type discriminator.
+- Processing manifest deferred to Increment 2.
+
 ## Core Principle
 
 The Librarian operates on the **vault/folder** directly. It reads and writes markdown files using Claude's native tools (`Read`, `Write`, `Edit`, `Glob`, `Grep`). It has no awareness of the canvas, card positions, or spatial layout.
@@ -32,43 +48,38 @@ The prompt lives at `src/main/services/default-librarian-prompt.md` (bundled def
 
 ## Spawn Mechanics
 
-### Wrapper script change
+### Direct child_process.spawn (no tmux)
 
-`agent-wrapper.sh` currently runs `claude --print "$PROMPT"`. Change to:
+The Librarian bypasses the tmux/ShellService stack entirely. `AgentSpawner` gains a `spawnLibrarian()` method that:
 
-```bash
-claude -p "$PROMPT" --allowedTools Read,Write,Edit,Glob,Grep,Bash
-```
+1. Generates a single UUID used everywhere (process tracking, sidecar, renderer state)
+2. Writes the prompt to `.machina/tmp/librarian-{sessionId}.md`
+3. Spawns `claude -p --allowedTools Read,Write,Edit,Glob,Grep,Bash` with `{ cwd: vaultPath }` via `child_process.spawn`
+4. Pipes the prompt file path as an argument
+5. Tracks the child process in a lightweight `LibrarianMonitor`
 
-This gives Claude tool access in non-interactive mode. The `--cwd` is already the vault path.
+### LibrarianMonitor
 
-### Fan-out
+A ~50-line class that tracks the spawned child process and emits `AgentSidecarState`-shaped updates via the existing `agent:states-changed` IPC event. The workbench panel and toolbar see it identically to tmux sessions.
 
-**Threshold: 25 markdown files.** Below 25, single agent. Above 25, spawn parallel scoped agents.
+Responsibilities:
+- Track PID, status (alive/exited), start time
+- Clean up temp prompt file on exit
+- Emit state changes through the existing agent state pipeline
 
-**Scoping strategy:** Split by top-level tags from the existing tag index (`src/shared/engine/tag-index.ts`).
+### No fan-out in v1
 
-Implementation in `AgentSpawner`:
-1. New `spawnLibrarian(vaultPath: string)` method
-2. Count `.md` files in the vault (excluding `.machina/` and system directories)
-3. If <= 25: single spawn with full prompt
-4. If > 25: read tag index, partition tags into N groups (2-4 agents), spawn each with a scoped prompt: "Focus on articles tagged [X, Y, Z]"
-5. One additional "index agent" runs after scoped agents finish to update `_index.md`
-6. Each agent is a separate tmux session — the monitor picks them all up
+Single agent, cold-start, full vault scan. Fan-out deferred to Increment 2 (when processing manifest exists to scope dirty files).
 
-### What stays the same
+### No new IPC channel
 
-- tmux session spawn via `AgentSpawner` + `ShellService` + `TmuxService`
-- `TmuxMonitor` polling for session state (3-second interval)
-- `useAgentStates` hook with the seen-before-clearing race condition fix
-- Sessions visible in workbench panel
-- `agent-wrapper.sh` sidecar convention (status tracking)
+Use the existing `agent:spawn` channel. Add a `type?: 'agent' | 'librarian'` discriminator to `AgentSpawnRequest`. The handler dispatches to either the existing tmux path or the new `spawnLibrarian()` path.
 
 ## UI
 
 ### Remove from canvas action bar
 
-Delete the Librarian `ActionButton` from `CanvasActionBar.tsx`. It is not a canvas operation.
+Delete the Librarian `ActionButton` from `CanvasActionBar.tsx`.
 
 ### Add book icon to canvas toolbar
 
@@ -76,14 +87,8 @@ Add to `CanvasToolbar.tsx` (the vertical rail on the left):
 - Inline SVG book icon using `canvas-toolbtn` class
 - Tooltip: "Librarian"
 - When running: accent color or `te-pulse` animation on the icon
-- Click while running: stops all librarian session(s)
+- Click while running: stops the librarian process
 - Separated from spatial tools by a divider
-
-### Files to modify
-
-- `src/renderer/src/panels/canvas/CanvasToolbar.tsx` — add book icon button
-- `src/renderer/src/panels/canvas/CanvasActionBar.tsx` — remove Librarian button
-- `src/renderer/src/panels/canvas/CanvasView.tsx` — pass librarian state to toolbar instead of action bar
 
 ## Vault Watcher Integration
 
@@ -94,28 +99,34 @@ Disk change -> vault-watcher -> IPC: vault:files-changed-batch
   -> vault-worker -> parse + graph rebuild -> store update -> UI re-renders
 ```
 
-Canvas, sidebar, graph view, and ghost panel all update automatically. Multiple simultaneous agents writing files are handled by the watcher's existing event batching.
-
 ## Files to Modify
 
 | File | Change |
 |------|--------|
 | `src/main/services/default-librarian-prompt.md` | Rewrite prompt for native file tools, full AK workflow |
-| `scripts/agent-wrapper.sh` | Change `--print` to `-p` with `--allowedTools` |
-| `src/main/services/agent-spawner.ts` | Add `spawnLibrarian()` with fan-out logic |
+| `src/main/services/agent-spawner.ts` | Add `spawnLibrarian()` with child_process.spawn, temp-file prompt |
+| `src/main/services/librarian-monitor.ts` | New: lightweight process monitor emitting AgentSidecarState |
+| `src/main/ipc/agents.ts` | Dispatch librarian spawns to new path, integrate LibrarianMonitor |
+| `src/shared/agent-types.ts` | Add `type?: 'librarian'` to AgentSpawnRequest |
+| `src/shared/ipc-channels.ts` | Update request type |
+| `src/preload/index.ts` | No change needed (existing channel) |
 | `src/renderer/src/panels/canvas/CanvasToolbar.tsx` | Add book icon button |
 | `src/renderer/src/panels/canvas/CanvasActionBar.tsx` | Remove Librarian button |
 | `src/renderer/src/panels/canvas/CanvasView.tsx` | Route librarian state to toolbar |
-| `src/renderer/src/hooks/use-agent-orchestrator.ts` | Update trigger to use `spawnLibrarian()` |
-| `src/main/ipc/agents.ts` | Add `agent:spawn-librarian` IPC channel |
-| `src/shared/ipc-channels.ts` | Declare new channel type |
-| `src/preload/index.ts` | Expose new channel |
-| `src/shared/agent-action-types.ts` | Remove `librarian` from `AgentActionName` |
+| `src/renderer/src/hooks/use-agent-orchestrator.ts` | Update trigger to pass type discriminator |
+| `src/shared/agent-action-types.ts` | Remove `librarian` from AgentActionName |
+
+## Increment 2 (deferred)
+
+1. Processing manifest at `.machina/librarian-state.json` — content hashes, last-processed timestamps
+2. Delta processing — Librarian prompt receives only dirty files
+3. Fan-out — when manifest shows > 25 dirty files, split into scoped agents
+4. Q&A output filing — mechanism for query results to flow back into the wiki
 
 ## Verification
 
-1. **Single agent**: Open a vault with < 25 files. Click the book icon. Verify a tmux session spawns, the icon shows active state, and Claude reads/writes files in the vault. Verify new/modified files appear in the sidebar and canvas automatically.
-2. **Fan-out**: Open a vault with > 25 files. Click the book icon. Verify multiple tmux sessions spawn (visible in workbench). Verify each agent scopes to its tag partition.
-3. **Stop**: Click the book icon while running. Verify all librarian sessions are killed.
-4. **Git safety**: After a librarian run, `git diff` shows all changes. `git checkout .` reverts everything cleanly.
-5. **Tests**: Existing agent spawn tests pass. Add test for fan-out threshold logic.
+1. **Single agent**: Open a vault with files. Click the book icon. Verify a child process spawns, the icon shows active state, and Claude reads/writes files in the vault. Verify new/modified files appear in the sidebar and canvas automatically.
+2. **Stop**: Click the book icon while running. Verify the librarian process is killed.
+3. **Git safety**: After a librarian run, `git diff` shows all changes. `git checkout .` reverts everything cleanly.
+4. **Workbench visibility**: Verify the librarian session appears in workbench panel via the agent state system.
+5. **Tests**: Add test for LibrarianMonitor lifecycle. Add test for type discriminator dispatch.
