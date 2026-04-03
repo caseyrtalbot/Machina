@@ -61,11 +61,8 @@ export function useAgentOrchestrator(
 
   const trigger = useCallback(
     async (action: AgentActionName) => {
-      // Single agent lock — ref is always current, no stale closure risk
-      if (phaseRef.current !== 'idle') return
-
       // Librarian is a long-running tmux session, not a single-shot action.
-      // Track its session ID so the action bar can show running state.
+      // Bypasses the phase machine — can spawn even while a canvas action is in preview/error.
       if (action === 'librarian') {
         const vaultPath = useVaultStore.getState().vaultPath
         if (!vaultPath) return
@@ -75,6 +72,9 @@ export function useAgentOrchestrator(
         }
         return
       }
+
+      // Single agent lock — ref is always current, no stale closure risk
+      if (phaseRef.current !== 'idle') return
 
       const { nodes, edges, selectedNodeIds, viewport } = useCanvasStore.getState()
 
