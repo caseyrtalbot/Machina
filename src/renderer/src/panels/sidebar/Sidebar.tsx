@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 
 import { rewriteWikilinks } from '@engine/rename-links'
+import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { useVaultStore } from '../../store/vault-store'
 import { colors, getArtifactColor } from '../../design/tokens'
 import { FileContextMenu } from './FileContextMenu'
@@ -326,6 +327,10 @@ export function Sidebar({
     (actionId: string, path: string) => {
       if (actionId === 'rename') {
         setRenamingPath(path)
+        return
+      }
+      if (actionId === 'mark-reviewed') {
+        useSidebarSelectionStore.getState().clearAgentModified(path)
         return
       }
       const node = nodes.find((n) => n.path === path)

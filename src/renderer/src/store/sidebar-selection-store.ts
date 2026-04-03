@@ -7,6 +7,8 @@ interface SidebarSelectionStore {
   readonly anchorPath: string | null
   /** True when a vault agent (librarian/curator) is actively running. */
   readonly agentActive: boolean
+  /** Paths modified by agent runs, awaiting user review. */
+  readonly agentModifiedPaths: ReadonlySet<string>
 
   /** Toggle a single path in the selection (cmd-click). */
   toggle: (path: string) => void
@@ -18,12 +20,31 @@ interface SidebarSelectionStore {
   clear: () => void
   /** Set whether a vault agent is actively running. */
   setAgentActive: (active: boolean) => void
+  /** Mark paths as agent-modified. */
+  markAgentModified: (paths: readonly string[]) => void
+  /** Clear a single path from agent-modified set (user reviewed it). */
+  clearAgentModified: (path: string) => void
+}
+
+function loadAgentModified(): Set<string> {
+  try {
+    const raw = localStorage.getItem('te:agent-modified-paths')
+    if (raw) return new Set(JSON.parse(raw) as string[])
+  } catch {
+    /* ignore */
+  }
+  return new Set()
+}
+
+function persistAgentModified(paths: ReadonlySet<string>): void {
+  localStorage.setItem('te:agent-modified-paths', JSON.stringify([...paths]))
 }
 
 export const useSidebarSelectionStore = create<SidebarSelectionStore>((set, get) => ({
   selectedPaths: new Set<string>(),
   anchorPath: null,
   agentActive: false,
+  agentModifiedPaths: loadAgentModified(),
 
   toggle: (path) => {
     const next = new Set(get().selectedPaths)
@@ -70,5 +91,19 @@ export const useSidebarSelectionStore = create<SidebarSelectionStore>((set, get)
     set({ selectedPaths: new Set<string>(), anchorPath: null })
   },
 
-  setAgentActive: (active) => set({ agentActive: active })
+  setAgentActive: (active) => set({ agentActive: active }),
+
+  markAgentModified: (paths) => {
+    const next = new Set(get().agentModifiedPaths)
+    for (const p of paths) next.add(p)
+    persistAgentModified(next)
+    set({ agentModifiedPaths: next })
+  },
+
+  clearAgentModified: (path) => {
+    const next = new Set(get().agentModifiedPaths)
+    next.delete(path)
+    persistAgentModified(next)
+    set({ agentModifiedPaths: next })
+  }
 }))

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { colors, transitions, floatingPanel } from '../../design/tokens'
+import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 
 interface ContextMenuAction {
   readonly id: string
@@ -47,8 +48,18 @@ interface FileContextMenuProps {
 export function FileContextMenu({ state, onClose, onAction }: FileContextMenuProps) {
   const [focusedIndex, setFocusedIndex] = useState(-1)
   const menuRef = useRef<HTMLDivElement>(null)
+  const agentModifiedPaths = useSidebarSelectionStore((s) => s.agentModifiedPaths)
 
-  const actions = state?.isDirectory ? FOLDER_ACTIONS : FILE_ACTIONS
+  const actions = useMemo(() => {
+    if (state?.isDirectory) return FOLDER_ACTIONS
+    const isAgentModified = state ? agentModifiedPaths.has(state.path) : false
+    if (!isAgentModified) return FILE_ACTIONS
+    return [
+      ...FILE_ACTIONS.slice(0, -1),
+      { id: 'mark-reviewed', label: 'Mark as Reviewed', separator: true },
+      FILE_ACTIONS[FILE_ACTIONS.length - 1]
+    ]
+  }, [state, agentModifiedPaths])
 
   // Close on click outside or Escape
   useEffect(() => {

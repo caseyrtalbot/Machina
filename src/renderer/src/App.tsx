@@ -1444,6 +1444,13 @@ export default function App() {
       // Single state update for all file list changes
       setFiles(Array.from(fileMap.values()))
 
+      // Mark files changed during an active agent run
+      const sel = useSidebarSelectionStore.getState()
+      if (sel.agentActive) {
+        const agentTouched = [...mdToUpdate, ...touchedPaths.filter((p) => !p.endsWith('.md'))]
+        if (agentTouched.length > 0) sel.markAgentModified(agentTouched)
+      }
+
       // Batch vault worker updates
       for (const path of mdToRemove) removeFile(path)
       for (const path of mdToUpdate) {

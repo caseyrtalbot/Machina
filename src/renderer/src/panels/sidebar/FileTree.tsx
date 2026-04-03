@@ -2,6 +2,7 @@ import { Fragment, memo, useMemo } from 'react'
 import { TE_FILE_MIME, inferCardType, type DragFileData } from '../canvas/file-drop-utils'
 import { colors } from '../../design/tokens'
 import { useSettingsStore } from '../../store/settings-store'
+import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { RenameInput } from './FileContextMenu'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode, TreeSortMode } from './buildFileTree'
@@ -472,6 +473,7 @@ function FileRow({
   treeFontFamily: string
 }) {
   const { base, ext } = splitName(node.name)
+  const isAgentModified = useSidebarSelectionStore((s) => s.agentModifiedPaths.has(node.path))
 
   return (
     <div
@@ -535,7 +537,13 @@ function FileRow({
       ) : (
         <span
           className="truncate flex-1 file-name-text"
-          style={{ color: isActive ? colors.text.primary : colors.text.secondary }}
+          style={{
+            color: isAgentModified
+              ? '#4ade80'
+              : isActive
+                ? colors.text.primary
+                : colors.text.secondary
+          }}
         >
           {base}
           {ext && <span className="file-name-text__ext">{ext}</span>}
