@@ -35,6 +35,10 @@ export function registerAgentIpc(): void {
     const sessionId = activeSpawner.spawn(request)
     return { sessionId }
   })
+
+  typedHandle('agent:kill', async ({ sessionId }) => {
+    librarianMonitor?.kill(sessionId)
+  })
 }
 
 export function setAgentServices(monitor: TmuxMonitor | null, spawner: AgentSpawner | null): void {

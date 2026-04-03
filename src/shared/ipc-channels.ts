@@ -163,6 +163,7 @@ export interface IpcChannels {
     request: AgentSpawnRequest
     response: { sessionId: string } | { error: string }
   }
+  'agent:kill': { request: { sessionId: string }; response: void }
   'agent-action:compute': {
     request: AgentActionRequest
     response: AgentActionResponse

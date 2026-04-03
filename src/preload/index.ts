@@ -106,7 +106,8 @@ const api = {
   },
   agent: {
     getStates: () => typedInvoke('agent:get-states'),
-    spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request)
+    spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request),
+    kill: (sessionId: string) => typedInvoke('agent:kill', { sessionId })
   },
   agentAction: {
     compute: (request: AgentActionRequest): Promise<AgentActionResponse> =>

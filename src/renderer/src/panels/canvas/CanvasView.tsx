@@ -659,6 +659,7 @@ export function CanvasView(): React.ReactElement {
 
   const handleLibrarian = useCallback(() => {
     if (librarianActive && agent.librarianSessionId) {
+      void window.api.agent.kill(agent.librarianSessionId)
       agent.setLibrarianSessionId(null)
     } else {
       const vp = useVaultStore.getState().vaultPath
@@ -690,6 +691,7 @@ export function CanvasView(): React.ReactElement {
     (mode: string) => {
       // Stop if already running (empty mode = stop request from status label)
       if ((curatorActive || !mode) && agent.curatorSessionId) {
+        void window.api.agent.kill(agent.curatorSessionId)
         agent.setCuratorSessionId(null)
         return
       }
