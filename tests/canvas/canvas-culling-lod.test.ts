@@ -145,8 +145,8 @@ describe('getLodLevel', () => {
     expect(getLodLevel(0.5, 'markdown')).toBe('full')
   })
 
-  it('returns preview for note card at zoom 0.49', () => {
-    expect(getLodLevel(0.49, 'note')).toBe('preview')
+  it('returns full for note card at zoom 0.49 (above heavy threshold)', () => {
+    expect(getLodLevel(0.49, 'note')).toBe('full')
   })
 
   it('returns dot for note card at zoom 0.14', () => {

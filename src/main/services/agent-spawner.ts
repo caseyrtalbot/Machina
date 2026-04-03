@@ -26,6 +26,9 @@ function readLibrarianPrompt(vaultRoot: string): string {
 
 /** Curator mode descriptions, keyed by mode ID. */
 const CURATOR_MODES: Record<string, string> = {
+  critique:
+    'Critically examine proposals from the librarian report. For each finding, add a "## Critique" ' +
+    'section to the relevant vault file examining assumptions, contradictions, and missing perspectives.',
   challenge:
     'Stress-test ideas from the librarian report. For each proposal, add a "## Challenge" ' +
     'section to the relevant vault file examining assumptions, contradictions, and missing perspectives.',

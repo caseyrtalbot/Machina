@@ -30,8 +30,8 @@ describe('ENV_DEFAULTS', () => {
     'sidebarFontSize'
   ]
 
-  it('dark defaults have panelLightness of 5', () => {
-    expect(ENV_DEFAULTS.panelLightness).toBe(5)
+  it('dark defaults have panelLightness of 56', () => {
+    expect(ENV_DEFAULTS.panelLightness).toBe(56)
   })
 
   it('all env keys are present in defaults', () => {

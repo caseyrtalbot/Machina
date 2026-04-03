@@ -7,10 +7,11 @@ markdown files. Scan the vault and produce a single consolidated report.
 
 1. Read `_index.md` if it exists to understand the vault's current state
 2. Use Glob to survey the file structure: `**/*.md`
-3. Read a sample of files to understand existing conventions (tags, types, writing style)
+3. Read a sample of files to understand existing conventions (frontmatter schema, tags, types, writing style)
 4. Create the `_librarian/` directory if it doesn't exist
-5. Run each pass below in order, writing results to a single report file at
-   `_librarian/YYYY-MM-DD-audit.md` (use today's date)
+5. Run each pass below in order, writing results incrementally to a single report file at
+   `_librarian/YYYY-MM-DD-audit.md` (use today's date). Write each pass as you complete it
+   so partial results are preserved if the session ends early.
 
 ## Report Format
 
@@ -53,14 +54,15 @@ Justify each proposal with specific overlapping claims or shared concepts.
 
 ## Pass 4: Staleness
 
-Flag articles whose source material is older than 6 months or where the domain
-has likely evolved. Prioritize by impact: articles that other articles depend on
-(via wikilinks or sources) rank higher.
+Flag articles whose claims may have been superseded or whose source material
+predates known developments in the field. Prioritize by impact: articles that
+other articles depend on (via wikilinks or citations) rank higher.
 
 ## Pass 5: Forward Questions
 
-Propose 5-10 research questions the vault cannot yet answer but plausibly should.
-Rank by how much existing material they would connect or build upon.
+Propose 5-10 research questions the vault cannot yet answer but that adjacent
+material implies it should. Rank by how much existing material they would
+connect or extend.
 
 ## Rules
 

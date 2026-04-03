@@ -255,9 +255,22 @@ function ConnectedSidebar({
     return map
   }, [artifacts, fileToId])
 
+  // Snapshot file entries for tree sorting. Only rebuild when files are added/removed
+  // or sort mode changes — NOT on mtime-only updates, which cause visible re-ordering
+  // ("jerking") during normal navigation.
+  const [stableFiles, setStableFiles] = useState(files)
+  const prevPathSetRef = useRef('')
+  useEffect(() => {
+    const pathKey = files.map((f) => f.path).join('\n')
+    if (pathKey !== prevPathSetRef.current || sortMode !== 'modified') {
+      prevPathSetRef.current = pathKey
+      setStableFiles(files)
+    }
+  }, [files, sortMode])
+
   const allTreeNodes = useMemo(() => {
     return buildFileTree(
-      files.map((file) => ({ path: file.path, modified: file.modified })),
+      stableFiles.map((file) => ({ path: file.path, modified: file.modified })),
       vaultPath ?? '',
       {
         sortMode,
@@ -269,7 +282,7 @@ function ConnectedSidebar({
         }
       }
     )
-  }, [artifactTypes, files, sortMode, vaultPath])
+  }, [artifactTypes, stableFiles, sortMode, vaultPath])
   const allTreeNodeByPath = useMemo(
     () => new Map(allTreeNodes.map((node) => [node.path, node])),
     [allTreeNodes]

@@ -147,6 +147,17 @@ export function CanvasView(): React.ReactElement {
     }
   }, [librarianActive, curatorActive])
 
+  // Track librarian completion for the "View Report" link in the flyout
+  const [lastLibrarianResultPath, setLastLibrarianResultPath] = useState<string | null>(null)
+  const prevLibrarianActiveRef = useRef(false)
+  useEffect(() => {
+    if (prevLibrarianActiveRef.current && !librarianActive) {
+      const today = new Date().toISOString().slice(0, 10)
+      setLastLibrarianResultPath(`_librarian/${today}-audit.md`)
+    }
+    prevLibrarianActiveRef.current = librarianActive
+  }, [librarianActive])
+
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
   const graph = useVaultStore((s) => s.graph)
@@ -696,6 +707,8 @@ export function CanvasView(): React.ReactElement {
         return
       }
       if (!mode) return
+      // Don't allow concurrent vault agents
+      if (librarianActive) return
       const vp = useVaultStore.getState().vaultPath
       if (!vp) return
       const sel = useSidebarSelectionStore.getState().selectedPaths
@@ -720,7 +733,7 @@ export function CanvasView(): React.ReactElement {
         }
       })()
     },
-    [curatorActive, agent]
+    [curatorActive, librarianActive, agent]
   )
 
   const ontologyGroups = ontology.pendingSnapshot
@@ -752,6 +765,7 @@ export function CanvasView(): React.ReactElement {
           onLibrarian={handleLibrarian}
           curatorActive={curatorActive}
           onCurator={handleCurator}
+          lastLibrarianResultPath={lastLibrarianResultPath}
         />
         <CanvasActionBar
           onTriggerAction={agent.trigger}

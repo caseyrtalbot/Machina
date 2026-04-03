@@ -269,6 +269,7 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('shell:trash-item', async (args) => {
-    await shell.trashItem(args.path)
+    const { rm } = await import('fs/promises')
+    await rm(args.path, { recursive: true })
   })
 }

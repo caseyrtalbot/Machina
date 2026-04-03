@@ -7,6 +7,7 @@ import { generateClaudeMd } from '../../engine/claude-md-template'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { colors } from '../../design/tokens'
 import { useAgentStates } from '../../hooks/use-agent-states'
+import { VaultAgentFlyout } from './VaultAgentFlyout'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -21,6 +22,7 @@ interface CanvasToolbarProps {
   readonly onLibrarian: () => void
   readonly curatorActive: boolean
   readonly onCurator: (mode: string) => void
+  readonly lastLibrarianResultPath: string | null
 }
 
 function Tip({
@@ -90,7 +92,8 @@ export function CanvasToolbar({
   librarianActive,
   onLibrarian,
   curatorActive,
-  onCurator
+  onCurator,
+  lastLibrarianResultPath
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
@@ -102,10 +105,10 @@ export function CanvasToolbar({
   const setEnv = useSettingsStore((s) => s.setEnv)
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
-  const [curatorMenuOpen, setCuratorMenuOpen] = useState(false)
+  const [agentFlyoutOpen, setAgentFlyoutOpen] = useState(false)
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
-  const curatorMenuRef = useRef<HTMLDivElement>(null)
+  const agentFlyoutRef = useRef<HTMLDivElement>(null)
 
   // Ground-truth agent status from the process monitor
   const agentStates = useAgentStates()
@@ -119,7 +122,7 @@ export function CanvasToolbar({
   )
 
   useEffect(() => {
-    if (!tileMenuOpen && !envMenuOpen && !curatorMenuOpen) return
+    if (!tileMenuOpen && !envMenuOpen && !agentFlyoutOpen) return
 
     const handlePointerDown = (event: MouseEvent) => {
       if (tileMenuRef.current && !tileMenuRef.current.contains(event.target as Node)) {
@@ -128,8 +131,8 @@ export function CanvasToolbar({
       if (envMenuRef.current && !envMenuRef.current.contains(event.target as Node)) {
         setEnvMenuOpen(false)
       }
-      if (curatorMenuRef.current && !curatorMenuRef.current.contains(event.target as Node)) {
-        setCuratorMenuOpen(false)
+      if (agentFlyoutRef.current && !agentFlyoutRef.current.contains(event.target as Node)) {
+        setAgentFlyoutOpen(false)
       }
     }
 
@@ -137,7 +140,7 @@ export function CanvasToolbar({
       if (event.key === 'Escape') {
         setTileMenuOpen(false)
         setEnvMenuOpen(false)
-        setCuratorMenuOpen(false)
+        setAgentFlyoutOpen(false)
       }
     }
 
@@ -147,7 +150,7 @@ export function CanvasToolbar({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [tileMenuOpen, envMenuOpen, curatorMenuOpen])
+  }, [tileMenuOpen, envMenuOpen, agentFlyoutOpen])
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -409,40 +412,36 @@ export function CanvasToolbar({
         <Tip label={showAllEdges ? 'Hide edges' : 'Show edges'} />
       </div>
 
-      <div className="canvas-toolbtn-wrap" style={{ position: 'relative' }}>
-        <button
-          onClick={onLibrarian}
-          className={`canvas-toolbtn${librarianActive || librarianAlive ? ' canvas-toolbtn--active' : ''}`}
-          data-testid="canvas-librarian"
-        >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={librarianAlive ? { animation: 'te-pulse 2s ease-in-out infinite' } : undefined}
-          >
-            {/* Open book icon */}
-            <path d="M8 3C6.5 2 4.5 1.5 2 2v10c2.5-.5 4.5 0 6 1" />
-            <path d="M8 3c1.5-1 3.5-1.5 6-1v10c-2.5-.5-4.5 0-6 1" />
-            <line x1="8" y1="3" x2="8" y2="13" />
-          </svg>
-        </button>
-        <Tip label={librarianAlive ? 'Stop Librarian' : 'Librarian'} />
-        {librarianAlive && <AgentStatusLabel onClick={onLibrarian} />}
-      </div>
-
-      <div ref={curatorMenuRef} style={{ position: 'relative' }}>
+      <div ref={agentFlyoutRef} style={{ position: 'relative' }}>
         <div className="canvas-toolbtn-wrap">
           <button
-            onClick={() => {
-              if (curatorActive) return
-              setCuratorMenuOpen((prev) => !prev)
-            }}
+            onClick={() => setAgentFlyoutOpen((prev) => !prev)}
+            className={`canvas-toolbtn${librarianActive || librarianAlive ? ' canvas-toolbtn--active' : ''}`}
+            data-testid="canvas-librarian"
+          >
+            <svg
+              width={14}
+              height={14}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={librarianAlive ? { animation: 'te-pulse 2s ease-in-out infinite' } : undefined}
+            >
+              {/* Open book icon */}
+              <path d="M8 3C6.5 2 4.5 1.5 2 2v10c2.5-.5 4.5 0 6 1" />
+              <path d="M8 3c1.5-1 3.5-1.5 6-1v10c-2.5-.5-4.5 0-6 1" />
+              <line x1="8" y1="3" x2="8" y2="13" />
+            </svg>
+          </button>
+          <Tip label={librarianAlive ? 'Stop Librarian' : 'Librarian'} />
+          {librarianAlive && <AgentStatusLabel onClick={onLibrarian} />}
+        </div>
+        <div className="canvas-toolbtn-wrap">
+          <button
+            onClick={() => setAgentFlyoutOpen((prev) => !prev)}
             className={`canvas-toolbtn${curatorActive || curatorAlive ? ' canvas-toolbtn--active' : ''}`}
             data-testid="canvas-curator"
           >
@@ -464,52 +463,18 @@ export function CanvasToolbar({
             </svg>
           </button>
           <Tip label={curatorAlive ? 'Curator running\u2026' : 'Curator'} />
+          {curatorAlive && <AgentStatusLabel onClick={() => onCurator('')} />}
         </div>
-        {curatorMenuOpen && (
-          <div
-            className="sidebar-popover absolute flex flex-col gap-1 p-2"
-            style={{
-              top: 0,
-              left: '100%',
-              marginLeft: 8,
-              minWidth: 160,
-              zIndex: 100
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--color-text-tertiary)',
-                padding: '2px 8px',
-                marginBottom: 2
-              }}
-            >
-              Select mode
-            </div>
-            {(
-              [
-                { id: 'challenge', label: 'Challenge', desc: 'Stress-test ideas' },
-                { id: 'emerge', label: 'Emerge', desc: 'Surface connections' },
-                { id: 'research', label: 'Research', desc: 'Address gaps' },
-                { id: 'learn', label: 'Learn', desc: 'Extract learnings' }
-              ] as const
-            ).map((mode) => (
-              <button
-                key={mode.id}
-                onClick={() => {
-                  onCurator(mode.id)
-                  setCuratorMenuOpen(false)
-                }}
-                className="sidebar-popover__item"
-                style={{ textAlign: 'left', padding: '4px 8px', borderRadius: 4 }}
-              >
-                <div style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>{mode.label}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{mode.desc}</div>
-              </button>
-            ))}
-          </div>
+        {agentFlyoutOpen && (
+          <VaultAgentFlyout
+            librarianActive={librarianActive || librarianAlive}
+            curatorActive={curatorActive || curatorAlive}
+            onLibrarian={onLibrarian}
+            onCurator={onCurator}
+            onClose={() => setAgentFlyoutOpen(false)}
+            lastResultPath={lastLibrarianResultPath}
+          />
         )}
-        {curatorAlive && <AgentStatusLabel onClick={() => onCurator('')} />}
       </div>
 
       <div className="canvas-toolrail__divider" />
