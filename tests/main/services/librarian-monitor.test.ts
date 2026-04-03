@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { LibrarianMonitor } from '../../../src/main/services/librarian-monitor'
-import type { AgentSidecarState } from '@shared/agent-types'
 
 describe('LibrarianMonitor', () => {
   let monitor: LibrarianMonitor

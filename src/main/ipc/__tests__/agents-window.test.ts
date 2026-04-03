@@ -112,6 +112,7 @@ describe('registerAgentIpc', () => {
       spawner
     )
 
-    expect((spawner as ReturnType<typeof createMockSpawner>).setLibrarianMonitor).toHaveBeenCalled()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((spawner as any).setLibrarianMonitor).toHaveBeenCalled()
   })
 })

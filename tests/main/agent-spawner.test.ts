@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { join } from 'path'
+
 import type { ShellService } from '../../src/main/services/shell-service'
 import type { AgentSpawnRequest } from '../../src/shared/agent-types'
 import type { SessionId } from '../../src/shared/types'
