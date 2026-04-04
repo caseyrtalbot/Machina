@@ -62,7 +62,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const [webviewKey, setWebviewKey] = useState(0)
   const webviewRef = useRef<HTMLElement | null>(null)
 
-  const isClaudeCard = node.metadata?.initialCommand === 'claude'
+  const isClaudeCard = node.metadata?.initialCommand === 'claude' || !!node.metadata?.actionId
   const { contextBadge, markError: _markError } = useClaudeContext(node, isClaudeCard)
   const claudeStatus = useClaudeStatus()
 
@@ -103,10 +103,9 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
     // For Claude cards, build context in the host (has access to canvas store)
     if (node.metadata?.initialCommand === 'claude') {
-      if (node.metadata?.actionPrompt) {
-        // Action terminal: prompt pre-assembled by handleAction
-        params.set('systemPrompt', String(node.metadata.actionPrompt))
-        params.set('actionPrompt', '1') // Signal to TerminalApp for autonomous mode
+      if (node.metadata?.actionId) {
+        // Action terminal: prompt is in a file, initialCommand has the full launch cmd.
+        // No systemPrompt URL param needed — the command reads from file directly.
       } else {
         // Regular Claude live card: canvas context
         const nodes = useCanvasStore.getState().nodes
@@ -134,7 +133,6 @@ export function TerminalCard({ node }: TerminalCardProps) {
     node.id,
     node.metadata?.initialCwd,
     node.metadata?.initialCommand,
-    node.metadata?.actionPrompt,
     vaultPath
   ])
 

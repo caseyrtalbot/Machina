@@ -22,6 +22,7 @@ const POLL_TIMEOUT_MS = 2000
 // --- Pure functions ---
 
 export function deriveLabel(metadata: Readonly<Record<string, unknown>>): string {
+  if (metadata.actionName) return String(metadata.actionName)
   if (metadata.initialCommand === 'claude') return 'Claude'
   if (typeof metadata.initialCwd === 'string') {
     return metadata.initialCwd.split('/').pop() || 'Terminal'
@@ -41,7 +42,7 @@ export function deriveStatus(
   if (!processNames.has(sessionId)) {
     return 'unknown'
   }
-  if (metadata.initialCommand === 'claude') {
+  if (metadata.initialCommand === 'claude' || metadata.actionId) {
     return 'claude'
   }
   const processName = processNames.get(sessionId) ?? ''

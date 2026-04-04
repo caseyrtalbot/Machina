@@ -641,18 +641,27 @@ export function CanvasView(): React.ReactElement {
       await window.api.fs.writeFile(claudeMdPath, generateClaudeMd(vaultName))
     }
 
-    // 5. Spawn terminal card on canvas
+    // 5. Write prompt to a file so the terminal command stays clean
+    const promptId = Date.now().toString(36)
+    const promptPath = `${vp}/${TE_DIR}/action-prompt-${promptId}.txt`
+    await window.api.fs.writeFile(promptPath, assembledPrompt)
+
+    // 6. Spawn terminal card with a shell command that reads the prompt file
     const viewport = useCanvasStore.getState().viewport
+    const launchCmd =
+      `claude --append-system-prompt "$(cat '${promptPath}')"` +
+      ' --dangerously-skip-permissions' +
+      ' --allowedTools Read,Write,Edit,Glob,Grep,Bash' +
+      ' -p "Begin."'
     const node = createCanvasNode(
       'terminal',
       { x: -viewport.x + 200, y: -viewport.y + 100 },
       {
         metadata: {
-          initialCommand: 'claude',
+          initialCommand: launchCmd,
           initialCwd: vp,
           actionId,
-          actionName: actionResult.definition.name,
-          actionPrompt: assembledPrompt
+          actionName: actionResult.definition.name
         }
       }
     )
