@@ -18,9 +18,24 @@ vi.mock('../../../store/canvas-store', () => ({
 
 vi.mock('../../../store/vault-store', () => ({
   useVaultStore: Object.assign(
-    vi.fn(() => null),
+    vi.fn((selector) => {
+      const state = { vaultPath: '/test', rawFileCount: 42 }
+      return selector(state)
+    }),
     {
-      getState: vi.fn(() => ({ vaultPath: '/test' }))
+      getState: vi.fn(() => ({ vaultPath: '/test', rawFileCount: 42 }))
+    }
+  )
+}))
+
+vi.mock('../../../store/sidebar-selection-store', () => ({
+  useSidebarSelectionStore: Object.assign(
+    vi.fn((selector) => {
+      const state = { selectedPaths: new Set<string>() }
+      return selector(state)
+    }),
+    {
+      getState: vi.fn(() => ({ selectedPaths: new Set<string>() }))
     }
   )
 }))
@@ -37,7 +52,8 @@ vi.mock('../../../store/settings-store', () => ({
 
 vi.mock('../../../design/tokens', () => ({
   colors: {
-    text: { primary: '#fff', secondary: '#aaa', muted: '#555' }
+    text: { primary: '#fff', secondary: '#aaa', muted: '#555' },
+    claude: { warning: '#f00' }
   }
 }))
 
@@ -53,13 +69,38 @@ vi.mock('../../../engine/claude-md-template', () => ({
   generateClaudeMd: vi.fn()
 }))
 
-let mockAgentStates: unknown[] = []
-vi.mock('../../../hooks/use-agent-states', () => ({
-  useAgentStates: vi.fn(() => mockAgentStates)
+vi.mock('../../../hooks/use-claude-status', () => ({
+  useClaudeStatus: vi.fn(() => ({ installed: true, authenticated: true }))
 }))
 
-vi.mock('../VaultAgentFlyout', () => ({
-  VaultAgentFlyout: () => null
+const mockActionsList = vi.fn().mockResolvedValue([
+  { id: 'emerge', name: 'Emerge', description: 'Surface connections', scope: 'any' },
+  { id: 'librarian', name: 'Librarian', description: 'Audit vault', scope: 'vault' }
+])
+
+vi.stubGlobal('window', {
+  ...globalThis.window,
+  api: {
+    fs: { fileExists: vi.fn(), writeFile: vi.fn() },
+    actions: { list: mockActionsList }
+  }
+})
+
+vi.mock('../ActionMenu', () => ({
+  ActionMenu: ({
+    scopeLabel,
+    onSelect
+  }: {
+    scopeLabel: string
+    onSelect: (id: string) => void
+  }) => (
+    <div data-testid="action-menu">
+      <span data-testid="scope-label">{scopeLabel}</span>
+      <button data-testid="action-emerge" onClick={() => onSelect('emerge')}>
+        Emerge
+      </button>
+    </div>
+  )
 }))
 
 // Lazy import after mocks
@@ -74,75 +115,80 @@ const baseProps = {
   onOpenImport: vi.fn(),
   onOrganize: vi.fn(),
   organizePhase: 'idle',
-  librarianActive: false,
-  onLibrarian: vi.fn(),
-  curatorActive: false,
-  onCurator: vi.fn(),
-  lastLibrarianResultPath: null
+  onActionSelect: vi.fn()
 }
 
-describe('CanvasToolbar librarian button', () => {
+describe('CanvasToolbar actions button', () => {
   afterEach(() => {
     cleanup()
+    vi.clearAllMocks()
   })
 
-  it('renders a button with data-testid="canvas-librarian"', () => {
+  it('renders a button with data-testid="canvas-actions"', () => {
     render(<CanvasToolbar {...baseProps} />)
-    const btn = screen.getByTestId('canvas-librarian')
+    const btn = screen.getByTestId('canvas-actions')
     expect(btn).toBeTruthy()
   })
 
-  it('toggles the agent flyout when the button is clicked', () => {
+  it('does not render librarian or curator buttons', () => {
     render(<CanvasToolbar {...baseProps} />)
-    fireEvent.click(screen.getByTestId('canvas-librarian'))
-    // Flyout is mocked, so we just verify the button is clickable without error
-    expect(screen.getByTestId('canvas-librarian')).toBeTruthy()
+    expect(screen.queryByTestId('canvas-librarian')).toBeNull()
+    expect(screen.queryByTestId('canvas-curator')).toBeNull()
   })
 
-  it('shows "Librarian" tooltip when inactive', () => {
-    render(<CanvasToolbar {...baseProps} librarianActive={false} />)
-    // Tip renders a span with class canvas-tooltip containing the label
-    const tip = screen.getByText('Librarian')
-    expect(tip).toBeTruthy()
+  it('opens ActionMenu after clicking the actions button', async () => {
+    render(<CanvasToolbar {...baseProps} />)
+    expect(screen.queryByTestId('action-menu')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('canvas-actions'))
+
+    // Wait for the async actions.list call to resolve
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('action-menu')).toBeTruthy()
+    })
   })
 
-  it('shows "Stop Librarian" tooltip when alive', () => {
-    mockAgentStates = [{ label: 'librarian', status: 'alive', sessionId: 'x' }]
-    render(<CanvasToolbar {...baseProps} librarianActive={true} />)
-    const tip = screen.getByText('Stop Librarian')
-    expect(tip).toBeTruthy()
-    mockAgentStates = []
+  it('shows vault scope label when no files selected', async () => {
+    render(<CanvasToolbar {...baseProps} />)
+    fireEvent.click(screen.getByTestId('canvas-actions'))
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('scope-label').textContent).toBe('Entire vault (42 notes)')
+    })
   })
 
-  it('applies active class when librarian alive', () => {
-    mockAgentStates = [{ label: 'librarian', status: 'alive', sessionId: 'x' }]
-    render(<CanvasToolbar {...baseProps} librarianActive={true} />)
-    const btn = screen.getByTestId('canvas-librarian')
-    expect(btn.className).toContain('canvas-toolbtn--active')
-    mockAgentStates = []
+  it('calls actions.list IPC when opening flyout', async () => {
+    render(<CanvasToolbar {...baseProps} />)
+    fireEvent.click(screen.getByTestId('canvas-actions'))
+
+    await vi.waitFor(() => {
+      expect(mockActionsList).toHaveBeenCalled()
+    })
   })
 
-  it('does not apply active class when librarianActive is false', () => {
-    render(<CanvasToolbar {...baseProps} librarianActive={false} />)
-    const btn = screen.getByTestId('canvas-librarian')
-    expect(btn.className).not.toContain('canvas-toolbtn--active')
+  it('calls onActionSelect when an action is chosen', async () => {
+    const onActionSelect = vi.fn()
+    render(<CanvasToolbar {...baseProps} onActionSelect={onActionSelect} />)
+    fireEvent.click(screen.getByTestId('canvas-actions'))
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('action-emerge')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByTestId('action-emerge'))
+    expect(onActionSelect).toHaveBeenCalledWith('emerge')
   })
 
-  it('applies pulse animation on svg when alive', () => {
-    mockAgentStates = [{ label: 'librarian', status: 'alive', sessionId: 'x' }]
-    render(<CanvasToolbar {...baseProps} librarianActive={true} />)
-    const btn = screen.getByTestId('canvas-librarian')
-    const svg = btn.querySelector('svg')
-    expect(svg).toBeTruthy()
-    expect(svg!.style.animation).toContain('te-pulse')
-    mockAgentStates = []
-  })
+  it('closes the flyout when toggled again', async () => {
+    render(<CanvasToolbar {...baseProps} />)
+    const btn = screen.getByTestId('canvas-actions')
 
-  it('does not apply pulse animation on svg when inactive', () => {
-    render(<CanvasToolbar {...baseProps} librarianActive={false} />)
-    const btn = screen.getByTestId('canvas-librarian')
-    const svg = btn.querySelector('svg')
-    expect(svg).toBeTruthy()
-    expect(svg!.style.animation).toBe('')
+    fireEvent.click(btn)
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('action-menu')).toBeTruthy()
+    })
+
+    fireEvent.click(btn)
+    expect(screen.queryByTestId('action-menu')).toBeNull()
   })
 })

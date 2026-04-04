@@ -46,7 +46,8 @@ import { OntologyPreview } from './OntologyPreview'
 import { useOntologyOrchestrator } from './ontology-orchestrator'
 import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
 import { useAgentOrchestrator } from '../../hooks/use-agent-orchestrator'
-import { useAgentStates } from '../../hooks/use-agent-states'
+import { buildScopeContext } from '@shared/action-types'
+import { generateClaudeMd } from '../../engine/claude-md-template'
 import { AgentPreview } from './AgentPreview'
 import { computeGhostNodes } from './agent-ghost-layer'
 import type { AgentActionName } from '@shared/agent-action-types'
@@ -97,66 +98,6 @@ export function CanvasView(): React.ReactElement {
   const agent = useAgentOrchestrator(commandStack, containerSize)
   useAgentPlanListener()
   const rawFileCount = useVaultStore((s) => s.rawFileCount)
-
-  // Track librarian running state via the agent state system.
-  // Only clear the tracked ID after the monitor has seen the session at least once,
-  // to avoid a race where the IPC spawn response arrives before the 3s monitor poll.
-  const agentStates = useAgentStates()
-  const librarianSeenRef = useRef(false)
-  const librarianActive = useMemo(() => {
-    if (!agent.librarianSessionId) {
-      librarianSeenRef.current = false
-      return false
-    }
-    const session = agentStates.find((s) => s.sessionId === agent.librarianSessionId)
-    if (session && session.status !== 'exited') {
-      librarianSeenRef.current = true
-      return true
-    }
-    // Session not found or exited — only clear if we saw it at least once
-    if (librarianSeenRef.current) {
-      queueMicrotask(() => agent.setLibrarianSessionId(null))
-      return false
-    }
-    // Not yet seen by monitor — keep the ID, assume still starting
-    return true
-  }, [agent.librarianSessionId, agentStates, agent.setLibrarianSessionId])
-
-  const curatorSeenRef = useRef(false)
-  const curatorActive = useMemo(() => {
-    if (!agent.curatorSessionId) {
-      curatorSeenRef.current = false
-      return false
-    }
-    const session = agentStates.find((s) => s.sessionId === agent.curatorSessionId)
-    if (session && session.status !== 'exited') {
-      curatorSeenRef.current = true
-      return true
-    }
-    if (curatorSeenRef.current) {
-      queueMicrotask(() => agent.setCuratorSessionId(null))
-      return false
-    }
-    return true
-  }, [agent.curatorSessionId, agentStates, agent.setCuratorSessionId])
-
-  // Clear agentActive in sidebar selection store when no vault agent is running
-  useEffect(() => {
-    if (!librarianActive && !curatorActive) {
-      useSidebarSelectionStore.getState().setAgentActive(false)
-    }
-  }, [librarianActive, curatorActive])
-
-  // Track librarian completion for the "View Report" link in the flyout
-  const [lastLibrarianResultPath, setLastLibrarianResultPath] = useState<string | null>(null)
-  const prevLibrarianActiveRef = useRef(false)
-  useEffect(() => {
-    if (prevLibrarianActiveRef.current && !librarianActive) {
-      const today = new Date().toISOString().slice(0, 10)
-      setLastLibrarianResultPath(`_librarian/${today}-audit.md`)
-    }
-    prevLibrarianActiveRef.current = librarianActive
-  }, [librarianActive])
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
@@ -668,73 +609,55 @@ export function CanvasView(): React.ReactElement {
     setPreviewPlan(null)
   }, [])
 
-  const handleLibrarian = useCallback(() => {
-    if (librarianActive && agent.librarianSessionId) {
-      void window.api.agent.kill(agent.librarianSessionId)
-      agent.setLibrarianSessionId(null)
-    } else {
-      const vp = useVaultStore.getState().vaultPath
-      if (!vp) return
-      const sel = useSidebarSelectionStore.getState().selectedPaths
-      const selectedFiles =
-        sel.size > 0
-          ? [...sel].map((p) => (p.startsWith(vp) ? p.slice(vp.length + 1) : p))
-          : undefined
-      void (async () => {
-        try {
-          const result = await window.api.agent.spawn({
-            cwd: vp,
-            type: 'librarian',
-            selectedFiles
-          })
-          if ('sessionId' in result) {
-            agent.setLibrarianSessionId(result.sessionId)
-            useSidebarSelectionStore.getState().setAgentActive(true)
-          }
-        } catch (err) {
-          console.error('Librarian spawn failed:', err)
-        }
-      })()
-    }
-  }, [librarianActive, agent])
+  const handleAction = useCallback(async (actionId: string) => {
+    const vp = useVaultStore.getState().vaultPath
+    if (!vp) return
 
-  const handleCurator = useCallback(
-    (mode: string) => {
-      // Stop if already running (empty mode = stop request from status label)
-      if ((curatorActive || !mode) && agent.curatorSessionId) {
-        void window.api.agent.kill(agent.curatorSessionId)
-        agent.setCuratorSessionId(null)
-        return
-      }
-      if (!mode) return
-      // Don't allow concurrent vault agents
-      if (librarianActive) return
-      const vp = useVaultStore.getState().vaultPath
-      if (!vp) return
-      const sel = useSidebarSelectionStore.getState().selectedPaths
-      const selectedFiles =
-        sel.size > 0
-          ? [...sel].map((p) => (p.startsWith(vp) ? p.slice(vp.length + 1) : p))
-          : undefined
-      void (async () => {
-        try {
-          const result = await window.api.agent.spawn({
-            cwd: vp,
-            type: 'curator',
-            curatorMode: mode,
-            selectedFiles
-          })
-          if ('sessionId' in result) {
-            agent.setCuratorSessionId(result.sessionId)
-            useSidebarSelectionStore.getState().setAgentActive(true)
-          }
-        } catch (err) {
-          console.error('Curator spawn failed:', err)
+    // 1. Read skill.md + action body via IPC
+    const [skillContent, actionResult] = await Promise.all([
+      window.api.fs.readFile(`${vp}/${TE_DIR}/skill.md`).catch(() => ''),
+      window.api.actions.read(actionId)
+    ])
+
+    if ('error' in actionResult) {
+      console.error('Action read failed:', actionResult.error)
+      return
+    }
+
+    // 2. Build scope context from sidebar selection
+    const selectedPaths = useSidebarSelectionStore.getState().selectedPaths
+    const scopeContext = buildScopeContext(selectedPaths, vp)
+
+    // 3. Assemble prompt
+    const assembledPrompt = [skillContent, actionResult.body, scopeContext]
+      .filter(Boolean)
+      .join('\n\n---\n\n')
+
+    // 4. Ensure CLAUDE.md exists (same as Claude Live card)
+    const claudeMdPath = `${vp}/CLAUDE.md`
+    const exists = await window.api.fs.fileExists(claudeMdPath)
+    if (!exists) {
+      const vaultName = vp.split('/').pop() ?? 'Vault'
+      await window.api.fs.writeFile(claudeMdPath, generateClaudeMd(vaultName))
+    }
+
+    // 5. Spawn terminal card on canvas
+    const viewport = useCanvasStore.getState().viewport
+    const node = createCanvasNode(
+      'terminal',
+      { x: -viewport.x + 200, y: -viewport.y + 100 },
+      {
+        metadata: {
+          initialCommand: 'claude',
+          initialCwd: vp,
+          actionId,
+          actionName: actionResult.definition.name,
+          actionPrompt: assembledPrompt
         }
-      })()
-    },
-    [curatorActive, librarianActive, agent]
-  )
+      }
+    )
+    useCanvasStore.getState().addNode(node)
+  }, [])
 
   const ontologyGroups = ontology.pendingSnapshot
     ? Object.values(ontology.pendingSnapshot.groupsById)
@@ -761,11 +684,7 @@ export function CanvasView(): React.ReactElement {
           onOpenImport={() => setImportOpen(true)}
           onOrganize={ontology.startOrganize}
           organizePhase={ontology.phase}
-          librarianActive={librarianActive}
-          onLibrarian={handleLibrarian}
-          curatorActive={curatorActive}
-          onCurator={handleCurator}
-          lastLibrarianResultPath={lastLibrarianResultPath}
+          onActionSelect={handleAction}
         />
         <CanvasActionBar
           onTriggerAction={agent.trigger}

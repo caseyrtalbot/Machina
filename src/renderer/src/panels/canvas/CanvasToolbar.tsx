@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useSettingsStore } from '../../store/settings-store'
@@ -6,9 +6,10 @@ import { createCanvasNode } from '@shared/canvas-types'
 import { generateClaudeMd } from '../../engine/claude-md-template'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { colors } from '../../design/tokens'
-import { useAgentStates } from '../../hooks/use-agent-states'
 import { useClaudeStatus } from '../../hooks/use-claude-status'
-import { VaultAgentFlyout } from './VaultAgentFlyout'
+import { ActionMenu } from './ActionMenu'
+import type { ActionDefinition } from '@shared/action-types'
+import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -19,11 +20,7 @@ interface CanvasToolbarProps {
   readonly onOpenImport: () => void
   readonly onOrganize: () => void
   readonly organizePhase: string
-  readonly librarianActive: boolean
-  readonly onLibrarian: () => void
-  readonly curatorActive: boolean
-  readonly onCurator: (mode: string) => void
-  readonly lastLibrarianResultPath: string | null
+  readonly onActionSelect: (actionId: string) => void
 }
 
 function Tip({
@@ -41,46 +38,6 @@ function Tip({
   )
 }
 
-function AgentStatusLabel({ onClick }: { readonly onClick: () => void }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        position: 'absolute',
-        left: '100%',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        marginLeft: 10,
-        fontSize: 8,
-        fontWeight: 500,
-        letterSpacing: '0.04em',
-        whiteSpace: 'nowrap',
-        cursor: 'pointer',
-        transition: 'opacity 120ms ease-out',
-        ...(hovered
-          ? {
-              color: 'var(--color-accent-default)',
-              opacity: 1
-            }
-          : {
-              background:
-                'linear-gradient(90deg, transparent 0%, var(--color-accent-default) 50%, transparent 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundSize: '200% 100%',
-              animation: 'te-shimmer 2s ease-in-out infinite'
-            })
-      }}
-    >
-      {hovered ? 'stop' : 'working'}
-    </div>
-  )
-}
-
 export function CanvasToolbar({
   canUndo,
   canRedo,
@@ -90,11 +47,7 @@ export function CanvasToolbar({
   onOpenImport,
   onOrganize,
   organizePhase,
-  librarianActive,
-  onLibrarian,
-  curatorActive,
-  onCurator,
-  lastLibrarianResultPath
+  onActionSelect
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
@@ -107,21 +60,19 @@ export function CanvasToolbar({
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
   const [agentFlyoutOpen, setAgentFlyoutOpen] = useState(false)
+  const [loadedActions, setLoadedActions] = useState<ActionDefinition[]>([])
   const claudeStatus = useClaudeStatus()
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
   const agentFlyoutRef = useRef<HTMLDivElement>(null)
 
-  // Ground-truth agent status from the process monitor
-  const agentStates = useAgentStates()
-  const librarianAlive = useMemo(
-    () => agentStates.some((s) => s.label === 'librarian' && s.status === 'alive'),
-    [agentStates]
-  )
-  const curatorAlive = useMemo(
-    () => agentStates.some((s) => s.label === 'curator' && s.status === 'alive'),
-    [agentStates]
-  )
+  const sidebarSelectedPaths = useSidebarSelectionStore((s) => s.selectedPaths)
+  const sidebarSelectedCount = sidebarSelectedPaths.size
+  const rawFileCount = useVaultStore((s) => s.rawFileCount)
+  const scopeLabel =
+    sidebarSelectedCount > 0
+      ? `${sidebarSelectedCount} file${sidebarSelectedCount !== 1 ? 's' : ''} selected`
+      : `Entire vault (${rawFileCount} notes)`
 
   useEffect(() => {
     if (!tileMenuOpen && !envMenuOpen && !agentFlyoutOpen) return
@@ -417,9 +368,17 @@ export function CanvasToolbar({
       <div ref={agentFlyoutRef} style={{ position: 'relative' }}>
         <div className="canvas-toolbtn-wrap">
           <button
-            onClick={() => setAgentFlyoutOpen((prev) => !prev)}
-            className={`canvas-toolbtn${librarianActive || librarianAlive ? ' canvas-toolbtn--active' : ''}`}
-            data-testid="canvas-librarian"
+            onClick={async () => {
+              if (agentFlyoutOpen) {
+                setAgentFlyoutOpen(false)
+                return
+              }
+              const listed = await window.api.actions.list()
+              setLoadedActions(listed as ActionDefinition[])
+              setAgentFlyoutOpen(true)
+            }}
+            className="canvas-toolbtn"
+            data-testid="canvas-actions"
           >
             <svg
               width={14}
@@ -430,51 +389,23 @@ export function CanvasToolbar({
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={librarianAlive ? { animation: 'te-pulse 2s ease-in-out infinite' } : undefined}
             >
-              {/* Open book icon */}
-              <path d="M8 3C6.5 2 4.5 1.5 2 2v10c2.5-.5 4.5 0 6 1" />
-              <path d="M8 3c1.5-1 3.5-1.5 6-1v10c-2.5-.5-4.5 0-6 1" />
-              <line x1="8" y1="3" x2="8" y2="13" />
+              <circle cx="8" cy="8" r="6" />
+              <path d="M8 5v6M5 8h6" />
             </svg>
           </button>
-          <Tip label={librarianAlive ? 'Stop Librarian' : 'Librarian'} />
-          {librarianAlive && <AgentStatusLabel onClick={onLibrarian} />}
-        </div>
-        <div className="canvas-toolbtn-wrap">
-          <button
-            onClick={() => setAgentFlyoutOpen((prev) => !prev)}
-            className={`canvas-toolbtn${curatorActive || curatorAlive ? ' canvas-toolbtn--active' : ''}`}
-            data-testid="canvas-curator"
-          >
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={curatorAlive ? { animation: 'te-pulse 2s ease-in-out infinite' } : undefined}
-            >
-              {/* Stamp/seal icon */}
-              <rect x="4" y="1" width="8" height="4" rx="1" />
-              <line x1="8" y1="5" x2="8" y2="9" />
-              <rect x="2" y="9" width="12" height="5" rx="1" />
-            </svg>
-          </button>
-          <Tip label={curatorAlive ? 'Curator running\u2026' : 'Curator'} />
-          {curatorAlive && <AgentStatusLabel onClick={() => onCurator('')} />}
+          <Tip label="Actions" />
         </div>
         {agentFlyoutOpen && (
-          <VaultAgentFlyout
-            librarianActive={librarianActive || librarianAlive}
-            curatorActive={curatorActive || curatorAlive}
-            onLibrarian={onLibrarian}
-            onCurator={onCurator}
+          <ActionMenu
+            actions={loadedActions}
+            selectedCount={sidebarSelectedCount}
+            scopeLabel={scopeLabel}
+            onSelect={(id) => {
+              setAgentFlyoutOpen(false)
+              onActionSelect(id)
+            }}
             onClose={() => setAgentFlyoutOpen(false)}
-            lastResultPath={lastLibrarianResultPath}
           />
         )}
       </div>
