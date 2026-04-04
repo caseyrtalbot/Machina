@@ -29,11 +29,13 @@ export const useViewStore = create<ViewStore>(() => ({
   }
 }))
 
-// Sync contentView whenever tab-store changes
-useTabStore.subscribe((state) => {
-  const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
-  const viewType = (activeTab?.type ?? 'editor') as ContentView
-  if (useViewStore.getState().contentView !== viewType) {
-    useViewStore.setState({ contentView: viewType })
-  }
-})
+/** Sync contentView whenever tab-store changes. Returns unsubscribe function. */
+export function subscribeViewSync(): () => void {
+  return useTabStore.subscribe((state) => {
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+    const viewType = (activeTab?.type ?? 'editor') as ContentView
+    if (useViewStore.getState().contentView !== viewType) {
+      useViewStore.setState({ contentView: viewType })
+    }
+  })
+}

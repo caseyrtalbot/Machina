@@ -32,7 +32,7 @@ import { useKeyboard } from './hooks/useKeyboard'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from './hooks/useCanvasAwareness'
 import { useVaultStore } from './store/vault-store'
 import { useEditorStore, flushPendingSave } from './store/editor-store'
-import { useViewStore } from './store/view-store'
+import { useViewStore, subscribeViewSync } from './store/view-store'
 import { useWorkbenchActionStore } from './store/workbench-actions-store'
 import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
@@ -1383,6 +1383,10 @@ export default function App() {
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  useEffect(() => {
+    return subscribeViewSync()
   }, [])
 
   useEffect(() => {
