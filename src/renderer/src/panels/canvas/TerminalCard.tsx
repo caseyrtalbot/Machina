@@ -133,6 +133,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
     node.id,
     node.metadata?.initialCwd,
     node.metadata?.initialCommand,
+    node.metadata?.actionPrompt,
     vaultPath
   ])
 
