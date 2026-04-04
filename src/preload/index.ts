@@ -115,6 +115,10 @@ const api = {
     spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request),
     kill: (sessionId: string) => typedInvoke('agent:kill', { sessionId })
   },
+  actions: {
+    list: () => typedInvoke('actions:list'),
+    read: (id: string) => typedInvoke('actions:read', { id })
+  },
   agentAction: {
     compute: (request: AgentActionRequest): Promise<AgentActionResponse> =>
       typedInvoke('agent-action:compute', request),

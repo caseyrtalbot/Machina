@@ -7,6 +7,7 @@ import type {
 } from './workbench-types'
 import type { SystemArtifactKind } from './system-artifacts'
 import type { AgentSidecarState, AgentSpawnRequest } from './agent-types'
+import type { ActionDefinition } from './action-types'
 import type { AgentActionRequest, AgentActionResponse } from './agent-action-types'
 import type { CanvasMutationPlan } from './canvas-mutation-types'
 import type { ClaudeStatus } from './claude-status-types'
@@ -157,6 +158,13 @@ export interface IpcChannels {
   'mcp:status': {
     request: void
     response: { running: boolean; toolCount: number }
+  }
+
+  // --- Actions ---
+  'actions:list': { request: void; response: readonly ActionDefinition[] }
+  'actions:read': {
+    request: { id: string }
+    response: { definition: ActionDefinition; body: string } | { error: string }
   }
 
   // --- Agents ---

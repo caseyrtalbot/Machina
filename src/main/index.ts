@@ -12,6 +12,7 @@ import { registerProjectIpc, getProjectWatcher, getSessionTailer } from './ipc/w
 import { registerDocumentIpc, getDocumentManager } from './ipc/documents'
 import { registerMcpIpc } from './ipc/mcp'
 import { registerAgentIpc, setAgentServices, stopAgentServices } from './ipc/agents'
+import { registerActionsIpc, setActionsVaultRoot } from './ipc/actions'
 import { registerCanvasIpc } from './ipc/canvas'
 import { registerAgentActionIpc } from './ipc/agent-actions'
 import { registerGhostEmergeIpc } from './ipc/ghost-emerge'
@@ -176,6 +177,7 @@ app.whenReady().then(() => {
     const monitor = new PtyMonitor(vaultPath, getShellService().getPtyService())
     const spawner = new AgentSpawner(getShellService(), vaultPath, claudeStatus)
     setAgentServices(monitor, spawner)
+    setActionsVaultRoot(vaultPath)
   })
 
   createWindow()
@@ -186,6 +188,7 @@ app.whenReady().then(() => {
   registerProjectIpc()
   registerMcpIpc(mcpLifecycle)
   registerAgentIpc() // Register once at startup, services update via setAgentServices
+  registerActionsIpc()
   registerCanvasIpc()
   registerAgentActionIpc()
   registerGhostEmergeIpc()
