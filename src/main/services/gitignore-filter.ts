@@ -1,6 +1,6 @@
 import ignore, { type Ignore } from 'ignore'
 import { readFile } from 'fs/promises'
-import { join, relative, sep } from 'path'
+import { join, relative } from 'path'
 
 /**
  * Creates an ignore filter from patterns and optional gitignore content.
@@ -62,9 +62,7 @@ async function readGitignoreFile(path: string): Promise<string | null> {
  * suitable for use with the `ignore` package.
  */
 export function toRelativeSlashPath(vaultPath: string, absolutePath: string): string {
-  const rel = relative(vaultPath, absolutePath)
-  // Normalize Windows backslashes to forward slashes
-  return sep === '\\' ? rel.replaceAll('\\', '/') : rel
+  return relative(vaultPath, absolutePath)
 }
 
 /**
