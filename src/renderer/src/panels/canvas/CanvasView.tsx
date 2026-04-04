@@ -661,7 +661,7 @@ export function CanvasView(): React.ReactElement {
       `exec claude --append-system-prompt "$(cat '${promptPath}')" \\`,
       '  --dangerously-skip-permissions \\',
       '  --allowedTools Read,Write,Edit,Glob,Grep,Bash \\',
-      '  -p "Begin."'
+      '  --initial-prompt "Begin."'
     ].join('\n')
     await window.api.fs.writeFile(scriptPath, script)
 
