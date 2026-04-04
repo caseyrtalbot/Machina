@@ -110,4 +110,4 @@ Machina is in active development and open for testing. Expect rough edges. If yo
 
 ## License
 
-TBD
+[MIT](LICENSE)

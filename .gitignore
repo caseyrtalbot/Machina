@@ -17,6 +17,7 @@ test-results/
 .forge/
 .superpowers/
 .collaborator/
+CLAUDE.md
 
 # Ad-hoc screenshots
 *.png
