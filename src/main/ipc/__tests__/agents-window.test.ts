@@ -20,9 +20,7 @@ vi.mock('../../window-registry', () => ({
 
 function createMockSpawner() {
   return {
-    spawn: vi.fn(),
-    spawnLibrarian: vi.fn(),
-    setLibrarianMonitor: vi.fn()
+    spawn: vi.fn()
   } as never
 }
 
@@ -60,7 +58,7 @@ describe('registerAgentIpc', () => {
     ])
   })
 
-  it('merges librarian states with pty monitor states in callback', () => {
+  it('sends pty monitor states directly (no librarian merge)', () => {
     registerAgentIpc()
 
     const mockMonitor = {
@@ -73,16 +71,15 @@ describe('registerAgentIpc', () => {
 
     setAgentServices(mockMonitor as never, createMockSpawner())
 
-    // Simulate a pty monitor callback while no librarian sessions exist
+    // Simulate a pty monitor callback
     state.monitorCallback?.([{ id: 'pty-1' }])
 
     expect(state.sent.length).toBe(1)
-    // With no librarian sessions, states should be just the pty states
     const payload = state.sent[0].data as { states: unknown[] }
     expect(payload.states).toEqual([{ id: 'pty-1' }])
   })
 
-  it('calls killAll on librarianMonitor during stopAgentServices', () => {
+  it('stopAgentServices does not throw', () => {
     registerAgentIpc()
 
     setAgentServices(
@@ -94,25 +91,6 @@ describe('registerAgentIpc', () => {
       createMockSpawner()
     )
 
-    // stopAgentServices should not throw (killAll on fresh monitor is a no-op)
     expect(() => stopAgentServices()).not.toThrow()
-  })
-
-  it('wires setLibrarianMonitor on the spawner', () => {
-    registerAgentIpc()
-
-    const spawner = createMockSpawner()
-
-    setAgentServices(
-      {
-        stop: vi.fn(),
-        start: vi.fn(),
-        getAgentStates: vi.fn().mockReturnValue([])
-      } as never,
-      spawner
-    )
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((spawner as any).setLibrarianMonitor).toHaveBeenCalled()
   })
 })

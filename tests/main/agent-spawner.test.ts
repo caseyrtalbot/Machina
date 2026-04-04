@@ -15,32 +15,6 @@ vi.mock('crypto', async (importOriginal) => {
   }
 })
 
-// Mock child_process.spawn for spawnLibrarian tests
-const mockChildProcess = vi.hoisted(() => ({
-  spawned: null as unknown,
-  onHandlers: {} as Record<string, (...args: unknown[]) => void>
-}))
-
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('child_process')>()
-  return {
-    ...actual,
-    spawn: vi.fn(() => {
-      const child = {
-        pid: 99999,
-        on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-          mockChildProcess.onHandlers[event] = handler
-        }),
-        kill: vi.fn(),
-        stdout: { on: vi.fn() },
-        stderr: { on: vi.fn() }
-      }
-      mockChildProcess.spawned = child
-      return child
-    })
-  }
-})
-
 function createMockShellService(): ShellService {
   return {
     create: vi.fn().mockReturnValue(MOCK_UUID as SessionId),
@@ -164,77 +138,5 @@ describe('AgentSpawner', () => {
 
     const vaultPathArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][5]
     expect(vaultPathArg).toBe('/vault/root')
-  })
-})
-
-describe('AgentSpawner.spawnLibrarian', () => {
-  let mockShellService: ShellService
-
-  beforeEach(() => {
-    vi.resetModules()
-    vi.clearAllMocks()
-    mockShellService = createMockShellService()
-    mockChildProcess.spawned = null
-    mockChildProcess.onHandlers = {}
-  })
-
-  it('spawns claude CLI as a child process', async () => {
-    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
-    const { spawn } = await import('child_process')
-    const spawner = new AgentSpawner(mockShellService, '/vault/root')
-
-    spawner.spawnLibrarian('/vault/root')
-
-    expect(spawn).toHaveBeenCalledOnce()
-    const args = (spawn as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(args[0]).toBe('claude')
-    expect(args[2].cwd).toBe('/vault/root')
-  })
-
-  it('passes system prompt via --system-prompt flag', async () => {
-    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
-    const { spawn } = await import('child_process')
-    const spawner = new AgentSpawner(mockShellService, '/vault/root')
-
-    spawner.spawnLibrarian('/vault/root')
-
-    const cliArgs: string[] = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][1]
-    expect(cliArgs).toContain('--system-prompt')
-  })
-
-  it('includes --allowedTools with file tools', async () => {
-    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
-    const { spawn } = await import('child_process')
-    const spawner = new AgentSpawner(mockShellService, '/vault/root')
-
-    spawner.spawnLibrarian('/vault/root')
-
-    const cliArgs: string[] = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][1]
-    expect(cliArgs).toContain('--allowedTools')
-    const toolsIdx = cliArgs.indexOf('--allowedTools')
-    const toolsArg = cliArgs[toolsIdx + 1]
-    expect(toolsArg).toContain('Read')
-    expect(toolsArg).toContain('Write')
-    expect(toolsArg).toContain('Edit')
-    expect(toolsArg).toContain('Glob')
-    expect(toolsArg).toContain('Grep')
-  })
-
-  it('returns a session ID and registers with the monitor', async () => {
-    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
-    const spawner = new AgentSpawner(mockShellService, '/vault/root')
-
-    const result = spawner.spawnLibrarian('/vault/root')
-    expect(result.sessionId).toBeTruthy()
-    expect(typeof result.sessionId).toBe('string')
-  })
-
-  it('does not call shellService.create', async () => {
-    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
-    const spawner = new AgentSpawner(mockShellService, '/vault/root')
-
-    spawner.spawnLibrarian('/vault/root')
-
-    expect(mockShellService.create).not.toHaveBeenCalled()
   })
 })

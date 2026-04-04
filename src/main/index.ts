@@ -2,7 +2,6 @@ import { app, shell, BrowserWindow, session } from 'electron'
 import { execSync } from 'child_process'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
 import { registerFilesystemIpc, onVaultReady } from './ipc/filesystem'
 import { registerWatcherIpc } from './ipc/watcher'
 import { registerShellIpc, getShellService } from './ipc/shell'
@@ -81,7 +80,6 @@ function createWindow(): BrowserWindow {
           visualEffectState: 'active' as const
         }
       : {}),
-    ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -175,7 +173,7 @@ app.whenReady().then(() => {
     })
 
     const monitor = new PtyMonitor(vaultPath, getShellService().getPtyService())
-    const spawner = new AgentSpawner(getShellService(), vaultPath, claudeStatus)
+    const spawner = new AgentSpawner(getShellService(), vaultPath)
     setAgentServices(monitor, spawner)
     setActionsVaultRoot(vaultPath)
   })
