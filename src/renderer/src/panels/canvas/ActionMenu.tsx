@@ -99,10 +99,15 @@ export function ActionMenu({
     <div
       className="sidebar-popover"
       style={{
+        position: 'absolute',
+        bottom: 0,
+        left: '100%',
+        marginLeft: 8,
         display: 'flex',
         flexDirection: 'column',
         width: 240,
-        padding: 0
+        padding: 0,
+        zIndex: 100
       }}
     >
       {/* Scope indicator */}
