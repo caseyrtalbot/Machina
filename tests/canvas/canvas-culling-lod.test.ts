@@ -129,12 +129,12 @@ describe('getLodLevel', () => {
     expect(getLodLevel(0.3, 'text')).toBe('full')
   })
 
-  it('returns preview for note card at zoom 0.3 (heavy threshold)', () => {
-    expect(getLodLevel(0.3, 'note')).toBe('preview')
+  it('returns full for note card at zoom 0.3 (unified threshold)', () => {
+    expect(getLodLevel(0.3, 'note')).toBe('full')
   })
 
-  it('returns preview for markdown card at zoom 0.3 (heavy threshold)', () => {
-    expect(getLodLevel(0.3, 'markdown')).toBe('preview')
+  it('returns full for markdown card at zoom 0.3 (unified threshold)', () => {
+    expect(getLodLevel(0.3, 'markdown')).toBe('full')
   })
 
   it('returns full for note card at zoom 0.5 (heavy boundary)', () => {

@@ -1,7 +1,7 @@
 export type LodLevel = 'full' | 'preview' | 'dot'
 
 const LOD_FULL_THRESHOLD = 0.3
-const LOD_FULL_THRESHOLD_HEAVY = 0.35
+const LOD_FULL_THRESHOLD_HEAVY = 0.3
 const LOD_PREVIEW_THRESHOLD = 0.15
 
 /**
