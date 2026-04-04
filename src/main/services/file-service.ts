@@ -19,6 +19,25 @@ import {
   defaultSystemArtifactFilename,
   type SystemArtifactKind
 } from '@shared/system-artifacts'
+import bundledSkill from './bundled-actions/skill.md?raw'
+import bundledLibrarian from './bundled-actions/librarian.md?raw'
+import bundledCurator from './bundled-actions/curator.md?raw'
+import bundledEmerge from './bundled-actions/emerge.md?raw'
+import bundledChallenge from './bundled-actions/challenge.md?raw'
+import bundledSteelman from './bundled-actions/steelman.md?raw'
+import bundledRedTeam from './bundled-actions/red-team.md?raw'
+
+const BUNDLED_ACTIONS: ReadonlyArray<{
+  readonly filename: string
+  readonly content: string
+}> = [
+  { filename: 'librarian.md', content: bundledLibrarian },
+  { filename: 'curator.md', content: bundledCurator },
+  { filename: 'emerge.md', content: bundledEmerge },
+  { filename: 'challenge.md', content: bundledChallenge },
+  { filename: 'steelman.md', content: bundledSteelman },
+  { filename: 'red-team.md', content: bundledRedTeam }
+]
 
 const IGNORED_PROJECT_DIRS = new Set(['node_modules', 'out', 'dist', 'build'])
 
@@ -183,6 +202,26 @@ export class FileService {
       const kindDir = teArtifactKindDirPath(vaultPath, kind)
       if (!existsSync(kindDir)) {
         await mkdir(kindDir, { recursive: true })
+      }
+    }
+
+    // Seed actions directory and bundled action files
+    const actionsDir = join(teDirPath(vaultPath), 'actions')
+    if (!existsSync(actionsDir)) {
+      await mkdir(actionsDir, { recursive: true })
+    }
+
+    // Write skill.md if it doesn't exist
+    const skillPath = join(teDirPath(vaultPath), 'skill.md')
+    if (!existsSync(skillPath)) {
+      await writeFile(skillPath, bundledSkill, 'utf-8')
+    }
+
+    // Write bundled actions (only if file doesn't exist — never overwrite user edits)
+    for (const action of BUNDLED_ACTIONS) {
+      const actionPath = join(actionsDir, action.filename)
+      if (!existsSync(actionPath)) {
+        await writeFile(actionPath, action.content, 'utf-8')
       }
     }
 
