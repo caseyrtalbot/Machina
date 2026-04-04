@@ -47,6 +47,11 @@ export function useCanvasViewport(
     }
   }, [])
 
+  // RAF coalescing for wheel events (zoom + scroll-pan).
+  // Trackpads fire wheel at 120Hz+; this caps updates to display refresh rate.
+  const wheelRaf = useRef(0)
+  const pendingViewport = useRef<{ x: number; y: number; zoom: number } | null>(null)
+
   const onWheel = useCallback(
     (e: WheelEvent) => {
       // Let wheel events pass through to terminal cards (xterm scrollback)
@@ -66,7 +71,7 @@ export function useCanvasViewport(
       e.preventDefault()
       perfMark('wheel-start')
       markViewportInteracting(true)
-      const { viewport, setViewport } = useCanvasStore.getState()
+      const { viewport } = useCanvasStore.getState()
       const container = containerRef.current
       if (!container) return
 
@@ -76,26 +81,39 @@ export function useCanvasViewport(
         const cursorX = e.clientX - rect.left
         const cursorY = e.clientY - rect.top
 
-        const oldZoom = viewport.zoom
+        // Accumulate zoom on top of any pending viewport to avoid stale reads
+        const base = pendingViewport.current ?? viewport
+        const oldZoom = base.zoom
         const delta = -e.deltaY * ZOOM_SENSITIVITY
         const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, oldZoom * (1 + delta)))
         const scale = newZoom / oldZoom
 
-        setViewport({
-          x: cursorX - (cursorX - viewport.x) * scale,
-          y: cursorY - (cursorY - viewport.y) * scale,
+        pendingViewport.current = {
+          x: cursorX - (cursorX - base.x) * scale,
+          y: cursorY - (cursorY - base.y) * scale,
           zoom: newZoom
-        })
+        }
       } else {
-        // Pan
-        setViewport({
-          x: viewport.x - e.deltaX,
-          y: viewport.y - e.deltaY,
-          zoom: viewport.zoom
+        // Pan — accumulate deltas on top of any pending viewport
+        const base = pendingViewport.current ?? viewport
+        pendingViewport.current = {
+          x: base.x - e.deltaX,
+          y: base.y - e.deltaY,
+          zoom: base.zoom
+        }
+      }
+
+      if (!wheelRaf.current) {
+        wheelRaf.current = requestAnimationFrame(() => {
+          wheelRaf.current = 0
+          if (pendingViewport.current) {
+            useCanvasStore.getState().setViewport(pendingViewport.current)
+            pendingViewport.current = null
+          }
+          markViewportInteracting(false)
+          perfMeasure('canvas-wheel', 'wheel-start')
         })
       }
-      markViewportInteracting(false)
-      perfMeasure('canvas-wheel', 'wheel-start')
     },
     [containerRef]
   )
@@ -115,19 +133,38 @@ export function useCanvasViewport(
     const { viewport } = useCanvasStore.getState()
     panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
 
+    let latestPanX = viewport.x
+    let latestPanY = viewport.y
+    let panRafPending = false
+
     const onMove = (me: PointerEvent) => {
       if (!isPanning.current) return
-      const dx = me.clientX - panStart.current.x
-      const dy = me.clientY - panStart.current.y
-      useCanvasStore.getState().setViewport({
-        x: panStart.current.vx + dx,
-        y: panStart.current.vy + dy,
-        zoom: useCanvasStore.getState().viewport.zoom
-      })
+      latestPanX = panStart.current.vx + (me.clientX - panStart.current.x)
+      latestPanY = panStart.current.vy + (me.clientY - panStart.current.y)
+
+      if (!panRafPending) {
+        panRafPending = true
+        requestAnimationFrame(() => {
+          panRafPending = false
+          useCanvasStore.getState().setViewport({
+            x: latestPanX,
+            y: latestPanY,
+            zoom: useCanvasStore.getState().viewport.zoom
+          })
+        })
+      }
     }
 
     const onUp = () => {
       isPanning.current = false
+      // Flush final position if a RAF is still pending
+      if (panRafPending) {
+        useCanvasStore.getState().setViewport({
+          x: latestPanX,
+          y: latestPanY,
+          zoom: useCanvasStore.getState().viewport.zoom
+        })
+      }
       markViewportInteracting(false)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)

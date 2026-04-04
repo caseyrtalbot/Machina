@@ -301,7 +301,6 @@ export function CardShell({
           isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
         WebkitBackdropFilter:
           isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.2)`,
-        transition: 'backdrop-filter 150ms ease',
         ...(isActive
           ? ({
               '--activity-color': 'rgba(167, 139, 250, 0.3)',

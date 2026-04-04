@@ -180,18 +180,38 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
 
       const min = getMinSize(nodeType)
 
+      let latestWidth = resizeStart.current.w
+      let latestHeight = resizeStart.current.h
+      let resizeRafPending = false
+
       const onMove = (me: PointerEvent) => {
         if (!resizeStart.current) return
         const dx = (me.clientX - resizeStart.current.x) / zoom
         const dy = (me.clientY - resizeStart.current.y) / zoom
-        useCanvasStore.getState().resizeNode(nodeId, {
-          width: Math.max(min.width, resizeStart.current.w + dx),
-          height: Math.max(min.height, resizeStart.current.h + dy)
-        })
+        latestWidth = Math.max(min.width, resizeStart.current.w + dx)
+        latestHeight = Math.max(min.height, resizeStart.current.h + dy)
+
+        if (!resizeRafPending) {
+          resizeRafPending = true
+          requestAnimationFrame(() => {
+            resizeRafPending = false
+            useCanvasStore.getState().resizeNode(nodeId, {
+              width: latestWidth,
+              height: latestHeight
+            })
+          })
+        }
       }
 
       const onUp = () => {
         markInteracting(false)
+        // Flush final size if a RAF is still pending
+        if (resizeRafPending) {
+          useCanvasStore.getState().resizeNode(nodeId, {
+            width: latestWidth,
+            height: latestHeight
+          })
+        }
         resizeStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
