@@ -46,27 +46,6 @@ function indentBorderStyle(depth: number, isActive?: boolean): React.CSSProperti
 
 // --- Date grouping helpers (matches collab SourcesFeed pattern) ---
 
-function formatRelativeTime(isoDate?: string): string {
-  if (!isoDate) return ''
-  const date = new Date(isoDate)
-  if (isNaN(date.getTime())) return ''
-
-  const diff = Math.abs(Date.now() - date.getTime())
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-  if (hours < 24) {
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-  }
-
-  const month = date.toLocaleDateString('en-US', { month: 'short' })
-  if (days < 365) {
-    const day = date.toLocaleDateString('en-US', { day: '2-digit' })
-    return `${day} ${month}`
-  }
-  return `${month} ${date.toLocaleDateString('en-US', { year: 'numeric' })}`
-}
-
 function getDateKey(timestamp?: string): string {
   if (!timestamp) return ''
   const date = new Date(timestamp)
@@ -297,7 +276,7 @@ export const FileTree = memo(function FileTree({
 
   const settingsFontSize = useSettingsStore((s) => s.env.sidebarFontSize)
   const resolvedFont = 'var(--font-body)'
-  const showDateHeaders = sortMode === 'modified'
+  const showDateHeaders = sortMode === 'modified' || sortMode === 'modified-asc'
 
   return (
     <div data-testid="file-tree" className="file-tree text-sm select-none px-1 py-1">
@@ -549,7 +528,7 @@ function FileRow({
           {ext && <span className="file-name-text__ext">{ext}</span>}
         </span>
       )}
-      {canvasConnectionCount >= 1 ? (
+      {canvasConnectionCount >= 1 && (
         <span
           className="ml-auto flex-shrink-0"
           style={{
@@ -561,8 +540,6 @@ function FileRow({
         >
           {canvasConnectionCount}
         </span>
-      ) : (
-        node.modified && <span className="row-timestamp">{formatRelativeTime(node.modified)}</span>
       )}
     </div>
   )

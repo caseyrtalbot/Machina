@@ -16,7 +16,7 @@ import type { FlatTreeNode } from './buildFileTree'
 import type { FileContextMenuState } from './FileContextMenu'
 import { TagBrowser } from './TagBrowser'
 
-type SortMode = 'modified' | 'name' | 'type'
+type SortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
 
 interface FileAction {
   readonly actionId: string
@@ -65,11 +65,20 @@ interface SidebarProps {
 }
 
 /** Cycle through sort modes on click instead of using a native <select> */
-const SORT_CYCLE: SortMode[] = ['modified', 'name', 'type']
+const SORT_CYCLE: SortMode[] = ['modified', 'modified-asc', 'name', 'name-desc', 'type']
 const SORT_ICONS: Record<SortMode, string> = {
-  modified: 'M12 8H4M10 12H4M8 16H4M16 4H4', // lines descending
-  name: 'M4 4h16M4 9h12M4 14h8', // alpha sort
+  modified: 'M12 8H4M10 12H4M8 16H4M16 4H4', // newest first
+  'modified-asc': 'M8 8H4M10 12H4M12 16H4M16 4H4', // oldest first
+  name: 'M4 4h16M4 9h12M4 14h8', // A-Z
+  'name-desc': 'M4 4h8M4 9h12M4 14h16', // Z-A
   type: 'M4 4h16M4 9h16M4 14h16' // grouped
+}
+const SORT_LABELS: Record<SortMode, string> = {
+  modified: 'Modified (newest)',
+  'modified-asc': 'Modified (oldest)',
+  name: 'Name A\u2013Z',
+  'name-desc': 'Name Z\u2013A',
+  type: 'Type'
 }
 
 function ActionBar({
@@ -167,7 +176,7 @@ function ActionBar({
             onClick={cycleSortMode}
             className="sidebar-icon-button"
             style={{ color: colors.text.muted }}
-            title={`Sort: ${sortMode}`}
+            title={`Sort: ${SORT_LABELS[sortMode]}`}
           >
             <svg
               width="12"

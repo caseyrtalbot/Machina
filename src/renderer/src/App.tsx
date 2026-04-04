@@ -208,7 +208,9 @@ function ConnectedSidebar({
   const artifactPathById = useVaultStore((s) => s.artifactPathById)
   const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
-  const [sortMode, setSortMode] = useState<'modified' | 'name' | 'type'>('modified')
+  const [sortMode, setSortMode] = useState<
+    'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
+  >('modified')
   const [searchQuery, setSearchQuery] = useState('')
   const [vaultHistory, setVaultHistory] = useState<string[]>([])
 

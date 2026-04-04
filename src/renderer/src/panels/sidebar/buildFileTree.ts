@@ -1,4 +1,4 @@
-export type TreeSortMode = 'modified' | 'name' | 'type'
+export type TreeSortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
 
 export interface TreeFileEntry {
   readonly path: string
@@ -66,8 +66,16 @@ function compareNodes(a: IndexedTreeNode, b: IndexedTreeNode, sortMode: TreeSort
     return b.modified.localeCompare(a.modified) || a.name.localeCompare(b.name)
   }
 
+  if (sortMode === 'modified-asc') {
+    return a.modified.localeCompare(b.modified) || a.name.localeCompare(b.name)
+  }
+
   if (sortMode === 'type') {
     return a.sortType.localeCompare(b.sortType) || a.name.localeCompare(b.name)
+  }
+
+  if (sortMode === 'name-desc') {
+    return b.name.localeCompare(a.name)
   }
 
   return a.name.localeCompare(b.name)
