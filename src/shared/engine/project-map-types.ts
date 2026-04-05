@@ -76,8 +76,6 @@ export const BINARY_EXTENSIONS = new Set([
   '.otf',
   '.eot',
   '.wasm',
-  '.exe',
-  '.dll',
   '.so',
   '.dylib',
   '.pdf',

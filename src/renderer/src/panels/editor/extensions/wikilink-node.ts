@@ -83,8 +83,7 @@ export const WikilinkNode = Node.create<WikilinkNodeOptions>({
         key: new PluginKey('wikilinkClick'),
         props: {
           handleClick: (view, pos, event) => {
-            // CMD+click (Mac) or Ctrl+click (Windows/Linux)
-            if (!event.metaKey && !event.ctrlKey) return false
+            if (!event.metaKey) return false
             const node = view.state.doc.nodeAt(pos)
             if (node?.type.name !== 'wikilink') return false
             const target = node.attrs.target as string

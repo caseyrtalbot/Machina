@@ -47,7 +47,7 @@ export function NoteCard({ node }: NoteCardProps) {
 
   // CMD+click on wikilinks in static HTML
   const handleWikilinkClick = useCallback((e: React.MouseEvent) => {
-    if (!e.metaKey && !e.ctrlKey) return
+    if (!e.metaKey) return
     const el = (e.target as HTMLElement).closest('[data-wikilink-target]')
     if (!el) return
     const linkTarget = el.getAttribute('data-wikilink-target')

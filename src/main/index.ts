@@ -40,10 +40,10 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err)
 })
 
-// Resolve the user's full shell PATH for macOS packaged builds.
+// Resolve the user's full shell PATH for packaged builds.
 // Finder launches inherit launchd's minimal PATH, which excludes Homebrew,
 // nvm, pyenv, and other tools installed in the user's shell profile.
-if (process.platform === 'darwin' && app.isPackaged) {
+if (app.isPackaged) {
   try {
     const shell = process.env.SHELL || '/bin/zsh'
     const fullPath = execSync(`${shell} -l -c 'printf "%s" "$PATH"'`, {
@@ -73,13 +73,8 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 12, y: 12 },
-    // macOS vibrancy: shows blurred desktop content behind transparent regions
-    ...(process.platform === 'darwin'
-      ? {
-          vibrancy: 'under-window' as const,
-          visualEffectState: 'active' as const
-        }
-      : {}),
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -226,8 +221,7 @@ app.on('before-quit', (event) => {
   })
 })
 
+// macOS keeps apps alive when all windows are closed (reactivated via dock icon)
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  // no-op: activate handler in whenReady re-creates the window
 })

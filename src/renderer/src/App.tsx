@@ -899,11 +899,11 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   // Cmd+Shift+G: toggle Graph tab
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault()
         toggleTabView('workbench')
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'g') {
         e.preventDefault()
         toggleTabView('graph')
       }

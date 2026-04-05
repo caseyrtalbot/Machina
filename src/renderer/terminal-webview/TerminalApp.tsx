@@ -180,7 +180,7 @@ export function TerminalApp() {
         }
         return false
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      if (e.metaKey && e.key === 'f') {
         searchAddon.findNext('')
         return false
       }
