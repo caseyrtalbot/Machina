@@ -2,14 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import CodeBlock from '@tiptap/extension-code-block'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react'
-import mermaid from 'mermaid'
 
-// Configure mermaid once at module load
+// Mermaid is loaded on demand (~2MB). The module is cached after first import.
+let mermaidModule: (typeof import('mermaid'))['default'] | null = null
 let mermaidInitialized = false
 
-function ensureMermaidInit(): void {
+async function loadMermaid(): Promise<(typeof import('mermaid'))['default']> {
+  if (mermaidModule) return mermaidModule
+  const { default: m } = await import('mermaid')
+  mermaidModule = m
+  return m
+}
+
+function initMermaid(m: (typeof import('mermaid'))['default']): void {
   if (mermaidInitialized) return
-  mermaid.initialize({
+  m.initialize({
     startOnLoad: false,
     theme: 'dark',
     darkMode: true,
@@ -32,41 +39,53 @@ let renderCounter = 0
 function MermaidDiagram({ code }: { code: string }): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!code.trim() || !containerRef.current) return
+    let cancelled = false
 
-    ensureMermaidInit()
+    setLoading(true)
 
-    const id = `mermaid-${++renderCounter}`
-
-    mermaid
-      .render(id, code.trim())
-      .then(({ svg }) => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = svg
-          const svgEl = containerRef.current.querySelector('svg')
-          if (svgEl) {
-            // Extract natural dimensions from the viewBox and set them
-            // explicitly so the diagram isn't squashed into the container.
-            const vb = svgEl.getAttribute('viewBox')
-            if (vb) {
-              const parts = vb.split(/[\s,]+/)
-              const vbWidth = parseFloat(parts[2])
-              const vbHeight = parseFloat(parts[3])
-              if (vbWidth && vbHeight) {
-                svgEl.setAttribute('width', `${vbWidth}px`)
-                svgEl.setAttribute('height', `${vbHeight}px`)
-              }
+    loadMermaid()
+      .then((m) => {
+        if (cancelled) return
+        initMermaid(m)
+        const id = `mermaid-${++renderCounter}`
+        return m.render(id, code.trim())
+      })
+      .then((result) => {
+        if (cancelled || !result || !containerRef.current) return
+        containerRef.current.innerHTML = result.svg
+        const svgEl = containerRef.current.querySelector('svg')
+        if (svgEl) {
+          // Extract natural dimensions from the viewBox and set them
+          // explicitly so the diagram isn't squashed into the container.
+          const vb = svgEl.getAttribute('viewBox')
+          if (vb) {
+            const parts = vb.split(/[\s,]+/)
+            const vbWidth = parseFloat(parts[2])
+            const vbHeight = parseFloat(parts[3])
+            if (vbWidth && vbHeight) {
+              svgEl.setAttribute('width', `${vbWidth}px`)
+              svgEl.setAttribute('height', `${vbHeight}px`)
             }
-            svgEl.style.maxWidth = 'none'
           }
-          setError(null)
+          svgEl.style.maxWidth = 'none'
         }
+        setError(null)
+        setLoading(false)
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err))
+          setLoading(false)
+        }
       })
+
+    return () => {
+      cancelled = true
+    }
   }, [code])
 
   if (error) {
@@ -78,7 +97,13 @@ function MermaidDiagram({ code }: { code: string }): React.ReactElement {
     )
   }
 
-  return <div ref={containerRef} className="mermaid-diagram" />
+  return (
+    <div ref={containerRef} className="mermaid-diagram">
+      {loading && (
+        <div style={{ padding: '12px', opacity: 0.4, fontSize: '12px' }}>Loading diagram…</div>
+      )}
+    </div>
+  )
 }
 
 function MermaidCodeBlockView({ node }: ReactNodeViewProps): React.ReactElement {
