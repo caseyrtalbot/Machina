@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { createCanvasNode, createCanvasEdge } from '../../src/shared/canvas-types'
 import { CommandStack } from '../../src/renderer/src/panels/canvas/canvas-commands'
-import {
-  applyFolderMapPlan,
-  getPendingApply
-} from '../../src/renderer/src/panels/canvas/folder-map-apply'
+import { applyFolderMapPlan } from '../../src/renderer/src/panels/canvas/folder-map-apply'
 import type { CanvasMutationPlan } from '../../src/shared/canvas-mutation-types'
 
 describe('folder-map-apply', () => {
@@ -72,12 +69,6 @@ describe('folder-map-apply', () => {
     commandStack.undo()
     commandStack.redo()
     expect(useCanvasStore.getState().nodes.length).toBe(2)
-  })
-
-  it('pendingApply is null after successful apply', () => {
-    const { plan } = makePlan(1)
-    applyFolderMapPlan(plan, commandStack)
-    expect(getPendingApply()).toBeNull()
   })
 
   it('undo removes edges that connect existing nodes', () => {

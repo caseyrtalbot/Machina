@@ -70,12 +70,14 @@
     "electron-store": "^11.0.2",
     "gray-matter": "^4.0.3",
     "ignore": "^7.0.5",
+    "markdown-it": "^14.1.1",
     "mermaid": "^11.13.0",
     "minisearch": "^7.2.0",
     "node-pty": "^1.1.0",
     "p-limit": "^7.3.0",
     "pdfjs-dist": "^5.5.207",
     "pixi.js": "^8.17.1",
+    "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -98,6 +100,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
+    "glob": "^13.0.6",
     "happy-dom": "^20.8.3",
     "prettier": "^3.7.4",
     "react": "^19.2.1",

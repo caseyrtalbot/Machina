@@ -448,7 +448,8 @@ export function GraphPanel() {
     labelScale,
     edgeBrightness,
     nodeBrightness,
-    getNeighborSet
+    getNeighborSet,
+    getFocusIdx
   ])
 
   // Settings panel toggle

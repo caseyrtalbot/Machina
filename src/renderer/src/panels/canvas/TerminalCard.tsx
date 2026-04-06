@@ -131,6 +131,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
   }, [
     launchSessionId,
     node.id,
+    node.metadata?.actionId,
     node.metadata?.initialCwd,
     node.metadata?.initialCommand,
     vaultPath

@@ -120,9 +120,6 @@ export const EDGE_WEIGHT_TABLE: Readonly<Record<string, number>> = {
   'co-occurrence': 0
 }
 
-export const WIKILINK_WEIGHT = 1
-export const RECIPROCAL_BONUS = 1
-
 // --- Agent Contract ---
 
 export interface OntologyAgentInput {

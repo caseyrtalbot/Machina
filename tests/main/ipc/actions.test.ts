@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs'
 import { join, basename } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
-import glob from 'glob'
+import { globSync } from 'glob'
 import matter from 'gray-matter'
 import type { ActionDefinition } from '../../../src/shared/action-types'
 
@@ -114,7 +114,7 @@ describe('action file parsing', () => {
     writeFileSync(join(testDir, 'a.md'), '---\nname: A\ndescription: A\n---\nBody')
     writeFileSync(join(testDir, 'b.md'), '---\nname: B\ndescription: B\n---\nBody')
     writeFileSync(join(testDir, 'readme.txt'), 'not an action')
-    const files = glob.sync(join(testDir, '*.md'))
+    const files = globSync(join(testDir, '*.md'))
     expect(files.length).toBe(2)
   })
 
@@ -123,7 +123,7 @@ describe('action file parsing', () => {
     expect(existsSync(missingDir)).toBe(false)
     // The handler should return [] when directory doesn't exist
     // Simulating the guard check from the handler
-    const result = existsSync(missingDir) ? glob.sync(join(missingDir, '*.md')) : []
+    const result = existsSync(missingDir) ? globSync(join(missingDir, '*.md')) : []
     expect(result).toEqual([])
   })
 

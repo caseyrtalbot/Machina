@@ -251,7 +251,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
     } else {
       editor.commands.setContent(parsed.body)
     }
-  }, [activeNotePath, doc.content, doc.loading, loadContent, editor])
+  }, [activeNotePath, doc.content, doc.loading, loadContent, editor, isSplitPane])
 
   // Note: content pushes to DocumentManager happen directly in handleUpdate
   // and onFrontmatterChange callbacks, NOT via a useEffect. This eliminates

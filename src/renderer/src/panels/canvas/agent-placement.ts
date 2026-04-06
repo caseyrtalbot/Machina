@@ -12,9 +12,6 @@ export interface PlacementViewport {
   readonly height: number
 }
 
-/** Gap between placed cards, matches existing canvas conventions. */
-export const PLACEMENT_GAP = 40
-
 /**
  * AABB overlap check: do two axis-aligned rectangles overlap?
  * Touching edges (exactly adjacent) are NOT considered overlapping.

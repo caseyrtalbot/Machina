@@ -2,7 +2,7 @@ import type { CanvasNode } from '@shared/canvas-types'
 import { createCanvasNode } from '@shared/canvas-types'
 import type { WorkbenchSessionEvent } from '@shared/workbench-types'
 
-export interface ZoneLabel {
+interface ZoneLabel {
   readonly text: string
   readonly x: number
   readonly y: number
