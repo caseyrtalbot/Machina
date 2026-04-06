@@ -83,6 +83,13 @@ export function VaultSelector({
     <div className="relative" ref={menuRef}>
       <button
         onClick={toggle}
+        onContextMenu={(e) => {
+          if (currentPath) {
+            e.preventDefault()
+            e.stopPropagation()
+            setCtxMenu({ x: e.clientX, y: e.clientY, path: currentPath })
+          }
+        }}
         className="sidebar-vault-button"
         data-open={open ? 'true' : 'false'}
         style={{ color: colors.text.primary }}
@@ -185,7 +192,7 @@ export function VaultSelector({
         </div>
       )}
 
-      {/* Right-click context menu for removing vaults from history */}
+      {/* Right-click context menu for vault path actions */}
       {ctxMenu && (
         <div
           ref={ctxMenuRef}
@@ -215,17 +222,21 @@ export function VaultSelector({
           >
             Copy Path
           </button>
-          <div className="sidebar-popover-divider mx-3 my-1" />
-          <button
-            onClick={() => {
-              onRemoveFromHistory?.(ctxMenu.path)
-              setCtxMenu(null)
-            }}
-            className="sidebar-popover-item"
-            style={{ color: '#EF4444' }}
-          >
-            Remove from History
-          </button>
+          {ctxMenu.path !== currentPath && onRemoveFromHistory && (
+            <>
+              <div className="sidebar-popover-divider mx-3 my-1" />
+              <button
+                onClick={() => {
+                  onRemoveFromHistory(ctxMenu.path)
+                  setCtxMenu(null)
+                }}
+                className="sidebar-popover-item"
+                style={{ color: '#EF4444' }}
+              >
+                Remove from History
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
