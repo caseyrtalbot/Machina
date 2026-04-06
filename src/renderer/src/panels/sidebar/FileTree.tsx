@@ -323,7 +323,7 @@ function updateTooltipTarget(targetName: string | null) {
 
 /** Position via translate3d — stays on GPU compositor, no layout thrash. */
 function positionTooltip(x: number, y: number) {
-  getTooltip().style.transform = `translate3d(${x + 16}px, ${y + 4}px, 0)`
+  getTooltip().style.transform = `translate3d(${x}px, calc(${y}px - 100%), 0)`
 }
 
 function hideTooltip() {
