@@ -399,14 +399,18 @@ function ConnectedSidebar({
         return
       }
 
-      // Single-click only pans canvas; double-click opens in editor
-      return
+      // Single-click: open in preview tab (transient, replaced by next single-click)
+      const file = files.find((f) => f.path === path)
+      useEditorStore.getState().openPreviewTab(path, file?.title)
+      useViewStore.getState().setContentView('editor')
+      useTabStore.getState().activateTab('editor')
     },
-    [treeNodes]
+    [treeNodes, files]
   )
 
   const handleFileDoubleClick = useCallback(
     (path: string) => {
+      // Double-click: pin the tab (permanent, won't be replaced)
       const file = files.find((f) => f.path === path)
       void openEditorPath(path, file?.title)
     },

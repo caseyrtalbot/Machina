@@ -22,6 +22,8 @@ interface EditorStore {
 
   // Tabs
   readonly openTabs: readonly Tab[]
+  /** Path of the transient preview tab (single-click). Null = no preview tab. */
+  readonly previewTabPath: string | null
 
   // Navigation history
   readonly historyStack: readonly string[]
@@ -44,6 +46,10 @@ interface EditorStore {
   closeSplit: () => void
 
   openTab: (path: string, title?: string) => void
+  /** Open file in a transient preview tab. Replaced by the next preview open. */
+  openPreviewTab: (path: string, title?: string) => void
+  /** Promote the current preview tab to a permanent (pinned) tab. */
+  pinPreviewTab: () => void
   closeTab: (path: string) => void
   switchTab: (path: string) => void
   goBack: () => void
@@ -123,6 +129,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   cursorCol: 1,
   splitNotePath: null,
   openTabs: [],
+  previewTabPath: null,
   historyStack: [],
   historyIndex: -1,
   pendingScrollTarget: null,
@@ -175,9 +182,55 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       activeNotePath: path,
       isDirty: false,
       openTabs: tabs,
+      // Opening a tab explicitly always pins it
+      previewTabPath: state.previewTabPath === path ? null : state.previewTabPath,
       historyStack: history.stack,
       historyIndex: history.index
     })
+  },
+
+  openPreviewTab: (path, title) => {
+    const state = get()
+    flushIfDirty(state)
+
+    // If this file is already in a pinned tab, just switch to it
+    if (state.openTabs.some((t) => t.path === path) && state.previewTabPath !== path) {
+      const history = pushHistory(state.historyStack, state.historyIndex, path)
+      set({
+        activeNotePath: path,
+        isDirty: false,
+        historyStack: history.stack,
+        historyIndex: history.index
+      })
+      return
+    }
+
+    const resolvedTitle = title ?? titleFromPath(path)
+    // Replace the existing preview tab with this one
+    let tabs: readonly Tab[]
+    if (state.previewTabPath && state.previewTabPath !== path) {
+      tabs = state.openTabs
+        .filter((t) => t.path !== state.previewTabPath)
+        .concat([{ path, title: resolvedTitle }])
+    } else if (state.openTabs.some((t) => t.path === path)) {
+      tabs = state.openTabs
+    } else {
+      tabs = [...state.openTabs, { path, title: resolvedTitle }]
+    }
+
+    const history = pushHistory(state.historyStack, state.historyIndex, path)
+    set({
+      activeNotePath: path,
+      isDirty: false,
+      openTabs: tabs,
+      previewTabPath: path,
+      historyStack: history.stack,
+      historyIndex: history.index
+    })
+  },
+
+  pinPreviewTab: () => {
+    set({ previewTabPath: null })
   },
 
   closeTab: (path) => {
@@ -186,6 +239,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       flushIfDirty(state)
     }
     const tabs = state.openTabs.filter((t) => t.path !== path)
+    const clearPreview = state.previewTabPath === path ? null : state.previewTabPath
 
     if (state.activeNotePath === path) {
       const oldIndex = state.openTabs.findIndex((t) => t.path === path)
@@ -194,10 +248,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       set({
         openTabs: tabs,
         activeNotePath: nextTab?.path ?? null,
+        previewTabPath: clearPreview,
         isDirty: false
       })
     } else {
-      set({ openTabs: tabs })
+      set({ openTabs: tabs, previewTabPath: clearPreview })
     }
   },
 

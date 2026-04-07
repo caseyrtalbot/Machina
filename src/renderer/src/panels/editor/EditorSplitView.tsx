@@ -9,8 +9,10 @@ interface EditorSplitViewProps {
 export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
   const openTabs = useEditorStore((s) => s.openTabs)
   const activeNotePath = useEditorStore((s) => s.activeNotePath)
+  const previewTabPath = useEditorStore((s) => s.previewTabPath)
   const switchTab = useEditorStore((s) => s.switchTab)
   const closeTab = useEditorStore((s) => s.closeTab)
+  const pinPreviewTab = useEditorStore((s) => s.pinPreviewTab)
   const vaultPath = useVaultStore((s) => s.vaultPath)
 
   const showTabBar = openTabs.length > 1
@@ -41,14 +43,24 @@ export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
         <div className="editor-tab-bar" data-testid="editor-tab-bar">
           {openTabs.map((tab) => {
             const isActive = tab.path === activeNotePath
+            const isPreview = tab.path === previewTabPath
             return (
               <div
                 key={tab.path}
                 className="editor-file-tab"
                 data-active={isActive ? 'true' : 'false'}
+                data-preview={isPreview ? 'true' : undefined}
                 onClick={() => switchTab(tab.path)}
+                onDoubleClick={() => {
+                  if (isPreview) pinPreviewTab()
+                }}
               >
-                <span className="editor-file-tab__title">{tab.title}</span>
+                <span
+                  className="editor-file-tab__title"
+                  style={isPreview ? { fontStyle: 'italic' } : undefined}
+                >
+                  {tab.title}
+                </span>
                 <button
                   className="editor-file-tab__close"
                   onClick={(e) => {
