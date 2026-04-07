@@ -104,6 +104,7 @@ async function writePersist(): Promise<void> {
   const vaultPath = useVaultStore.getState().vaultPath
   if (!vaultPath) return
   const state = gatherVaultState()
+  useVaultStore.getState().setState(state)
   try {
     await window.api.vault.writeState(vaultPath, state)
   } catch (err) {
@@ -123,6 +124,7 @@ export function flushVaultState(): void {
   const vaultPath = useVaultStore.getState().vaultPath
   if (!vaultPath) return
   const state = gatherVaultState()
+  useVaultStore.getState().setState(state)
   // Fire-and-forget: best-effort persist on close (Slice 2 will add coordinated quit)
   window.api.vault
     .writeState(vaultPath, state)
