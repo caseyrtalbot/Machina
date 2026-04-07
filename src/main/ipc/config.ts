@@ -6,13 +6,21 @@ import { typedHandle } from '../typed-ipc'
 const Store = (StoreModule as { default?: typeof StoreModule }).default ?? StoreModule
 const appStore = new Store({ name: 'machina-settings' })
 
+export function readAppConfigValue<T>(key: string): T | null {
+  return (appStore.get(key, null) as T | null) ?? null
+}
+
+export function writeAppConfigValue(key: string, value: unknown): void {
+  appStore.set(key, value)
+}
+
 export function registerConfigIpc(): void {
   typedHandle('config:read', async (args) => {
-    if (args.scope === 'app') return appStore.get(args.key, null)
+    if (args.scope === 'app') return readAppConfigValue(args.key)
     return null
   })
 
   typedHandle('config:write', async (args) => {
-    if (args.scope === 'app') appStore.set(args.key, args.value)
+    if (args.scope === 'app') writeAppConfigValue(args.key, args.value)
   })
 }

@@ -256,4 +256,16 @@ describe('PtyService', () => {
     expect(mockDeleteSessionMeta).toHaveBeenCalledWith('s2')
     expect(service.getActiveSessions()).toHaveLength(0)
   })
+
+  it('shutdown() kills sessions without firing exit callbacks', () => {
+    const onExit = vi.fn()
+    service.setCallbacks(vi.fn(), onExit)
+    service.create('s1', '/tmp')
+
+    service.shutdown()
+
+    expect(pty.kill).toHaveBeenCalledOnce()
+    expect(service.getActiveSessions()).toHaveLength(0)
+    expect(onExit).not.toHaveBeenCalled()
+  })
 })

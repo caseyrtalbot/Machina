@@ -122,15 +122,15 @@ describe('ShellService', () => {
     expect(service.getPtyService()).toBeDefined()
   })
 
-  it('shutdown marks sessions as disconnected', () => {
+  it('shutdown kills active PTYs', async () => {
     const service = new ShellService()
     service.setCallbacks(
       () => {},
       () => {}
     )
     service.create('/tmp')
-    // Should not throw
-    service.shutdown()
+    await service.shutdown()
+    expect(mockPty.kill).toHaveBeenCalled()
   })
 
   it('killAll kills all sessions', () => {

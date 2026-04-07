@@ -1,11 +1,11 @@
-import { app, shell, BrowserWindow, session } from 'electron'
+import { app, shell, BrowserWindow, session, screen } from 'electron'
 import { execSync } from 'child_process'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerFilesystemIpc, onVaultReady } from './ipc/filesystem'
-import { registerWatcherIpc } from './ipc/watcher'
+import { registerWatcherIpc, getVaultWatcher } from './ipc/watcher'
 import { registerShellIpc, getShellService } from './ipc/shell'
-import { registerConfigIpc } from './ipc/config'
+import { registerConfigIpc, readAppConfigValue, writeAppConfigValue } from './ipc/config'
 
 import { registerProjectIpc, getProjectWatcher, getSessionTailer } from './ipc/workbench'
 import { registerDocumentIpc, getDocumentManager } from './ipc/documents'
@@ -24,6 +24,14 @@ import { ClaudeStatusService } from './services/claude-status-service'
 import { typedHandle } from './typed-ipc'
 import { getMainWindow, setMainWindow } from './window-registry'
 import { QuitCoordinator } from './services/quit-coordinator'
+import { installMainLogger } from './services/main-logger'
+import { attachExternalNavigationGuards } from './services/external-navigation'
+import {
+  DEFAULT_MAIN_WINDOW_STATE,
+  captureWindowState,
+  resolveInitialWindowState,
+  type WindowState
+} from './services/window-state'
 
 const PROD_CSP = [
   "default-src 'self'",
@@ -34,10 +42,35 @@ const PROD_CSP = [
   "worker-src 'self' blob:"
 ].join('; ')
 
-// Prevent EPIPE from node-pty/shell service from crashing the app
+const APP_ID = 'com.caseytalbot.machina'
+const WINDOW_STATE_KEY = 'window.bounds'
+const WINDOW_STATE_SAVE_DEBOUNCE_MS = 300
+
+installMainLogger()
+
+function normalizeProcessError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error))
+}
+
+function shouldIgnoreProcessError(error: Error): boolean {
+  return error.message === 'write EPIPE'
+}
+
+function reportProcessError(kind: 'uncaughtException' | 'unhandledRejection', error: unknown): void {
+  const normalized = normalizeProcessError(error)
+  if (kind === 'uncaughtException' && shouldIgnoreProcessError(normalized)) {
+    return
+  }
+
+  console.error(`[main:${kind}]`, normalized)
+}
+
 process.on('uncaughtException', (err) => {
-  if (err.message === 'write EPIPE') return
-  console.error('Uncaught exception:', err)
+  reportProcessError('uncaughtException', err)
+})
+
+process.on('unhandledRejection', (reason) => {
+  reportProcessError('unhandledRejection', reason)
 })
 
 // Resolve the user's full shell PATH for packaged builds.
@@ -66,9 +99,18 @@ const quitCoordinator = new QuitCoordinator()
 const claudeStatus = new ClaudeStatusService()
 
 function createWindow(): BrowserWindow {
+  const savedWindowState = readAppConfigValue<WindowState>(WINDOW_STATE_KEY)
+  const initialWindowState = resolveInitialWindowState(
+    savedWindowState,
+    screen.getAllDisplays(),
+    DEFAULT_MAIN_WINDOW_STATE
+  )
+
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: initialWindowState.width,
+    height: initialWindowState.height,
+    ...(typeof initialWindowState.x === 'number' ? { x: initialWindowState.x } : {}),
+    ...(typeof initialWindowState.y === 'number' ? { y: initialWindowState.y } : {}),
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
@@ -85,8 +127,37 @@ function createWindow(): BrowserWindow {
 
   setMainWindow(window)
 
+  let persistBoundsTimeout: ReturnType<typeof setTimeout> | null = null
+
+  const persistWindowState = (): void => {
+    if (window.isDestroyed()) return
+    writeAppConfigValue(WINDOW_STATE_KEY, captureWindowState(window))
+  }
+
+  const schedulePersistWindowState = (): void => {
+    if (persistBoundsTimeout) {
+      clearTimeout(persistBoundsTimeout)
+    }
+
+    persistBoundsTimeout = setTimeout(() => {
+      persistBoundsTimeout = null
+      if (window.isDestroyed() || window.isMinimized()) return
+      persistWindowState()
+    }, WINDOW_STATE_SAVE_DEBOUNCE_MS)
+  }
+
   window.on('ready-to-show', () => {
     window.show()
+  })
+
+  window.on('move', schedulePersistWindowState)
+  window.on('resize', schedulePersistWindowState)
+  window.on('close', () => {
+    if (persistBoundsTimeout) {
+      clearTimeout(persistBoundsTimeout)
+      persistBoundsTimeout = null
+    }
+    persistWindowState()
   })
 
   window.on('closed', () => {
@@ -95,22 +166,14 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  window.webContents.setWindowOpenHandler((details) => {
-    try {
-      const url = new URL(details.url)
-      if (url.protocol === 'https:' || url.protocol === 'http:') {
-        shell.openExternal(details.url)
-      }
-    } catch {
-      // Invalid URL, ignore
-    }
-    return { action: 'deny' }
-  })
-
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     window.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     window.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  if (initialWindowState.isMaximized) {
+    window.maximize()
   }
 
   return window
@@ -131,10 +194,17 @@ function registerWindowIpc(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId(APP_ID)
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+  })
+
+  app.on('web-contents-created', (_event, contents) => {
+    attachExternalNavigationGuards(contents, {
+      rendererUrl: process.env['ELECTRON_RENDERER_URL'],
+      openExternal: (url) => shell.openExternal(url)
+    })
   })
 
   if (!is.dev) {
@@ -193,32 +263,66 @@ app.whenReady().then(() => {
 
 // Coordinated quit: block quit → signal renderer to flush vault state → flush documents → quit
 let quitCleanupDone = false
+let quitCleanupPromise: Promise<void> | null = null
+
+function logCleanupResult(step: string, result: PromiseSettledResult<void>): void {
+  if (result.status === 'rejected') {
+    console.error(`[quit] ${step} failed`, result.reason)
+  }
+}
 
 app.on('before-quit', (event) => {
   if (quitCleanupDone) return // Cleanup already done, let quit proceed
 
   event.preventDefault() // Block quit until async cleanup completes
+  if (quitCleanupPromise) return
 
-  const cleanup = async (): Promise<void> => {
+  quitCleanupPromise = (async (): Promise<void> => {
     // Step 1: Signal renderer to flush vault state, wait up to 500ms
     await quitCoordinator.requestRendererFlush(() => getMainWindow(), 500)
 
     // Step 2: Flush all dirty documents
-    await getDocumentManager().flushAll()
+    try {
+      await getDocumentManager().flushAll()
+    } catch (err) {
+      console.error('[quit] document flush failed', err)
+    }
 
     // Step 3: Clean up services
-    claudeStatus.stop()
-    stopAgentServices()
-    await mcpLifecycle.stop()
-    getShellService().shutdown()
-    getProjectWatcher().stop()
-    getSessionTailer()?.stop()
-  }
+    try {
+      claudeStatus.stop()
+    } catch (err) {
+      console.error('[quit] claude status stop failed', err)
+    }
 
-  cleanup().finally(() => {
-    quitCleanupDone = true
-    app.quit()
-  })
+    try {
+      stopAgentServices()
+    } catch (err) {
+      console.error('[quit] agent service stop failed', err)
+    }
+
+    const cleanupResults = await Promise.allSettled([
+      mcpLifecycle.stop(),
+      getShellService().shutdown(),
+      getVaultWatcher().stop(),
+      getProjectWatcher().stop(),
+      getSessionTailer()?.stop() ?? Promise.resolve()
+    ])
+
+    logCleanupResult('mcp stop', cleanupResults[0])
+    logCleanupResult('shell shutdown', cleanupResults[1])
+    logCleanupResult('vault watcher stop', cleanupResults[2])
+    logCleanupResult('project watcher stop', cleanupResults[3])
+    logCleanupResult('session tailer stop', cleanupResults[4])
+  })()
+    .catch((err) => {
+      console.error('[quit] cleanup failed', err)
+    })
+    .finally(() => {
+      quitCleanupDone = true
+      quitCleanupPromise = null
+      app.quit()
+    })
 })
 
 // macOS keeps apps alive when all windows are closed (reactivated via dock icon)

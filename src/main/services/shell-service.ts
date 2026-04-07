@@ -92,11 +92,10 @@ export class ShellService {
 
   /**
    * Graceful shutdown on app quit.
-   * Marks all sessions as disconnected. PTY processes are cleaned up
-   * when the main Electron process exits.
+   * Terminates child PTYs explicitly so shutdown does not rely on process exit.
    */
-  shutdown(): void {
-    this.pty.detachAll()
+  async shutdown(): Promise<void> {
+    this.pty.shutdown()
   }
 
   /**

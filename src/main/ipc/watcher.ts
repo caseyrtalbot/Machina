@@ -45,3 +45,7 @@ export function registerWatcherIpc(): void {
     await watcher.stop()
   })
 }
+
+export function getVaultWatcher(): VaultWatcher {
+  return watcher
+}

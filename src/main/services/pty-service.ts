@@ -55,6 +55,7 @@ interface ManagedSession {
 
 export class PtyService {
   private readonly sessions = new Map<string, ManagedSession>()
+  private readonly closingSessions = new Map<string, boolean>()
   private onData: DataCallback = () => {}
   private onExit: ExitCallback = () => {}
 
@@ -121,7 +122,11 @@ export class PtyService {
     ptyProcess.onExit(({ exitCode }) => {
       this.sessions.delete(sessionId)
       deleteSessionMeta(sessionId)
-      this.onExit(sessionId, exitCode)
+      const shouldNotifyExit = this.closingSessions.get(sessionId) ?? true
+      this.closingSessions.delete(sessionId)
+      if (shouldNotifyExit) {
+        this.onExit(sessionId, exitCode)
+      }
     })
 
     // Persist metadata for discover-on-startup
@@ -233,13 +238,22 @@ export class PtyService {
     }
   }
 
-  kill(sessionId: string): void {
+  kill(sessionId: string, notifyExit = true): void {
     const session = this.sessions.get(sessionId)
     if (!session) return
 
     this.sessions.delete(sessionId)
     deleteSessionMeta(sessionId)
-    session.pty.kill()
+    this.closingSessions.set(sessionId, notifyExit)
+
+    try {
+      session.pty.kill()
+    } catch {
+      this.closingSessions.delete(sessionId)
+      if (notifyExit) {
+        this.onExit(sessionId, 0)
+      }
+    }
   }
 
   getProcessName(sessionId: string): string | null {
@@ -277,8 +291,17 @@ export class PtyService {
 
   /**
    * Graceful shutdown on app quit.
-   * Mark all sessions as disconnected. The PTY processes will be cleaned
-   * up when the main Electron process exits.
+   * Explicitly terminate PTYs so app exit does not rely on process teardown.
+   */
+  shutdown(): void {
+    for (const id of [...this.sessions.keys()]) {
+      this.kill(id, false)
+    }
+  }
+
+  /**
+   * Mark all sessions as disconnected without killing them.
+   * Used by reconnect/discovery flows.
    */
   detachAll(): void {
     for (const session of this.sessions.values()) {
@@ -290,11 +313,9 @@ export class PtyService {
    * Destroy everything. User-initiated "kill all sessions".
    */
   killAll(): void {
-    for (const [id, session] of this.sessions) {
-      session.pty.kill()
-      deleteSessionMeta(id)
+    for (const id of [...this.sessions.keys()]) {
+      this.kill(id, true)
     }
-    this.sessions.clear()
   }
 }
 
