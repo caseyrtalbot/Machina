@@ -14,8 +14,10 @@ import type { ArtifactOrigin } from './origin-utils'
 import type { SystemArtifactKind } from '@shared/system-artifacts'
 import type { FlatTreeNode } from './buildFileTree'
 import type { FileContextMenuState } from './FileContextMenu'
+import { useUiStore } from '../../store/ui-store'
 import { TagBrowser } from './TagBrowser'
 import { DailyNoteSection } from './DailyNoteSection'
+import { BookmarksList } from './BookmarksList'
 
 type SortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
 
@@ -350,6 +352,10 @@ export function Sidebar({
         useSidebarSelectionStore.getState().clearAgentModified(path)
         return
       }
+      if (actionId === 'toggle-bookmark') {
+        useUiStore.getState().toggleBookmark(path)
+        return
+      }
       const node = nodes.find((n) => n.path === path)
       onFileAction?.({ actionId, path, isDirectory: node?.isDirectory ?? false })
     },
@@ -431,6 +437,7 @@ export function Sidebar({
         />
       </div>
       {onOpenDailyNote && <DailyNoteSection onOpenDate={onOpenDailyNote} />}
+      <BookmarksList activeFilePath={activeFilePath} onFileSelect={onFileSelect} />
       {!filesCollapsed && (
         <>
           <TagBrowser />

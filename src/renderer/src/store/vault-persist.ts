@@ -8,7 +8,8 @@ import { useViewStore } from './view-store'
 const DEFAULT_UI_STATE: UiPersistedState = {
   backlinkCollapsed: {},
   dismissedGhosts: [],
-  outlineVisible: false
+  outlineVisible: false,
+  bookmarkedPaths: []
 }
 
 let uiState: UiPersistedState = { ...DEFAULT_UI_STATE }

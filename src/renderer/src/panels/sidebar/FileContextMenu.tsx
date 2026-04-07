@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 
 import { colors, transitions, floatingPanel } from '../../design/tokens'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
+import { useUiStore } from '../../store/ui-store'
 
 interface ContextMenuAction {
   readonly id: string
@@ -51,16 +52,24 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
   const menuRef = useRef<HTMLDivElement>(null)
   const agentModifiedPaths = useSidebarSelectionStore((s) => s.agentModifiedPaths)
 
+  const isBookmarked = useUiStore((s) => (state ? s.bookmarkedPaths.includes(state.path) : false))
+
   const actions = useMemo(() => {
     if (state?.isDirectory) return FOLDER_ACTIONS
+    const bookmarkAction: ContextMenuAction = {
+      id: 'toggle-bookmark',
+      label: isBookmarked ? 'Remove Bookmark' : 'Bookmark',
+      shortcut: '⇧⌘D'
+    }
+    const base: readonly ContextMenuAction[] = [bookmarkAction, ...FILE_ACTIONS]
     const isAgentModified = state ? agentModifiedPaths.has(state.path) : false
-    if (!isAgentModified) return FILE_ACTIONS
+    if (!isAgentModified) return base
     return [
-      ...FILE_ACTIONS.slice(0, -1),
+      ...base.slice(0, -1),
       { id: 'mark-reviewed', label: 'Mark as Reviewed', separator: true },
-      FILE_ACTIONS[FILE_ACTIONS.length - 1]
+      base[base.length - 1]
     ]
-  }, [state, agentModifiedPaths])
+  }, [state, agentModifiedPaths, isBookmarked])
 
   // Close on click outside or Escape
   useEffect(() => {

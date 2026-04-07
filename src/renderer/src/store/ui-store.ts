@@ -5,6 +5,7 @@ interface UiStore {
   readonly backlinkCollapsed: Readonly<Record<string, boolean>>
   readonly dismissedGhosts: readonly string[]
   readonly outlineVisible: boolean
+  readonly bookmarkedPaths: readonly string[]
 
   getBacklinkCollapsed: (notePath: string) => boolean
   toggleBacklinkCollapsed: (notePath: string) => void
@@ -12,10 +13,13 @@ interface UiStore {
   dismissGhost: (id: string) => void
   undismissGhost: (id: string) => void
   isGhostDismissed: (id: string) => boolean
+  toggleBookmark: (path: string) => void
+  isBookmarked: (path: string) => boolean
   rehydrate: (
     backlinkCollapsed: Record<string, boolean>,
     dismissedGhosts: readonly string[],
-    outlineVisible: boolean
+    outlineVisible: boolean,
+    bookmarkedPaths: readonly string[]
   ) => void
 }
 
@@ -23,6 +27,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   backlinkCollapsed: {},
   dismissedGhosts: [],
   outlineVisible: false,
+  bookmarkedPaths: [],
 
   getBacklinkCollapsed: (notePath) => get().backlinkCollapsed[notePath] ?? true,
 
@@ -55,8 +60,22 @@ export const useUiStore = create<UiStore>((set, get) => ({
 
   isGhostDismissed: (id) => get().dismissedGhosts.includes(id),
 
-  rehydrate: (backlinkCollapsed, dismissedGhosts, outlineVisible) => {
-    set({ backlinkCollapsed, dismissedGhosts: [...dismissedGhosts], outlineVisible })
+  toggleBookmark: (path) => {
+    const current = get().bookmarkedPaths
+    const next = current.includes(path) ? current.filter((p) => p !== path) : [...current, path]
+    set({ bookmarkedPaths: next })
+    updateUiState({ bookmarkedPaths: next })
+  },
+
+  isBookmarked: (path) => get().bookmarkedPaths.includes(path),
+
+  rehydrate: (backlinkCollapsed, dismissedGhosts, outlineVisible, bookmarkedPaths) => {
+    set({
+      backlinkCollapsed,
+      dismissedGhosts: [...dismissedGhosts],
+      outlineVisible,
+      bookmarkedPaths: [...bookmarkedPaths]
+    })
   }
 }))
 
@@ -71,6 +90,7 @@ export function rehydrateUiStore(): void {
     .rehydrate(
       persisted.backlinkCollapsed ?? {},
       persisted.dismissedGhosts ?? [],
-      persisted.outlineVisible ?? false
+      persisted.outlineVisible ?? false,
+      persisted.bookmarkedPaths ?? []
     )
 }

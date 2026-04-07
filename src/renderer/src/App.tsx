@@ -712,6 +712,14 @@ const BUILT_IN_COMMANDS: CommandItem[] = [
     keywords: ['outline', 'headings', 'toc', 'table of contents']
   },
   {
+    id: 'cmd:toggle-bookmark',
+    label: 'Toggle Bookmark',
+    category: 'command',
+    shortcut: '\u21e7\u2318D',
+    description: 'Bookmark or unbookmark the current note.',
+    keywords: ['bookmark', 'star', 'pin', 'favorite']
+  },
+  {
     id: 'cmd:open-settings',
     label: 'Open Settings',
     category: 'command',
@@ -864,6 +872,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       }
     }
   }, [artifacts, artifactPathById])
+  const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const contentView = useViewStore((s) => s.contentView)
   const setContentView = useViewStore((s) => s.setContentView)
   const mode = useEditorStore((s) => s.mode)
@@ -999,7 +1008,9 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   // Cmd+Shift+P: toggle Workbench tab
   // Cmd+Shift+G: toggle Graph tab
   // Cmd+Shift+O: toggle Outline panel
+  // Cmd+Shift+D: toggle Bookmark on current note
   const toggleOutline = useUiStore((s) => s.toggleOutline)
+  const toggleBookmark = useUiStore((s) => s.toggleBookmark)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey || !e.shiftKey) return
@@ -1013,11 +1024,14 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       } else if (key === 'o') {
         e.preventDefault()
         toggleOutline()
+      } else if (key === 'd') {
+        e.preventDefault()
+        if (activeNotePath) toggleBookmark(activeNotePath)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [toggleTabView, toggleOutline])
+  }, [toggleTabView, toggleOutline, toggleBookmark, activeNotePath])
 
   const artifactById = useMemo(
     () => new Map(artifacts.map((artifact) => [artifact.id, artifact])),
@@ -1218,6 +1232,9 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         case 'cmd:toggle-outline':
           toggleOutline()
           break
+        case 'cmd:toggle-bookmark':
+          if (activeNotePath) toggleBookmark(activeNotePath)
+          break
         case 'cmd:open-settings':
           setSettingsOpen(true)
           break
@@ -1302,6 +1319,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       toggleView,
       toggleSourceMode,
       toggleOutline,
+      toggleBookmark,
+      activeNotePath,
       toggleSidebar,
       setSettingsOpen,
       vaultPath,
