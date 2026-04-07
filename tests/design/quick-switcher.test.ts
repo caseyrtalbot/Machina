@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { fuzzyMatch } from '../../src/renderer/src/design/components/CommandPalette'
+import { useEditorStore } from '../../src/renderer/src/store/editor-store'
 
 // QuickSwitcher reuses fuzzyMatch from CommandPalette.
 // These tests cover the prioritized ordering logic and fuzzy search integration.
@@ -67,5 +68,74 @@ describe('recent files tracking', () => {
     const MAX = 50
     const big = Array.from({ length: 100 }, (_, i) => `/note-${i}.md`)
     expect(big.slice(0, MAX)).toHaveLength(50)
+  })
+})
+
+describe('open tab reactivity', () => {
+  beforeEach(() => {
+    useEditorStore.setState(useEditorStore.getInitialState())
+  })
+
+  it('openTabs selector updates when tabs change without activeNotePath changing', () => {
+    // Simulate: activeNotePath stays the same, but a background tab is opened.
+    // The bug was that openTabPaths used getState() snapshot inside useMemo
+    // with [activeNotePath] dep, so it went stale when only tabs changed.
+    //
+    // This test verifies the store-level contract: openTabs is a distinct
+    // slice that changes independently of activeNotePath.
+
+    // Start with one tab open and an active note
+    useEditorStore.setState({
+      activeNotePath: '/vault/note-a.md',
+      openTabs: [{ path: '/vault/note-a.md', title: 'Note A' }]
+    })
+
+    const stateBeforeTabOpen = useEditorStore.getState()
+    const pathsBefore = stateBeforeTabOpen.openTabs.map((t) => t.path)
+    expect(pathsBefore).toEqual(['/vault/note-a.md'])
+
+    // Open a background tab without changing activeNotePath
+    useEditorStore.setState({
+      openTabs: [
+        { path: '/vault/note-a.md', title: 'Note A' },
+        { path: '/vault/note-b.md', title: 'Note B' }
+      ]
+    })
+
+    const stateAfterTabOpen = useEditorStore.getState()
+
+    // activeNotePath did NOT change
+    expect(stateAfterTabOpen.activeNotePath).toBe('/vault/note-a.md')
+
+    // But openTabs DID change -- a reactive subscription to openTabs
+    // would see this, while a getState() snapshot gated on activeNotePath would not
+    const pathsAfter = stateAfterTabOpen.openTabs.map((t) => t.path)
+    expect(pathsAfter).toEqual(['/vault/note-a.md', '/vault/note-b.md'])
+
+    // The openTabs reference itself changed (immutable update)
+    expect(stateAfterTabOpen.openTabs).not.toBe(stateBeforeTabOpen.openTabs)
+  })
+
+  it('openTabs selector updates when a background tab is closed', () => {
+    useEditorStore.setState({
+      activeNotePath: '/vault/note-a.md',
+      openTabs: [
+        { path: '/vault/note-a.md', title: 'Note A' },
+        { path: '/vault/note-b.md', title: 'Note B' },
+        { path: '/vault/note-c.md', title: 'Note C' }
+      ]
+    })
+
+    // Close a background tab without changing activeNotePath
+    useEditorStore.setState({
+      openTabs: [
+        { path: '/vault/note-a.md', title: 'Note A' },
+        { path: '/vault/note-c.md', title: 'Note C' }
+      ]
+    })
+
+    const state = useEditorStore.getState()
+    expect(state.activeNotePath).toBe('/vault/note-a.md')
+    expect(state.openTabs.map((t) => t.path)).toEqual(['/vault/note-a.md', '/vault/note-c.md'])
   })
 })

@@ -1190,11 +1190,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   ])
 
   const bookmarkedPaths = useUiStore((s) => s.bookmarkedPaths)
-  const openTabPaths = useMemo(
-    () => useEditorStore.getState().openTabs.map((t) => t.path),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeNotePath change signals tab list may have changed
-    [activeNotePath]
-  )
+  const openTabs = useEditorStore((s) => s.openTabs)
+  const openTabPaths = useMemo(() => openTabs.map((t) => t.path), [openTabs])
   const vaultState = useVaultStore((s) => s.state)
   const recentPaths = useMemo(() => vaultState?.recentFiles ?? [], [vaultState])
 
