@@ -1,11 +1,14 @@
 import { useState, useMemo, useCallback } from 'react'
+import { FileText } from '@phosphor-icons/react'
 import { colors } from '../../design/tokens'
 import { useSettingsStore } from '../../store/settings-store'
 import { useVaultStore } from '../../store/vault-store'
-import { extractDailyNoteDates, localDateStr } from '../../utils/daily-notes'
+import { extractDailyNoteDates, localDateStr, dailyNotePath } from '../../utils/daily-notes'
 
 interface DailyNoteSectionProps {
   onOpenDate: (dateStr: string) => void
+  activeFilePath: string | null
+  onFileSelect: (path: string) => void
 }
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const
@@ -32,7 +35,11 @@ function formatMonthYear(year: number, month: number): string {
   return `${months[month]} ${year}`
 }
 
-export function DailyNoteSection({ onOpenDate }: DailyNoteSectionProps) {
+export function DailyNoteSection({
+  onOpenDate,
+  activeFilePath,
+  onFileSelect
+}: DailyNoteSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [viewDate, setViewDate] = useState(() => new Date())
 
@@ -47,6 +54,21 @@ export function DailyNoteSection({ onOpenDate }: DailyNoteSectionProps) {
   )
 
   const todayStr = localDateStr()
+
+  // Daily note files for the viewed month, pinned below calendar
+  const pinnedNotes = useMemo(() => {
+    if (!vaultPath) return []
+    return Array.from(noteDates)
+      .filter((d) => {
+        const y = viewDate.getFullYear()
+        const m = viewDate.getMonth()
+        const prefix = `${y}-${String(m + 1).padStart(2, '0')}-`
+        return d.startsWith(prefix)
+      })
+      .sort()
+      .reverse()
+      .map((d) => ({ dateStr: d, path: dailyNotePath(vaultPath, dailyNoteFolder, d) }))
+  }, [noteDates, vaultPath, dailyNoteFolder, viewDate])
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
@@ -164,7 +186,7 @@ export function DailyNoteSection({ onOpenDate }: DailyNoteSectionProps) {
               return (
                 <button
                   key={dateStr}
-                  onClick={() => handleDayClick(day)}
+                  onDoubleClick={() => handleDayClick(day)}
                   style={{
                     background: isToday ? '#ffffff' : 'none',
                     border: 'none',
@@ -209,7 +231,7 @@ export function DailyNoteSection({ onOpenDate }: DailyNoteSectionProps) {
             className="w-full mt-1.5"
             style={{
               background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.14)',
               borderRadius: '4px',
               color: colors.text.secondary,
               cursor: 'pointer',
@@ -220,6 +242,42 @@ export function DailyNoteSection({ onOpenDate }: DailyNoteSectionProps) {
           >
             Today
           </button>
+
+          {/* Pinned daily note files for viewed month */}
+          {vaultPath && pinnedNotes.length > 0 && (
+            <div className="mt-1.5">
+              {pinnedNotes.map(({ dateStr: d, path }) => {
+                const isActive = activeFilePath === path
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    className="file-row-hover flex items-center gap-1.5 w-full text-left py-[2px]"
+                    data-active={isActive || undefined}
+                    onClick={() => onFileSelect(path)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      paddingLeft: 24,
+                      fontSize: 'var(--env-sidebar-font-size)'
+                    }}
+                  >
+                    <FileText size={14} color="#56b6c2" weight="duotone" />
+                    <span
+                      style={{
+                        color: isActive ? colors.text.primary : colors.text.secondary,
+                        fontSize: 'var(--env-sidebar-font-size)'
+                      }}
+                    >
+                      {d}
+                    </span>
+                    <span className="file-name-text__ext">.md</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

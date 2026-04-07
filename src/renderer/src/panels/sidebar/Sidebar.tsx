@@ -436,7 +436,13 @@ export function Sidebar({
           onSelect={onSystemArtifactSelect}
         />
       </div>
-      {onOpenDailyNote && <DailyNoteSection onOpenDate={onOpenDailyNote} />}
+      {onOpenDailyNote && (
+        <DailyNoteSection
+          onOpenDate={onOpenDailyNote}
+          activeFilePath={activeFilePath}
+          onFileSelect={onFileSelect}
+        />
+      )}
       <BookmarksList activeFilePath={activeFilePath} onFileSelect={onFileSelect} />
       {!filesCollapsed && (
         <>
