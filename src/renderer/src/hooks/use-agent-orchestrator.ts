@@ -61,7 +61,7 @@ export function useAgentOrchestrator(
   }, [])
 
   const trigger = useCallback(
-    async (action: AgentActionName) => {
+    async (action: AgentActionName, userPrompt?: string) => {
       // Single agent lock — ref is always current, no stale closure risk
       if (phaseRef.current !== 'idle') return
 
@@ -77,7 +77,8 @@ export function useAgentOrchestrator(
       // For challenge/emerge with no selection, use vault-scope context
       // instead of sending empty card arrays
       const useVaultScope =
-        (action === 'challenge' || action === 'emerge') && selectedNodeIds.size === 0
+        (action === 'challenge' || action === 'emerge' || action === 'ask') &&
+        selectedNodeIds.size === 0
 
       const context = useVaultScope
         ? (() => {
@@ -106,7 +107,7 @@ export function useAgentOrchestrator(
         : extractAgentContext(action, nodes, edges, selectedNodeIds, viewport, containerSize)
 
       try {
-        const response = await window.api.agentAction.compute({ action, context })
+        const response = await window.api.agentAction.compute({ action, context, userPrompt })
 
         if ('error' in response) {
           setPhase({
