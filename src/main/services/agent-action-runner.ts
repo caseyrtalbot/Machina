@@ -294,7 +294,14 @@ const ACTION_INSTRUCTIONS: Record<AgentActionName, string> = {
     'metadata field as an array of the source card titles (e.g. {"sources": ["Paper A", "Paper B"]}). ' +
     'Set metadata.origin to "agent". Position new cards near their source cards, offset to form a ' +
     'visible cluster. Connect new articles to their sources with edges, and to each other where ' +
-    'concepts relate.'
+    'concepts relate.',
+
+  ask:
+    'You are a thinking partner working on a spatial canvas. The user has a question ' +
+    'or instruction about the cards in view. Respond by creating new cards, adding edges, ' +
+    'or reorganizing existing cards as appropriate. Your response should materialize on ' +
+    'the canvas as spatial objects the user can grab and build on, not as a text reply ' +
+    'in a chat window. Set metadata.origin to "agent" on new cards.'
 }
 
 function formatCards(context: AgentContext): string {
@@ -334,7 +341,11 @@ const VAULT_SCOPE_PREAMBLE =
   'unresolved references (ghosts). Identify the most important areas to address and produce your ' +
   'output as new cards positioned in open canvas space.\n\n'
 
-export function buildPrompt(action: AgentActionName, context: AgentContext): string {
+export function buildPrompt(
+  action: AgentActionName,
+  context: AgentContext,
+  userPrompt?: string
+): string {
   const instructions = context.vaultScope
     ? VAULT_SCOPE_PREAMBLE + ACTION_INSTRUCTIONS[action]
     : ACTION_INSTRUCTIONS[action]
@@ -346,7 +357,7 @@ export function buildPrompt(action: AgentActionName, context: AgentContext): str
   return `# Canvas Agent: ${action}
 
 ${instructions}
-
+${userPrompt ? `\n## User Prompt\n\n${userPrompt}\n` : ''}
 ## Selected Cards
 
 ${cards}
@@ -448,7 +459,7 @@ export async function runAgentAction(
   callClaudeFn: CallClaudeFn = callClaude
 ): Promise<AgentActionResponse> {
   try {
-    const prompt = buildPrompt(request.action, request.context)
+    const prompt = buildPrompt(request.action, request.context, request.userPrompt)
     const response = await callClaudeFn(prompt)
     const parsed = extractJsonFromResponse(response)
 

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   extractJsonFromResponse,
   validateAgentOps,
@@ -189,11 +189,55 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('add-node')
   })
 
-  it('builds prompts for all four actions', () => {
-    for (const action of ['challenge', 'emerge', 'organize', 'tidy'] as const) {
+  it('builds prompts for all actions', () => {
+    for (const action of ['challenge', 'emerge', 'organize', 'tidy', 'compile', 'ask'] as const) {
       const prompt = buildPrompt(action, { ...minimalContext, action })
       expect(prompt.length).toBeGreaterThan(100)
     }
+  })
+})
+
+describe('buildPrompt with ask action', () => {
+  const minimalContext: AgentContext = {
+    action: 'challenge',
+    selectedCards: [
+      {
+        id: 'a',
+        type: 'text',
+        title: 'Test Card',
+        body: 'Some content here',
+        tags: ['idea'],
+        position: { x: 0, y: 0 },
+        size: { width: 200, height: 100 }
+      }
+    ],
+    neighbors: [],
+    edges: [],
+    canvasMeta: {
+      viewportBounds: { x: 0, y: 0, width: 1200, height: 800 },
+      totalCardCount: 1
+    }
+  }
+
+  it('includes user prompt section when userPrompt is provided', () => {
+    const prompt = buildPrompt(
+      'ask',
+      { ...minimalContext, action: 'ask' },
+      'what is the tension here?'
+    )
+    expect(prompt).toContain('## User Prompt')
+    expect(prompt).toContain('what is the tension here?')
+  })
+
+  it('omits user prompt section when userPrompt is absent', () => {
+    const prompt = buildPrompt('ask', { ...minimalContext, action: 'ask' })
+    expect(prompt).not.toContain('## User Prompt')
+  })
+
+  it('includes ask instructions', () => {
+    const prompt = buildPrompt('ask', { ...minimalContext, action: 'ask' }, 'test')
+    expect(prompt).toContain('thinking partner')
+    expect(prompt).toContain('spatial canvas')
   })
 })
 
@@ -262,5 +306,36 @@ describe('runAgentAction', () => {
     if ('plan' in result) {
       expect(result.plan.ops).toHaveLength(0)
     }
+  })
+})
+
+describe('runAgentAction with ask', () => {
+  it('passes userPrompt through to prompt builder', async () => {
+    const mockClaude = vi.fn().mockResolvedValue('```json\n{"ops":[]}\n```')
+    const askContext: AgentContext = {
+      action: 'ask',
+      selectedCards: [
+        {
+          id: 'a',
+          type: 'text',
+          title: 'Test Card',
+          body: 'Content',
+          tags: [],
+          position: { x: 0, y: 0 },
+          size: { width: 200, height: 100 }
+        }
+      ],
+      neighbors: [],
+      edges: [],
+      canvasMeta: {
+        viewportBounds: { x: 0, y: 0, width: 1200, height: 800 },
+        totalCardCount: 1
+      }
+    }
+    await runAgentAction(
+      { action: 'ask', context: askContext, userPrompt: 'explain this' },
+      mockClaude
+    )
+    expect(mockClaude).toHaveBeenCalledWith(expect.stringContaining('explain this'))
   })
 })
