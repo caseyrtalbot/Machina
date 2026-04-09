@@ -13,7 +13,10 @@ vi.mock('../../../store/vault-store', () => ({
 
 vi.mock('../../../store/canvas-store', () => ({
   useCanvasStore: vi.fn((selector) => {
-    const state = { selectedNodeIds: new Set<string>() }
+    const state = {
+      selectedNodeIds: new Set<string>(),
+      nodes: [{ id: 'n1' }]
+    }
     return selector(state)
   })
 }))
@@ -42,33 +45,33 @@ describe('CanvasActionBar', () => {
     onStop: vi.fn(),
     activeAction: null as AgentActionName | null,
     phase: 'idle' as const,
-    onAskPrompt: vi.fn()
+    onClearCanvas: vi.fn()
   }
 
-  it('renders the /ask button when vault has content', () => {
+  it('renders the Clear button when canvas has nodes', () => {
     render(<CanvasActionBar {...baseProps} />)
-    expect(screen.getByText('/ask')).toBeTruthy()
+    expect(screen.getByText('Clear')).toBeTruthy()
   })
 
-  it('calls onAskPrompt when /ask button is clicked', () => {
-    const onAskPrompt = vi.fn()
-    render(<CanvasActionBar {...baseProps} onAskPrompt={onAskPrompt} />)
-    fireEvent.click(screen.getByText('/ask'))
-    expect(onAskPrompt).toHaveBeenCalledOnce()
+  it('calls onClearCanvas when Clear button is clicked', () => {
+    const onClearCanvas = vi.fn()
+    render(<CanvasActionBar {...baseProps} onClearCanvas={onClearCanvas} />)
+    fireEvent.click(screen.getByText('Clear'))
+    expect(onClearCanvas).toHaveBeenCalledOnce()
   })
 
-  it('does not call onAskPrompt when computing', () => {
-    const onAskPrompt = vi.fn()
+  it('does not call onClearCanvas when computing', () => {
+    const onClearCanvas = vi.fn()
     render(
       <CanvasActionBar
         {...baseProps}
-        onAskPrompt={onAskPrompt}
+        onClearCanvas={onClearCanvas}
         phase="computing"
         activeAction="compile"
       />
     )
-    fireEvent.click(screen.getByText('/ask'))
-    expect(onAskPrompt).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Clear'))
+    expect(onClearCanvas).not.toHaveBeenCalled()
   })
 
   it('applies glass background style to container', () => {
@@ -77,7 +80,7 @@ describe('CanvasActionBar', () => {
     expect(outerDiv.style.backgroundColor).toBe('rgba(4, 4, 8, 0.90)')
   })
 
-  it('renders divider between Think and /ask', () => {
+  it('renders divider between Compile and Clear', () => {
     const { container } = render(<CanvasActionBar {...baseProps} />)
     const dividers = container.querySelectorAll('div')
     const dividerElements = Array.from(dividers).filter(

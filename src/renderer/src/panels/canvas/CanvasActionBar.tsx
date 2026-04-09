@@ -10,7 +10,7 @@ interface CanvasActionBarProps {
   readonly onStop: () => void
   readonly activeAction: AgentActionName | null
   readonly phase: AgentPhase
-  readonly onAskPrompt: () => void
+  readonly onClearCanvas: () => void
 }
 
 const actionLabelStyle: React.CSSProperties = {
@@ -32,7 +32,7 @@ export function CanvasActionBar({
   onStop,
   activeAction,
   phase,
-  onAskPrompt
+  onClearCanvas
 }: CanvasActionBarProps): React.ReactElement | null {
   const artifacts = useVaultStore((s) => s.artifacts)
   const graph = useVaultStore((s) => s.graph)
@@ -75,6 +75,8 @@ export function CanvasActionBar({
     />
   )
 
+  const hasNodes = useCanvasStore((s) => s.nodes.length > 0)
+
   return (
     <div
       style={{
@@ -84,9 +86,9 @@ export function CanvasActionBar({
         zIndex: 30,
         backgroundColor: floatingPanel.glass.bg,
         backdropFilter: floatingPanel.glass.blur,
-        borderRadius: 8,
-        border: '1px solid rgba(255,255,255,0.12)',
-        padding: '4px 8px',
+        borderRadius: 6,
+        border: '1px solid rgba(255,255,255,0.08)',
+        padding: '2px 8px',
         display: 'flex',
         alignItems: 'center',
         gap: 0
@@ -104,26 +106,27 @@ export function CanvasActionBar({
         />
       )}
 
-      {showCompile && hasAnyContent && divider}
+      {showCompile && hasNodes && divider}
 
-      {hasAnyContent && (
+      {hasNodes && (
         <button
           type="button"
           style={{
             ...actionLabelStyle,
+            color: '#ef4444',
             ...(isComputing ? { opacity: 0.4, cursor: 'default' } : {})
           }}
           onClick={() => {
-            if (!isComputing) onAskPrompt()
+            if (!isComputing) onClearCanvas()
           }}
           onMouseEnter={(e) => {
-            if (!isComputing) e.currentTarget.style.color = colors.text.primary
+            if (!isComputing) e.currentTarget.style.color = '#f87171'
           }}
           onMouseLeave={(e) => {
-            if (!isComputing) e.currentTarget.style.color = colors.text.secondary
+            if (!isComputing) e.currentTarget.style.color = '#ef4444'
           }}
         >
-          /ask
+          Clear
         </button>
       )}
     </div>

@@ -741,9 +741,19 @@ export function CanvasView(): React.ReactElement {
           onStop={agent.cancel}
           activeAction={agent.activeAction}
           phase={agent.phase}
-          onAskPrompt={() => {
-            setShowPromptInput(true)
-            setPromptPlaceholder(undefined)
+          onClearCanvas={() => {
+            useCanvasStore.setState({
+              nodes: [],
+              edges: [],
+              selectedNodeIds: new Set(),
+              selectedEdgeId: null,
+              focusedCardId: null,
+              lockedCardId: null,
+              ontologySnapshot: null,
+              ontologyLayout: null,
+              ontologyIsStale: false,
+              isDirty: true
+            })
           }}
         />
         {showPromptInput && agent.phase === 'idle' && (
