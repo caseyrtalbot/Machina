@@ -22,6 +22,7 @@ import { saveCanvas } from './canvas-io'
 import { TE_DIR } from '@shared/constants'
 import { CanvasToolbar } from './CanvasToolbar'
 import { CanvasActionBar } from './CanvasActionBar'
+import { CanvasPromptInput } from './CanvasPromptInput'
 import { CanvasMinimap } from './CanvasMinimap'
 import { ZoomIndicator } from './ZoomIndicator'
 import { EdgeDots } from './EdgeDots'
@@ -97,6 +98,8 @@ export function CanvasView(): React.ReactElement {
   const ontology = useOntologyOrchestrator(commandStack)
   const agent = useAgentOrchestrator(commandStack, containerSize)
   useAgentPlanListener()
+  const [showPromptInput, setShowPromptInput] = useState(false)
+  const [promptPlaceholder, setPromptPlaceholder] = useState<string | undefined>()
   const rawFileCount = useVaultStore((s) => s.rawFileCount)
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -420,6 +423,18 @@ export function CanvasView(): React.ReactElement {
         }
       }
 
+      if (e.key === '/') {
+        if (useCanvasStore.getState().focusedTerminalId) return
+        if (document.activeElement?.tagName === 'TEXTAREA') return
+        if (document.activeElement?.tagName === 'INPUT') return
+        if ((document.activeElement as HTMLElement)?.isContentEditable) return
+        if (document.activeElement?.closest('.cm-editor')) return
+
+        e.preventDefault()
+        setShowPromptInput(true)
+        setPromptPlaceholder(undefined)
+      }
+
       // Escape clears focus lock first, then keyboard focus
       if (e.key === 'Escape') {
         const { lockedCardId } = useCanvasStore.getState()
@@ -531,6 +546,16 @@ export function CanvasView(): React.ReactElement {
     return () => window.removeEventListener('agent-action-trigger', handler)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- agent.trigger is a stable useCallback
   }, [agent.trigger])
+
+  // Agent prompt: listen for agent-prompt-open events from command palette
+  useEffect(() => {
+    const handler = () => {
+      setShowPromptInput(true)
+      setPromptPlaceholder(undefined)
+    }
+    window.addEventListener('agent-prompt-open', handler)
+    return () => window.removeEventListener('agent-prompt-open', handler)
+  }, [])
 
   // Folder-map: trigger analysis when a folder path is set.
   // We capture the path, clear pendingFolderMap immediately, and run the orchestrator.
@@ -714,7 +739,22 @@ export function CanvasView(): React.ReactElement {
           onStop={agent.cancel}
           activeAction={agent.activeAction}
           phase={agent.phase}
+          onAskPrompt={() => {
+            setShowPromptInput(true)
+            setPromptPlaceholder(undefined)
+          }}
         />
+        {showPromptInput && agent.phase === 'idle' && (
+          <CanvasPromptInput
+            selectedCount={selectedNodeIds.size}
+            placeholder={promptPlaceholder}
+            onSubmit={(text) => {
+              setShowPromptInput(false)
+              agent.trigger('ask', text)
+            }}
+            onCancel={() => setShowPromptInput(false)}
+          />
+        )}
         <CanvasSurface
           onContextMenu={handleContextMenu}
           onBackgroundClick={handleBackgroundClick}
@@ -852,6 +892,11 @@ export function CanvasView(): React.ReactElement {
                   agent.trigger(action)
                 }}
                 agentBusy={agent.phase !== 'idle'}
+                onAskPrompt={(placeholder) => {
+                  setShowPromptInput(true)
+                  setPromptPlaceholder(placeholder)
+                  setCardContextMenu(null)
+                }}
                 onShowConnections={() => {
                   const { newNodes, newEdges } = computeShowConnections(
                     menuNode,

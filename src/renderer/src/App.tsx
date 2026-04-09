@@ -1248,6 +1248,11 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       // Agent actions — dispatch to canvas orchestrator via custom event
       if (item.id.startsWith('cmd:agent-')) {
         const actionName = item.id.replace('cmd:agent-', '') as AgentActionName
+        if (actionName === 'ask') {
+          window.dispatchEvent(new CustomEvent('agent-prompt-open'))
+          setPaletteOpen(false)
+          return
+        }
         window.dispatchEvent(
           new CustomEvent('agent-action-trigger', { detail: { action: actionName } })
         )

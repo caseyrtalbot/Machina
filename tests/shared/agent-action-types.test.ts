@@ -3,17 +3,24 @@ import { AGENT_ACTIONS, AGENT_ACTION_NAMES } from '@shared/agent-action-types'
 import type { AgentActionName } from '@shared/agent-action-types'
 
 describe('AGENT_ACTIONS registry', () => {
-  it('has five actions', () => {
-    expect(AGENT_ACTIONS).toHaveLength(5)
+  it('has six actions', () => {
+    expect(AGENT_ACTIONS).toHaveLength(6)
   })
 
-  it('contains challenge, emerge, organize, tidy, compile', () => {
+  it('contains challenge, emerge, organize, tidy, compile, ask', () => {
     const ids = AGENT_ACTIONS.map((a) => a.id)
-    expect(ids).toEqual(['challenge', 'emerge', 'organize', 'tidy', 'compile'])
+    expect(ids).toEqual(['challenge', 'emerge', 'organize', 'tidy', 'compile', 'ask'])
   })
 
   it('exports AGENT_ACTION_NAMES matching registry ids', () => {
-    expect(AGENT_ACTION_NAMES).toEqual(['challenge', 'emerge', 'organize', 'tidy', 'compile'])
+    expect(AGENT_ACTION_NAMES).toEqual([
+      'challenge',
+      'emerge',
+      'organize',
+      'tidy',
+      'compile',
+      'ask'
+    ])
   })
 
   it('challenge requires no selection (vault-scope capable)', () => {
@@ -36,6 +43,11 @@ describe('AGENT_ACTIONS registry', () => {
     expect(tidy.requiresSelection).toBe(0)
   })
 
+  it('ask requires no selection (vault-scope capable)', () => {
+    const ask = AGENT_ACTIONS.find((a) => a.id === 'ask')!
+    expect(ask.requiresSelection).toBe(0)
+  })
+
   it('all actions have label, description, and keywords', () => {
     for (const action of AGENT_ACTIONS) {
       expect(action.label).toBeTruthy()
@@ -44,7 +56,7 @@ describe('AGENT_ACTIONS registry', () => {
     }
   })
 
-  it('AgentActionName type is a union of the five ids', () => {
+  it('AgentActionName type is a union of the six ids', () => {
     const name: AgentActionName = 'challenge'
     expect(AGENT_ACTION_NAMES).toContain(name)
   })

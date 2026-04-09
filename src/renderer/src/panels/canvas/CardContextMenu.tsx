@@ -12,6 +12,7 @@ interface CardContextMenuProps {
   readonly onClose: () => void
   readonly selectedCount: number
   readonly onAgentAction?: (action: AgentActionName) => void
+  readonly onAskPrompt?: (placeholder?: string) => void
   readonly agentBusy?: boolean
 }
 
@@ -56,6 +57,7 @@ export function CardContextMenu({
   onClose,
   selectedCount,
   onAgentAction,
+  onAskPrompt,
   agentBusy
 }: CardContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -149,7 +151,15 @@ export function CardContextMenu({
               key={action.id}
               label={action.label}
               onClick={() => {
-                onAgentAction(action.id as AgentActionName)
+                if (action.id === 'ask' && onAskPrompt) {
+                  const hint =
+                    selectedCount === 1
+                      ? 'Ask about this card...'
+                      : `Ask about ${selectedCount} selected cards...`
+                  onAskPrompt(hint)
+                } else {
+                  onAgentAction?.(action.id as AgentActionName)
+                }
                 onClose()
               }}
               disabled={agentBusy}

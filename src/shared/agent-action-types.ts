@@ -48,6 +48,13 @@ export const AGENT_ACTIONS = [
     description: 'Compile sources into wiki articles',
     requiresSelection: 1,
     keywords: ['compile', 'synthesize', 'wiki', 'article', 'summarize']
+  },
+  {
+    id: 'ask',
+    label: '/ask',
+    description: 'Ask a question or give an instruction about the canvas',
+    requiresSelection: 0,
+    keywords: ['ask', 'question', 'prompt', 'what', 'why', 'how', 'explain']
   }
 ] as const satisfies readonly AgentActionDef[]
 
@@ -108,6 +115,7 @@ export interface AgentContext {
 export interface AgentActionRequest {
   readonly action: AgentActionName
   readonly context: AgentContext
+  readonly userPrompt?: string
 }
 
 export type AgentActionResponse = { readonly plan: CanvasMutationPlan } | { readonly error: string }
