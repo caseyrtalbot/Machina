@@ -37,6 +37,7 @@ export function CanvasActionBar({
   const artifacts = useVaultStore((s) => s.artifacts)
   const graph = useVaultStore((s) => s.graph)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
+  const hasNodes = useCanvasStore((s) => s.nodes.length > 0)
 
   const isComputing = phase === 'computing'
 
@@ -62,7 +63,7 @@ export function CanvasActionBar({
   const hasSelection = selectedNodeIds.size > 0
   const showCompile = unprocessedSourceCount > 0 || hasSelection
 
-  if (!hasAnyContent && !showCompile) return null
+  if (!hasAnyContent && !showCompile && !hasNodes) return null
 
   const divider = (
     <div
@@ -74,8 +75,6 @@ export function CanvasActionBar({
       }}
     />
   )
-
-  const hasNodes = useCanvasStore((s) => s.nodes.length > 0)
 
   return (
     <div
