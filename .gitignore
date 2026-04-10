@@ -14,6 +14,7 @@ test-results/
 # Tool caches
 .worktrees/
 .claude/
+.codex/
 .forge/
 .superpowers/
 .collaborator/
