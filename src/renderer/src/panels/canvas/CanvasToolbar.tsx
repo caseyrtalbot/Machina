@@ -354,7 +354,7 @@ export function CanvasToolbar({
           disabled={thinkBusy}
           data-testid="canvas-think"
           style={{
-            color: thinkBusy ? colors.text.muted : colors.accent.default,
+            color: thinkBusy ? colors.text.muted : colors.semantic.tension,
             cursor: thinkBusy ? 'wait' : undefined
           }}
         >
@@ -368,13 +368,8 @@ export function CanvasToolbar({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            {/* Brain: two lobes + center stem */}
-            <path d="M8 12v2" />
-            <path d="M5 4a3 3 0 0 1 6 0" />
-            <path d="M5 4C3.5 4 2 5.5 2 7.5S3.5 10 5 10" />
-            <path d="M11 4c1.5 0 3 1.5 3 3.5S12.5 10 11 10" />
-            <path d="M5 10c0 1 1 2 3 2s3-1 3-2" />
-            <line x1="8" y1="4" x2="8" y2="12" />
+            {/* Sparkle: 4-point star — challenge surfaces insights/tensions */}
+            <path d="M8 2 L9.5 6.5 L14 8 L9.5 9.5 L8 14 L6.5 9.5 L2 8 L6.5 6.5 Z" />
           </svg>
         </button>
         <Tip label={thinkBusy ? 'Thinking\u2026' : 'Think'} />
