@@ -88,10 +88,6 @@ export function installMainLogger(): string {
   return logFilePath
 }
 
-export function getMainLogFilePath(): string {
-  return logFilePath || resolveMainLogFilePath()
-}
-
 export function resetMainLoggerForTests(): void {
   if (originalConsole) {
     console.log = originalConsole.log

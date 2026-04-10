@@ -172,13 +172,3 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
     </div>
   )
 }
-
-/** @deprecated Use FolderMapPreviewGhosts + FolderMapPreviewBar instead */
-export function FolderMapPreview({ plan, onApply, onCancel }: FolderMapPreviewProps) {
-  return (
-    <>
-      <FolderMapPreviewGhosts plan={plan} />
-      <FolderMapPreviewBar plan={plan} onApply={onApply} onCancel={onCancel} />
-    </>
-  )
-}
