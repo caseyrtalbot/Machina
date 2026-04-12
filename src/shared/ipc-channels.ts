@@ -1,4 +1,5 @@
 import type { FilesystemFileEntry, SessionId, VaultConfig, VaultState } from './types'
+import type { AgentArtifactDraft, MaterializeResult } from './agent-artifact-types'
 import type {
   WorkbenchSessionEvent,
   WorkbenchFileChangedEvent,
@@ -201,6 +202,16 @@ export interface IpcChannels {
     response:
       | { accepted: boolean; mtime: string }
       | { error: 'stale' | 'validation-failed'; message: string }
+  }
+
+  // --- Artifact ---
+  'artifact:materialize': {
+    request: { draft: AgentArtifactDraft; vaultPath: string }
+    response: MaterializeResult
+  }
+  'artifact:unmaterialize': {
+    request: { paths: readonly string[]; vaultPath: string }
+    response: void
   }
 }
 

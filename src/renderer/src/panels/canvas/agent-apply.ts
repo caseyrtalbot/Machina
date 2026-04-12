@@ -26,6 +26,7 @@ export function filterStaleOps(
   const willExist = new Set(existingNodeIds)
   for (const op of ops) {
     if (op.type === 'add-node') willExist.add(op.node.id)
+    if (op.type === 'materialize-artifact') willExist.add(op.tempNodeId)
   }
 
   return ops.filter((op) => {
@@ -41,6 +42,8 @@ export function filterStaleOps(
       case 'remove-node':
         return existingNodeIds.has(op.nodeId)
       case 'remove-edge':
+        return true
+      case 'materialize-artifact':
         return true
     }
   })

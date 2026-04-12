@@ -132,6 +132,10 @@ export interface VaultConfig {
   fonts: { display: string; body: string; mono: string }
   workspaces: string[]
   createdAt: string
+  compile?: {
+    outputDir?: string // default: 'compiled/'
+    persistenceEnabled?: boolean // default: true
+  }
 }
 
 export interface UiPersistedState {
