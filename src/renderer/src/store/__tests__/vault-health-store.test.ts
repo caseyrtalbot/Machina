@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { DerivedHealth, InfraHealth, HealthIssue } from '@shared/engine/vault-health'
 import type { WorkerResult } from '@shared/engine/types'
 
@@ -360,5 +360,139 @@ describe('vault-health-store vault-swap reset', () => {
     expect(state.lastInfraAt).toBeNull()
     expect(state.issues).toEqual([])
     expect(state.runs).toEqual([])
+  })
+})
+
+// --------------------------------------------------------------------------
+// Cycle 4: Staleness detection (Tasks 40-44)
+// --------------------------------------------------------------------------
+
+describe('vault-health-store staleness detection', () => {
+  let useVaultHealthStore: typeof import('../vault-health-store').useVaultHealthStore
+  let HEARTBEAT_MS: number
+  let STALENESS_MULTIPLIER: number
+
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    const mod = await import('../vault-health-store')
+    useVaultHealthStore = mod.useVaultHealthStore
+    HEARTBEAT_MS = mod.HEARTBEAT_MS
+    STALENESS_MULTIPLIER = mod.STALENESS_MULTIPLIER
+    useVaultHealthStore.setState(useVaultHealthStore.getInitialState())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('status flips to unknown when lastInfraAt exceeds 2.5x heartbeat', () => {
+    const now = Date.now()
+
+    // Set both derived and infra so status is green
+    useVaultHealthStore.getState().setInfra({
+      computedAt: now,
+      runs: [{ checkId: 'vault-reachable', ranAt: now, passed: true, issues: [] }]
+    })
+    useVaultHealthStore.getState().setDerived({
+      computedAt: now,
+      runs: [{ checkId: 'parse-errors', ranAt: now, passed: true, issues: [] }]
+    })
+
+    expect(useVaultHealthStore.getState().status).toBe('green')
+
+    // Advance time past staleness threshold (2.5 * 30_000 = 75_000ms)
+    vi.advanceTimersByTime(HEARTBEAT_MS * STALENESS_MULTIPLIER + 1)
+
+    // Trigger a recomputation by setting derived again
+    useVaultHealthStore.getState().setDerived({
+      computedAt: Date.now(),
+      runs: [{ checkId: 'parse-errors', ranAt: Date.now(), passed: true, issues: [] }]
+    })
+
+    expect(useVaultHealthStore.getState().status).toBe('unknown')
+  })
+
+  it('status stays green when infra is fresh', () => {
+    const now = Date.now()
+
+    // Set both derived and infra
+    useVaultHealthStore.getState().setInfra({
+      computedAt: now,
+      runs: [{ checkId: 'vault-reachable', ranAt: now, passed: true, issues: [] }]
+    })
+    useVaultHealthStore.getState().setDerived({
+      computedAt: now,
+      runs: [{ checkId: 'parse-errors', ranAt: now, passed: true, issues: [] }]
+    })
+
+    expect(useVaultHealthStore.getState().status).toBe('green')
+
+    // Advance time within threshold
+    vi.advanceTimersByTime(HEARTBEAT_MS * STALENESS_MULTIPLIER - 1000)
+
+    // Trigger a recomputation
+    useVaultHealthStore.getState().setDerived({
+      computedAt: Date.now(),
+      runs: [{ checkId: 'parse-errors', ranAt: Date.now(), passed: true, issues: [] }]
+    })
+
+    expect(useVaultHealthStore.getState().status).toBe('green')
+  })
+
+  it('unknown takes priority over degraded when stale', () => {
+    const now = Date.now()
+
+    // Set infra and derived with a failing check
+    useVaultHealthStore.getState().setInfra({
+      computedAt: now,
+      runs: [{ checkId: 'vault-reachable', ranAt: now, passed: true, issues: [] }]
+    })
+    useVaultHealthStore.getState().setDerived({
+      computedAt: now,
+      runs: [
+        {
+          checkId: 'parse-errors',
+          ranAt: now,
+          passed: false,
+          issues: [
+            {
+              checkId: 'parse-errors',
+              severity: 'hard',
+              title: 'Parse error',
+              detail: 'bad'
+            }
+          ]
+        }
+      ]
+    })
+
+    expect(useVaultHealthStore.getState().status).toBe('degraded')
+
+    // Advance time past staleness threshold
+    vi.advanceTimersByTime(HEARTBEAT_MS * STALENESS_MULTIPLIER + 1)
+
+    // Trigger recomputation with a still-failing check
+    useVaultHealthStore.getState().setDerived({
+      computedAt: Date.now(),
+      runs: [
+        {
+          checkId: 'parse-errors',
+          ranAt: Date.now(),
+          passed: false,
+          issues: [
+            {
+              checkId: 'parse-errors',
+              severity: 'hard',
+              title: 'Parse error',
+              detail: 'bad'
+            }
+          ]
+        }
+      ]
+    })
+
+    // unknown takes priority over degraded when infra is stale
+    expect(useVaultHealthStore.getState().status).toBe('unknown')
   })
 })
