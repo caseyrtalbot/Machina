@@ -94,6 +94,12 @@ describe('ArtifactMaterializer', () => {
       await expect(materializer.materialize(bad, vaultRoot, 'compiled/')).rejects.toThrow()
     })
 
+    it('falls back to "artifact" slug when title has no alphanumeric chars', async () => {
+      const draft = makeDraft({ title: '!!!' })
+      const result = await materializer.materialize(draft, vaultRoot, 'compiled/')
+      expect(result.vaultRelativePath).toBe('compiled/artifact.md')
+    })
+
     it('writes to vault root when outputDir is empty string', async () => {
       const draft = makeDraft()
       const result = await materializer.materialize(draft, vaultRoot, '')
@@ -137,12 +143,15 @@ describe('ArtifactMaterializer', () => {
       const draft1 = makeDraft({ title: 'Good One' })
       const draft2 = makeDraft({ title: 'Bad One' })
 
-      // Spy on the internal write to fail on the second call
+      // Spy on the internal write: first call writes for real, second fails
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const writeSpy = vi.spyOn(materializer as any, '_atomicWrite')
       writeSpy
-        .mockResolvedValueOnce(undefined) // first succeeds
-        .mockRejectedValueOnce(new Error('disk full')) // second fails
+        .mockImplementationOnce(async (...args: unknown[]) => {
+          const { writeFile: fsWriteFile } = await import('fs/promises')
+          await fsWriteFile(args[0] as string, args[1] as string, 'utf-8')
+        })
+        .mockRejectedValueOnce(new Error('disk full'))
 
       await expect(
         materializer.materializeBatch([draft1, draft2], vaultRoot, 'compiled/')

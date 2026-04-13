@@ -20,7 +20,7 @@ function slugify(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
+    .replace(/^-+|-+$/g, '')
     .slice(0, SLUG_MAX_LENGTH)
 }
 
@@ -40,7 +40,7 @@ export class ArtifactMaterializer {
     AgentArtifactDraftSchema.parse(draft)
 
     const id = randomUUID()
-    const slug = slugify(draft.suggestedFilename ?? draft.title)
+    const slug = slugify(draft.suggestedFilename ?? draft.title) || 'artifact'
     const dir = outputDir ? join(vaultRoot, outputDir) : vaultRoot
 
     if (!existsSync(dir)) {
