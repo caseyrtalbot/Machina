@@ -139,3 +139,19 @@ useVaultStore.subscribe((state) => {
 
   useVaultHealthStore.getState().setDerived(derived)
 })
+
+// ---------------------------------------------------------------------------
+// Vault-store subscription: reset on vault path change (close or A→B swap)
+// ---------------------------------------------------------------------------
+
+let _prevVaultPath: string | null = useVaultStore.getState().vaultPath
+
+useVaultStore.subscribe((state) => {
+  if (state.vaultPath === _prevVaultPath) return
+  _prevVaultPath = state.vaultPath
+
+  // Reset artifacts ref so the worker subscription doesn't skip the next update
+  _prevArtifactsRef = state.artifacts
+
+  useVaultHealthStore.getState().reset()
+})

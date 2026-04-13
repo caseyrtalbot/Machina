@@ -293,3 +293,72 @@ describe('vault-health-store subscription wiring', () => {
     expect(parseRun!.passed).toBe(true)
   })
 })
+
+// --------------------------------------------------------------------------
+// Cycle 3: Vault-swap reset (Tasks 35-39)
+// --------------------------------------------------------------------------
+
+describe('vault-health-store vault-swap reset', () => {
+  let useVaultHealthStore: typeof import('../vault-health-store').useVaultHealthStore
+  let useVaultStore: typeof import('../vault-store').useVaultStore
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const vaultMod = await import('../vault-store')
+    useVaultStore = vaultMod.useVaultStore
+    const healthMod = await import('../vault-health-store')
+    useVaultHealthStore = healthMod.useVaultHealthStore
+    useVaultHealthStore.setState(useVaultHealthStore.getInitialState())
+  })
+
+  it('resets on vault path change to null', () => {
+    const now = Date.now()
+    // Pre-populate health state
+    useVaultHealthStore.getState().setInfra({
+      computedAt: now,
+      runs: [{ checkId: 'vault-reachable', ranAt: now, passed: true, issues: [] }]
+    })
+    expect(useVaultHealthStore.getState().lastInfraAt).toBe(now)
+
+    // Set a vault path first, then change to null
+    useVaultStore.setState({ vaultPath: '/vault/A' })
+    useVaultStore.setState({ vaultPath: null })
+
+    const state = useVaultHealthStore.getState()
+    expect(state.status).toBe('unknown')
+    expect(state.lastDerivedAt).toBeNull()
+    expect(state.lastInfraAt).toBeNull()
+    expect(state.issues).toEqual([])
+    expect(state.runs).toEqual([])
+  })
+
+  it('resets on direct A to B vault swap without null intermediate', () => {
+    const now = Date.now()
+    // Pre-populate health state
+    useVaultHealthStore.getState().setInfra({
+      computedAt: now,
+      runs: [{ checkId: 'vault-reachable', ranAt: now, passed: true, issues: [] }]
+    })
+    expect(useVaultHealthStore.getState().lastInfraAt).toBe(now)
+
+    // Set vault A
+    useVaultStore.setState({ vaultPath: '/vault/A' })
+
+    // Re-populate after reset from A
+    useVaultHealthStore.getState().setInfra({
+      computedAt: now,
+      runs: [{ checkId: 'vault-reachable', ranAt: now, passed: true, issues: [] }]
+    })
+    expect(useVaultHealthStore.getState().lastInfraAt).toBe(now)
+
+    // Direct swap to B (no null in between)
+    useVaultStore.setState({ vaultPath: '/vault/B' })
+
+    const state = useVaultHealthStore.getState()
+    expect(state.status).toBe('unknown')
+    expect(state.lastDerivedAt).toBeNull()
+    expect(state.lastInfraAt).toBeNull()
+    expect(state.issues).toEqual([])
+    expect(state.runs).toEqual([])
+  })
+})
