@@ -55,23 +55,23 @@ describe('folder-map-apply', () => {
     expect(useCanvasStore.getState().nodes.length).toBe(3)
   })
 
-  it('undo removes all added nodes', () => {
+  it('undo removes all added nodes', async () => {
     const { plan } = makePlan(3)
     applyFolderMapPlan(plan, commandStack)
     expect(useCanvasStore.getState().nodes.length).toBe(3)
-    commandStack.undo()
+    await commandStack.undo()
     expect(useCanvasStore.getState().nodes.length).toBe(0)
   })
 
-  it('redo restores nodes', () => {
+  it('redo restores nodes', async () => {
     const { plan } = makePlan(2)
     applyFolderMapPlan(plan, commandStack)
-    commandStack.undo()
-    commandStack.redo()
+    await commandStack.undo()
+    await commandStack.redo()
     expect(useCanvasStore.getState().nodes.length).toBe(2)
   })
 
-  it('undo removes edges that connect existing nodes', () => {
+  it('undo removes edges that connect existing nodes', async () => {
     const existingA = createCanvasNode('project-file', { x: 0, y: 0 })
     const existingB = createCanvasNode('project-file', { x: 200, y: 0 })
     useCanvasStore.getState().addNodesAndEdges([existingA, existingB], [])
@@ -94,7 +94,7 @@ describe('folder-map-apply', () => {
     applyFolderMapPlan(plan, commandStack)
     expect(useCanvasStore.getState().edges).toHaveLength(1)
 
-    commandStack.undo()
+    await commandStack.undo()
     expect(useCanvasStore.getState().edges).toHaveLength(0)
   })
 })

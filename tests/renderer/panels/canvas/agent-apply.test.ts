@@ -111,7 +111,7 @@ describe('applyAgentResult', () => {
     expect(nodes.find((n) => n.id === 'new1')).toBeTruthy()
   })
 
-  it('undoes the entire plan with a single undo', () => {
+  it('undoes the entire plan with a single undo', async () => {
     useCanvasStore.setState({ nodes: [makeNode('existing', 50, 50)], edges: [] })
 
     const plan = makePlan([
@@ -127,7 +127,7 @@ describe('applyAgentResult', () => {
     expect(state.nodes.find((n) => n.id === 'existing')?.position).toEqual({ x: 300, y: 400 })
 
     // Undo
-    commandStack.undo()
+    await commandStack.undo()
 
     state = useCanvasStore.getState()
     expect(state.nodes).toHaveLength(1)
@@ -135,16 +135,16 @@ describe('applyAgentResult', () => {
     expect(state.nodes[0].position).toEqual({ x: 50, y: 50 })
   })
 
-  it('supports redo after undo', () => {
+  it('supports redo after undo', async () => {
     const plan = makePlan([{ type: 'add-node', node: makeNode('new1') }])
 
     applyAgentResult(plan, commandStack)
     expect(useCanvasStore.getState().nodes).toHaveLength(1)
 
-    commandStack.undo()
+    await commandStack.undo()
     expect(useCanvasStore.getState().nodes).toHaveLength(0)
 
-    commandStack.redo()
+    await commandStack.redo()
     expect(useCanvasStore.getState().nodes).toHaveLength(1)
   })
 

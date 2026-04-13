@@ -1,6 +1,6 @@
 export interface Command {
-  execute: () => void
-  undo: () => void
+  execute: () => void | Promise<void>
+  undo: () => void | Promise<void>
 }
 
 export class CommandStack {
@@ -27,16 +27,16 @@ export class CommandStack {
     }
   }
 
-  undo(): void {
+  async undo(): Promise<void> {
     if (!this.canUndo()) return
-    this.stack[this.index].undo()
+    await this.stack[this.index].undo()
     this.index--
   }
 
-  redo(): void {
+  async redo(): Promise<void> {
     if (!this.canRedo()) return
     this.index++
-    this.stack[this.index].execute()
+    await this.stack[this.index].execute()
   }
 
   canUndo(): boolean {

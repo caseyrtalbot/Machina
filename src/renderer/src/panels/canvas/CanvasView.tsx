@@ -459,10 +459,10 @@ export function CanvasView(): React.ReactElement {
       if (!e.metaKey) return
       if (e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
-        commandStack.current.undo()
+        void commandStack.current.undo()
       } else if (e.key === 'z' && e.shiftKey) {
         e.preventDefault()
-        commandStack.current.redo()
+        void commandStack.current.redo()
       } else if (e.key === 'g') {
         if (
           !containerRef.current?.contains(document.activeElement) &&
@@ -724,8 +724,8 @@ export function CanvasView(): React.ReactElement {
         <CanvasToolbar
           canUndo={commandStack.current.canUndo()}
           canRedo={commandStack.current.canRedo()}
-          onUndo={() => commandStack.current.undo()}
-          onRedo={() => commandStack.current.redo()}
+          onUndo={() => void commandStack.current.undo()}
+          onRedo={() => void commandStack.current.redo()}
           onAddCard={() => {
             const vp = useCanvasStore.getState().viewport
             const node = createCanvasNode('text', {

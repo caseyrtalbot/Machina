@@ -13,7 +13,7 @@ describe('CommandStack', () => {
     expect(stack.canRedo()).toBe(false)
   })
 
-  it('executes and undoes a command', () => {
+  it('executes and undoes a command', async () => {
     let value = 0
     const cmd: Command = {
       execute: () => {
@@ -28,12 +28,12 @@ describe('CommandStack', () => {
     expect(value).toBe(1)
     expect(stack.canUndo()).toBe(true)
 
-    stack.undo()
+    await stack.undo()
     expect(value).toBe(0)
     expect(stack.canUndo()).toBe(false)
   })
 
-  it('redoes after undo', () => {
+  it('redoes after undo', async () => {
     let value = 0
     const cmd: Command = {
       execute: () => {
@@ -45,14 +45,14 @@ describe('CommandStack', () => {
     }
 
     stack.execute(cmd)
-    stack.undo()
+    await stack.undo()
     expect(stack.canRedo()).toBe(true)
 
-    stack.redo()
+    await stack.redo()
     expect(value).toBe(1)
   })
 
-  it('clears redo stack on new execute', () => {
+  it('clears redo stack on new execute', async () => {
     let value = 0
     const cmd1: Command = {
       execute: () => {
@@ -72,13 +72,13 @@ describe('CommandStack', () => {
     }
 
     stack.execute(cmd1)
-    stack.undo()
+    await stack.undo()
     stack.execute(cmd2)
     expect(stack.canRedo()).toBe(false)
     expect(value).toBe(2)
   })
 
-  it('caps at max size', () => {
+  it('caps at max size', async () => {
     const stack = new CommandStack(3)
     for (let i = 0; i < 5; i++) {
       stack.execute({ execute: () => {}, undo: () => {} })
@@ -86,7 +86,7 @@ describe('CommandStack', () => {
     // Only 3 undos available
     let undos = 0
     while (stack.canUndo()) {
-      stack.undo()
+      await stack.undo()
       undos++
     }
     expect(undos).toBe(3)
