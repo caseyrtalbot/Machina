@@ -23,7 +23,12 @@ const mockHealthState = {
 }
 
 vi.mock('../../../store/vault-health-store', () => ({
-  useVaultHealthStore: vi.fn((selector) => selector(mockHealthState))
+  useVaultHealthStore: Object.assign(
+    vi.fn((selector) => selector(mockHealthState)),
+    {
+      getState: vi.fn(() => mockHealthState)
+    }
+  )
 }))
 
 const mockVaultState = {
@@ -185,5 +190,139 @@ describe('HealthPanel', () => {
     // computeDerivedHealth should have been called
     const { computeDerivedHealth } = await import('@shared/engine/vault-health')
     expect(computeDerivedHealth).toHaveBeenCalled()
+  })
+
+  it('renders degraded state with grouped issues', async () => {
+    const now = Date.now()
+    mockHealthState.status = 'degraded'
+    mockHealthState.lastDerivedAt = now
+    mockHealthState.lastInfraAt = now
+    mockHealthState.issues = [
+      {
+        checkId: 'parse-errors',
+        severity: 'hard',
+        title: 'Parse error in note',
+        detail: 'Invalid YAML frontmatter',
+        filePath: '/vault/broken.md'
+      },
+      {
+        checkId: 'broken-refs',
+        severity: 'hard',
+        title: 'Broken reference',
+        detail: 'Link target does not exist',
+        filePath: '/vault/missing-ref.md'
+      },
+      {
+        checkId: 'stale-worker-index',
+        severity: 'integrity',
+        title: 'Stale worker index',
+        detail: 'Index is 5 minutes behind disk'
+      }
+    ]
+    mockHealthState.runs = [
+      { checkId: 'parse-errors', passed: false },
+      { checkId: 'broken-refs', passed: false },
+      { checkId: 'stale-worker-index', passed: false }
+    ]
+
+    const { HealthPanel } = await import('../HealthPanel')
+    render(<HealthPanel />)
+
+    expect(screen.getByText('HARD FAILURES')).toBeDefined()
+    expect(screen.getByText('INTEGRITY')).toBeDefined()
+    expect(screen.getByText('Parse error in note')).toBeDefined()
+    expect(screen.getByText('Stale worker index')).toBeDefined()
+  })
+
+  it('clicking file link calls openTab and openFile', async () => {
+    const now = Date.now()
+    const mockOpenTab = vi.fn()
+    const mockOpenFile = vi.fn()
+
+    // Re-wire tab-store mock for this test
+    const { useTabStore } = await import('../../../store/tab-store')
+    ;(useTabStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+      tabs: [],
+      activeTabId: 'editor',
+      openTab: mockOpenTab,
+      activateTab: vi.fn()
+    })
+
+    const { useEditorStore } = await import('../../../store/editor-store')
+    ;(useEditorStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+      activeNotePath: null,
+      openFile: mockOpenFile
+    })
+
+    mockHealthState.status = 'degraded'
+    mockHealthState.lastDerivedAt = now
+    mockHealthState.lastInfraAt = now
+    mockHealthState.issues = [
+      {
+        checkId: 'parse-errors',
+        severity: 'hard',
+        title: 'Parse error',
+        detail: 'Bad YAML',
+        filePath: '/vault/broken.md'
+      }
+    ]
+    mockHealthState.runs = [{ checkId: 'parse-errors', passed: false }]
+
+    const { HealthPanel } = await import('../HealthPanel')
+    render(<HealthPanel />)
+
+    const fileLink = screen.getByText('broken.md')
+    fireEvent.click(fileLink)
+
+    expect(mockOpenTab).toHaveBeenCalled()
+    expect(mockOpenFile).toHaveBeenCalledWith('/vault/broken.md')
+  })
+
+  it('refresh button disables for 500ms after click', async () => {
+    const now = Date.now()
+    mockHealthState.status = 'green'
+    mockHealthState.lastDerivedAt = now
+    mockHealthState.lastInfraAt = now
+    mockHealthState.runs = [{ checkId: 'parse-errors', passed: true }]
+
+    const { HealthPanel } = await import('../HealthPanel')
+    render(<HealthPanel />)
+
+    const refreshBtn = screen.getByLabelText('Refresh health checks') as HTMLButtonElement
+    fireEvent.click(refreshBtn)
+
+    expect(refreshBtn.disabled).toBe(true)
+  })
+
+  it('groups hard issues before integrity', async () => {
+    const now = Date.now()
+    mockHealthState.status = 'degraded'
+    mockHealthState.lastDerivedAt = now
+    mockHealthState.lastInfraAt = now
+    mockHealthState.issues = [
+      {
+        checkId: 'stale-worker-index',
+        severity: 'integrity',
+        title: 'Stale index',
+        detail: 'Index is behind'
+      },
+      {
+        checkId: 'parse-errors',
+        severity: 'hard',
+        title: 'Parse error',
+        detail: 'Bad YAML'
+      }
+    ]
+    mockHealthState.runs = [
+      { checkId: 'stale-worker-index', passed: false },
+      { checkId: 'parse-errors', passed: false }
+    ]
+
+    const { HealthPanel } = await import('../HealthPanel')
+    render(<HealthPanel />)
+
+    const sections = screen.getAllByRole('heading', { level: 3 })
+    expect(sections[0].textContent).toBe('HARD FAILURES')
+    expect(sections[1].textContent).toBe('INTEGRITY')
   })
 })

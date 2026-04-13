@@ -1,7 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useVaultStore } from '../../store/vault-store'
+import { useTabStore } from '../../store/tab-store'
+import { useEditorStore } from '../../store/editor-store'
 import { computeDerivedHealth } from '@shared/engine/vault-health'
+import type { HealthIssue } from '@shared/engine/vault-health'
 import { colors, typography } from '../../design/tokens'
 
 // ---------------------------------------------------------------------------
@@ -170,6 +173,117 @@ function UnknownState() {
 }
 
 // ---------------------------------------------------------------------------
+// Degraded state
+// ---------------------------------------------------------------------------
+
+interface IssueGroup {
+  readonly severity: string
+  readonly label: string
+  readonly issues: readonly HealthIssue[]
+}
+
+function groupIssuesBySeverity(issues: readonly HealthIssue[]): readonly IssueGroup[] {
+  const hard = issues.filter((i) => i.severity === 'hard')
+  const integrity = issues.filter((i) => i.severity === 'integrity')
+  const groups: IssueGroup[] = []
+  if (hard.length > 0) groups.push({ severity: 'hard', label: 'HARD FAILURES', issues: hard })
+  if (integrity.length > 0)
+    groups.push({ severity: 'integrity', label: 'INTEGRITY', issues: integrity })
+  return groups
+}
+
+function IssueRow({ issue }: { readonly issue: HealthIssue }) {
+  const [hovered, setHovered] = useState(false)
+
+  const handleFileClick = useCallback(() => {
+    if (!issue.filePath) return
+    useTabStore.getState().openTab({
+      id: 'editor',
+      type: 'editor',
+      label: 'Editor',
+      closeable: false
+    })
+    useEditorStore.getState().openFile(issue.filePath)
+  }, [issue.filePath])
+
+  const fileName = issue.filePath?.split('/').pop() ?? null
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '8px 0',
+        transition: 'background 100ms ease',
+        background: hovered ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span
+          style={{
+            fontSize: 13,
+            color: colors.text.primary,
+            fontWeight: 400
+          }}
+        >
+          {issue.title}
+        </span>
+      </div>
+      <div style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>{issue.detail}</div>
+      {fileName && (
+        <button
+          type="button"
+          onClick={handleFileClick}
+          style={{
+            fontSize: 12,
+            color: colors.accent.default,
+            cursor: 'pointer',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            marginTop: 2,
+            fontFamily: 'inherit'
+          }}
+        >
+          {fileName}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function DegradedState({ issues }: { readonly issues: readonly HealthIssue[] }) {
+  const groups = useMemo(() => groupIssuesBySeverity(issues), [issues])
+
+  return (
+    <div>
+      {groups.map((group) => (
+        <div key={group.severity}>
+          <h3
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: colors.text.muted,
+              padding: '14px 0 6px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              marginBottom: 2,
+              margin: 0
+            }}
+          >
+            {group.label}
+          </h3>
+          {group.issues.map((issue, i) => (
+            <IssueRow key={`${issue.checkId}-${i}`} issue={issue} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // HealthPanel (main export)
 // ---------------------------------------------------------------------------
 
@@ -241,6 +355,7 @@ export function HealthPanel() {
 
         {/* Body */}
         {status === 'green' && <GreenState totalRuns={totalRuns} />}
+        {status === 'degraded' && <DegradedState issues={issues} />}
         {status === 'unknown' && <UnknownState />}
       </div>
     </div>
