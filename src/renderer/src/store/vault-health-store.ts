@@ -1,0 +1,114 @@
+import { create } from 'zustand'
+import type {
+  AggregateHealth,
+  CheckRun,
+  DerivedHealth,
+  HealthIssue,
+  HealthStatus,
+  InfraHealth
+} from '@shared/engine/vault-health'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+export const HEARTBEAT_MS = 30_000
+export const STALENESS_MULTIPLIER = 2.5
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+export interface VaultHealthState extends AggregateHealth {
+  setDerived: (health: DerivedHealth) => void
+  setInfra: (health: InfraHealth) => void
+  reset: () => void
+}
+
+const INITIAL_STATE: AggregateHealth = {
+  status: 'unknown',
+  lastDerivedAt: null,
+  lastInfraAt: null,
+  issues: [],
+  runs: []
+}
+
+// ---------------------------------------------------------------------------
+// Aggregation helpers
+// ---------------------------------------------------------------------------
+
+function sortIssues(issues: readonly HealthIssue[]): readonly HealthIssue[] {
+  return [...issues].sort((a, b) => {
+    // hard before integrity
+    if (a.severity !== b.severity) {
+      return a.severity === 'hard' ? -1 : 1
+    }
+    // then alpha by checkId
+    return a.checkId.localeCompare(b.checkId)
+  })
+}
+
+function mergeRuns(
+  existing: readonly CheckRun[],
+  incoming: readonly CheckRun[]
+): readonly CheckRun[] {
+  const incomingIds = new Set(incoming.map((r) => r.checkId))
+  const kept = existing.filter((r) => !incomingIds.has(r.checkId))
+  return [...kept, ...incoming]
+}
+
+function computeStatus(
+  runs: readonly CheckRun[],
+  lastDerivedAt: number | null,
+  lastInfraAt: number | null
+): HealthStatus {
+  if (lastDerivedAt === null || lastInfraAt === null) {
+    return 'unknown'
+  }
+
+  const stalenessThreshold = HEARTBEAT_MS * STALENESS_MULTIPLIER
+  if (Date.now() - lastInfraAt > stalenessThreshold) {
+    return 'unknown'
+  }
+
+  const anyFailed = runs.some((r) => !r.passed)
+  return anyFailed ? 'degraded' : 'green'
+}
+
+function flattenIssues(runs: readonly CheckRun[]): readonly HealthIssue[] {
+  return sortIssues(runs.flatMap((r) => r.issues))
+}
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+export const useVaultHealthStore = create<VaultHealthState>()((set, get) => ({
+  ...INITIAL_STATE,
+
+  setDerived: (health: DerivedHealth) => {
+    const prev = get()
+    const lastDerivedAt = health.computedAt
+    const lastInfraAt = prev.lastInfraAt
+    const runs = mergeRuns(prev.runs, health.runs)
+    const status = computeStatus(runs, lastDerivedAt, lastInfraAt)
+    const issues = flattenIssues(runs)
+
+    set({ runs, status, issues, lastDerivedAt })
+  },
+
+  setInfra: (health: InfraHealth) => {
+    const prev = get()
+    const lastInfraAt = health.computedAt
+    const lastDerivedAt = prev.lastDerivedAt
+    const runs = mergeRuns(prev.runs, health.runs)
+    const status = computeStatus(runs, lastDerivedAt, lastInfraAt)
+    const issues = flattenIssues(runs)
+
+    set({ runs, status, issues, lastInfraAt })
+  },
+
+  reset: () => {
+    set({ ...INITIAL_STATE })
+  }
+}))
