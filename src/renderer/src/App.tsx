@@ -74,6 +74,9 @@ const LazyGraphPanel = lazy(() =>
 const LazyGhostPanel = lazy(() =>
   import('./panels/ghosts/GhostPanel').then((module) => ({ default: module.GhostPanel }))
 )
+const LazyHealthPanel = lazy(() =>
+  import('./panels/health/HealthPanel').then((module) => ({ default: module.HealthPanel }))
+)
 
 async function openArtifactInEditorOnDemand(path: string, title?: string): Promise<void> {
   const { openArtifactInEditor } = await import('./system-artifacts/system-artifact-runtime')
@@ -185,6 +188,13 @@ function ContentArea() {
         <KeepAliveSlot active={activeType === 'ghosts'}>
           <Suspense fallback={<PanelLoadingFallback label="Loading ghosts..." />}>
             <LazyGhostPanel />
+          </Suspense>
+        </KeepAliveSlot>
+      )}
+      {openTypes.has('health') && mountedTypes.has('health') && (
+        <KeepAliveSlot active={activeType === 'health'}>
+          <Suspense fallback={<PanelLoadingFallback label="Loading health..." />}>
+            <LazyHealthPanel />
           </Suspense>
         </KeepAliveSlot>
       )}
