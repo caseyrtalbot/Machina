@@ -7,6 +7,8 @@ import type {
   HealthStatus,
   InfraHealth
 } from '@shared/engine/vault-health'
+import { computeDerivedHealth } from '@shared/engine/vault-health'
+import { useVaultStore } from './vault-store'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -112,3 +114,28 @@ export const useVaultHealthStore = create<VaultHealthState>()((set, get) => ({
     set({ ...INITIAL_STATE })
   }
 }))
+
+// ---------------------------------------------------------------------------
+// Vault-store subscription: recompute derived health when worker result changes
+// ---------------------------------------------------------------------------
+
+let _prevArtifactsRef: readonly unknown[] = useVaultStore.getState().artifacts
+
+useVaultStore.subscribe((state) => {
+  // Only react when artifacts reference changes (proxy for setWorkerResult)
+  if (state.artifacts === _prevArtifactsRef) return
+  _prevArtifactsRef = state.artifacts
+
+  const derived = computeDerivedHealth({
+    workerResult: {
+      artifacts: state.artifacts,
+      errors: state.parseErrors,
+      fileToId: state.fileToId,
+      artifactPathById: state.artifactPathById,
+      graph: state.graph
+    },
+    files: state.files
+  })
+
+  useVaultHealthStore.getState().setDerived(derived)
+})
