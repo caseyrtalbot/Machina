@@ -98,4 +98,38 @@ describe('normalizePersistedTabState', () => {
 
     expect(result.activeTabId).toBe('editor')
   })
+
+  it('v3 state with health tab survives migration to v4', () => {
+    const result = normalizePersistedTabState({
+      tabs: [
+        { id: 'editor', type: 'editor', label: 'Editor', closeable: false },
+        { id: 'health', type: 'health', label: 'Health', closeable: true }
+      ],
+      activeTabId: 'health'
+    })
+    expect(result.tabs).toContainEqual(expect.objectContaining({ id: 'health', type: 'health' }))
+    expect(result.activeTabId).toBe('health')
+  })
+
+  it('v3 state without health tab migrates cleanly', () => {
+    const result = normalizePersistedTabState({
+      tabs: [
+        { id: 'editor', type: 'editor', label: 'Editor', closeable: false },
+        { id: 'canvas', type: 'canvas', label: 'Vault Canvas', closeable: true }
+      ],
+      activeTabId: 'editor'
+    })
+    expect(result.tabs.map((t) => t.id)).toEqual(['editor', 'canvas'])
+  })
+
+  it('health tab type is recognized as valid tab type', () => {
+    const result = normalizePersistedTabState({
+      tabs: [
+        { id: 'editor', type: 'editor', label: 'Editor', closeable: false },
+        { id: 'health', type: 'health', label: 'Health', closeable: true }
+      ],
+      activeTabId: 'editor'
+    })
+    expect(result.tabs.map((t) => t.type)).toContain('health')
+  })
 })

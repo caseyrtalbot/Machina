@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
-export type TabType = 'editor' | 'canvas' | 'workbench' | 'graph' | 'ghosts'
+export type TabType = 'editor' | 'canvas' | 'workbench' | 'graph' | 'ghosts' | 'health'
 
 export interface ViewTab {
   readonly id: string
@@ -24,7 +24,7 @@ interface TabActions {
 
 type TabStore = TabState & TabActions
 
-const TAB_TYPES = ['editor', 'canvas', 'workbench', 'graph', 'ghosts'] as const
+const TAB_TYPES = ['editor', 'canvas', 'workbench', 'graph', 'ghosts', 'health'] as const
 const LEGACY_WORKBENCH_TAB_ID = 'project-canvas'
 
 export const TAB_DEFINITIONS: Record<TabType, { label: string; iconId: string }> = {
@@ -32,7 +32,8 @@ export const TAB_DEFINITIONS: Record<TabType, { label: string; iconId: string }>
   canvas: { label: 'Vault Canvas', iconId: 'canvas' },
   workbench: { label: 'Workbench', iconId: 'workbench' },
   graph: { label: 'Graph', iconId: 'graph' },
-  ghosts: { label: 'Ghosts', iconId: 'ghosts' }
+  ghosts: { label: 'Ghosts', iconId: 'ghosts' },
+  health: { label: 'Health', iconId: 'health' }
 }
 
 const DEFAULT_TABS: readonly ViewTab[] = [
@@ -168,7 +169,7 @@ export const useTabStore = create<TabStore>()(
     }),
     {
       name: 'machina-tabs',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       migrate: (persistedState) =>
         normalizePersistedTabState(persistedState as PersistedTabSnapshot),
