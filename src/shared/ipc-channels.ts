@@ -12,6 +12,7 @@ import type { ActionDefinition } from './action-types'
 import type { AgentActionRequest, AgentActionResponse } from './agent-action-types'
 import type { CanvasMutationPlan } from './canvas-mutation-types'
 import type { ClaudeStatus } from './claude-status-types'
+import type { InfraHealth } from './engine/vault-health'
 
 export interface IpcChannels {
   // --- Filesystem ---
@@ -213,6 +214,10 @@ export interface IpcChannels {
     request: { paths: readonly string[]; vaultPath: string }
     response: void
   }
+
+  // --- Health ---
+  'health:heartbeat': { request: { at: number }; response: void }
+  'health:request-tick': { request: void; response: void }
 }
 
 export interface IpcEvents {
@@ -242,6 +247,9 @@ export interface IpcEvents {
 
   // Claude status events (main -> renderer)
   'claude:status-changed': ClaudeStatus
+
+  // Health monitoring events (main -> renderer)
+  'health:report': InfraHealth
 }
 
 export type IpcChannel = keyof IpcChannels

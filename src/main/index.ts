@@ -16,11 +16,14 @@ import { registerCanvasIpc } from './ipc/canvas'
 import { registerAgentActionIpc } from './ipc/agent-actions'
 import { registerArtifactIpc } from './ipc/artifact'
 import { registerGhostEmergeIpc } from './ipc/ghost-emerge'
+import { registerHealthIpc, setHealthMonitor, emitHealthReport } from './ipc/health'
 import { registerClaudeStatusIpc } from './ipc/claude-status'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { PtyMonitor } from './services/pty-monitor'
 import { AgentSpawner } from './services/agent-spawner'
 import { initVaultIndex } from './services/vault-indexing'
+import { VaultHealthMonitor } from './services/vault-health-monitor'
+import { FsErrorLog } from './services/fs-error-log'
 import { ClaudeStatusService } from './services/claude-status-service'
 import { typedHandle } from './typed-ipc'
 import { getMainWindow, setMainWindow } from './window-registry'
@@ -101,6 +104,7 @@ if (!process.env.LANG) {
 const mcpLifecycle = new McpLifecycle()
 const quitCoordinator = new QuitCoordinator()
 const claudeStatus = new ClaudeStatusService()
+let healthMonitor: VaultHealthMonitor | null = null
 
 function createWindow(): BrowserWindow {
   const savedWindowState = readAppConfigValue<WindowState>(WINDOW_STATE_KEY)
@@ -245,6 +249,18 @@ app.whenReady().then(() => {
     const spawner = new AgentSpawner(getShellService(), vaultPath)
     setAgentServices(monitor, spawner)
     setActionsVaultRoot(vaultPath)
+
+    if (!healthMonitor) {
+      const errorLog = new FsErrorLog(32, (path) => getDocumentManager().hasPendingWrite(path))
+      healthMonitor = new VaultHealthMonitor(getVaultWatcher(), errorLog, (report) =>
+        emitHealthReport(report)
+      )
+    } else {
+      healthMonitor.stop()
+    }
+    setHealthMonitor(healthMonitor)
+    healthMonitor.switchVault(vaultPath)
+    healthMonitor.start(vaultPath)
   })
 
   createWindow()
@@ -260,6 +276,7 @@ app.whenReady().then(() => {
   registerAgentActionIpc()
   registerArtifactIpc()
   registerGhostEmergeIpc()
+  registerHealthIpc()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -65,6 +65,10 @@ function RefreshButton() {
     })
     useVaultHealthStore.getState().setDerived(derived)
 
+    if (window.api?.health) {
+      window.api.health.requestTick()
+    }
+
     setDisabled(true)
     timerRef.current = setTimeout(() => setDisabled(false), REFRESH_COOLDOWN_MS)
   }, [disabled])

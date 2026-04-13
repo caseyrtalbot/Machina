@@ -4,6 +4,7 @@ import { teConfigPath } from '../utils/paths'
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getDocumentManager } from './documents'
 import { getMainWindow } from '../window-registry'
+import { recordFileChange } from './health'
 
 const watcher = new VaultWatcher()
 const fileService = new FileService()
@@ -36,6 +37,8 @@ export function registerWatcherIpc(): void {
             })
           }
         }
+
+        recordFileChange()
       },
       customPatterns
     )

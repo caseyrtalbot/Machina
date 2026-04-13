@@ -15,6 +15,7 @@ import type { AgentActionRequest, AgentActionResponse } from '../shared/agent-ac
 import type { CanvasMutationPlan } from '../shared/canvas-mutation-types'
 import type { ClaudeStatus } from '../shared/claude-status-types'
 import type { AgentArtifactDraft, MaterializeResult } from '../shared/agent-artifact-types'
+import type { InfraHealth } from '../shared/engine/vault-health'
 
 const api = {
   window: {
@@ -136,6 +137,10 @@ const api = {
     unmaterialize: (paths: readonly string[], vaultPath: string): Promise<void> =>
       typedInvoke('artifact:unmaterialize', { paths, vaultPath })
   },
+  health: {
+    heartbeat: (payload: { at: number }) => typedInvoke('health:heartbeat', payload),
+    requestTick: () => typedInvoke('health:request-tick')
+  },
   document: {
     open: (path: string) => typedInvoke('doc:open', { path }),
     close: (path: string) => typedInvoke('doc:close', { path }),
@@ -176,7 +181,8 @@ const api = {
     appWillQuit: (callback: (data: Record<string, never>) => void) =>
       typedOn('app:will-quit', callback),
     claudeStatusChanged: (callback: (data: ClaudeStatus) => void) =>
-      typedOn('claude:status-changed', callback)
+      typedOn('claude:status-changed', callback),
+    healthReport: (callback: (data: InfraHealth) => void) => typedOn('health:report', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path })

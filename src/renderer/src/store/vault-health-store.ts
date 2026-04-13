@@ -138,7 +138,21 @@ useVaultStore.subscribe((state) => {
   })
 
   useVaultHealthStore.getState().setDerived(derived)
+
+  if (typeof window !== 'undefined' && window.api?.health) {
+    window.api.health.heartbeat({ at: Date.now() })
+  }
 })
+
+// ---------------------------------------------------------------------------
+// Infra report listener: receive InfraHealth from main process
+// ---------------------------------------------------------------------------
+
+if (typeof window !== 'undefined' && window.api?.on?.healthReport) {
+  window.api.on.healthReport((health) => {
+    useVaultHealthStore.getState().setInfra(health)
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Vault-store subscription: reset on vault path change (close or A→B swap)
