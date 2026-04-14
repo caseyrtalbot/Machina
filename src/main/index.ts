@@ -239,6 +239,12 @@ app.whenReady().then(() => {
   // Wire MCP + agent services to vault initialization.
   // Services update on vault switch without re-registering IPC handlers.
   onVaultReady(async (vaultPath) => {
+    // Drop any pending-write suppression flags inherited from the previous
+    // vault. Otherwise an inflight write against the old vault can leak
+    // suppression into the new one and swallow legitimate external-change
+    // notifications for same-pathed files.
+    getDocumentManager().clearPendingWrites()
+
     const deps = await initVaultIndex(vaultPath)
     mcpLifecycle.createForVault(vaultPath, {
       ...deps,

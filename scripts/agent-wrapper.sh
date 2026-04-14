@@ -3,12 +3,13 @@ set -uo pipefail
 
 # agent-wrapper.sh — Bridges Claude Code to the Machina sidecar convention.
 # Usage: agent-wrapper.sh --session-id <id> --vault-root <path> --cwd <path>
-#                         [--prompt <text>] [--no-cleanup]
+#                         [--prompt <text>] [--prompt-file <path>] [--no-cleanup]
 
 SESSION_ID=""
 VAULT_ROOT=""
 CWD=""
 PROMPT=""
+PROMPT_FILE=""
 NO_CLEANUP=false
 
 # Parse arguments
@@ -18,6 +19,7 @@ while [[ $# -gt 0 ]]; do
     --vault-root)  VAULT_ROOT="$2";  shift 2 ;;
     --cwd)         CWD="$2";         shift 2 ;;
     --prompt)      PROMPT="$2";      shift 2 ;;
+    --prompt-file) PROMPT_FILE="$2"; shift 2 ;;
     --no-cleanup)  NO_CLEANUP=true;  shift ;;
     *)             echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
@@ -37,10 +39,25 @@ if [[ -z "$CWD" ]]; then
   exit 1
 fi
 
+# Resolve prompt: --prompt-file takes precedence over --prompt. The file form
+# avoids MAX_ARG_STRLEN truncation on large composed prompts and removes the
+# most-variable input from the shell-escaping surface.
+if [[ -n "$PROMPT_FILE" ]]; then
+  if [[ ! -f "$PROMPT_FILE" ]]; then
+    echo "Error: prompt file not found: $PROMPT_FILE" >&2
+    exit 1
+  fi
+  PROMPT="$(cat "$PROMPT_FILE")"
+fi
+
 # Sidecar paths
 AGENTS_DIR="${VAULT_ROOT}/.te/agents"
 SIDECAR_PATH="${AGENTS_DIR}/${SESSION_ID}.json"
 mkdir -p "$AGENTS_DIR"
+
+# PID recorded in sidecar. Populated after claude is launched so monitors
+# see the actual claude process, not the wrapper shell that will exit.
+CLAUDE_PID=0
 
 # Write sidecar JSON to disk
 write_sidecar() {
@@ -55,7 +72,7 @@ write_sidecar() {
   \"agentType\": \"claude-code\",
   \"status\": \"${status}\",
   \"startedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-  \"pid\": $$"
+  \"pid\": ${CLAUDE_PID}"
 
   if [[ -n "$exit_code" ]]; then
     json="${json},
@@ -94,7 +111,8 @@ collect_files_touched() {
   printf '%s' "$files_json"
 }
 
-# Cleanup: collect final filesTouched, write status, optionally remove sidecar
+# Cleanup: collect final filesTouched, write status, optionally remove sidecar.
+# Also removes the prompt temp file if one was passed in.
 cleanup() {
   local code="${1:-0}"
   local files
@@ -102,6 +120,9 @@ cleanup() {
   write_sidecar "completed" "$code" "" "$files"
   if [[ "$NO_CLEANUP" == "false" ]]; then
     rm -f "$SIDECAR_PATH"
+  fi
+  if [[ -n "$PROMPT_FILE" && -f "$PROMPT_FILE" ]]; then
+    rm -f "$PROMPT_FILE"
   fi
 }
 
@@ -111,7 +132,11 @@ if ! command -v claude &>/dev/null; then
   exit 0
 fi
 
-# Signal handler: update sidecar before dying
+# Signal handlers: update sidecar before dying. HUP must be trapped because
+# node-pty defaults to SIGHUP when killing a PTY (e.g., app quit), and without
+# this trap the wrapper would exit without running cleanup, orphaning the
+# sidecar JSON in .te/agents/.
+trap 'cleanup 129; exit 129' HUP
 trap 'cleanup 130; exit 130' INT
 trap 'cleanup 143; exit 143' TERM
 
@@ -123,9 +148,15 @@ if [[ -n "$PROMPT" ]]; then
   CLAUDE_ARGS+=("$PROMPT")
 fi
 
-# Launch claude in the specified working directory
+# Launch claude in the specified working directory. Backgrounded so we can
+# capture its real PID ($!) into the sidecar, then wait for it. This lets
+# monitors key off the claude process rather than the wrapper shell (which
+# exits before claude does in some paths).
 CLAUDE_EXIT=0
-(cd "$CWD" && claude "${CLAUDE_ARGS[@]}") || CLAUDE_EXIT=$?
+(cd "$CWD" && claude "${CLAUDE_ARGS[@]}") &
+CLAUDE_PID=$!
+write_sidecar "running"
+wait "$CLAUDE_PID" || CLAUDE_EXIT=$?
 
 # Clean exit: collect files, write final status, clean up
 cleanup "$CLAUDE_EXIT"

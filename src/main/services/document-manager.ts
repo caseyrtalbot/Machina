@@ -175,6 +175,20 @@ export class DocumentManager {
   }
 
   /**
+   * Drop all pending-write suppression flags and cancel their safety timers.
+   * Must be called on vault switch: otherwise an inflight write against the
+   * old vault could leak suppression into the new vault and swallow a
+   * legitimate external-change notification for a same-pathed file.
+   */
+  clearPendingWrites(): void {
+    for (const timer of this._pendingWriteTimers.values()) {
+      clearTimeout(timer)
+    }
+    this._pendingWriteTimers.clear()
+    this._pendingWrites.clear()
+  }
+
+  /**
    * Register a path as about to be written by an external source (e.g., MCP agent).
    * Prevents the vault watcher from triggering a reload for this write.
    * The flag auto-clears after PENDING_WRITE_TIMEOUT_MS as a safety net.

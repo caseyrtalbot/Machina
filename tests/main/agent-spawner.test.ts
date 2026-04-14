@@ -15,6 +15,30 @@ vi.mock('crypto', async (importOriginal) => {
   }
 })
 
+// Mock fs writes (prompt temp file). readFileSync/existsSync delegate to real
+// fs so the bundled default-agent-prompt.md lookup still works.
+const writeFileSyncMock = vi.fn()
+const mkdirSyncMock = vi.fn()
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>()
+  return {
+    ...actual,
+    writeFileSync: (...args: unknown[]) => writeFileSyncMock(...args),
+    mkdirSync: (...args: unknown[]) => mkdirSyncMock(...args)
+  }
+})
+
+// Mock vault-git so auto-commit is a no-op in tests
+const commitPreAgentSnapshotMock = vi.fn().mockReturnValue({
+  committed: false,
+  reason: 'not-a-git-repo'
+})
+vi.mock('../../src/main/services/vault-git', () => ({
+  commitPreAgentSnapshot: (...args: unknown[]) => commitPreAgentSnapshotMock(...args),
+  isGitRepo: vi.fn().mockReturnValue(false),
+  isAutoCommitOptedOut: vi.fn().mockReturnValue(false)
+}))
+
 function createMockShellService(): ShellService {
   return {
     create: vi.fn().mockReturnValue(MOCK_UUID as SessionId),
@@ -60,7 +84,7 @@ describe('AgentSpawner', () => {
     expect(result.length).toBeGreaterThan(0)
   })
 
-  it('passes wrapper script path as shell command', async () => {
+  it('passes wrapper script path and shell-escaped args', async () => {
     const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
     const spawner = new AgentSpawner(mockShellService, '/vault/root')
     const request: AgentSpawnRequest = { cwd: '/projects/my-app' }
@@ -70,12 +94,11 @@ describe('AgentSpawner', () => {
     const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
     expect(shellArg).toContain('agent-wrapper.sh')
     expect(shellArg).toContain('--session-id')
-    // Args are now shell-escaped (single-quoted)
     expect(shellArg).toContain("--vault-root '/vault/root'")
     expect(shellArg).toContain("--cwd '/projects/my-app'")
   })
 
-  it('includes --prompt in shell command when prompt is provided', async () => {
+  it('writes prompt to a temp file and passes --prompt-file when user prompt is provided', async () => {
     const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
     const spawner = new AgentSpawner(mockShellService, '/vault/root')
     const request: AgentSpawnRequest = {
@@ -86,11 +109,18 @@ describe('AgentSpawner', () => {
     spawner.spawn(request)
 
     const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
-    expect(shellArg).toContain('--prompt')
-    expect(shellArg).toContain('Fix the failing tests')
+    expect(shellArg).toContain('--prompt-file')
+    // Prompt text itself is no longer inlined into the shell command — it's in the temp file
+    expect(shellArg).not.toContain('Fix the failing tests')
+
+    // The prompt file should have been written under <TE_DIR>/agents/prompts/
+    expect(writeFileSyncMock).toHaveBeenCalledOnce()
+    const [writtenPath, writtenContent] = writeFileSyncMock.mock.calls[0]
+    expect(writtenPath).toMatch(/[\\/]agents[\\/]prompts[\\/].*\.txt$/)
+    expect(writtenContent).toContain('Fix the failing tests')
   })
 
-  it('sends agent prompt template even when no user prompt is provided', async () => {
+  it('writes bundled default prompt to file even when no user prompt is provided', async () => {
     const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
     const spawner = new AgentSpawner(mockShellService, '/vault/root')
     const request: AgentSpawnRequest = { cwd: '/projects/my-app' }
@@ -98,9 +128,25 @@ describe('AgentSpawner', () => {
     spawner.spawn(request)
 
     const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
-    // When the bundled default-agent-prompt.md exists, it gets sent as the prompt
-    expect(shellArg).toContain('--prompt')
-    expect(shellArg).toContain('Output Contract')
+    expect(shellArg).toContain('--prompt-file')
+
+    // Bundled default prompt is written to the temp file
+    expect(writeFileSyncMock).toHaveBeenCalledOnce()
+    const [, writtenContent] = writeFileSyncMock.mock.calls[0]
+    expect(writtenContent).toContain('Output Contract')
+  })
+
+  it('attempts a pre-agent git snapshot', async () => {
+    const { AgentSpawner } = await import('../../src/main/services/agent-spawner')
+    const spawner = new AgentSpawner(mockShellService, '/vault/root')
+    const request: AgentSpawnRequest = { cwd: '/projects/my-app' }
+
+    spawner.spawn(request)
+
+    expect(commitPreAgentSnapshotMock).toHaveBeenCalledOnce()
+    const [vaultRoot, sessionId] = commitPreAgentSnapshotMock.mock.calls[0]
+    expect(vaultRoot).toBe('/vault/root')
+    expect(typeof sessionId).toBe('string')
   })
 
   it('sets label with agent: prefix for terminal tab', async () => {
@@ -112,7 +158,6 @@ describe('AgentSpawner', () => {
 
     const labelArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][4]
     expect(labelArg).toMatch(/^agent:/)
-    // Label should include the first 8 chars of the session ID
     expect(labelArg).toHaveLength('agent:'.length + 8)
   })
 
@@ -124,7 +169,6 @@ describe('AgentSpawner', () => {
     spawner.spawn(request)
 
     const shellArg = (mockShellService.create as ReturnType<typeof vi.fn>).mock.calls[0][3]
-    // In test/dev, __dirname does NOT contain .asar, so uses relative path from out/main/
     expect(shellArg).toContain('scripts/agent-wrapper.sh')
     expect(shellArg).not.toContain('resourcesPath')
   })

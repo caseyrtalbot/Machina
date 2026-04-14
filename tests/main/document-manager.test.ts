@@ -198,6 +198,33 @@ describe('DocumentManager', () => {
     })
   })
 
+  describe('clearPendingWrites (vault switch)', () => {
+    it('drops pending-write flags so suppression does not leak across vaults', async () => {
+      dm.registerExternalWrite('/vault/a/note.md')
+      dm.registerExternalWrite('/vault/a/other.md')
+      expect(dm.hasPendingWrite('/vault/a/note.md')).toBe(true)
+      expect(dm.hasPendingWrite('/vault/a/other.md')).toBe(true)
+
+      dm.clearPendingWrites()
+
+      expect(dm.hasPendingWrite('/vault/a/note.md')).toBe(false)
+      expect(dm.hasPendingWrite('/vault/a/other.md')).toBe(false)
+    })
+
+    it('cancels the pending-write safety timer so it cannot fire later', async () => {
+      dm.registerExternalWrite('/vault/a/note.md')
+      dm.clearPendingWrites()
+
+      // Advance past the PENDING_WRITE_TIMEOUT_MS safety window. If the timer
+      // leaked, it would still try to delete from the now-empty set; fake
+      // timers surface this as a pending timer if cleanup was skipped.
+      await vi.advanceTimersByTimeAsync(5000)
+
+      // Still false and, critically, no dangling timer did anything observable
+      expect(dm.hasPendingWrite('/vault/a/note.md')).toBe(false)
+    })
+  })
+
   // ─── External change detection ───
 
   describe('handleExternalChange', () => {
