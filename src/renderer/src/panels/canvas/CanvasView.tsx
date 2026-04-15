@@ -48,7 +48,7 @@ import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
 import { useAgentOrchestrator } from '../../hooks/use-agent-orchestrator'
 import { buildScopeContext } from '@shared/action-types'
 import { generateClaudeMd } from '../../engine/claude-md-template'
-import { buildActionLaunchScript } from './action-launcher'
+import { buildActionLaunchScript, shellQuote } from './action-launcher'
 import { AgentPreview } from './AgentPreview'
 import { computeGhostNodes } from './agent-ghost-layer'
 import type { AgentActionName } from '@shared/agent-action-types'
@@ -700,7 +700,7 @@ export function CanvasView(): React.ReactElement {
       { x: -viewport.x + 200, y: -viewport.y + 100 },
       {
         metadata: {
-          initialCommand: `bash '${scriptPath}'`,
+          initialCommand: `bash ${shellQuote(scriptPath)}`,
           initialCwd: vp,
           actionId,
           actionName: actionResult.definition.name

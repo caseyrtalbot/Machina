@@ -5,7 +5,7 @@ export interface BuildActionLaunchScriptArgs {
   readonly scriptPath: string
 }
 
-function shellQuote(value: string): string {
+export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 

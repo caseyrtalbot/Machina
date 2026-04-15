@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildActionLaunchScript } from '../action-launcher'
+import { buildActionLaunchScript, shellQuote } from '../action-launcher'
 
 describe('buildActionLaunchScript', () => {
   it('builds a Claude Code action launcher with a supported positional prompt', () => {
@@ -31,5 +31,19 @@ describe('buildActionLaunchScript', () => {
     expect(script).toContain('rm -f "$PROMPT_PATH" "$SCRIPT_PATH"')
     expect(script).toContain("PROMPT_PATH='/vault/.machina-dev/action-prompt-quote'\\''s.txt'")
     expect(script).toContain("SCRIPT_PATH='/vault/.machina-dev/action-launch-quote'\\''s.sh'")
+  })
+})
+
+describe('shellQuote', () => {
+  it('wraps plain paths in single quotes', () => {
+    expect(shellQuote('/vault/.machina/action-launch-abc.sh')).toBe(
+      "'/vault/.machina/action-launch-abc.sh'"
+    )
+  })
+
+  it('escapes apostrophes so bash does not drop into a `quote>` prompt', () => {
+    expect(shellQuote("/Users/x/Desktop/Naval's Library/.machina/a.sh")).toBe(
+      "'/Users/x/Desktop/Naval'\\''s Library/.machina/a.sh'"
+    )
   })
 })
