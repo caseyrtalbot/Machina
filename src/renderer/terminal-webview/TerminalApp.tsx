@@ -17,13 +17,17 @@ function readUrlParams(): {
   cwd: string | null
   initialCommand: string | null
   systemPrompt: string | null
+  label: string | null
+  vaultPath: string | null
 } {
   const params = new URLSearchParams(window.location.search)
   return {
     sessionId: params.get('sessionId'),
     cwd: params.get('cwd'),
     initialCommand: params.get('initialCommand'),
-    systemPrompt: params.get('systemPrompt')
+    systemPrompt: params.get('systemPrompt'),
+    label: params.get('label'),
+    vaultPath: params.get('vaultPath')
   }
 }
 
@@ -106,7 +110,14 @@ export function TerminalApp() {
   }, [])
 
   useEffect(() => {
-    const { sessionId: urlSessionId, cwd, initialCommand, systemPrompt } = readUrlParams()
+    const {
+      sessionId: urlSessionId,
+      cwd,
+      initialCommand,
+      systemPrompt,
+      label,
+      vaultPath
+    } = readUrlParams()
     let cancelled = false
     firstDataRef.current = true
     reconnectRef.current = Boolean(urlSessionId)
@@ -347,7 +358,9 @@ export function TerminalApp() {
       const newSessionId = await window.terminalApi.create({
         cwd: cwd || '/',
         cols,
-        rows
+        rows,
+        label: label ?? undefined,
+        vaultPath: vaultPath ?? undefined
       })
       if (cancelled) return
 

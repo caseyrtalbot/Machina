@@ -30,6 +30,14 @@ describe('TerminalApp component', () => {
     it('reads systemPrompt from URL search params', () => {
       expect(src).toContain("'systemPrompt'")
     })
+
+    it('reads action label from URL search params', () => {
+      expect(src).toContain("'label'")
+    })
+
+    it('reads vaultPath from URL search params', () => {
+      expect(src).toContain("'vaultPath'")
+    })
   })
 
   describe('xterm setup', () => {
@@ -155,6 +163,11 @@ describe('TerminalApp component', () => {
 
     it('calls terminalApi.create for new sessions', () => {
       expect(src).toContain('window.terminalApi.create')
+    })
+
+    it('passes action metadata into terminal creation', () => {
+      expect(src).toContain('label: label ?? undefined')
+      expect(src).toContain('vaultPath: vaultPath ?? undefined')
     })
 
     it('sends session-created to host after creation', () => {

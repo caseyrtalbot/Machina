@@ -100,6 +100,12 @@ export function TerminalCard({ node }: TerminalCardProps) {
     if (node.metadata?.initialCommand) {
       params.set('initialCommand', String(node.metadata.initialCommand))
     }
+    if (node.metadata?.actionId) {
+      params.set('label', String(node.metadata.actionId))
+    }
+    if (vaultPath) {
+      params.set('vaultPath', vaultPath)
+    }
 
     // For Claude cards, build context in the host (has access to canvas store)
     if (node.metadata?.initialCommand === 'claude') {

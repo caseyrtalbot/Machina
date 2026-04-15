@@ -48,6 +48,7 @@ import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
 import { useAgentOrchestrator } from '../../hooks/use-agent-orchestrator'
 import { buildScopeContext } from '@shared/action-types'
 import { generateClaudeMd } from '../../engine/claude-md-template'
+import { buildActionLaunchScript } from './action-launcher'
 import { AgentPreview } from './AgentPreview'
 import { computeGhostNodes } from './agent-ghost-layer'
 import type { AgentActionName } from '@shared/agent-action-types'
@@ -684,15 +685,12 @@ export function CanvasView(): React.ReactElement {
     const scopeSummary =
       scopeFiles.length > 0 ? scopeFiles.map((f) => f.split('/').pop()).join(', ') : 'entire vault'
 
-    const script = [
-      '#!/bin/bash',
-      'clear',
-      `printf "\\033[1m${actionResult.definition.name}\\033[0m  ${scopeSummary}\\n\\n"`,
-      `exec claude --append-system-prompt "$(cat '${promptPath}')" \\`,
-      '  --dangerously-skip-permissions \\',
-      '  --allowedTools Read,Write,Edit,Glob,Grep,Bash \\',
-      '  --initial-prompt "Begin."'
-    ].join('\n')
+    const script = buildActionLaunchScript({
+      actionName: actionResult.definition.name,
+      scopeSummary,
+      promptPath,
+      scriptPath
+    })
     await window.api.fs.writeFile(scriptPath, script)
 
     // 6. Spawn terminal card that runs the launcher script

@@ -288,6 +288,24 @@ describe('TerminalCard (webview host)', () => {
     expect(src).toContain('cwd=%2Ftest%2Fvault%2Fsubfolder')
   })
 
+  it('passes action label and vault path in webview src params for action terminals', async () => {
+    const { TerminalCard } = await import('../TerminalCard')
+    const node = makeTerminalNode({
+      metadata: {
+        initialCommand: "bash '/test/vault/.machina-dev/action-launch-abc.sh'",
+        initialCwd: '/test/vault',
+        actionId: 'librarian',
+        actionName: 'Librarian'
+      }
+    })
+    const { container } = render(<TerminalCard node={node} />)
+
+    const webview = container.querySelector('webview')
+    const src = webview?.getAttribute('src') ?? ''
+    expect(src).toContain('label=librarian')
+    expect(src).toContain('vaultPath=%2Ftest%2Fvault')
+  })
+
   it('replays focus to the webview on dom-ready after the card is already focused', async () => {
     mockFocusedCardId = 'term-1'
 
