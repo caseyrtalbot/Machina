@@ -28,22 +28,23 @@ function HealthDot() {
   const issues = useVaultHealthStore((s) => s.issues)
   const openTab = useTabStore((s) => s.openTab)
 
-  const fill =
-    status === 'green'
-      ? colors.accent.default
-      : status === 'degraded'
-        ? colors.claude.warning
-        : colors.text.muted
-
-  const passingCount = runs.filter((r) => r.passed).length
-  const totalCount = runs.length
-
-  const title =
-    status === 'green'
-      ? `Vault healthy \u2022 ${passingCount}/${totalCount} checks passing`
-      : status === 'degraded'
-        ? `${issues.length} issues, click for details`
-        : 'Checking\u2026'
+  let fill: string
+  let title: string
+  switch (status) {
+    case 'green': {
+      const passingCount = runs.filter((r) => r.passed).length
+      fill = colors.accent.default
+      title = `Vault healthy \u2022 ${passingCount}/${runs.length} checks passing`
+      break
+    }
+    case 'degraded':
+      fill = colors.claude.warning
+      title = `${issues.length} issues, click for details`
+      break
+    default:
+      fill = colors.text.muted
+      title = 'Checking\u2026'
+  }
 
   const handleClick = () => {
     if (status !== 'green') {

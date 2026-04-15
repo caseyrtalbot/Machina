@@ -85,35 +85,28 @@ function flattenIssues(runs: readonly CheckRun[]): readonly HealthIssue[] {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useVaultHealthStore = create<VaultHealthState>()((set, get) => ({
-  ...INITIAL_STATE,
-
-  setDerived: (health: DerivedHealth) => {
+export const useVaultHealthStore = create<VaultHealthState>()((set, get) => {
+  function applyIncoming(
+    incoming: DerivedHealth | InfraHealth,
+    timestampKey: 'lastDerivedAt' | 'lastInfraAt'
+  ): void {
     const prev = get()
-    const lastDerivedAt = health.computedAt
-    const lastInfraAt = prev.lastInfraAt
-    const runs = mergeRuns(prev.runs, health.runs)
+    const runs = mergeRuns(prev.runs, incoming.runs)
+    const lastDerivedAt =
+      timestampKey === 'lastDerivedAt' ? incoming.computedAt : prev.lastDerivedAt
+    const lastInfraAt = timestampKey === 'lastInfraAt' ? incoming.computedAt : prev.lastInfraAt
     const status = computeStatus(runs, lastDerivedAt, lastInfraAt)
     const issues = flattenIssues(runs)
-
-    set({ runs, status, issues, lastDerivedAt })
-  },
-
-  setInfra: (health: InfraHealth) => {
-    const prev = get()
-    const lastInfraAt = health.computedAt
-    const lastDerivedAt = prev.lastDerivedAt
-    const runs = mergeRuns(prev.runs, health.runs)
-    const status = computeStatus(runs, lastDerivedAt, lastInfraAt)
-    const issues = flattenIssues(runs)
-
-    set({ runs, status, issues, lastInfraAt })
-  },
-
-  reset: () => {
-    set({ ...INITIAL_STATE })
+    set({ runs, status, issues, [timestampKey]: incoming.computedAt })
   }
-}))
+
+  return {
+    ...INITIAL_STATE,
+    setDerived: (health) => applyIncoming(health, 'lastDerivedAt'),
+    setInfra: (health) => applyIncoming(health, 'lastInfraAt'),
+    reset: () => set({ ...INITIAL_STATE })
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Vault-store subscription: recompute derived health when worker result changes

@@ -45,6 +45,18 @@ function Tip({
   )
 }
 
+/** Compute the canvas-space point at the center of the visible surface. */
+function getViewportCenter(): { x: number; y: number } {
+  const vp = useCanvasStore.getState().viewport
+  const el = document.querySelector('[data-canvas-surface]')
+  const w = el?.clientWidth ?? 1920
+  const h = el?.clientHeight ?? 1080
+  return {
+    x: (-vp.x + w / 2) / vp.zoom,
+    y: (-vp.y + h / 2) / vp.zoom
+  }
+}
+
 export function CanvasToolbar({
   canUndo,
   canRedo,
@@ -476,18 +488,13 @@ export function CanvasToolbar({
               className="sidebar-popover-item"
               style={{ color: colors.text.primary }}
               onClick={() => {
-                const vp = useCanvasStore.getState().viewport
-                const el = document.querySelector('[data-canvas-surface]')
-                const w = el?.clientWidth ?? 1920
-                const h = el?.clientHeight ?? 1080
-                const centerX = (-vp.x + w / 2) / vp.zoom
-                const centerY = (-vp.y + h / 2) / vp.zoom
+                const center = getViewportCenter()
                 const { artifacts, graph, fileToId } = useVaultStore.getState()
                 const fileToIdMap = new Map(Object.entries(fileToId))
                 const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
                 useCanvasStore
                   .getState()
-                  .applySemanticLayout({ x: centerX, y: centerY }, fileToIdMap, artMap, graph.edges)
+                  .applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
                 setTileMenuOpen(false)
               }}
             >
@@ -500,16 +507,9 @@ export function CanvasToolbar({
                 className="sidebar-popover-item"
                 style={{ color: colors.text.secondary }}
                 onClick={() => {
-                  const vp = useCanvasStore.getState().viewport
-                  const el = document.querySelector('[data-canvas-surface]')
-                  const w = el?.clientWidth ?? 1920
-                  const h = el?.clientHeight ?? 1080
-                  const centerX = (-vp.x + w / 2) / vp.zoom
-                  const centerY = (-vp.y + h / 2) / vp.zoom
-                  useCanvasStore.getState().applyTileLayout(p.id as TilePattern, {
-                    x: centerX,
-                    y: centerY
-                  })
+                  useCanvasStore
+                    .getState()
+                    .applyTileLayout(p.id as TilePattern, getViewportCenter())
                   setTileMenuOpen(false)
                 }}
               >

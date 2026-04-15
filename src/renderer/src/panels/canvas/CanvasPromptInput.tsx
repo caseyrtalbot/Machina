@@ -25,6 +25,11 @@ export function CanvasPromptInput({
   const defaultPlaceholder =
     selectedCount > 0 ? `Ask about ${selectedCount} selected cards...` : 'Ask about vault...'
 
+  const submit = () => {
+    const trimmed = text.trim()
+    if (trimmed) onSubmit(trimmed)
+  }
+
   return (
     <div
       style={{
@@ -61,12 +66,8 @@ export function CanvasPromptInput({
         onChange={(e) => setText(e.target.value)}
         placeholder={placeholder ?? defaultPlaceholder}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            const trimmed = text.trim()
-            if (trimmed) onSubmit(trimmed)
-          } else if (e.key === 'Escape') {
-            onCancel()
-          }
+          if (e.key === 'Enter') submit()
+          else if (e.key === 'Escape') onCancel()
         }}
         style={{
           flex: 1,
@@ -80,10 +81,7 @@ export function CanvasPromptInput({
       />
       <button
         type="button"
-        onClick={() => {
-          const trimmed = text.trim()
-          if (trimmed) onSubmit(trimmed)
-        }}
+        onClick={submit}
         onMouseEnter={(e) => {
           e.currentTarget.style.color = colors.text.primary
         }}

@@ -117,6 +117,32 @@ function rewriteAsFileViewAddNode(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Snapshot nodes/edges, then push an apply/undo pair onto the command stack.
+ * `extraUndo` runs after restoring state (e.g., to unmaterialize files).
+ */
+function executeAgentPlanCommand(
+  plan: CanvasMutationPlan,
+  commandStack: CommandStack,
+  extraUndo?: () => Promise<void>
+): void {
+  const { nodes: prevNodes, edges: prevEdges } = useCanvasStore.getState()
+
+  commandStack.execute({
+    execute: () => {
+      useCanvasStore.getState().applyAgentPlan(plan)
+    },
+    undo: async () => {
+      useCanvasStore.setState({ nodes: prevNodes, edges: prevEdges, isDirty: true })
+      if (extraUndo) await extraUndo()
+    }
+  })
+}
+
+/* ------------------------------------------------------------------ */
 /*  Two-phase apply with persistence                                  */
 /* ------------------------------------------------------------------ */
 
@@ -136,43 +162,27 @@ async function applyWithPersistence(
       results.push(result)
     }
   } catch (err) {
-    // Rollback any already-materialized files
+    // Rollback any already-materialized files (best-effort; original error matters more)
     if (results.length > 0) {
       const paths = results.map((r) => r.absolutePath)
       try {
         await window.api.artifact.unmaterialize(paths, vaultPath)
       } catch {
-        // Best-effort cleanup; the original error is more important
+        /* swallow */
       }
     }
     throw err
   }
 
-  // Rewrite materialize ops to file-view add-node ops
-  const rewrittenOps: CanvasMutationOp[] = [
-    ...otherOps,
-    ...materializeOps.map((op, i) => rewriteAsFileViewAddNode(op, results[i]))
-  ]
-
+  // Phase B: Rewrite materialize ops to file-view add-node ops, then apply
   const rewrittenPlan: CanvasMutationPlan = {
     ...filteredPlan,
-    ops: rewrittenOps
+    ops: [...otherOps, ...materializeOps.map((op, i) => rewriteAsFileViewAddNode(op, results[i]))]
   }
 
-  // Phase B: Apply canvas mutations via CommandStack
-  const prevNodes = useCanvasStore.getState().nodes
-  const prevEdges = useCanvasStore.getState().edges
-
-  commandStack.execute({
-    execute: () => {
-      useCanvasStore.getState().applyAgentPlan(rewrittenPlan)
-    },
-    undo: async () => {
-      useCanvasStore.setState({ nodes: prevNodes, edges: prevEdges, isDirty: true })
-      // Unmaterialize the files we created in Phase A
-      const paths = results.map((r) => r.absolutePath)
-      await window.api.artifact.unmaterialize(paths, vaultPath)
-    }
+  executeAgentPlanCommand(rewrittenPlan, commandStack, async () => {
+    const paths = results.map((r) => r.absolutePath)
+    await window.api.artifact.unmaterialize(paths, vaultPath)
   })
 }
 
@@ -195,58 +205,34 @@ export async function applyAgentResult(
   plan: CanvasMutationPlan,
   commandStack: CommandStack
 ): Promise<void> {
-  const store = useCanvasStore.getState()
+  const { nodes } = useCanvasStore.getState()
 
   // Filter out ops referencing nodes deleted during compute
-  const currentNodeIds = new Set(store.nodes.map((n) => n.id))
+  const currentNodeIds = new Set(nodes.map((n) => n.id))
   const filteredOps = filterStaleOps(plan.ops, currentNodeIds)
 
   if (filteredOps.length === 0) return
 
   const filteredPlan: CanvasMutationPlan = { ...plan, ops: filteredOps }
-
-  // Partition ops
   const materializeOps = filteredOps.filter(isMaterializeOp)
-  const otherOps = filteredOps.filter((op) => !isMaterializeOp(op))
 
-  // Fast path: no materialize ops, use original synchronous logic
+  // Fast path: no materialize ops
   if (materializeOps.length === 0) {
-    const prevNodes = store.nodes
-    const prevEdges = store.edges
-
-    commandStack.execute({
-      execute: () => {
-        useCanvasStore.getState().applyAgentPlan(filteredPlan)
-      },
-      undo: () => {
-        useCanvasStore.setState({ nodes: prevNodes, edges: prevEdges, isDirty: true })
-      }
-    })
+    executeAgentPlanCommand(filteredPlan, commandStack)
     return
   }
 
-  // Materialize ops present
+  const otherOps = filteredOps.filter((op) => !isMaterializeOp(op))
+
   if (isPersistenceEnabled()) {
     await applyWithPersistence(filteredPlan, commandStack, materializeOps, otherOps)
-  } else {
-    // Persistence disabled: rewrite materialize ops as markdown fallback cards
-    const fallbackOps: CanvasMutationOp[] = [
-      ...otherOps,
-      ...materializeOps.map(rewriteAsFallbackAddNode)
-    ]
-
-    const fallbackPlan: CanvasMutationPlan = { ...filteredPlan, ops: fallbackOps }
-
-    const prevNodes = store.nodes
-    const prevEdges = store.edges
-
-    commandStack.execute({
-      execute: () => {
-        useCanvasStore.getState().applyAgentPlan(fallbackPlan)
-      },
-      undo: () => {
-        useCanvasStore.setState({ nodes: prevNodes, edges: prevEdges, isDirty: true })
-      }
-    })
+    return
   }
+
+  // Persistence disabled: rewrite materialize ops as markdown fallback cards
+  const fallbackPlan: CanvasMutationPlan = {
+    ...filteredPlan,
+    ops: [...otherOps, ...materializeOps.map(rewriteAsFallbackAddNode)]
+  }
+  executeAgentPlanCommand(fallbackPlan, commandStack)
 }

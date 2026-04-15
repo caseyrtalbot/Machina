@@ -163,7 +163,6 @@ function UnknownState() {
       style={{ padding: '4rem 2rem', textAlign: 'center' }}
     >
       <div
-        className="te-pulse"
         style={{
           fontSize: 14,
           color: colors.text.muted,
@@ -306,8 +305,7 @@ export function HealthPanel() {
 
   const lastChecked = lastDerivedAt ?? lastInfraAt
   const totalRuns = runs.length
-  const failedRuns = runs.filter((r) => !r.passed).length
-  const passingRuns = totalRuns - failedRuns
+  const passingRuns = runs.filter((r) => r.passed).length
 
   return (
     <div
