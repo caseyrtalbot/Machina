@@ -26,6 +26,7 @@ interface CardShellProps {
   readonly onContextMenu?: (e: React.MouseEvent) => void
   readonly onActivateContentClick?: (e: React.MouseEvent<HTMLDivElement>) => void
   readonly titleExtra?: React.ReactNode
+  readonly headerActions?: React.ReactNode
 }
 
 /** Valid conversion targets for each card type */
@@ -172,7 +173,8 @@ export function CardShell({
   onOpenInEditor,
   onContextMenu,
   onActivateContentClick,
-  titleExtra
+  titleExtra,
+  headerActions
 }: CardShellProps) {
   const copyText = filePath ?? title
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
@@ -454,6 +456,7 @@ export function CardShell({
               onClose={() => setConvertMenuOpen(false)}
             />
           )}
+          {headerActions}
           <button
             onClick={(e) => {
               e.stopPropagation()
