@@ -8,12 +8,15 @@ import { useEffect } from 'react'
 import { colors, typography } from '../../design/tokens'
 import type { AgentPhase } from '../../hooks/use-agent-orchestrator'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
+import type { AgentErrorTag } from '@shared/agent-action-types'
+import { agentErrorCopy } from './agent-error-copy'
 
 interface AgentPreviewProps {
   readonly phase: AgentPhase
   readonly actionName: string | null
   readonly plan: CanvasMutationPlan | null
   readonly errorMessage: string | null
+  readonly errorTag: AgentErrorTag | null
   readonly onApply: () => void
   readonly onCancel: () => void
 }
@@ -61,6 +64,7 @@ export function AgentPreview({
   actionName,
   plan,
   errorMessage,
+  errorTag,
   onApply,
   onCancel
 }: AgentPreviewProps) {
@@ -82,33 +86,8 @@ export function AgentPreview({
     return () => window.removeEventListener('keydown', handler)
   }, [phase, onApply, onCancel])
 
-  if (phase === 'computing') {
-    return (
-      <div
-        style={{
-          ...barBase,
-          backgroundColor: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        <span style={{ opacity: 0.8 }}>{actionName ?? 'Agent'}</span>
-        <span style={{ opacity: 0.5 }}>Computing&hellip;</span>
-        <button
-          onClick={onCancel}
-          style={{
-            ...btnBase,
-            backgroundColor: 'rgba(239,83,80,0.12)',
-            border: '1px solid rgba(239,83,80,0.35)',
-            color: '#f87171'
-          }}
-          title="Stop (Esc)"
-        >
-          Stop
-        </button>
-      </div>
-    )
-  }
+  // phase === 'computing' is now rendered by AgentThoughtCard, not here
+  if (phase === 'computing') return null
 
   if (phase === 'error') {
     return (
@@ -119,7 +98,11 @@ export function AgentPreview({
           border: '1px solid rgba(239,83,80,0.3)'
         }}
       >
-        <span>{errorMessage ?? 'Agent action failed'}</span>
+        <span>
+          {errorMessage
+            ? agentErrorCopy({ error: errorMessage, tag: errorTag ?? undefined })
+            : 'Agent action failed'}
+        </span>
         <button
           onClick={onCancel}
           style={{

@@ -25,6 +25,7 @@ const defaultProps = {
   actionName: null,
   plan: null,
   errorMessage: null,
+  errorTag: null,
   onApply: vi.fn(),
   onCancel: vi.fn()
 }
@@ -39,15 +40,11 @@ describe('AgentPreview', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('renders computing state with action name', () => {
-    render(<AgentPreview {...defaultProps} phase="computing" actionName="Suggest Connections" />)
-    expect(screen.getByText('Suggest Connections')).toBeTruthy()
-    expect(screen.getByText('Computing\u2026')).toBeTruthy()
-  })
-
-  it('renders computing state with fallback when actionName is null', () => {
-    render(<AgentPreview {...defaultProps} phase="computing" actionName={null} />)
-    expect(screen.getByText('Agent')).toBeTruthy()
+  it('renders nothing when phase is computing (AgentThoughtCard owns that phase)', () => {
+    const { container } = render(
+      <AgentPreview {...defaultProps} phase="computing" actionName="Suggest Connections" />
+    )
+    expect(container.innerHTML).toBe('')
   })
 
   it('renders error state with message', () => {

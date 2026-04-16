@@ -53,6 +53,7 @@ import { buildScopeContext } from '@shared/action-types'
 import { generateClaudeMd } from '../../engine/claude-md-template'
 import { buildActionLaunchScript, shellQuote } from './action-launcher'
 import { AgentPreview } from './AgentPreview'
+import { AgentThoughtCard } from './AgentThoughtCard'
 import { computeGhostNodes } from './agent-ghost-layer'
 import type { AgentActionName } from '@shared/agent-action-types'
 import { applyFolderMapPlan } from './folder-map-apply'
@@ -859,13 +860,23 @@ export function CanvasView(): React.ReactElement {
           />
         )}
 
-        {(agent.phase === 'computing' || agent.phase === 'preview' || agent.phase === 'error') && (
+        {(agent.phase === 'preview' || agent.phase === 'error') && (
           <AgentPreview
             phase={agent.phase}
             actionName={agentActionDisplayName(agent.activeAction)}
             plan={agent.pendingPlan}
             errorMessage={agent.errorMessage}
+            errorTag={agent.errorTag}
             onApply={agent.apply}
+            onCancel={agent.cancel}
+          />
+        )}
+        {agent.phase === 'computing' && agent.anchor && agent.startedAt != null && (
+          <AgentThoughtCard
+            streamState={agent.streamState}
+            actionName={agent.activeAction}
+            anchor={agent.anchor}
+            startedAt={agent.startedAt}
             onCancel={agent.cancel}
           />
         )}
