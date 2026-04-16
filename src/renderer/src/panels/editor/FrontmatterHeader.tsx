@@ -606,6 +606,7 @@ interface ConnectionPillProps {
 
 function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
   const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
 
   return (
     <span
@@ -616,7 +617,7 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
         position: 'relative',
         cursor: onNavigate ? 'pointer' : 'default',
         color: colors.text.secondary,
-        paddingRight: onRemove ? '22px' : pillStyle.padding ? undefined : undefined,
+        paddingRight: onRemove ? '22px' : undefined,
         transition: 'border-color 120ms, color 120ms'
       }}
     >
@@ -648,6 +649,8 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
             e.stopPropagation()
             onRemove()
           }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           style={{
             position: 'absolute',
             right: 6,
@@ -661,14 +664,14 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
             cursor: 'pointer',
             color: colors.text.muted,
             fontSize: '10px',
-            opacity: hovered ? 0.7 : 0,
+            opacity: focused ? 1 : hovered ? 0.7 : 0,
             transition: 'opacity 120ms'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '1'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = hovered ? '0.7' : '0'
+            e.currentTarget.style.opacity = focused ? '1' : hovered ? '0.7' : '0'
           }}
         >
           {'\u00D7'}
