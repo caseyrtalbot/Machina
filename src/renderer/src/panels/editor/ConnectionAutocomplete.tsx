@@ -117,11 +117,22 @@ export function ConnectionAutocomplete({
           }}
           onKeyDown={handleKeyDown}
           placeholder="Add connection…"
+          role="combobox"
+          aria-expanded={true}
+          aria-controls="connection-autocomplete-listbox"
+          aria-activedescendant={
+            suggestions.length > 0 ? `connection-autocomplete-option-${highlight}` : undefined
+          }
           className="w-full bg-transparent border-0 outline-none text-xs px-1.5 py-1"
           style={{ color: colors.text.primary, fontFamily: 'var(--font-mono)' }}
         />
       </div>
-      <div className="border-t" style={{ borderColor: colors.border.default }} role="listbox">
+      <div
+        id="connection-autocomplete-listbox"
+        className="border-t"
+        style={{ borderColor: colors.border.default }}
+        role="listbox"
+      >
         {suggestions.length === 0 ? (
           <div
             className="px-3 py-1.5 text-xs"
@@ -133,6 +144,7 @@ export function ConnectionAutocomplete({
           suggestions.map((s, index) => (
             <button
               key={s.artifact.id}
+              id={`connection-autocomplete-option-${index}`}
               type="button"
               role="option"
               aria-selected={index === highlight}
