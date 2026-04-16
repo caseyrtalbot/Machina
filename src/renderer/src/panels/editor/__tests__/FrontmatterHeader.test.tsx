@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { FrontmatterHeader } from '../FrontmatterHeader'
 import type { Artifact } from '@shared/types'
 
@@ -76,5 +76,40 @@ describe('FrontmatterHeader — Relationships empty state', () => {
       />
     )
     expect(screen.queryByText('Relationships')).toBeNull()
+  })
+})
+
+describe('FrontmatterHeader — connection remove', () => {
+  it('clicking the × on a connection pill calls onFrontmatterChange with that id removed', () => {
+    const onFrontmatterChange = vi.fn()
+    render(
+      <FrontmatterHeader
+        artifact={makeArtifact({ connections: ['Vibe Coding', 'LLM Council', 'ag04'] })}
+        frontmatter={{ connections: ['Vibe Coding', 'LLM Council', 'ag04'] }}
+        mode="rich"
+        onFrontmatterChange={onFrontmatterChange}
+      />
+    )
+
+    const removeBtn = screen.getByLabelText('Remove connection LLM Council')
+    fireEvent.click(removeBtn)
+
+    expect(onFrontmatterChange).toHaveBeenCalledTimes(1)
+    const raw = onFrontmatterChange.mock.calls[0][0] as string
+    expect(raw).toContain('Vibe Coding')
+    expect(raw).toContain('ag04')
+    expect(raw).not.toContain('LLM Council')
+  })
+
+  it('does not render × when non-editable', () => {
+    render(
+      <FrontmatterHeader
+        artifact={makeArtifact({ connections: ['Vibe Coding'] })}
+        frontmatter={{ connections: ['Vibe Coding'] }}
+        mode="rich"
+        // no onFrontmatterChange
+      />
+    )
+    expect(screen.queryByLabelText('Remove connection Vibe Coding')).toBeNull()
   })
 })

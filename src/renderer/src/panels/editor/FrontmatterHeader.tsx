@@ -563,9 +563,16 @@ function RelationshipRow({
   label,
   ids,
   onNavigate,
-  onChange: _onChange,
+  onChange,
   currentArtifactId: _currentArtifactId
 }: RelationshipRowProps) {
+  const editable = !!onChange
+
+  const handleRemove = (id: string) => {
+    if (!onChange) return
+    onChange(ids.filter((existing) => existing !== id))
+  }
+
   return (
     <div
       style={{
@@ -579,28 +586,94 @@ function RelationshipRow({
       <span style={rowLabelStyle}>{label}</span>
       <div style={{ ...rowValueStyle, gap: '0.45rem' }}>
         {ids.map((id) => (
-          <span
+          <ConnectionPill
             key={id}
-            onClick={() => onNavigate?.(id)}
-            style={{
-              ...pillStyle,
-              cursor: onNavigate ? 'pointer' : 'default',
-              color: colors.text.secondary
-            }}
-            onMouseEnter={(e) => {
-              if (!onNavigate) return
-              e.currentTarget.style.borderColor = colors.accent.default
-              e.currentTarget.style.color = colors.text.primary
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = colors.border.default
-              e.currentTarget.style.color = colors.text.secondary
-            }}
-          >
-            {id}
-          </span>
+            id={id}
+            onNavigate={onNavigate}
+            onRemove={editable ? () => handleRemove(id) : undefined}
+          />
         ))}
       </div>
     </div>
+  )
+}
+
+interface ConnectionPillProps {
+  id: string
+  onNavigate?: (id: string) => void
+  onRemove?: () => void
+}
+
+function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <span
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        ...pillStyle,
+        position: 'relative',
+        cursor: onNavigate ? 'pointer' : 'default',
+        color: colors.text.secondary,
+        paddingRight: onRemove ? '22px' : pillStyle.padding ? undefined : undefined,
+        transition: 'border-color 120ms, color 120ms'
+      }}
+    >
+      <span
+        onClick={() => onNavigate?.(id)}
+        style={{
+          display: 'inline-block',
+          transition: 'color 120ms'
+        }}
+        onMouseEnter={(e) => {
+          if (!onNavigate) return
+          const parent = e.currentTarget.parentElement
+          if (parent) parent.style.borderColor = colors.accent.default
+          e.currentTarget.style.color = colors.text.primary
+        }}
+        onMouseLeave={(e) => {
+          const parent = e.currentTarget.parentElement
+          if (parent) parent.style.borderColor = colors.border.default
+          e.currentTarget.style.color = colors.text.secondary
+        }}
+      >
+        {id}
+      </span>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={`Remove connection ${id}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+          style={{
+            position: 'absolute',
+            right: 6,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            margin: 0,
+            lineHeight: 1,
+            cursor: 'pointer',
+            color: colors.text.muted,
+            fontSize: '10px',
+            opacity: hovered ? 0.7 : 0,
+            transition: 'opacity 120ms'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '1'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = hovered ? '0.7' : '0'
+          }}
+        >
+          {'\u00D7'}
+        </button>
+      )}
+    </span>
   )
 }
