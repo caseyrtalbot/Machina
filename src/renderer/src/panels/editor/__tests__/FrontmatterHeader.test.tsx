@@ -3,14 +3,55 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { FrontmatterHeader } from '../FrontmatterHeader'
 import type { Artifact } from '@shared/types'
 
-// Mock vault-store for autocomplete tests later; safe to include now.
-vi.mock('../../../store/vault-store', () => ({
-  useVaultStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      artifactById: {},
-      artifacts: []
-    })
-}))
+// Mock vault-store with artifact fixtures used by the autocomplete (Task 4).
+vi.mock('../../../store/vault-store', () => {
+  const artifacts: Artifact[] = [
+    {
+      id: 'n-vibe',
+      title: 'Vibe Coding',
+      type: 'note',
+      created: '2026-04-01',
+      modified: '2026-04-15',
+      signal: 'emerging',
+      tags: [],
+      connections: [],
+      clusters_with: [],
+      tensions_with: [],
+      appears_in: [],
+      related: [],
+      concepts: [],
+      origin: 'human',
+      sources: [],
+      bodyLinks: [],
+      body: '',
+      frontmatter: {}
+    },
+    {
+      id: 'n-llm',
+      title: 'LLM Council',
+      type: 'note',
+      created: '2026-04-01',
+      modified: '2026-04-14',
+      signal: 'emerging',
+      tags: [],
+      connections: [],
+      clusters_with: [],
+      tensions_with: [],
+      appears_in: [],
+      related: [],
+      concepts: [],
+      origin: 'human',
+      sources: [],
+      bodyLinks: [],
+      body: '',
+      frontmatter: {}
+    }
+  ]
+  return {
+    useVaultStore: (selector: (s: unknown) => unknown) =>
+      selector({ artifactById: Object.fromEntries(artifacts.map((a) => [a.id, a])), artifacts })
+  }
+})
 
 function makeArtifact(overrides: Partial<Artifact> = {}): Artifact {
   return {
@@ -111,5 +152,40 @@ describe('FrontmatterHeader — connection remove', () => {
       />
     )
     expect(screen.queryByLabelText('Remove connection Vibe Coding')).toBeNull()
+  })
+})
+
+describe('FrontmatterHeader — connection add', () => {
+  it('clicking "+ add connection" opens the autocomplete and selecting a suggestion calls onFrontmatterChange', () => {
+    const onFrontmatterChange = vi.fn()
+    render(
+      <FrontmatterHeader
+        artifact={makeArtifact({ connections: [] })}
+        frontmatter={{}}
+        mode="rich"
+        onFrontmatterChange={onFrontmatterChange}
+      />
+    )
+
+    fireEvent.click(screen.getByText('+ add connection'))
+    const input = screen.getByPlaceholderText('Add connection…')
+    fireEvent.change(input, { target: { value: 'vibe' } })
+    fireEvent.click(screen.getByText('Vibe Coding'))
+
+    expect(onFrontmatterChange).toHaveBeenCalledTimes(1)
+    const raw = onFrontmatterChange.mock.calls[0][0] as string
+    expect(raw).toContain('Vibe Coding')
+  })
+
+  it('+ add connection is not rendered in non-editable mode', () => {
+    render(
+      <FrontmatterHeader
+        artifact={makeArtifact({ connections: ['Vibe Coding'] })}
+        frontmatter={{ connections: ['Vibe Coding'] }}
+        mode="rich"
+        // no onFrontmatterChange
+      />
+    )
+    expect(screen.queryByText('+ add connection')).toBeNull()
   })
 })

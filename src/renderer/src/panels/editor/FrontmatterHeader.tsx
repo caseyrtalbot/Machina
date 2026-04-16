@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react'
 import type { Artifact } from '@shared/types'
 import { colors, getArtifactColor } from '../../design/tokens'
+import { useVaultStore } from '../../store/vault-store'
 import { serializeFrontmatter, type PropertyValue } from './markdown-utils'
+import { ConnectionAutocomplete } from './ConnectionAutocomplete'
 import {
   inferPropertyType,
   convertValue,
@@ -564,13 +566,25 @@ function RelationshipRow({
   ids,
   onNavigate,
   onChange,
-  currentArtifactId: _currentArtifactId
+  currentArtifactId
 }: RelationshipRowProps) {
   const editable = !!onChange
+  const [addOpen, setAddOpen] = useState(false)
+  const artifacts = useVaultStore((s) => s.artifacts)
 
   const handleRemove = (id: string) => {
     if (!onChange) return
     onChange(ids.filter((existing) => existing !== id))
+  }
+
+  const handleAdd = (connectionValue: string) => {
+    if (!onChange) return
+    if (ids.includes(connectionValue)) {
+      setAddOpen(false)
+      return
+    }
+    onChange([...ids, connectionValue])
+    setAddOpen(false)
   }
 
   return (
@@ -593,6 +607,35 @@ function RelationshipRow({
             onRemove={editable ? () => handleRemove(id) : undefined}
           />
         ))}
+        {editable && (
+          <div className="relative" style={{ display: 'inline-block' }}>
+            <button
+              type="button"
+              onClick={() => setAddOpen((v) => !v)}
+              className="transition-colors hover:opacity-80 focus:outline-none"
+              style={{
+                color: colors.text.muted,
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+                background: 'none',
+                border: 'none',
+                padding: '2px 4px',
+                cursor: 'pointer'
+              }}
+            >
+              + add connection
+            </button>
+            {addOpen && (
+              <ConnectionAutocomplete
+                artifacts={artifacts}
+                currentArtifactId={currentArtifactId}
+                existingConnections={ids}
+                onSelect={handleAdd}
+                onClose={() => setAddOpen(false)}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
