@@ -373,9 +373,12 @@ function makeFakeProc() {
   return proc
 }
 
-// Helper to write a JSONL line into the fake stdout
+// Helper to write a JSONL line into the fake stdout.
+// We emit 'data' synchronously (rather than push()) so the production code's
+// standard .on('data', ...) handler fires immediately — push() defers via
+// nextTick, which vi.advanceTimersByTime cannot flush.
 function emitLine(proc: ReturnType<typeof makeFakeProc>, obj: unknown) {
-  proc.stdout.push(JSON.stringify(obj) + '\n')
+  proc.stdout.emit('data', Buffer.from(JSON.stringify(obj) + '\n'))
 }
 
 describe('callClaude streaming transport', () => {
@@ -484,7 +487,7 @@ describe('callClaude streaming transport', () => {
     ).catch((e) => e)
 
     await Promise.resolve()
-    proc.stderr.push('some error text\n')
+    proc.stderr.emit('data', Buffer.from('some error text\n'))
     proc.emit('close', 1)
     const err = await pending
     expect((err as Error & { tag?: string }).tag).toBe('cli-error')

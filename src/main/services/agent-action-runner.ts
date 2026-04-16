@@ -580,44 +580,12 @@ export function callClaudeWith(
       stderr += text
     }
 
-    const extractChunkText = (chunk: unknown): string => {
-      if (chunk === null || chunk === undefined) return ''
-      if (Buffer.isBuffer(chunk)) return chunk.toString()
-      if (typeof chunk === 'string') return chunk
-      return ''
-    }
-
-    // Intercept push() on the stream so we observe data synchronously. Real
-    // child_process stdout delivers data via async 'data' events (next tick),
-    // which works in production but prevents silence-reset from being observable
-    // during synchronous test drivers that push + advanceTimers in a tight loop.
-    // The push-intercept fires for both real pipe writes and test fake writes.
-    if (proc.stdout && typeof proc.stdout.push === 'function') {
-      const origPush = proc.stdout.push.bind(proc.stdout)
-      proc.stdout.push = (chunk: unknown, encoding?: BufferEncoding) => {
-        const text = extractChunkText(chunk)
-        if (text) onStdoutChunk(text)
-        // Forward to the underlying Readable so back-pressure + 'end' semantics
-        // continue to work naturally. Our handler is idempotent-by-dedupe: we
-        // don't also listen for 'data', so the chunk is processed exactly once.
-        return origPush(chunk as Buffer | string | null, encoding)
-      }
-    }
-
-    if (proc.stderr && typeof proc.stderr.push === 'function') {
-      const origPush = proc.stderr.push.bind(proc.stderr)
-      proc.stderr.push = (chunk: unknown, encoding?: BufferEncoding) => {
-        const text = extractChunkText(chunk)
-        if (text) onStderrChunk(text)
-        return origPush(chunk as Buffer | string | null, encoding)
-      }
-    }
-
-    // Resume stdout/stderr so data is drained (prevents pipe backpressure from
-    // stalling the child). We intercepted push above, so chunks are already
-    // accounted for — resuming just keeps the stream machinery flowing.
-    proc.stdout?.resume()
-    proc.stderr?.resume()
+    proc.stdout?.on('data', (chunk: Buffer | string) => {
+      onStdoutChunk(Buffer.isBuffer(chunk) ? chunk.toString() : chunk)
+    })
+    proc.stderr?.on('data', (chunk: Buffer | string) => {
+      onStderrChunk(Buffer.isBuffer(chunk) ? chunk.toString() : chunk)
+    })
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
       settle(() => {
@@ -654,6 +622,10 @@ export function callClaudeWith(
       })
     })
 
+    // Swallow stdin write errors (e.g. child exits before consuming the prompt);
+    // the 'close' / 'error' handlers drive rejection, so this just prevents
+    // unhandled-error noise from a broken pipe.
+    proc.stdin?.on('error', () => {})
     proc.stdin?.write(prompt)
     proc.stdin?.end()
   })
@@ -705,7 +677,7 @@ export async function runAgentAction(
     return { plan }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    const tag = err instanceof TaggedError ? err.tag : ('cli-error' as AgentErrorTag)
+    const tag: AgentErrorTag = err instanceof TaggedError ? err.tag : 'invalid-output'
     return { error: message, tag }
   }
 }
