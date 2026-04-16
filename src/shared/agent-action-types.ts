@@ -118,4 +118,23 @@ export interface AgentActionRequest {
   readonly userPrompt?: string
 }
 
-export type AgentActionResponse = { readonly plan: CanvasMutationPlan } | { readonly error: string }
+export type AgentActionResponse =
+  | { readonly plan: CanvasMutationPlan }
+  | { readonly error: string; readonly tag?: AgentErrorTag }
+
+// ---------------------------------------------------------------------------
+// Streaming (main -> renderer, one-way)
+// ---------------------------------------------------------------------------
+
+export type AgentStreamPhase = 'starting' | 'thinking' | 'drafting' | 'materializing'
+
+export type AgentStreamEvent =
+  | { readonly kind: 'phase'; readonly phase: AgentStreamPhase; readonly count?: number }
+  | { readonly kind: 'thinking-delta'; readonly text: string }
+  | { readonly kind: 'text-delta'; readonly text: string }
+
+// ---------------------------------------------------------------------------
+// Error taxonomy
+// ---------------------------------------------------------------------------
+
+export type AgentErrorTag = 'stalled' | 'cap' | 'cli-error' | 'not-found' | 'invalid-output'
