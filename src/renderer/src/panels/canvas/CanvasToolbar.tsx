@@ -22,7 +22,7 @@ interface CanvasToolbarProps {
   readonly onOpenImport: () => void
   readonly onOrganize: () => void
   readonly organizePhase: string
-  readonly onAgentAction: (action: AgentActionName) => void
+  readonly onAgentAction: (action: AgentActionName, anchor?: { x: number; y: number }) => void
   readonly onStopAgent: () => void
   readonly agentPhase: AgentPhase
   readonly activeAction: AgentActionName | null
@@ -551,8 +551,14 @@ export function CanvasToolbar({
       {/* THINK: have the agent do something */}
       <div className="canvas-toolbtn-wrap">
         <button
-          onClick={() => {
-            if (hasNodes && !thinkBusy) onAgentAction('challenge')
+          onClick={(e) => {
+            if (hasNodes && !thinkBusy) {
+              const rect = e.currentTarget.getBoundingClientRect()
+              onAgentAction('challenge', {
+                x: rect.left + rect.width / 2,
+                y: rect.bottom
+              })
+            }
           }}
           className="canvas-toolbtn"
           disabled={thinkBusy || !hasNodes}
@@ -589,11 +595,15 @@ export function CanvasToolbar({
       </div>
       <div className="canvas-toolbtn-wrap" style={{ position: 'relative' }}>
         <button
-          onClick={() => {
+          onClick={(e) => {
             if (isCompileRunning) {
               onStopAgent()
             } else if (!isCompileBusy && compileEnabled) {
-              onAgentAction('compile')
+              const rect = e.currentTarget.getBoundingClientRect()
+              onAgentAction('compile', {
+                x: rect.left + rect.width / 2,
+                y: rect.bottom
+              })
             }
           }}
           className="canvas-toolbtn"
