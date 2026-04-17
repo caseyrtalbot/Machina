@@ -66,6 +66,10 @@ function isPersistenceEnabled(): boolean {
   return useVaultStore.getState().config?.compile?.persistenceEnabled !== false
 }
 
+function isCaptureEnabled(): boolean {
+  return useVaultStore.getState().config?.cluster?.captureEnabled !== false
+}
+
 function getVaultPath(): string {
   return useVaultStore.getState().vaultPath ?? ''
 }
@@ -117,6 +121,56 @@ function rewriteAsFileViewAddNode(
     }
   }
   return { type: 'add-node', node }
+}
+
+/**
+ * Convert each cluster section's existing card into a file-view card
+ * that projects a single section of the materialized cluster file.
+ * The tempNodeId itself is dropped — the cluster lives as its member
+ * cards plus the on-disk file.
+ */
+function rewriteClusterOps(
+  op: MaterializeArtifactOp,
+  result: MaterializeResult,
+  existingNodes: readonly CanvasNode[]
+): CanvasMutationOp[] {
+  if (op.draft.kind !== 'cluster') return []
+  const byId = new Map(existingNodes.map((n) => [n.id, n]))
+
+  const sectionMap: Record<string, string> = {}
+  for (const s of op.draft.sections) sectionMap[s.cardId] = s.heading
+
+  const swaps: CanvasMutationOp[] = []
+  for (const section of op.draft.sections) {
+    const existing = byId.get(section.cardId)
+    if (!existing) continue
+    swaps.push({ type: 'remove-node', nodeId: section.cardId })
+    swaps.push({
+      type: 'add-node',
+      node: {
+        ...existing,
+        type: 'file-view',
+        content: result.vaultRelativePath,
+        metadata: {
+          ...existing.metadata,
+          filePath: result.absolutePath,
+          artifactId: result.artifactId,
+          section: section.cardId,
+          sectionMap,
+          origin: op.draft.origin,
+          cluster_id: result.artifactId
+        }
+      }
+    })
+  }
+  return swaps
+}
+
+function isConvertSentinel(op: CanvasMutationOp): boolean {
+  return (
+    op.type === 'update-metadata' &&
+    (op.metadata as { __convertToFileView?: boolean }).__convertToFileView === true
+  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -177,10 +231,25 @@ async function applyWithPersistence(
     throw err
   }
 
-  // Phase B: Rewrite materialize ops to file-view add-node ops, then apply
+  // Phase B: Rewrite materialize ops. Clusters swap each member card into
+  // a section-projected file-view; compiled articles become a new file-view.
+  const existingNodes = useCanvasStore.getState().nodes
+  const otherOpsFiltered = otherOps.filter((op) => !isConvertSentinel(op))
+
+  const rewrittenOps: CanvasMutationOp[] = []
+  for (let i = 0; i < materializeOps.length; i++) {
+    const op = materializeOps[i]
+    const res = results[i]
+    if (op.draft.kind === 'cluster') {
+      rewrittenOps.push(...rewriteClusterOps(op, res, existingNodes))
+    } else {
+      rewrittenOps.push(rewriteAsFileViewAddNode(op, res))
+    }
+  }
+
   const rewrittenPlan: CanvasMutationPlan = {
     ...filteredPlan,
-    ops: [...otherOps, ...materializeOps.map((op, i) => rewriteAsFileViewAddNode(op, results[i]))]
+    ops: [...otherOpsFiltered, ...rewrittenOps]
   }
 
   executeAgentPlanCommand(rewrittenPlan, commandStack, async () => {
@@ -225,6 +294,14 @@ export async function applyAgentResult(
     return
   }
 
+  const hasCluster = materializeOps.some((op) => op.draft.kind === 'cluster')
+  if (hasCluster && !isPersistenceEnabled()) {
+    throw new Error('Cluster capture requires compile.persistenceEnabled=true')
+  }
+  if (hasCluster && !isCaptureEnabled()) {
+    throw new Error('Cluster capture disabled in config')
+  }
+
   const otherOps = filteredOps.filter((op) => !isMaterializeOp(op))
 
   if (isPersistenceEnabled()) {
@@ -232,7 +309,7 @@ export async function applyAgentResult(
     return
   }
 
-  // Persistence disabled: rewrite materialize ops as markdown fallback cards
+  // Persistence disabled (and no clusters): rewrite materialize ops as markdown fallback cards
   const fallbackPlan: CanvasMutationPlan = {
     ...filteredPlan,
     ops: [...otherOps, ...materializeOps.map(rewriteAsFallbackAddNode)]
