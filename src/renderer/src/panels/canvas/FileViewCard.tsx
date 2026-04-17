@@ -10,8 +10,11 @@ import { colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
 import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
 import { extractSection } from '@shared/engine/section-rewriter'
+import { commitSectionEdit } from './section-projection'
 import type { CanvasNode } from '@shared/canvas-types'
 import { vaultEvents } from '@engine/vault-event-hub'
+
+const SECTION_EDIT_DEBOUNCE_MS = 1000
 
 /**
  * If `sectionId` is set, returns only the body of the named section from
@@ -83,6 +86,30 @@ export function FileViewCard({ node }: FileViewCardProps) {
     }
   }, [filePath, sectionId])
 
+  // Debounced commit for section edits. The ref holds a live handle so we
+  // can clear on unmount and avoid firing after the card is gone.
+  const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSectionEdit = useCallback(
+    (newBody: string) => {
+      if (!sectionId) return
+      if (commitTimerRef.current) clearTimeout(commitTimerRef.current)
+      commitTimerRef.current = setTimeout(async () => {
+        commitTimerRef.current = null
+        const r = await commitSectionEdit(filePath, sectionId, newBody, {
+          readFile: (p) => window.api.fs.readFile(p),
+          writeDocument: async (p, c) => {
+            await window.api.document.update(p, c)
+          }
+        })
+        if (!r.ok) {
+          setError(`section write failed: ${r.error}`)
+        }
+      }, SECTION_EDIT_DEBOUNCE_MS)
+    },
+    [filePath, sectionId]
+  )
+
   // Step 2: Mount CodeMirror once content is loaded and container exists
   useEffect(() => {
     if (!containerRef.current || fileContent === null) return
@@ -90,7 +117,11 @@ export function FileViewCard({ node }: FileViewCardProps) {
     let cancelled = false
 
     async function mount() {
-      const extensions = await createEditorExtensions(language, { readOnly: true })
+      const readOnly = sectionId === null
+      const extensions = await createEditorExtensions(language, {
+        readOnly,
+        onUpdate: sectionId ? handleSectionEdit : undefined
+      })
       if (cancelled || !containerRef.current) return
 
       const state = EditorState.create({ doc: fileContent ?? '', extensions })
@@ -102,10 +133,14 @@ export function FileViewCard({ node }: FileViewCardProps) {
 
     return () => {
       cancelled = true
+      if (commitTimerRef.current) {
+        clearTimeout(commitTimerRef.current)
+        commitTimerRef.current = null
+      }
       viewRef.current?.destroy()
       viewRef.current = null
     }
-  }, [fileContent, language])
+  }, [fileContent, language, sectionId, handleSectionEdit])
 
   // Subscribe to filesystem changes (freeze-then-signal pattern)
   useEffect(() => {
