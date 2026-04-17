@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
+import matter from 'gray-matter'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useViewStore } from '../../store/view-store'
@@ -8,8 +9,23 @@ import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
 import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
+import { extractSection } from '@shared/engine/section-rewriter'
 import type { CanvasNode } from '@shared/canvas-types'
 import { vaultEvents } from '@engine/vault-event-hub'
+
+/**
+ * If `sectionId` is set, returns only the body of the named section from
+ * the raw file content. Falls back to the raw content when the card does
+ * not project a section, or yields an inline error marker if the section
+ * can't be found.
+ */
+function projectSection(raw: string, sectionId: string | null): string {
+  if (!sectionId) return raw
+  const parsed = matter(raw)
+  const sectionMap = (parsed.data.sections as Record<string, string> | undefined) ?? {}
+  const extracted = extractSection(parsed.content, sectionId, sectionMap)
+  return extracted.ok ? extracted.value : '[section not found]'
+}
 
 interface FileViewCardProps {
   readonly node: CanvasNode
@@ -29,6 +45,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   const removeNode = useCanvasStore((s) => s.removeNode)
 
   const filePath = node.content
+  const sectionId = typeof node.metadata.section === 'string' ? node.metadata.section : null
 
   const filename = useMemo(() => {
     const parts = filePath.split('/')
@@ -47,8 +64,9 @@ export function FileViewCard({ node }: FileViewCardProps) {
       .readFile(filePath)
       .then((content: string) => {
         if (!cancelled) {
-          setFileContent(content)
-          previousLineCountRef.current = countLines(content)
+          const projected = projectSection(content, sectionId)
+          setFileContent(projected)
+          previousLineCountRef.current = countLines(projected)
           setLoading(false)
           setError(null)
         }
@@ -63,7 +81,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
     return () => {
       cancelled = true
     }
-  }, [filePath])
+  }, [filePath, sectionId])
 
   // Step 2: Mount CodeMirror once content is loaded and container exists
   useEffect(() => {
@@ -128,17 +146,18 @@ export function FileViewCard({ node }: FileViewCardProps) {
     window.api.fs
       .readFile(filePath)
       .then((content: string) => {
+        const projected = projectSection(content, sectionId)
         const view = viewRef.current
         if (view) {
           view.dispatch({
             changes: {
               from: 0,
               to: view.state.doc.length,
-              insert: content
+              insert: projected
             }
           })
         }
-        previousLineCountRef.current = countLines(content)
+        previousLineCountRef.current = countLines(projected)
         setModified(false)
         setLineDelta('')
         setError(null)
@@ -146,7 +165,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
       .catch(() => {
         setError('Failed to load file')
       })
-  }, [filePath])
+  }, [filePath, sectionId])
 
   // Keyboard: press R while card is focused to refresh
   useEffect(() => {
