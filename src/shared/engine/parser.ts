@@ -172,6 +172,12 @@ export function serializeDraft(draft: AgentArtifactDraft, id: string): string {
   if (draft.sources.length > 0) frontmatter.sources = [...draft.sources]
   if (draft.tags && draft.tags.length > 0) frontmatter.tags = [...draft.tags]
 
+  if (draft.kind !== 'compiled-article') {
+    // Cluster serialization is implemented in a later task; for now only
+    // compiled-article drafts are materialized through this path.
+    throw new Error(`serializeDraft: unsupported draft kind '${draft.kind}'`)
+  }
+
   if (draft.frontmatterExtras) {
     for (const [key, value] of Object.entries(draft.frontmatterExtras)) {
       frontmatter[key] = value

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { ArtifactMaterializer } from '../artifact-materializer'
-import type { AgentArtifactDraft } from '@shared/agent-artifact-types'
+import type { CompiledArticleDraft } from '@shared/agent-artifact-types'
 
 function createTestVault(): string {
   const base = join(tmpdir(), `te-mat-test-${Date.now()}-${randomUUID().slice(0, 8)}`)
@@ -13,7 +13,7 @@ function createTestVault(): string {
   return base
 }
 
-function makeDraft(overrides: Partial<AgentArtifactDraft> = {}): AgentArtifactDraft {
+function makeDraft(overrides: Partial<CompiledArticleDraft> = {}): CompiledArticleDraft {
   return {
     kind: 'compiled-article',
     title: 'Test Article',
@@ -90,7 +90,7 @@ describe('ArtifactMaterializer', () => {
         body: '',
         origin: 'agent',
         sources: []
-      } as AgentArtifactDraft
+      } as CompiledArticleDraft
       await expect(materializer.materialize(bad, vaultRoot, 'compiled/')).rejects.toThrow()
     })
 

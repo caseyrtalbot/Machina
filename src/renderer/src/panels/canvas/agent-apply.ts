@@ -82,12 +82,15 @@ function isMaterializeOp(op: CanvasMutationOp): op is MaterializeArtifactOp {
  * Used when persistence is disabled.
  */
 function rewriteAsFallbackAddNode(op: MaterializeArtifactOp): CanvasMutationOp {
+  // Cluster fallback rendering is implemented in a later task; for now only
+  // compiled-article drafts flow through the fallback path.
+  const body = op.draft.kind === 'compiled-article' ? op.draft.body : ''
   const node: CanvasNode = {
     id: op.tempNodeId,
     type: 'markdown',
     position: { x: op.placement.x, y: op.placement.y },
     size: { width: op.placement.width, height: op.placement.height },
-    content: `# ${op.draft.title}\n\n${op.draft.body}`,
+    content: `# ${op.draft.title}\n\n${body}`,
     metadata: { viewMode: 'rendered', origin: op.draft.origin }
   }
   return { type: 'add-node', node }
