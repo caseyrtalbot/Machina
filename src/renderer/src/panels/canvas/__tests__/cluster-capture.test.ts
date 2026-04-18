@@ -49,8 +49,8 @@ describe('buildClusterDraft (agent-run path)', () => {
     expect(draft.title).toBe('Prompt: compare X and Y')
     expect(draft.prompt).toBe('body-root')
     expect(draft.sources).toEqual(['src-1', 'src-2'])
-    expect(draft.sections.map((s) => s.cardId)).toEqual(['root', 'a', 'b', 'c'])
-    expect(draft.sections[0].heading).toBe('Prompt: compare X and Y')
+    expect(draft.sections.map((s) => s.cardId)).toEqual(['a', 'b', 'c'])
+    expect(draft.sections[0].heading).toBe('X')
   })
 })
 

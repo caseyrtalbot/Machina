@@ -73,10 +73,10 @@ export function buildClusterDraft(
     .filter((n): n is CanvasNode => Boolean(n))
 
   let ordered: CanvasNode[]
+  let rootNode: CanvasNode | undefined
   if (rootCardId) {
-    const rest = memberNodes.filter((n) => n.id !== rootCardId).sort(byPosition)
-    const root = memberNodes.find((n) => n.id === rootCardId)
-    ordered = root ? [root, ...rest] : rest
+    rootNode = memberNodes.find((n) => n.id === rootCardId)
+    ordered = memberNodes.filter((n) => n.id !== rootCardId).sort(byPosition)
   } else {
     ordered = [...memberNodes].sort(byPosition)
   }
@@ -87,19 +87,18 @@ export function buildClusterDraft(
     body: cardBody(n)
   }))
 
-  const isAgent = Boolean(rootCardId) && ordered[0]?.metadata.origin === 'agent'
-  const root = rootCardId ? nodeById.get(rootCardId) : undefined
-  const clusterId = (root?.metadata.cluster_id as string | undefined) ?? null
+  const isAgent = Boolean(rootCardId) && rootNode?.metadata.origin === 'agent'
+  const clusterId = (rootNode?.metadata.cluster_id as string | undefined) ?? null
   const agentSources = clusterId ? (snapshot.agentSources[clusterId] ?? []) : []
 
   const title = isAgent
-    ? cardTitle(ordered[0]) || 'Agent cluster'
+    ? cardTitle(rootNode!) || 'Agent cluster'
     : (snapshot.userTitle ?? 'Cluster')
 
   return {
     kind: 'cluster',
     title,
-    prompt: isAgent ? cardBody(ordered[0]) : '',
+    prompt: isAgent ? cardBody(rootNode!) : '',
     origin: isAgent ? 'agent' : 'human',
     sources: agentSources,
     sections
