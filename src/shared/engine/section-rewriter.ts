@@ -89,9 +89,14 @@ export function replaceSection(
 export function addSection(
   fileContent: string,
   section: ClusterSection,
-  position: 'end' | number,
+  position: 'end',
   sectionMap: SectionMap
 ): Result<{ readonly content: string; readonly sectionMap: SectionMap }> {
+  // `position` is currently fixed to 'end'. The parameter is retained so
+  // callers remain explicit at the call site; positional insertion can be
+  // added back later with proper bounds checks when a caller needs it.
+  void position
+
   const existingHeadings = new Set(Object.values(sectionMap))
   let finalHeading = section.heading
   let n = 2
@@ -104,14 +109,7 @@ export function addSection(
   const block = `\n## ${finalHeading}\n${bodyWithNl}`
 
   const lines = fileContent.split('\n')
-  const h2Hits = findHeadings(lines).filter((h) => h.level === 2)
-
-  let insertIdx: number
-  if (position === 'end' || position >= h2Hits.length) {
-    insertIdx = lines.length
-  } else {
-    insertIdx = h2Hits[position].lineIndex
-  }
+  const insertIdx = lines.length
 
   const before = lines.slice(0, insertIdx).join('\n')
   const after = lines.slice(insertIdx).join('\n')
