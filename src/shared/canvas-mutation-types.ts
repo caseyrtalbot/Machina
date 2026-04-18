@@ -19,6 +19,13 @@ export type CanvasMutationOp =
       readonly nodeId: string
       readonly metadata: Partial<Record<string, unknown>>
     }
+  | {
+      readonly type: 'update-node'
+      readonly nodeId: string
+      readonly nodeType?: CanvasNode['type']
+      readonly content?: string
+      readonly metadata?: Readonly<Record<string, unknown>>
+    }
   | { readonly type: 'remove-node'; readonly nodeId: string }
   | { readonly type: 'remove-edge'; readonly edgeId: string }
   | {
@@ -80,6 +87,19 @@ export function applyPlanOps(
       case 'update-metadata':
         currentNodes = currentNodes.map((n) =>
           n.id === op.nodeId ? { ...n, metadata: { ...n.metadata, ...op.metadata } } : n
+        )
+        break
+
+      case 'update-node':
+        currentNodes = currentNodes.map((n) =>
+          n.id === op.nodeId
+            ? {
+                ...n,
+                type: op.nodeType ?? n.type,
+                content: op.content ?? n.content,
+                metadata: op.metadata ? { ...n.metadata, ...op.metadata } : n.metadata
+              }
+            : n
         )
         break
 

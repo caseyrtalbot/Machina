@@ -136,6 +136,10 @@ export interface VaultConfig {
     outputDir?: string // default: 'compiled/'
     persistenceEnabled?: boolean // default: true
   }
+  cluster?: {
+    outputDir?: string // default: 'clusters/'
+    captureEnabled?: boolean // default: true
+  }
 }
 
 export interface UiPersistedState {

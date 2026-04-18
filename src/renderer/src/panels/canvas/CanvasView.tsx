@@ -18,6 +18,7 @@ import { CardLodPreview } from './CardLodPreview'
 import { EdgeLayer } from './EdgeLayer'
 import { ConnectionDragOverlay } from './ConnectionDragOverlay'
 import { CommandStack } from './canvas-commands'
+import { CommandStackProvider } from './command-stack-context'
 import { saveCanvas } from './canvas-io'
 import { TE_DIR } from '@shared/constants'
 import { CanvasToolbar } from './CanvasToolbar'
@@ -749,295 +750,300 @@ export function CanvasView(): React.ReactElement {
   const ontologyCardCount = ontologyGroups.reduce((sum, g) => sum + g.cardIds.length, 0)
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
-        <CanvasToolbar
-          canUndo={commandStack.current.canUndo()}
-          canRedo={commandStack.current.canRedo()}
-          onUndo={() => void commandStack.current.undo()}
-          onRedo={() => void commandStack.current.redo()}
-          onAddCard={() => {
-            const vp = useCanvasStore.getState().viewport
-            const node = createCanvasNode('text', {
-              x: -vp.x / vp.zoom + 200,
-              y: -vp.y / vp.zoom + 200
-            })
-            addNodeWithUndo(node)
-          }}
-          onOpenImport={() => setImportOpen(true)}
-          onOrganize={ontology.startOrganize}
-          organizePhase={ontology.phase}
-          onAgentAction={(action, anchor) => agent.trigger(action, undefined, anchor)}
-          onStopAgent={agent.cancel}
-          agentPhase={agent.phase}
-          activeAction={agent.activeAction}
-          onClear={() => {
-            useCanvasStore.setState({
-              nodes: [],
-              edges: [],
-              selectedNodeIds: new Set(),
-              selectedEdgeId: null,
-              focusedCardId: null,
-              lockedCardId: null,
-              ontologySnapshot: null,
-              ontologyLayout: null,
-              ontologyIsStale: false,
-              isDirty: true
-            })
-          }}
-          onActionSelect={handleAction}
-        />
-        {showPromptInput && agent.phase === 'idle' && (
-          <CanvasPromptInput
-            selectedCount={selectedNodeIds.size}
-            placeholder={promptPlaceholder}
-            onSubmit={(text) => {
-              setShowPromptInput(false)
-              agent.trigger('ask', text)
+    <CommandStackProvider value={commandStack.current}>
+      <div className="flex h-full w-full overflow-hidden">
+        <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
+          <CanvasToolbar
+            canUndo={commandStack.current.canUndo()}
+            canRedo={commandStack.current.canRedo()}
+            onUndo={() => void commandStack.current.undo()}
+            onRedo={() => void commandStack.current.redo()}
+            onAddCard={() => {
+              const vp = useCanvasStore.getState().viewport
+              const node = createCanvasNode('text', {
+                x: -vp.x / vp.zoom + 200,
+                y: -vp.y / vp.zoom + 200
+              })
+              addNodeWithUndo(node)
             }}
-            onCancel={() => setShowPromptInput(false)}
+            onOpenImport={() => setImportOpen(true)}
+            onOrganize={ontology.startOrganize}
+            organizePhase={ontology.phase}
+            onAgentAction={(action, anchor) => agent.trigger(action, undefined, anchor)}
+            onStopAgent={agent.cancel}
+            agentPhase={agent.phase}
+            activeAction={agent.activeAction}
+            onClear={() => {
+              useCanvasStore.setState({
+                nodes: [],
+                edges: [],
+                selectedNodeIds: new Set(),
+                selectedEdgeId: null,
+                focusedCardId: null,
+                lockedCardId: null,
+                ontologySnapshot: null,
+                ontologyLayout: null,
+                ontologyIsStale: false,
+                isDirty: true
+              })
+            }}
+            onActionSelect={handleAction}
           />
-        )}
-        <CanvasSurface
-          onContextMenu={handleContextMenu}
-          onBackgroundClick={handleBackgroundClick}
-          onFileDrop={handleFileDrop}
-        >
-          <EdgeLayer />
-          {visibleNodes.map((node) => {
-            const nodeLod = getLodLevel(viewport.zoom, node.type)
-            // Terminal cards always render at full LOD to preserve PTY sessions
-            if ((nodeLod === 'dot' || nodeLod === 'preview') && node.type !== 'terminal') {
-              return <CardLodPreview key={node.id} node={node} lod={nodeLod} />
-            }
-            const Card = LazyCards[node.type]
-            if (!Card) return null
-            return (
-              <Suspense key={node.id} fallback={<CardShellSkeleton node={node} />}>
-                <Card node={node} />
-              </Suspense>
-            )
-          })}
-          {previewPlan && <FolderMapPreviewGhosts plan={previewPlan} />}
-          {agent.phase === 'preview' && agent.pendingPlan && (
-            <>
-              {computeGhostNodes(agent.pendingPlan, nodes).map((ghost) => (
-                <div
-                  key={`ghost-${ghost.id}`}
-                  style={{
-                    position: 'absolute',
-                    left: ghost.position.x,
-                    top: ghost.position.y,
-                    width: ghost.size.width,
-                    height: ghost.size.height,
-                    backgroundColor: 'rgba(76, 175, 80, 0.08)',
-                    border: '1px dashed rgba(76, 175, 80, 0.3)',
-                    borderRadius: 8,
-                    padding: 12,
-                    pointerEvents: 'none',
-                    overflow: 'hidden',
-                    fontSize: 12,
-                    color: 'rgba(255, 255, 255, 0.4)'
+          {showPromptInput && agent.phase === 'idle' && (
+            <CanvasPromptInput
+              selectedCount={selectedNodeIds.size}
+              placeholder={promptPlaceholder}
+              onSubmit={(text) => {
+                setShowPromptInput(false)
+                agent.trigger('ask', text)
+              }}
+              onCancel={() => setShowPromptInput(false)}
+            />
+          )}
+          <CanvasSurface
+            onContextMenu={handleContextMenu}
+            onBackgroundClick={handleBackgroundClick}
+            onFileDrop={handleFileDrop}
+          >
+            <EdgeLayer />
+            {visibleNodes.map((node) => {
+              const nodeLod = getLodLevel(viewport.zoom, node.type)
+              // Terminal cards always render at full LOD to preserve PTY sessions
+              if ((nodeLod === 'dot' || nodeLod === 'preview') && node.type !== 'terminal') {
+                return <CardLodPreview key={node.id} node={node} lod={nodeLod} />
+              }
+              const Card = LazyCards[node.type]
+              if (!Card) return null
+              return (
+                <Suspense key={node.id} fallback={<CardShellSkeleton node={node} />}>
+                  <Card node={node} />
+                </Suspense>
+              )
+            })}
+            {previewPlan && <FolderMapPreviewGhosts plan={previewPlan} />}
+            {agent.phase === 'preview' && agent.pendingPlan && (
+              <>
+                {computeGhostNodes(agent.pendingPlan, nodes).map((ghost) => (
+                  <div
+                    key={`ghost-${ghost.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: ghost.position.x,
+                      top: ghost.position.y,
+                      width: ghost.size.width,
+                      height: ghost.size.height,
+                      backgroundColor: 'rgba(76, 175, 80, 0.08)',
+                      border: '1px dashed rgba(76, 175, 80, 0.3)',
+                      borderRadius: 8,
+                      padding: 12,
+                      pointerEvents: 'none',
+                      overflow: 'hidden',
+                      fontSize: 12,
+                      color: 'rgba(255, 255, 255, 0.4)'
+                    }}
+                  >
+                    {ghost.isMoved ? '\u21A6 moved' : ghost.content.slice(0, 120)}
+                  </div>
+                ))}
+              </>
+            )}
+          </CanvasSurface>
+
+          <SectionOverlay viewport={viewport} />
+
+          {(ontology.phase === 'preview' || ontology.phase === 'error') && (
+            <OntologyPreview
+              phase={ontology.phase}
+              errorMessage={ontology.errorMessage ?? undefined}
+              groupCount={ontologyGroupCount}
+              cardCount={ontologyCardCount}
+              onApply={ontology.applyResult}
+              onCancel={ontology.cancel}
+            />
+          )}
+
+          {(agent.phase === 'preview' || agent.phase === 'error') && (
+            <AgentPreview
+              phase={agent.phase}
+              actionName={agentActionDisplayName(agent.activeAction)}
+              plan={agent.pendingPlan}
+              errorMessage={agent.errorMessage}
+              errorTag={agent.errorTag}
+              onApply={agent.apply}
+              onCancel={agent.cancel}
+            />
+          )}
+          {agent.phase === 'computing' && agent.anchor && agent.startedAt != null && (
+            <AgentThoughtCard
+              streamState={agent.streamState}
+              actionName={agent.activeAction}
+              anchor={agent.anchor}
+              startedAt={agent.startedAt}
+              onCancel={agent.cancel}
+            />
+          )}
+
+          {previewPlan && (
+            <FolderMapPreviewBar
+              plan={previewPlan}
+              onApply={handleApplyPlan}
+              onCancel={handleCancelPlan}
+            />
+          )}
+
+          {folderMapProgress &&
+            folderMapProgress.phase !== 'idle' &&
+            folderMapProgress.phase !== 'done' && (
+              <div style={folderMapProgressStyle}>
+                {folderMapProgress.phase === 'error'
+                  ? `\u26A0 ${folderMapProgress.errorMessage ?? 'Mapping failed'}`
+                  : `Mapping\u2026 ${folderMapProgress.filesProcessed}/${folderMapProgress.totalFiles} files`}
+              </div>
+            )}
+
+          <ConnectionDragOverlay />
+          {nodes.length === 0 && !vaultPath && <CanvasWelcomeCard />}
+          {nodes.length === 0 && vaultPath && <EmptyCanvasHint rawFileCount={rawFileCount} />}
+          <ZoomIndicator />
+          <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
+          <ClusterLabels viewport={viewport} />
+          <CanvasMinimap
+            containerWidth={containerSize.width}
+            containerHeight={containerSize.height}
+          />
+          <TerminalDock
+            containerWidth={containerSize.width}
+            containerHeight={containerSize.height}
+          />
+
+          <ImportPalette
+            open={importOpen}
+            onClose={() => setImportOpen(false)}
+            onImport={handleImportExecute}
+            containerWidth={containerSize.width}
+            containerHeight={containerSize.height}
+          />
+
+          {contextMenu && (
+            <CanvasContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              onAddCard={handleAddCard}
+              onClose={() => setContextMenu(null)}
+            />
+          )}
+
+          {cardContextMenu &&
+            (() => {
+              const menuNode = nodes.find((n) => n.id === cardContextMenu.nodeId)
+              if (!menuNode) return null
+              const isNote = menuNode.type === 'note'
+              const menuFilePath = isNote ? menuNode.content : undefined
+              const { graph, fileToId, artifacts } = useVaultStore.getState()
+              return (
+                <CardContextMenu
+                  x={cardContextMenu.x}
+                  y={cardContextMenu.y}
+                  selectedCount={selectedNodeIds.size}
+                  onAgentAction={(action) => {
+                    setCardContextMenu(null)
+                    agent.trigger(action)
                   }}
-                >
-                  {ghost.isMoved ? '\u21A6 moved' : ghost.content.slice(0, 120)}
-                </div>
-              ))}
-            </>
-          )}
-        </CanvasSurface>
-
-        <SectionOverlay viewport={viewport} />
-
-        {(ontology.phase === 'preview' || ontology.phase === 'error') && (
-          <OntologyPreview
-            phase={ontology.phase}
-            errorMessage={ontology.errorMessage ?? undefined}
-            groupCount={ontologyGroupCount}
-            cardCount={ontologyCardCount}
-            onApply={ontology.applyResult}
-            onCancel={ontology.cancel}
-          />
-        )}
-
-        {(agent.phase === 'preview' || agent.phase === 'error') && (
-          <AgentPreview
-            phase={agent.phase}
-            actionName={agentActionDisplayName(agent.activeAction)}
-            plan={agent.pendingPlan}
-            errorMessage={agent.errorMessage}
-            errorTag={agent.errorTag}
-            onApply={agent.apply}
-            onCancel={agent.cancel}
-          />
-        )}
-        {agent.phase === 'computing' && agent.anchor && agent.startedAt != null && (
-          <AgentThoughtCard
-            streamState={agent.streamState}
-            actionName={agent.activeAction}
-            anchor={agent.anchor}
-            startedAt={agent.startedAt}
-            onCancel={agent.cancel}
-          />
-        )}
-
-        {previewPlan && (
-          <FolderMapPreviewBar
-            plan={previewPlan}
-            onApply={handleApplyPlan}
-            onCancel={handleCancelPlan}
-          />
-        )}
-
-        {folderMapProgress &&
-          folderMapProgress.phase !== 'idle' &&
-          folderMapProgress.phase !== 'done' && (
-            <div style={folderMapProgressStyle}>
-              {folderMapProgress.phase === 'error'
-                ? `\u26A0 ${folderMapProgress.errorMessage ?? 'Mapping failed'}`
-                : `Mapping\u2026 ${folderMapProgress.filesProcessed}/${folderMapProgress.totalFiles} files`}
-            </div>
-          )}
-
-        <ConnectionDragOverlay />
-        {nodes.length === 0 && !vaultPath && <CanvasWelcomeCard />}
-        {nodes.length === 0 && vaultPath && <EmptyCanvasHint rawFileCount={rawFileCount} />}
-        <ZoomIndicator />
-        <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
-        <ClusterLabels viewport={viewport} />
-        <CanvasMinimap
-          containerWidth={containerSize.width}
-          containerHeight={containerSize.height}
-        />
-        <TerminalDock containerWidth={containerSize.width} containerHeight={containerSize.height} />
-
-        <ImportPalette
-          open={importOpen}
-          onClose={() => setImportOpen(false)}
-          onImport={handleImportExecute}
-          containerWidth={containerSize.width}
-          containerHeight={containerSize.height}
-        />
-
-        {contextMenu && (
-          <CanvasContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
-            onAddCard={handleAddCard}
-            onClose={() => setContextMenu(null)}
-          />
-        )}
-
-        {cardContextMenu &&
-          (() => {
-            const menuNode = nodes.find((n) => n.id === cardContextMenu.nodeId)
-            if (!menuNode) return null
-            const isNote = menuNode.type === 'note'
-            const menuFilePath = isNote ? menuNode.content : undefined
-            const { graph, fileToId, artifacts } = useVaultStore.getState()
-            return (
-              <CardContextMenu
-                x={cardContextMenu.x}
-                y={cardContextMenu.y}
-                selectedCount={selectedNodeIds.size}
-                onAgentAction={(action) => {
-                  setCardContextMenu(null)
-                  agent.trigger(action)
-                }}
-                agentBusy={agent.phase !== 'idle'}
-                onAskPrompt={(placeholder) => {
-                  setShowPromptInput(true)
-                  setPromptPlaceholder(placeholder)
-                  setCardContextMenu(null)
-                }}
-                onShowConnections={() => {
-                  const { newNodes, newEdges } = computeShowConnections(
-                    menuNode,
-                    nodes,
-                    graph,
-                    fileToId,
-                    artifacts
-                  )
-                  if (newNodes.length > 0 || newEdges.length > 0) {
-                    commandStack.current.execute({
-                      execute: () => addNodesAndEdges(newNodes, newEdges),
-                      undo: () => {
-                        const store = useCanvasStore.getState()
-                        const nodeIds = new Set(newNodes.map((n) => n.id))
-                        const edgeIds = new Set(newEdges.map((e) => e.id))
-                        useCanvasStore.setState({
-                          nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
-                          edges: store.edges.filter((e) => !edgeIds.has(e.id)),
-                          isDirty: true
-                        })
-                      }
-                    })
-                    // Fit viewport to all cards including new connections
-                    const allNodes = [...useCanvasStore.getState().nodes]
-                    const vp = computeImportViewport(
-                      allNodes,
-                      containerSize.width,
-                      containerSize.height
+                  agentBusy={agent.phase !== 'idle'}
+                  onAskPrompt={(placeholder) => {
+                    setShowPromptInput(true)
+                    setPromptPlaceholder(placeholder)
+                    setCardContextMenu(null)
+                  }}
+                  onShowConnections={() => {
+                    const { newNodes, newEdges } = computeShowConnections(
+                      menuNode,
+                      nodes,
+                      graph,
+                      fileToId,
+                      artifacts
                     )
-                    setViewport(vp)
+                    if (newNodes.length > 0 || newEdges.length > 0) {
+                      commandStack.current.execute({
+                        execute: () => addNodesAndEdges(newNodes, newEdges),
+                        undo: () => {
+                          const store = useCanvasStore.getState()
+                          const nodeIds = new Set(newNodes.map((n) => n.id))
+                          const edgeIds = new Set(newEdges.map((e) => e.id))
+                          useCanvasStore.setState({
+                            nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
+                            edges: store.edges.filter((e) => !edgeIds.has(e.id)),
+                            isDirty: true
+                          })
+                        }
+                      })
+                      // Fit viewport to all cards including new connections
+                      const allNodes = [...useCanvasStore.getState().nodes]
+                      const vp = computeImportViewport(
+                        allNodes,
+                        containerSize.width,
+                        containerSize.height
+                      )
+                      setViewport(vp)
+                    }
+                    setCardContextMenu(null)
+                  }}
+                  onOpenInEditor={
+                    isNote
+                      ? () => {
+                          useCanvasStore.getState().openSplit(menuFilePath!)
+                          setCardContextMenu(null)
+                        }
+                      : undefined
                   }
-                  setCardContextMenu(null)
+                  onCopyPath={() => {
+                    navigator.clipboard.writeText(menuNode.content)
+                    setCardContextMenu(null)
+                  }}
+                  onClose={() => setCardContextMenu(null)}
+                  onQuickSaveText={
+                    menuNode.type === 'text'
+                      ? async () => {
+                          await saveQuick(menuNode.id)
+                        }
+                      : undefined
+                  }
+                  onSaveTextAs={
+                    menuNode.type === 'text'
+                      ? () => {
+                          void openSaveDialog(menuNode.id)
+                        }
+                      : undefined
+                  }
+                />
+              )
+            })()}
+        </div>
+        {splitFilePath && <SplitDividerAndPanel filePath={splitFilePath} />}
+        {saveDialogNodeId &&
+          (() => {
+            const node = nodes.find((n) => n.id === saveDialogNodeId)
+            const initialFilename = node ? slugifyFilename(node.content, new Date()) : 'note'
+            return (
+              <SaveTextCardDialog
+                initialFilename={initialFilename}
+                folders={vaultFolders}
+                files={vaultFiles}
+                onClose={() => setSaveDialogNodeId(null)}
+                onSaveNew={async (params) => {
+                  const id = saveDialogNodeId
+                  setSaveDialogNodeId(null)
+                  if (id) await saveAsNew(id, params)
                 }}
-                onOpenInEditor={
-                  isNote
-                    ? () => {
-                        useCanvasStore.getState().openSplit(menuFilePath!)
-                        setCardContextMenu(null)
-                      }
-                    : undefined
-                }
-                onCopyPath={() => {
-                  navigator.clipboard.writeText(menuNode.content)
-                  setCardContextMenu(null)
+                onSaveAppend={async (path) => {
+                  const id = saveDialogNodeId
+                  setSaveDialogNodeId(null)
+                  if (id) await saveAppend(id, path)
                 }}
-                onClose={() => setCardContextMenu(null)}
-                onQuickSaveText={
-                  menuNode.type === 'text'
-                    ? async () => {
-                        await saveQuick(menuNode.id)
-                      }
-                    : undefined
-                }
-                onSaveTextAs={
-                  menuNode.type === 'text'
-                    ? () => {
-                        void openSaveDialog(menuNode.id)
-                      }
-                    : undefined
-                }
               />
             )
           })()}
       </div>
-      {splitFilePath && <SplitDividerAndPanel filePath={splitFilePath} />}
-      {saveDialogNodeId &&
-        (() => {
-          const node = nodes.find((n) => n.id === saveDialogNodeId)
-          const initialFilename = node ? slugifyFilename(node.content, new Date()) : 'note'
-          return (
-            <SaveTextCardDialog
-              initialFilename={initialFilename}
-              folders={vaultFolders}
-              files={vaultFiles}
-              onClose={() => setSaveDialogNodeId(null)}
-              onSaveNew={async (params) => {
-                const id = saveDialogNodeId
-                setSaveDialogNodeId(null)
-                if (id) await saveAsNew(id, params)
-              }}
-              onSaveAppend={async (path) => {
-                const id = saveDialogNodeId
-                setSaveDialogNodeId(null)
-                if (id) await saveAppend(id, path)
-              }}
-            />
-          )
-        })()}
-    </div>
+    </CommandStackProvider>
   )
 }

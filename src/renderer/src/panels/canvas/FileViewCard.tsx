@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
+import matter from 'gray-matter'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useViewStore } from '../../store/view-store'
@@ -8,8 +9,45 @@ import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
 import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
+import { extractSection } from '@shared/engine/section-rewriter'
+import { rematchSections } from '@shared/engine/section-rematch'
+import { commitSectionEdit } from './section-projection'
 import type { CanvasNode } from '@shared/canvas-types'
 import { vaultEvents } from '@engine/vault-event-hub'
+
+const SECTION_EDIT_DEBOUNCE_MS = 1000
+
+interface SectionProjection {
+  readonly body: string
+  /** Refreshed map — non-null only when external rename was unambiguous
+   *  and the file's frontmatter should be re-saved. */
+  readonly refreshedMap: Readonly<Record<string, string>> | null
+  readonly unresolved: boolean
+}
+
+/**
+ * If `sectionId` is set, returns only the body of the named section from
+ * the raw file content. Handles external heading renames via rematch.
+ */
+function projectSection(raw: string, sectionId: string | null): SectionProjection {
+  if (!sectionId) return { body: raw, refreshedMap: null, unresolved: false }
+  const parsed = matter(raw)
+  const sectionMap = (parsed.data.sections as Record<string, string> | undefined) ?? {}
+  const direct = extractSection(parsed.content, sectionId, sectionMap)
+  if (direct.ok) return { body: direct.value, refreshedMap: null, unresolved: false }
+
+  const rematch = rematchSections(parsed.content, sectionMap)
+  if (rematch.unresolved.includes(sectionId)) {
+    return { body: '[section not found]', refreshedMap: null, unresolved: true }
+  }
+  const retry = extractSection(parsed.content, sectionId, rematch.resolved)
+  if (!retry.ok) return { body: '[section not found]', refreshedMap: null, unresolved: true }
+  return {
+    body: retry.value,
+    refreshedMap: rematch.changed ? rematch.resolved : null,
+    unresolved: false
+  }
+}
 
 interface FileViewCardProps {
   readonly node: CanvasNode
@@ -29,6 +67,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   const removeNode = useCanvasStore((s) => s.removeNode)
 
   const filePath = node.content
+  const sectionId = typeof node.metadata.section === 'string' ? node.metadata.section : null
 
   const filename = useMemo(() => {
     const parts = filePath.split('/')
@@ -45,12 +84,24 @@ export function FileViewCard({ node }: FileViewCardProps) {
 
     window.api.fs
       .readFile(filePath)
-      .then((content: string) => {
-        if (!cancelled) {
-          setFileContent(content)
-          previousLineCountRef.current = countLines(content)
-          setLoading(false)
-          setError(null)
+      .then(async (content: string) => {
+        if (cancelled) return
+        const { body, refreshedMap, unresolved } = projectSection(content, sectionId)
+        setFileContent(body)
+        previousLineCountRef.current = countLines(body)
+        setLoading(false)
+        setError(unresolved ? 'Section missing in file. Detach or re-pick a heading.' : null)
+        if (refreshedMap) {
+          const parsed = matter(content)
+          const next = matter.stringify(parsed.content, {
+            ...parsed.data,
+            sections: refreshedMap
+          })
+          try {
+            await window.api.document.update(filePath, next)
+          } catch {
+            // Non-fatal: the in-memory map is still correct; next save will sync.
+          }
         }
       })
       .catch(() => {
@@ -63,7 +114,31 @@ export function FileViewCard({ node }: FileViewCardProps) {
     return () => {
       cancelled = true
     }
-  }, [filePath])
+  }, [filePath, sectionId])
+
+  // Debounced commit for section edits. The ref holds a live handle so we
+  // can clear on unmount and avoid firing after the card is gone.
+  const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSectionEdit = useCallback(
+    (newBody: string) => {
+      if (!sectionId) return
+      if (commitTimerRef.current) clearTimeout(commitTimerRef.current)
+      commitTimerRef.current = setTimeout(async () => {
+        commitTimerRef.current = null
+        const r = await commitSectionEdit(filePath, sectionId, newBody, {
+          readFile: (p) => window.api.fs.readFile(p),
+          writeDocument: async (p, c) => {
+            await window.api.document.update(p, c)
+          }
+        })
+        if (!r.ok) {
+          setError(`section write failed: ${r.error}`)
+        }
+      }, SECTION_EDIT_DEBOUNCE_MS)
+    },
+    [filePath, sectionId]
+  )
 
   // Step 2: Mount CodeMirror once content is loaded and container exists
   useEffect(() => {
@@ -72,7 +147,11 @@ export function FileViewCard({ node }: FileViewCardProps) {
     let cancelled = false
 
     async function mount() {
-      const extensions = await createEditorExtensions(language, { readOnly: true })
+      const readOnly = sectionId === null
+      const extensions = await createEditorExtensions(language, {
+        readOnly,
+        onUpdate: sectionId ? handleSectionEdit : undefined
+      })
       if (cancelled || !containerRef.current) return
 
       const state = EditorState.create({ doc: fileContent ?? '', extensions })
@@ -84,10 +163,14 @@ export function FileViewCard({ node }: FileViewCardProps) {
 
     return () => {
       cancelled = true
+      if (commitTimerRef.current) {
+        clearTimeout(commitTimerRef.current)
+        commitTimerRef.current = null
+      }
       viewRef.current?.destroy()
       viewRef.current = null
     }
-  }, [fileContent, language])
+  }, [fileContent, language, sectionId, handleSectionEdit])
 
   // Subscribe to filesystem changes (freeze-then-signal pattern)
   useEffect(() => {
@@ -128,25 +211,26 @@ export function FileViewCard({ node }: FileViewCardProps) {
     window.api.fs
       .readFile(filePath)
       .then((content: string) => {
+        const { body, unresolved } = projectSection(content, sectionId)
         const view = viewRef.current
         if (view) {
           view.dispatch({
             changes: {
               from: 0,
               to: view.state.doc.length,
-              insert: content
+              insert: body
             }
           })
         }
-        previousLineCountRef.current = countLines(content)
+        previousLineCountRef.current = countLines(body)
         setModified(false)
         setLineDelta('')
-        setError(null)
+        setError(unresolved ? 'Section missing in file. Detach or re-pick a heading.' : null)
       })
       .catch(() => {
         setError('Failed to load file')
       })
-  }, [filePath])
+  }, [filePath, sectionId])
 
   // Keyboard: press R while card is focused to refresh
   useEffect(() => {

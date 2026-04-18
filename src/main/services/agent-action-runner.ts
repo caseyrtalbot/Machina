@@ -12,6 +12,11 @@ import type {
   AgentStreamEvent
 } from '@shared/agent-action-types'
 import type { Result } from '@shared/engine/types'
+import {
+  isClusterProducingAction,
+  newClusterId,
+  stampRootCardWithCluster
+} from './agent-action-runner-helpers'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -672,7 +677,14 @@ export async function runAgentAction(
       return { error: `Validation failed: ${validation.error}`, tag: 'invalid-output' }
     }
 
-    const plan = buildPlanFromOps(validation.value)
+    const basePlan = buildPlanFromOps(validation.value)
+    const plan = isClusterProducingAction(request.action)
+      ? stampRootCardWithCluster(
+          basePlan,
+          newClusterId(),
+          request.context.selectedCards.map((c) => c.id)
+        )
+      : basePlan
     onStream({ kind: 'phase', phase: 'materializing', count: plan.ops.length })
     return { plan }
   } catch (err) {

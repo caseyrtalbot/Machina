@@ -1,4 +1,5 @@
 import type { OntologySnapshot, OntologyLayoutResult } from './engine/ontology-types'
+import type { SectionMap } from './cluster-types'
 
 export type CanvasNodeType =
   | 'text'
@@ -52,6 +53,20 @@ export interface SystemArtifactNodeMeta {
   readonly fileTouchCount?: number
   readonly connections: readonly string[]
   readonly tensionRefs: readonly string[]
+}
+
+/** Typed metadata shape for `file-view` nodes. `CanvasNode.metadata` is a
+ *  generic record; consumers cast to this interface when reading/writing. */
+export interface FileViewNodeMeta {
+  readonly filePath: string
+  readonly artifactId?: string
+  readonly origin?: 'human' | 'agent' | 'source'
+  /** cardId within the projected file (for cluster sections). Undefined = whole file. */
+  readonly section?: string
+  /** Local cache of the file's sections map; refreshed on external change. */
+  readonly sectionMap?: SectionMap
+  /** cluster_id this card belongs to (denormalized for quick lookup) */
+  readonly cluster_id?: string
 }
 
 export interface CanvasNode {

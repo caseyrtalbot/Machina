@@ -160,10 +160,51 @@ export function serializeArtifact(artifact: Artifact): string {
 
 export function serializeDraft(draft: AgentArtifactDraft, id: string): string {
   const now = new Date().toISOString()
+
+  if (draft.kind === 'cluster') {
+    // De-dupe heading collisions while preserving order; the resolved
+    // headings are recorded in frontmatter.sections so the projection
+    // can round-trip card identity.
+    const usedHeadings = new Set<string>()
+    const sectionsMap: Record<string, string> = {}
+    const resolvedSections: { heading: string; body: string }[] = []
+    for (const s of draft.sections) {
+      let h = s.heading
+      let n = 2
+      while (usedHeadings.has(h)) h = `${s.heading} (${n++})`
+      usedHeadings.add(h)
+      sectionsMap[s.cardId] = h
+      resolvedSections.push({ heading: h, body: s.body })
+    }
+
+    const frontmatter: Record<string, unknown> = {
+      id,
+      title: draft.title,
+      kind: 'cluster',
+      cluster_id: id,
+      cluster_prompt: draft.prompt,
+      created: now,
+      modified: now,
+      origin: draft.origin,
+      sources: [...draft.sources],
+      sections: sectionsMap
+    }
+    if (draft.tags && draft.tags.length > 0) frontmatter.tags = [...draft.tags]
+
+    const promptIntro = draft.prompt ? `${draft.prompt}\n\n` : ''
+    const body =
+      promptIntro +
+      resolvedSections
+        .map((s) => `## ${s.heading}\n${s.body}${s.body.endsWith('\n') ? '' : '\n'}`)
+        .join('\n')
+
+    return matter.stringify(body, frontmatter)
+  }
+
   const frontmatter: Record<string, unknown> = {
     id,
     title: draft.title,
-    type: draft.kind === 'compiled-article' ? 'output' : draft.kind,
+    type: 'output',
     created: now,
     modified: now
   }
@@ -171,7 +212,6 @@ export function serializeDraft(draft: AgentArtifactDraft, id: string): string {
   if (draft.origin !== 'human') frontmatter.origin = draft.origin
   if (draft.sources.length > 0) frontmatter.sources = [...draft.sources]
   if (draft.tags && draft.tags.length > 0) frontmatter.tags = [...draft.tags]
-
   if (draft.frontmatterExtras) {
     for (const [key, value] of Object.entries(draft.frontmatterExtras)) {
       frontmatter[key] = value

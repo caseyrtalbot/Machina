@@ -47,6 +47,7 @@ export function filterStaleOps(
       case 'move-node':
       case 'resize-node':
       case 'update-metadata':
+      case 'update-node':
         return willExist.has(op.nodeId)
       case 'remove-node':
         return existingNodeIds.has(op.nodeId)
@@ -66,6 +67,10 @@ function isPersistenceEnabled(): boolean {
   return useVaultStore.getState().config?.compile?.persistenceEnabled !== false
 }
 
+function isCaptureEnabled(): boolean {
+  return useVaultStore.getState().config?.cluster?.captureEnabled !== false
+}
+
 function getVaultPath(): string {
   return useVaultStore.getState().vaultPath ?? ''
 }
@@ -82,6 +87,12 @@ function isMaterializeOp(op: CanvasMutationOp): op is MaterializeArtifactOp {
  * Used when persistence is disabled.
  */
 function rewriteAsFallbackAddNode(op: MaterializeArtifactOp): CanvasMutationOp {
+  if (op.draft.kind !== 'compiled-article') {
+    throw new Error(
+      `rewriteAsFallbackAddNode called with unsupported kind: ${op.draft.kind}. ` +
+        `applyAgentResult should have rejected this earlier.`
+    )
+  }
   const node: CanvasNode = {
     id: op.tempNodeId,
     type: 'markdown',
@@ -114,6 +125,44 @@ function rewriteAsFileViewAddNode(
     }
   }
   return { type: 'add-node', node }
+}
+
+/**
+ * Convert each cluster section's existing card into a file-view card
+ * that projects a single section of the materialized cluster file.
+ * The tempNodeId itself is dropped — the cluster lives as its member
+ * cards plus the on-disk file.
+ */
+function rewriteClusterOps(
+  op: MaterializeArtifactOp,
+  result: MaterializeResult,
+  existingNodes: readonly CanvasNode[]
+): CanvasMutationOp[] {
+  if (op.draft.kind !== 'cluster') return []
+  const byId = new Map(existingNodes.map((n) => [n.id, n]))
+
+  const sectionMap: Record<string, string> = {}
+  for (const s of op.draft.sections) sectionMap[s.cardId] = s.heading
+
+  const swaps: CanvasMutationOp[] = []
+  for (const section of op.draft.sections) {
+    if (!byId.has(section.cardId)) continue
+    swaps.push({
+      type: 'update-node',
+      nodeId: section.cardId,
+      nodeType: 'file-view',
+      content: result.vaultRelativePath,
+      metadata: {
+        filePath: result.absolutePath,
+        artifactId: result.artifactId,
+        section: section.cardId,
+        sectionMap,
+        origin: op.draft.origin,
+        cluster_id: result.artifactId
+      }
+    })
+  }
+  return swaps
 }
 
 /* ------------------------------------------------------------------ */
@@ -174,10 +223,24 @@ async function applyWithPersistence(
     throw err
   }
 
-  // Phase B: Rewrite materialize ops to file-view add-node ops, then apply
+  // Phase B: Rewrite materialize ops. Clusters swap each member card into
+  // a section-projected file-view; compiled articles become a new file-view.
+  const existingNodes = useCanvasStore.getState().nodes
+
+  const rewrittenOps: CanvasMutationOp[] = []
+  for (let i = 0; i < materializeOps.length; i++) {
+    const op = materializeOps[i]
+    const res = results[i]
+    if (op.draft.kind === 'cluster') {
+      rewrittenOps.push(...rewriteClusterOps(op, res, existingNodes))
+    } else {
+      rewrittenOps.push(rewriteAsFileViewAddNode(op, res))
+    }
+  }
+
   const rewrittenPlan: CanvasMutationPlan = {
     ...filteredPlan,
-    ops: [...otherOps, ...materializeOps.map((op, i) => rewriteAsFileViewAddNode(op, results[i]))]
+    ops: [...otherOps, ...rewrittenOps]
   }
 
   executeAgentPlanCommand(rewrittenPlan, commandStack, async () => {
@@ -222,6 +285,14 @@ export async function applyAgentResult(
     return
   }
 
+  const hasCluster = materializeOps.some((op) => op.draft.kind === 'cluster')
+  if (hasCluster && !isPersistenceEnabled()) {
+    throw new Error('Cluster capture requires compile.persistenceEnabled=true')
+  }
+  if (hasCluster && !isCaptureEnabled()) {
+    throw new Error('Cluster capture disabled in config')
+  }
+
   const otherOps = filteredOps.filter((op) => !isMaterializeOp(op))
 
   if (isPersistenceEnabled()) {
@@ -229,7 +300,7 @@ export async function applyAgentResult(
     return
   }
 
-  // Persistence disabled: rewrite materialize ops as markdown fallback cards
+  // Persistence disabled (and no clusters): rewrite materialize ops as markdown fallback cards
   const fallbackPlan: CanvasMutationPlan = {
     ...filteredPlan,
     ops: [...otherOps, ...materializeOps.map(rewriteAsFallbackAddNode)]
