@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { colors, floatingPanel, typography } from '../../design/tokens'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 import type { AgentActionName } from '@shared/agent-action-types'
 import type { StreamState } from './agent-stream-state'
 
@@ -41,11 +42,6 @@ function phaseLabel(
   }
 }
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 export function AgentThoughtCard({
   streamState,
   actionName,
@@ -56,7 +52,7 @@ export function AgentThoughtCard({
   const [now, setNow] = useState(() => Date.now())
   const bodyRef = useRef<HTMLDivElement>(null)
   const userScrolledUp = useRef(false)
-  const reducedMotion = prefersReducedMotion()
+  const reducedMotion = useReducedMotion()
   const titleId = useId()
 
   // Elapsed timer — tick every 500ms during active phases

@@ -8,6 +8,7 @@ import { GraphSettingsPanel } from './GraphSettingsPanel'
 import { getGraphLod } from './graph-lod'
 import { resolveFocusIdx } from './graph-focus'
 import { colors, floatingPanel } from '@renderer/design/tokens'
+import { useReducedMotion } from '@renderer/hooks/useReducedMotion'
 import type { SimNode, PhysicsCommand, PhysicsResult, ForceParams } from './graph-types'
 import type { KnowledgeGraph } from '@shared/types'
 
@@ -169,6 +170,7 @@ function GraphStatusRail({
 }
 
 export function GraphPanel() {
+  const reducedMotion = useReducedMotion()
   const containerRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<GraphRenderer | null>(null)
   const labelLayerRef = useRef<LabelLayer | null>(null)
@@ -462,12 +464,13 @@ export function GraphPanel() {
     workerRef.current.postMessage(cmd)
   }, [])
 
-  // Reheat the simulation
+  // Reheat the simulation (skip when user prefers reduced motion — the settling
+  // tween is the whole point of reheat; stop instead to flatten it.)
   const handleReheat = useCallback(() => {
     if (!workerRef.current) return
-    const cmd: PhysicsCommand = { type: 'reheat', alpha: 0.5 }
+    const cmd: PhysicsCommand = reducedMotion ? { type: 'stop' } : { type: 'reheat', alpha: 0.5 }
     workerRef.current.postMessage(cmd)
-  }, [])
+  }, [reducedMotion])
 
   // Fit all nodes into view
   const handleFitAll = useCallback(() => {

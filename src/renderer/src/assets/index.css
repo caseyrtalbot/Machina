@@ -1063,13 +1063,26 @@ body {
   right: -3px;
 }
 
+/* Reduced-motion scope:
+ * target only app-owned animations (te-* keyframe classes), never the wildcard.
+ * A wildcard selector flattens Tiptap cursor blink and CodeMirror's internal
+ * transitions, which breaks the editor for reduced-motion users. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  [class*='te-enter'],
+  .te-card-enter,
+  .te-popover-enter,
+  .te-cmdk-backdrop,
+  [class*='te-pulse'],
+  [class*='te-shimmer'],
+  [class*='te-slide'],
+  [class*='te-fade'],
+  [class*='te-dock-pulse'] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  html {
     scroll-behavior: auto !important;
   }
 }
