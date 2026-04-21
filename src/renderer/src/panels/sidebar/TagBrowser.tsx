@@ -177,6 +177,7 @@ export function TagBrowser() {
                     onClick={() => useSidebarFilterStore.getState().toggleTag(tag)}
                     className="opacity-60 hover:opacity-100"
                     style={{ transition: transitions.hover }}
+                    aria-label={`Remove tag ${tag}`}
                   >
                     ×
                   </button>

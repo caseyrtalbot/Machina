@@ -39,6 +39,7 @@ function CodeSnippet({ code }: { code: string }) {
         onClick={handleCopy}
         className="ml-3 p-1 rounded hover:bg-white/10 transition-colors"
         title="Copy to clipboard"
+        aria-label="Copy to clipboard"
         style={{ color: colors.text.muted }}
       >
         <Copy size={14} />

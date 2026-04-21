@@ -178,6 +178,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
             e.currentTarget.style.opacity = '0.5'
           }}
           title="Close split editor (Cmd+Shift+E)"
+          aria-label="Close split editor"
         >
           <svg
             width={12}

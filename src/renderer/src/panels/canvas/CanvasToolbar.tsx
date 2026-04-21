@@ -171,6 +171,7 @@ export function CanvasToolbar({
           onClick={onAddCard}
           className="canvas-toolbtn"
           data-testid="canvas-add-card"
+          aria-label="Add card"
           style={{ color: colors.text.secondary }}
         >
           <svg
@@ -192,6 +193,7 @@ export function CanvasToolbar({
           onClick={onOpenImport}
           className="canvas-toolbtn"
           data-testid="canvas-import"
+          aria-label="Import notes"
           style={{ color: colors.text.secondary }}
         >
           <svg
@@ -236,6 +238,13 @@ export function CanvasToolbar({
           }}
           className={`canvas-toolbtn ${claudeStatus.installed ? 'canvas-toolbtn--accent' : ''}`}
           disabled={!claudeStatus.installed}
+          aria-label={
+            !claudeStatus.installed
+              ? 'Claude Code not installed'
+              : !claudeStatus.authenticated
+                ? 'Start Claude (not signed in)'
+                : 'Start Claude'
+          }
           style={!claudeStatus.installed ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
         >
           <svg
@@ -277,7 +286,7 @@ export function CanvasToolbar({
 
       {/* VIEW: how am I seeing it */}
       <div className="canvas-toolbtn-wrap">
-        <button onClick={zoomIn} className="canvas-toolbtn">
+        <button onClick={zoomIn} className="canvas-toolbtn" aria-label="Zoom in">
           +
         </button>
         <Tip label="Zoom in" />
@@ -290,7 +299,7 @@ export function CanvasToolbar({
         {zoomPercent}%
       </button>
       <div className="canvas-toolbtn-wrap">
-        <button onClick={zoomOut} className="canvas-toolbtn">
+        <button onClick={zoomOut} className="canvas-toolbtn" aria-label="Zoom out">
           -
         </button>
         <Tip label="Zoom out" />
@@ -299,6 +308,8 @@ export function CanvasToolbar({
         <button
           onClick={toggleShowAllEdges}
           className={`canvas-toolbtn${showAllEdges ? ' canvas-toolbtn--active' : ''}`}
+          aria-label={showAllEdges ? 'Hide edges' : 'Show edges'}
+          aria-pressed={showAllEdges}
         >
           <svg
             width={14}
@@ -322,6 +333,9 @@ export function CanvasToolbar({
             onClick={() => setEnvMenuOpen((prev) => !prev)}
             className="canvas-toolbtn"
             data-testid="canvas-env-settings"
+            aria-label="Environment settings"
+            aria-haspopup="menu"
+            aria-expanded={envMenuOpen}
           >
             <svg
               width={14}
@@ -408,6 +422,7 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           disabled={!canUndo}
           data-testid="canvas-undo"
+          aria-label="Undo"
         >
           <svg
             width={14}
@@ -430,6 +445,7 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           disabled={!canRedo}
           data-testid="canvas-redo"
+          aria-label="Redo"
         >
           <svg
             width={14}
@@ -456,6 +472,9 @@ export function CanvasToolbar({
             onClick={() => setTileMenuOpen((prev) => !prev)}
             className="canvas-toolbtn"
             data-testid="canvas-tile"
+            aria-label="Tile layout"
+            aria-haspopup="menu"
+            aria-expanded={tileMenuOpen}
           >
             <svg
               width={14}
@@ -525,6 +544,7 @@ export function CanvasToolbar({
           disabled={organizePhase === 'processing'}
           className="canvas-toolbtn"
           data-testid="canvas-organize"
+          aria-label={organizePhase === 'processing' ? 'Organizing…' : 'Organize'}
           style={{ cursor: organizePhase === 'processing' ? 'wait' : undefined }}
         >
           <svg
@@ -557,6 +577,13 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           disabled={thinkBusy || !hasNodes}
           data-testid="canvas-think"
+          aria-label={
+            thinkBusy
+              ? 'Thinking…'
+              : !hasNodes
+                ? 'Think — add cards first'
+                : 'Think — challenge for insights'
+          }
           style={{
             color: thinkBusy || !hasNodes ? colors.text.muted : colors.semantic.tension,
             cursor: thinkBusy ? 'wait' : undefined,
@@ -599,6 +626,13 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           disabled={(!compileEnabled && !isCompileRunning) || isCompileBusy}
           data-testid="canvas-compile"
+          aria-label={
+            isCompileRunning
+              ? 'Stop compile'
+              : unprocessedSourceCount > 0
+                ? `Compile — ${unprocessedSourceCount} unprocessed source${unprocessedSourceCount === 1 ? '' : 's'}`
+                : 'Compile — process sources'
+          }
           style={{
             color: isCompileRunning
               ? '#f87171'
@@ -667,6 +701,9 @@ export function CanvasToolbar({
             }}
             className="canvas-toolbtn"
             data-testid="canvas-actions"
+            aria-label="Actions"
+            aria-haspopup="menu"
+            aria-expanded={agentFlyoutOpen}
           >
             <svg
               width={14}
@@ -721,6 +758,11 @@ export function CanvasToolbar({
                   ? `Focus Frame ${slot} — ⌘${slot} jump, ⇧⌘${slot} overwrite, ⌥click clear`
                   : `Focus Frame ${slot} — ⇧⌘${slot} to save`
               }
+              aria-label={
+                filled
+                  ? `Jump to focus frame ${slot}`
+                  : `Focus frame ${slot} (empty)`
+              }
               style={{
                 width: 8,
                 height: 8,
@@ -746,6 +788,7 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           disabled={!clearEnabled}
           data-testid="canvas-clear"
+          aria-label="Clear canvas"
           style={{
             color: colors.text.secondary,
             opacity: clearEnabled ? 1 : 0.4,

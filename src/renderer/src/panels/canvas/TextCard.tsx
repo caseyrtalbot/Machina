@@ -104,6 +104,7 @@ function TextCardImpl({ node }: TextCardProps) {
         type="button"
         onClick={handleHeaderSaveClick}
         title="Save to vault (Cmd+Shift+S)"
+        aria-label="Save to vault"
         className="text-xs px-1"
         style={{ opacity: 0.7, cursor: 'pointer' }}
         data-testid="text-card-save-button"

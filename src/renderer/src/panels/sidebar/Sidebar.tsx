@@ -165,6 +165,7 @@ function ActionBar({
             className="sidebar-icon-button"
             style={{ color: colors.text.muted }}
             title="New file"
+            aria-label="New file"
           >
             <svg
               width="12"
@@ -183,6 +184,7 @@ function ActionBar({
             className="sidebar-icon-button"
             style={{ color: colors.text.muted }}
             title={`Sort: ${SORT_LABELS[sortMode]}`}
+            aria-label={`Sort: ${SORT_LABELS[sortMode]}. Click to cycle.`}
           >
             <svg
               width="12"

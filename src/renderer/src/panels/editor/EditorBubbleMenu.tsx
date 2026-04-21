@@ -18,6 +18,8 @@ function FormatButton({ active, onClick, title, children }: FormatButtonProps) {
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       style={{
         width: 30,
         height: 30,

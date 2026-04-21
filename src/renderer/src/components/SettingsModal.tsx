@@ -60,14 +60,16 @@ function SliderInput({ value, min, max, step, onChange, unit }: SliderInputProps
 interface ToggleProps {
   value: boolean
   onChange: (value: boolean) => void
+  ariaLabel: string
 }
 
-function Toggle({ value, onChange }: ToggleProps) {
+function Toggle({ value, onChange, ariaLabel }: ToggleProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={value}
+      aria-label={ariaLabel}
       onClick={() => onChange(!value)}
       className="settings-toggle w-9 h-5 rounded-full relative transition-colors flex-shrink-0"
       style={{
@@ -336,7 +338,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             />
           </SettingRow>
           <SettingRow label="Spell Check">
-            <Toggle value={spellCheck} onChange={setSpellCheck} />
+            <Toggle value={spellCheck} onChange={setSpellCheck} ariaLabel="Spell check" />
           </SettingRow>
 
           {/* ── Vault ── */}

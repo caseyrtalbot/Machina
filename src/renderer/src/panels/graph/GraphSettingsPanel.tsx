@@ -70,6 +70,9 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
           height: 18,
           backgroundColor: checked ? colors.accent.default : 'var(--color-border-default)'
         }}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
       >
         <span
           className="absolute top-0.5 rounded-full transition-transform"

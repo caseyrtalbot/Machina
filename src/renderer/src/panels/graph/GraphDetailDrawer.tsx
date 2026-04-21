@@ -158,6 +158,7 @@ export function GraphDetailDrawer() {
                 className="shrink-0 text-xs rounded p-1 interactive-hover"
                 style={{ color: colors.text.muted }}
                 title="Close drawer"
+                aria-label="Close drawer"
               >
                 ×
               </button>
@@ -261,6 +262,7 @@ function GhostDrawerContent({
             className="shrink-0 text-xs rounded p-1 interactive-hover"
             style={{ color: colors.text.muted }}
             title="Close drawer"
+            aria-label="Close drawer"
           >
             ×
           </button>

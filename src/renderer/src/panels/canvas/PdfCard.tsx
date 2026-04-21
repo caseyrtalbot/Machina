@@ -164,6 +164,7 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
               type="button"
               onClick={goToPrevPage}
               disabled={currentPage <= 1}
+              aria-label="Previous page"
               style={{
                 background: 'none',
                 border: 'none',
@@ -182,6 +183,7 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
               type="button"
               onClick={goToNextPage}
               disabled={currentPage >= pageCount}
+              aria-label="Next page"
               style={{
                 background: 'none',
                 border: 'none',

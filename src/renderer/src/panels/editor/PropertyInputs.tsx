@@ -301,6 +301,7 @@ export function ListInput({ value, onChange }: ListInputProps) {
             border: `1px dashed ${colors.text.muted}40`
           }}
           className="hover:opacity-80 transition-opacity"
+          aria-label="Add item"
         >
           +
         </button>

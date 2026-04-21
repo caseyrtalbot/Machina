@@ -551,6 +551,8 @@ export function GraphPanel() {
           boxShadow: '0 10px 24px rgba(0, 0, 0, 0.22)'
         }}
         title="Graph settings"
+        aria-label="Graph settings"
+        aria-expanded={showSettings}
       >
         <svg
           width={16}

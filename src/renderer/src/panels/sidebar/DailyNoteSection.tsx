@@ -132,6 +132,7 @@ export function DailyNoteSection({
           <div className="flex items-center justify-between mb-1">
             <button
               onClick={prevMonth}
+              aria-label="Previous month"
               style={{
                 background: 'none',
                 border: 'none',
@@ -148,6 +149,7 @@ export function DailyNoteSection({
             </span>
             <button
               onClick={nextMonth}
+              aria-label="Next month"
               style={{
                 background: 'none',
                 border: 'none',

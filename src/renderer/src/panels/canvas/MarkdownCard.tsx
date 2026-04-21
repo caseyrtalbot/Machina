@@ -127,6 +127,7 @@ export function MarkdownCard({ node }: MarkdownCardProps) {
               backgroundColor: colors.accent.muted,
               color: colors.text.secondary
             }}
+            aria-label={viewMode === 'rendered' ? 'Switch to source view' : 'Switch to rendered view'}
           >
             {viewMode === 'rendered' ? '</>' : 'Aa'}
           </button>
