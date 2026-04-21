@@ -75,8 +75,7 @@ export function CanvasPromptInput({
           border: 'none',
           color: colors.text.primary,
           fontFamily: typography.fontFamily.mono,
-          fontSize: 13,
-          outline: 'none'
+          fontSize: 13
         }}
       />
       <button

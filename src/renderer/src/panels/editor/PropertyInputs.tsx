@@ -62,8 +62,7 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: '11px',
   background: 'transparent',
-  border: 0,
-  outline: 'none'
+  border: 0
 }
 
 // ── Boolean Input ──

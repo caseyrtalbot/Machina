@@ -325,6 +325,7 @@ body {
   min-width: 0;
   background: transparent;
   border: 0;
+  /* Focus indicator lives on the parent .sidebar-search-shell via data-focused. */
   outline: none;
   font-family: var(--font-body);
   font-size: var(--env-sidebar-font-size);
@@ -800,6 +801,23 @@ body {
 
 /* ─── Focus & Interaction ─── */
 
+/*
+ * Global keyboard focus affordance. Applies only on keyboard navigation
+ * (:focus-visible), not on mouse click. `:where()` keeps specificity 0 so
+ * components can override by supplying their own focus treatment.
+ */
+:where(button, a, input, select, textarea, [role='button'], [role='menuitem'], [role='option'], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent-default);
+  outline-offset: 2px;
+  border-radius: var(--radius-inline);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :where(button, a, input, select, textarea, [role='button'], [role='menuitem'], [role='option'], [tabindex]):focus-visible {
+    outline-width: 3px;
+  }
+}
+
 .focus-ring:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-accent-focus);
@@ -1065,7 +1083,6 @@ body {
   height: 4px;
   border-radius: 2px;
   background: var(--color-border-default);
-  outline: none;
   cursor: pointer;
 }
 

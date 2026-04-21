@@ -175,7 +175,6 @@ export function ImportPalette({
               flex: 1,
               background: 'transparent',
               border: 'none',
-              outline: 'none',
               color: colors.text.primary,
               fontSize: 14
             }}

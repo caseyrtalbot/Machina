@@ -105,7 +105,6 @@ function SelectInput({ value, options, onChange }: SelectInputProps) {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="settings-select text-xs rounded"
-      style={{ outline: 'none' }}
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
