@@ -19,6 +19,21 @@ describe('buildActionLaunchScript', () => {
     expect(script).toContain('entire vault')
   })
 
+  // Regression guard: without --print, Claude v2.1+ boots into interactive
+  // REPL mode and the positional "Begin." pre-fills the prompt box instead
+  // of auto-submitting. The user sees a `>` cursor waiting for input and
+  // thinks nothing is happening.
+  it('runs Claude in --print mode so the agent executes non-interactively', () => {
+    const script = buildActionLaunchScript({
+      actionName: 'Librarian',
+      scopeSummary: 'entire vault',
+      promptPath: '/vault/.machina-dev/action-prompt-abc.txt',
+      scriptPath: '/vault/.machina-dev/action-launch-abc.sh'
+    })
+
+    expect(script).toMatch(/claude --print/)
+  })
+
   // Regression guard: the terminal card looks dead during Claude's
   // session-start hooks (~3s of silent output). Removing `clear` and
   // printing a launch banner is what gives the user visible feedback.
@@ -32,7 +47,7 @@ describe('buildActionLaunchScript', () => {
 
     expect(script).not.toMatch(/^clear$/m)
     expect(script).toContain('Launching')
-    expect(script).toContain('first output may take a few seconds')
+    expect(script).toContain('first tokens may take a few seconds')
   })
 
   it('surfaces a non-zero Claude exit with a red failure line', () => {

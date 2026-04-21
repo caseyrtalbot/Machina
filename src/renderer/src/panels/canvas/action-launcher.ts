@@ -29,8 +29,15 @@ export function buildActionLaunchScript({
     '}',
     'trap cleanup EXIT',
     `printf '\\033[1m▸ Launching %s\\033[0m  (%s)\\n' ${shellQuote(actionName)} ${shellQuote(scopeSummary)}`,
-    `printf '  Starting Claude — first output may take a few seconds...\\n\\n'`,
-    'claude --append-system-prompt "$(cat "$PROMPT_PATH")" \\',
+    `printf '  Streaming Claude output — first tokens may take a few seconds...\\n\\n'`,
+    // --print runs non-interactively: Claude streams its work to stdout and
+    // exits when done. Without it, Claude boots into its REPL/TUI and the
+    // positional "Begin." just pre-fills the prompt box without submitting,
+    // so the user sees a banner and a waiting `>` cursor instead of the agent
+    // doing its job. --verbose keeps tool-use lines visible so the user can
+    // watch progress.
+    'claude --print --verbose \\',
+    '  --append-system-prompt "$(cat "$PROMPT_PATH")" \\',
     '  --dangerously-skip-permissions \\',
     '  --allowed-tools Read,Write,Edit,Glob,Grep,Bash \\',
     '  "Begin."',
