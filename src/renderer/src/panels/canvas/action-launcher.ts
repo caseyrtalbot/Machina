@@ -31,16 +31,15 @@ export function buildActionLaunchScript({
     `printf '\\033[1m▸ Launching %s\\033[0m  (%s)\\n' ${shellQuote(actionName)} ${shellQuote(scopeSummary)}`,
     `printf '  Streaming Claude output — first tokens may take a few seconds...\\n\\n'`,
     // --print runs non-interactively: Claude streams its work to stdout and
-    // exits when done. Without it, Claude boots into its REPL/TUI and the
-    // positional "Begin." just pre-fills the prompt box without submitting,
-    // so the user sees a banner and a waiting `>` cursor instead of the agent
-    // doing its job. --verbose keeps tool-use lines visible so the user can
-    // watch progress.
-    'claude --print --verbose \\',
+    // exits when done. The prompt goes in via stdin because --allowed-tools
+    // is variadic — passing "Begin." positionally gets swallowed as another
+    // tool name and Claude errors with "Input must be provided either
+    // through stdin or as a prompt argument". --verbose keeps tool-use
+    // lines visible so the user can watch progress.
+    `printf '%s\\n' 'Begin.' | claude --print --verbose \\`,
     '  --append-system-prompt "$(cat "$PROMPT_PATH")" \\',
     '  --dangerously-skip-permissions \\',
-    '  --allowed-tools Read,Write,Edit,Glob,Grep,Bash \\',
-    '  "Begin."',
+    '  --allowed-tools Read,Write,Edit,Glob,Grep,Bash',
     'status=$?',
     'if [ "$status" -ne 0 ]; then',
     `  printf '\\n\\033[31m✗ %s exited with code %d\\033[0m\\n' ${shellQuote(actionName)} "$status"`,

@@ -13,10 +13,25 @@ describe('buildActionLaunchScript', () => {
     expect(script).toContain('--append-system-prompt')
     expect(script).toContain('--dangerously-skip-permissions')
     expect(script).toContain('--allowed-tools Read,Write,Edit,Glob,Grep,Bash')
-    expect(script).toContain('"Begin."')
+    expect(script).toContain("'Begin.'")
     expect(script).not.toContain('--initial-prompt')
     expect(script).toContain('Librarian')
     expect(script).toContain('entire vault')
+  })
+
+  // Regression guard: --allowed-tools is variadic (commander.js <tools...>),
+  // so a positional "Begin." gets consumed as another tool name and Claude
+  // errors with "Input must be provided either through stdin or as a prompt
+  // argument". Piping the prompt via stdin sidesteps arg-parsing entirely.
+  it('feeds the prompt via stdin so --allowed-tools does not swallow it', () => {
+    const script = buildActionLaunchScript({
+      actionName: 'Librarian',
+      scopeSummary: 'entire vault',
+      promptPath: '/vault/.machina-dev/action-prompt-abc.txt',
+      scriptPath: '/vault/.machina-dev/action-launch-abc.sh'
+    })
+
+    expect(script).toMatch(/printf '%s\\n' 'Begin\.' \| claude --print/)
   })
 
   // Regression guard: without --print, Claude v2.1+ boots into interactive
