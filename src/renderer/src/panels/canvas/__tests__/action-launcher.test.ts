@@ -19,6 +19,36 @@ describe('buildActionLaunchScript', () => {
     expect(script).toContain('entire vault')
   })
 
+  // Regression guard: the terminal card looks dead during Claude's
+  // session-start hooks (~3s of silent output). Removing `clear` and
+  // printing a launch banner is what gives the user visible feedback.
+  it('emits a visible launch banner and no `clear` so the user sees activity', () => {
+    const script = buildActionLaunchScript({
+      actionName: 'Librarian',
+      scopeSummary: 'entire vault',
+      promptPath: '/vault/.machina-dev/action-prompt-abc.txt',
+      scriptPath: '/vault/.machina-dev/action-launch-abc.sh'
+    })
+
+    expect(script).not.toMatch(/^clear$/m)
+    expect(script).toContain('Launching')
+    expect(script).toContain('first output may take a few seconds')
+  })
+
+  it('surfaces a non-zero Claude exit with a red failure line', () => {
+    const script = buildActionLaunchScript({
+      actionName: 'Librarian',
+      scopeSummary: 'entire vault',
+      promptPath: '/vault/.machina-dev/action-prompt-abc.txt',
+      scriptPath: '/vault/.machina-dev/action-launch-abc.sh'
+    })
+
+    expect(script).toContain('status=$?')
+    expect(script).toContain('if [ "$status" -ne 0 ]')
+    expect(script).toContain('exited with code')
+    expect(script).toContain('exit "$status"')
+  })
+
   it('cleans up generated prompt and launch files after Claude exits', () => {
     const script = buildActionLaunchScript({
       actionName: 'Steelman',
