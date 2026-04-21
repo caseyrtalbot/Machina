@@ -73,6 +73,19 @@ describe('reduceStream', () => {
     expect(s.visibleText).toBe('Here:\n')
   })
 
+  // Regression guard: if a future prompt change drops the preamble instruction,
+  // the model may emit the fence immediately and the thought card goes blank.
+  // The fix lives in the prompt (agent-action-runner buildPrompt) — this test
+  // pins the reducer behavior so drift is visible.
+  it('yields empty visibleText when fence arrives with no preamble', () => {
+    const s = apply([
+      { kind: 'phase', phase: 'drafting' },
+      { kind: 'text-delta', text: '```json\n{"ops":[]}\n```' }
+    ])
+    expect(s.visibleText).toBe('')
+    expect(s.fenceHidden).toBe(true)
+  })
+
   it('does not hide a stray backtick that never matures into a fence', () => {
     const s = apply([
       { kind: 'phase', phase: 'drafting' },

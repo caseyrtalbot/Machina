@@ -404,7 +404,7 @@ Respond with a JSON object containing an "ops" array. Each op must be one of:
 Valid node types: text, note, code, markdown, image, terminal, pdf, project-file, system-artifact, file-view, agent-session, project-folder.
 Valid sides: top, right, bottom, left.
 
-Wrap your JSON in a \`\`\`json code fence.`
+Before the JSON fence, briefly state your plan in 1-2 sentences so the user sees what you're about to do. Then wrap your JSON in a \`\`\`json code fence.`
 }
 
 // ---------------------------------------------------------------------------
