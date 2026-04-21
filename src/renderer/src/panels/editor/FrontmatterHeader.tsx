@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Artifact } from '@shared/types'
-import { colors, getArtifactColor } from '../../design/tokens'
+import { colors, getArtifactColor, typography } from '../../design/tokens'
+import { SectionLabel } from '../../design/components/SectionLabel'
 import { useVaultStore } from '../../store/vault-store'
 import { serializeFrontmatter, type PropertyValue } from './markdown-utils'
 import { ConnectionAutocomplete } from './ConnectionAutocomplete'
@@ -60,9 +61,9 @@ const pillStyle: React.CSSProperties = {
 }
 
 const sectionLabelStyle: React.CSSProperties = {
-  textTransform: 'uppercase',
-  letterSpacing: '0.16em',
-  fontSize: '10px',
+  textTransform: typography.metadata.textTransform,
+  letterSpacing: typography.metadata.letterSpacing,
+  fontSize: typography.metadata.size,
   fontWeight: 600,
   color: colors.text.muted
 }
@@ -534,7 +535,9 @@ function RelationshipSection({
         borderTop: `1px solid ${colors.border.default}`
       }}
     >
-      <div style={{ ...sectionLabelStyle, marginBottom: '0.7rem' }}>Relationships</div>
+      <SectionLabel as="div" style={{ marginBottom: '0.7rem' }}>
+        Relationships
+      </SectionLabel>
       {rows.map(({ key, label }) => {
         const editableRow = key === 'connections' && connectionsEditable
         return (
@@ -612,7 +615,16 @@ function RelationshipRow({
         marginBottom: '0.55rem'
       }}
     >
-      <span style={rowLabelStyle}>{label}</span>
+      <SectionLabel
+        style={{
+          paddingTop: '0.2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem'
+        }}
+      >
+        {label}
+      </SectionLabel>
       <div style={{ ...rowValueStyle, gap: '0.45rem' }}>
         {ids.map((id) => (
           <ConnectionPill

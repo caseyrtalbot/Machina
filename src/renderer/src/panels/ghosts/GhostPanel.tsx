@@ -6,6 +6,7 @@ import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
 import { colors, typography } from '../../design/tokens'
+import { SectionLabel } from '../../design/components/SectionLabel'
 import { groupByFrequency } from './ghost-sections'
 import type { Artifact } from '@shared/types'
 
@@ -517,12 +518,9 @@ export function GhostPanel() {
         {/* Sections */}
         {sections.map((section) => (
           <div key={section.label}>
-            <div
+            <SectionLabel
+              as="div"
               style={{
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase' as const,
                 color: colors.text.primary,
                 padding: '14px 0 6px',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
@@ -530,7 +528,7 @@ export function GhostPanel() {
               }}
             >
               {section.label}
-            </div>
+            </SectionLabel>
             {section.ghosts.map((ghost) => (
               <GhostRow
                 key={ghost.id}

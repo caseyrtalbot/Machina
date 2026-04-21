@@ -4,6 +4,7 @@ import { useSidebarFilterStore } from '../../store/sidebar-filter-store'
 import { buildTagIndex } from '@engine/tag-index'
 import type { TagTreeNode } from '@engine/tag-index'
 import { colors, transitions } from '../../design/tokens'
+import { SectionLabel } from '../../design/components/SectionLabel'
 
 function TagNode({
   node,
@@ -129,15 +130,14 @@ export function TagBrowser() {
           >
             {expanded ? '\u25BE' : '\u25B8'}
           </span>
-          <span
-            className="uppercase font-medium tracking-[0.04em]"
+          <SectionLabel
             style={{
               color: colors.text.secondary,
               fontSize: 'var(--env-sidebar-tertiary-font-size)'
             }}
           >
             Tags
-          </span>
+          </SectionLabel>
           <span
             style={{
               color: colors.text.secondary,

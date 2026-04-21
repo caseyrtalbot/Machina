@@ -101,6 +101,11 @@ vi.mock('../../../design/tokens', () => ({
       display: 'system-ui',
       body: 'system-ui',
       mono: 'monospace'
+    },
+    metadata: {
+      size: '11px',
+      letterSpacing: '0.05em',
+      textTransform: 'uppercase' as const
     }
   }
 }))

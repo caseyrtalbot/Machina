@@ -6,6 +6,7 @@ import { useEditorStore } from '../../store/editor-store'
 import { computeDerivedHealth } from '@shared/engine/vault-health'
 import type { HealthIssue } from '@shared/engine/vault-health'
 import { colors, typography } from '../../design/tokens'
+import { SectionLabel } from '../../design/components/SectionLabel'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -262,21 +263,17 @@ function DegradedState({ issues }: { readonly issues: readonly HealthIssue[] }) 
     <div>
       {groups.map((group) => (
         <div key={group.severity}>
-          <h3
+          <SectionLabel
+            as="h3"
             style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: colors.text.muted,
               padding: '14px 0 6px',
               borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
               marginBottom: 2,
-              margin: 0
+              marginTop: 0
             }}
           >
             {group.label}
-          </h3>
+          </SectionLabel>
           {group.issues.map((issue, i) => (
             <IssueRow key={`${issue.checkId}-${i}`} issue={issue} />
           ))}

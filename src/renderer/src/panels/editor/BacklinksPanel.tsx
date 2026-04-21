@@ -1,5 +1,6 @@
 import type { Artifact } from '@shared/types'
 import { getArtifactColor, colors, transitions } from '../../design/tokens'
+import { SectionLabel } from '../../design/components/SectionLabel'
 import { useUiStore } from '../../store/ui-store'
 
 /**
@@ -129,16 +130,7 @@ export function BacklinksPanel({
         className="w-full flex items-center justify-between px-4 py-2 focus-ring interactive-hover"
         style={{ transition: transitions.hover }}
       >
-        <span
-          className="text-xs font-medium"
-          style={{
-            color: colors.text.muted,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}
-        >
-          Backlinks
-        </span>
+        <SectionLabel>Backlinks</SectionLabel>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: colors.text.muted }}>
             {backlinks.length}

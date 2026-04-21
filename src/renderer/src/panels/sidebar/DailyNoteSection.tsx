@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { FileText } from '@phosphor-icons/react'
 import { colors } from '../../design/tokens'
+import { SectionLabel } from '../../design/components/SectionLabel'
 import { useSettingsStore } from '../../store/settings-store'
 import { useVaultStore } from '../../store/vault-store'
 import { extractDailyNoteDates, localDateStr, dailyNotePath } from '../../utils/daily-notes'
@@ -123,7 +124,7 @@ export function DailyNoteSection({
         >
           ▼
         </span>
-        <span className="text-[11px] font-medium tracking-wide uppercase">Daily Notes</span>
+        <SectionLabel style={{ color: 'inherit' }}>Daily Notes</SectionLabel>
       </button>
 
       {!collapsed && (
