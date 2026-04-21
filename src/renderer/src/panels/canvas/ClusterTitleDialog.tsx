@@ -19,7 +19,8 @@ export function ClusterTitleDialog({
   return (
     <div
       role="dialog"
-      aria-label="Name the cluster"
+      aria-modal="true"
+      aria-labelledby="cluster-title-dialog-title"
       className="fixed inset-0 flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000 }}
       onClick={onCancel}
@@ -33,7 +34,11 @@ export function ClusterTitleDialog({
           borderRadius: 6
         }}
       >
-        <label className="text-sm" style={{ color: colors.text.primary }}>
+        <label
+          id="cluster-title-dialog-title"
+          className="text-sm"
+          style={{ color: colors.text.primary }}
+        >
           Title for this cluster
         </label>
         <input

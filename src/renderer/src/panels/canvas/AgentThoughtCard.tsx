@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { colors, floatingPanel, typography } from '../../design/tokens'
 import type { AgentActionName } from '@shared/agent-action-types'
 import type { StreamState } from './agent-stream-state'
@@ -57,6 +57,7 @@ export function AgentThoughtCard({
   const bodyRef = useRef<HTMLDivElement>(null)
   const userScrolledUp = useRef(false)
   const reducedMotion = prefersReducedMotion()
+  const titleId = useId()
 
   // Elapsed timer — tick every 500ms during active phases
   useEffect(() => {
@@ -173,9 +174,9 @@ export function AgentThoughtCard({
   const showTimer = streamState.phase !== 'materializing'
 
   return (
-    <div style={containerStyle} role="dialog" aria-label="Agent thought stream">
+    <div style={containerStyle} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div style={headerStyle} aria-live="polite">
-        <span>
+        <span id={titleId}>
           {phaseLabel(streamState.phase, actionName, streamState.opCount)}
           {showTimer && (
             <span style={{ marginLeft: 8, color: colors.text.muted }}>· {elapsed}</span>

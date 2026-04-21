@@ -162,7 +162,8 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   return (
     <div
       role="dialog"
-      aria-label="Settings"
+      aria-modal="true"
+      aria-labelledby="settings-dialog-title"
       className="fixed top-0 right-0 bottom-0 z-40 flex"
       style={{
         width: 340,
@@ -183,7 +184,9 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         <div className="settings-header flex items-center justify-between px-4 pt-10 pb-3 flex-shrink-0">
           <div className="flex flex-col gap-1">
             <span className="settings-kicker">Workspace</span>
-            <span className="settings-title">Settings</span>
+            <span id="settings-dialog-title" className="settings-title">
+              Settings
+            </span>
           </div>
           <button
             ref={closeRef}

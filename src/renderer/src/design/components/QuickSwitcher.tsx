@@ -180,6 +180,7 @@ function QuickSwitcherInner({
       data-testid="quick-switcher"
       role="dialog"
       aria-modal="true"
+      aria-label="Quick switcher"
       className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] te-cmdk-backdrop"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
       onClick={onClose}
@@ -200,7 +201,7 @@ function QuickSwitcherInner({
             value={query}
             onChange={handleQueryChange}
             placeholder="Jump to note..."
-            aria-label="Quick switcher"
+            aria-label="Search notes"
             className="w-full bg-transparent outline-none text-sm"
             style={{
               color: colors.text.primary,

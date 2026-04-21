@@ -58,7 +58,8 @@ export function SaveTextCardDialog({
   return (
     <div
       role="dialog"
-      aria-label="Save text card to vault"
+      aria-modal="true"
+      aria-labelledby="save-text-card-title"
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
       onClick={onClose}
@@ -73,6 +74,13 @@ export function SaveTextCardDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        <h2
+          id="save-text-card-title"
+          className="text-sm font-semibold"
+          style={{ color: colors.text.primary, margin: 0 }}
+        >
+          Save text card
+        </h2>
         <div className="flex items-center gap-4 text-sm">
           <label className="flex items-center gap-1 cursor-pointer">
             <input

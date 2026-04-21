@@ -260,6 +260,7 @@ function CommandPaletteInner({
       data-testid="command-palette"
       role="dialog"
       aria-modal="true"
+      aria-label="Command palette"
       className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] te-cmdk-backdrop"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
       onClick={onClose}
@@ -280,7 +281,7 @@ function CommandPaletteInner({
             value={query}
             onChange={handleQueryChange}
             placeholder="Search notes or actions... (> for actions)"
-            aria-label="Command palette"
+            aria-label="Search commands and notes"
             className="w-full bg-transparent outline-none text-sm"
             style={{
               color: colors.text.primary,

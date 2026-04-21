@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, useId } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useUiStore } from '../../store/ui-store'
 import { useTabStore, TAB_DEFINITIONS } from '../../store/tab-store'
@@ -97,6 +97,7 @@ interface ContextPopupProps {
 function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+  const titleId = useId()
 
   useEffect(() => {
     if (anchorRef.current) {
@@ -136,7 +137,8 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
     <div
       ref={popupRef}
       role="dialog"
-      aria-label={`${ghost.id} references`}
+      aria-modal="true"
+      aria-labelledby={titleId}
       style={{
         position: 'fixed',
         top: pos.top,
@@ -154,6 +156,7 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
       }}
     >
       <div
+        id={titleId}
         style={{
           fontSize: 12,
           fontWeight: 600,
