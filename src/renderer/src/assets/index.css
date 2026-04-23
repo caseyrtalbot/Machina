@@ -933,12 +933,52 @@ body {
   color: var(--color-text-secondary);
 }
 
-.editor-file-tab__close {
-  display: flex;
+/* Indicator slot: holds the dirty dot and close button in the same 16px cell
+   so they swap without layout shift. */
+.editor-file-tab__indicator {
+  position: relative;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
+}
+
+.editor-file-tab__dirty-dot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+
+.editor-file-tab__dirty-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+}
+
+.editor-file-tab[data-dirty='true'] .editor-file-tab__dirty-dot {
+  opacity: 1;
+}
+
+.editor-file-tab[data-dirty='true']:hover .editor-file-tab__dirty-dot,
+.editor-file-tab[data-dirty='true']:focus-within .editor-file-tab__dirty-dot {
+  opacity: 0;
+}
+
+.editor-file-tab__close {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
@@ -946,14 +986,13 @@ body {
   cursor: pointer;
   padding: 0;
   opacity: 0;
-  position: relative;
   z-index: 4;
   transition: opacity 120ms ease-out;
   -webkit-app-region: no-drag;
 }
 
 .editor-file-tab:hover .editor-file-tab__close,
-.editor-file-tab[data-active='true'] .editor-file-tab__close {
+.editor-file-tab:focus-within .editor-file-tab__close {
   opacity: 1;
 }
 
@@ -1015,6 +1054,33 @@ body {
 }
 
 .editor-tab-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+}
+
+/* Close-all: text-first affordance to disambiguate from the macOS
+   window-close control (F-editor-04). */
+.editor-tab-bar__close-all {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+  -webkit-app-region: no-drag;
+}
+
+.editor-tab-bar__close-all:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-text-secondary);
 }

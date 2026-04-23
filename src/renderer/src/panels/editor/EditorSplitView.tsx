@@ -10,6 +10,7 @@ export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
   const openTabs = useEditorStore((s) => s.openTabs)
   const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const previewTabPath = useEditorStore((s) => s.previewTabPath)
+  const isDirty = useEditorStore((s) => s.isDirty)
   const switchTab = useEditorStore((s) => s.switchTab)
   const closeTab = useEditorStore((s) => s.closeTab)
   const pinPreviewTab = useEditorStore((s) => s.pinPreviewTab)
@@ -44,15 +45,27 @@ export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
           {openTabs.map((tab) => {
             const isActive = tab.path === activeNotePath
             const isPreview = tab.path === previewTabPath
+            const isTabDirty = isActive && isDirty
             return (
               <div
                 key={tab.path}
                 className="editor-file-tab"
                 data-active={isActive ? 'true' : 'false'}
                 data-preview={isPreview ? 'true' : undefined}
+                data-dirty={isTabDirty ? 'true' : undefined}
                 onClick={() => switchTab(tab.path)}
                 onDoubleClick={() => {
                   if (isPreview) pinPreviewTab()
+                }}
+                onAuxClick={(e) => {
+                  if (e.button === 1) {
+                    e.preventDefault()
+                    closeTab(tab.path)
+                  }
+                }}
+                onMouseDown={(e) => {
+                  // Suppress middle-click auto-scroll on the tab body
+                  if (e.button === 1) e.preventDefault()
                 }}
               >
                 <span
@@ -61,28 +74,33 @@ export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
                 >
                   {tab.title}
                 </span>
-                <button
-                  type="button"
-                  className="editor-file-tab__close"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    closeTab(tab.path)
-                  }}
-                  aria-label={`Close ${tab.title}`}
-                >
-                  <svg
-                    width={9}
-                    height={9}
-                    viewBox="0 0 9 9"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
+                <span className="editor-file-tab__indicator">
+                  <span className="editor-file-tab__dirty-dot" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className="editor-file-tab__close"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      closeTab(tab.path)
+                    }}
+                    aria-label={
+                      isTabDirty ? `Close ${tab.title} (unsaved changes)` : `Close ${tab.title}`
+                    }
                   >
-                    <line x1="2" y1="2" x2="7" y2="7" />
-                    <line x1="7" y1="2" x2="2" y2="7" />
-                  </svg>
-                </button>
+                    <svg
+                      width={9}
+                      height={9}
+                      viewBox="0 0 9 9"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    >
+                      <line x1="2" y1="2" x2="7" y2="7" />
+                      <line x1="7" y1="2" x2="2" y2="7" />
+                    </svg>
+                  </button>
+                </span>
               </div>
             )
           })}
@@ -114,26 +132,17 @@ export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
             aria-hidden="true"
           />
 
-          {/* Close all pinned right */}
+          {/* Close all pinned right — text button to disambiguate from the macOS
+              traffic-light close control. See F-editor-04. */}
           <div className="editor-tab-bar__actions">
             <button
               type="button"
-              className="editor-tab-bar__btn"
+              className="editor-tab-bar__close-all"
               onClick={handleCloseAll}
               aria-label="Close all tabs"
+              title="Close all tabs"
             >
-              <svg
-                width={12}
-                height={12}
-                viewBox="0 0 12 12"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              >
-                <line x1="3" y1="3" x2="9" y2="9" />
-                <line x1="9" y1="3" x2="3" y2="9" />
-              </svg>
+              Close all
             </button>
           </div>
         </div>
