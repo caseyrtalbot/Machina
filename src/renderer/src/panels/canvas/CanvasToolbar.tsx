@@ -758,11 +758,7 @@ export function CanvasToolbar({
                   ? `Focus Frame ${slot} — ⌘${slot} jump, ⇧⌘${slot} overwrite, ⌥click clear`
                   : `Focus Frame ${slot} — ⇧⌘${slot} to save`
               }
-              aria-label={
-                filled
-                  ? `Jump to focus frame ${slot}`
-                  : `Focus frame ${slot} (empty)`
-              }
+              aria-label={filled ? `Jump to focus frame ${slot}` : `Focus frame ${slot} (empty)`}
               style={{
                 width: 8,
                 height: 8,

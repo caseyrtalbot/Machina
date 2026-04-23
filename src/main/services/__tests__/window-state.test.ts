@@ -12,18 +12,17 @@ describe('window-state', () => {
     expect(boundsVisibleOnAnyDisplay({ x: 10, y: 10, width: 800, height: 600 }, displays)).toBe(
       true
     )
-    expect(
-      boundsVisibleOnAnyDisplay({ x: 5000, y: 5000, width: 800, height: 600 }, displays)
-    ).toBe(false)
+    expect(boundsVisibleOnAnyDisplay({ x: 5000, y: 5000, width: 800, height: 600 }, displays)).toBe(
+      false
+    )
   })
 
   it('falls back when saved bounds are no longer visible', () => {
     expect(
-      resolveInitialWindowState(
-        { x: 5000, y: 5000, width: 900, height: 700 },
-        displays,
-        { width: 1280, height: 800 }
-      )
+      resolveInitialWindowState({ x: 5000, y: 5000, width: 900, height: 700 }, displays, {
+        width: 1280,
+        height: 800
+      })
     ).toEqual({ width: 1280, height: 800 })
   })
 

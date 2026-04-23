@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  attachExternalNavigationGuards,
-  isExternalHttpNavigation
-} from '../external-navigation'
+import { attachExternalNavigationGuards, isExternalHttpNavigation } from '../external-navigation'
 
 describe('external-navigation', () => {
   it('treats non-http URLs as internal', () => {
@@ -11,9 +8,9 @@ describe('external-navigation', () => {
   })
 
   it('allows renderer dev-origin URLs to stay internal', () => {
-    expect(
-      isExternalHttpNavigation('http://localhost:5173/editor', 'http://localhost:5173')
-    ).toBe(false)
+    expect(isExternalHttpNavigation('http://localhost:5173/editor', 'http://localhost:5173')).toBe(
+      false
+    )
   })
 
   it('opens external URLs from window.open and denies the new window', async () => {
@@ -41,9 +38,7 @@ describe('external-navigation', () => {
   it('prevents external navigation on will-navigate', async () => {
     const openExternal = vi.fn()
     const preventDefault = vi.fn()
-    let willNavigate:
-      | ((event: { preventDefault: () => void }, url: string) => void)
-      | null = null
+    let willNavigate: ((event: { preventDefault: () => void }, url: string) => void) | null = null
 
     attachExternalNavigationGuards(
       {
