@@ -1556,7 +1556,8 @@ body {
   font-size: 10px;
 }
 
-.canvas-toolbtn-wrap:hover .canvas-tooltip {
+.canvas-toolbtn-wrap:hover .canvas-tooltip,
+.canvas-toolbtn-wrap:has(:focus-visible) .canvas-tooltip {
   opacity: 1;
 }
 
