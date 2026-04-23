@@ -655,8 +655,8 @@ export function WorkbenchPanel() {
         {/* Zone labels removed — cards have type badges and title bars that
             communicate grouping. Fixed labels break once users drag cards. */}
         {visibleNodes.map((node: CanvasNode) => {
-          if ((lod === 'dot' || lod === 'preview') && node.type !== 'terminal') {
-            return <CardLodPreview key={node.id} node={node} lod={lod} />
+          if (lod === 'preview' && node.type !== 'terminal') {
+            return <CardLodPreview key={node.id} node={node} />
           }
           const Card = LazyCards[node.type]
           if (!Card) return null

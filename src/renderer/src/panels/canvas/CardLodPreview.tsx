@@ -2,11 +2,9 @@ import { memo, useCallback } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, borderRadius } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNode } from '@shared/canvas-types'
-import type { LodLevel } from './use-canvas-lod'
 
 interface CardLodPreviewProps {
   node: CanvasNode
-  lod: LodLevel
 }
 
 /** Type-based colors for LOD rectangles */
@@ -22,10 +20,9 @@ const LOD_COLORS: Record<string, string> = {
 
 /**
  * Lightweight LOD renderer for zoomed-out views.
- * - preview: colored rectangle with type label
- * - dot: small colored circle
+ * Colored rectangle with a type label — no editor, PTY, or image decoder.
  */
-function CardLodPreviewInner({ node, lod }: CardLodPreviewProps) {
+function CardLodPreviewInner({ node }: CardLodPreviewProps) {
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
@@ -43,27 +40,6 @@ function CardLodPreviewInner({ node, lod }: CardLodPreviewProps) {
   )
 
   const color = LOD_COLORS[node.type] ?? '#94a3b8'
-
-  if (lod === 'dot') {
-    return (
-      <div
-        data-canvas-node
-        className="absolute rounded-full"
-        style={{
-          left: node.position.x + node.size.width / 2 - 4,
-          top: node.position.y + node.size.height / 2 - 4,
-          width: 8,
-          height: 8,
-          backgroundColor: color,
-          border: isSelected ? `2px solid ${colors.accent.default}` : 'none',
-          opacity: 0.8
-        }}
-        onClick={handleClick}
-      />
-    )
-  }
-
-  // preview mode
   const info = CARD_TYPE_INFO[node.type]
 
   return (
@@ -92,7 +68,4 @@ function CardLodPreviewInner({ node, lod }: CardLodPreviewProps) {
   )
 }
 
-export const CardLodPreview = memo(
-  CardLodPreviewInner,
-  (prev, next) => prev.node === next.node && prev.lod === next.lod
-)
+export const CardLodPreview = memo(CardLodPreviewInner, (prev, next) => prev.node === next.node)

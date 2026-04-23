@@ -105,57 +105,19 @@ describe('getLodLevel', () => {
     expect(getLodLevel(0.3)).toBe('full')
   })
 
-  it('returns preview at zoom 0.29', () => {
-    expect(getLodLevel(0.29)).toBe('preview')
-  })
-
-  it('returns preview at zoom 0.15 (boundary)', () => {
-    expect(getLodLevel(0.15)).toBe('preview')
-  })
-
-  it('returns dot at zoom 0.14', () => {
-    expect(getLodLevel(0.14)).toBe('dot')
-  })
-
-  it('returns dot at zoom 0.1 (min zoom)', () => {
-    expect(getLodLevel(0.1)).toBe('dot')
-  })
-
   it('returns full at zoom 3.0 (max zoom)', () => {
     expect(getLodLevel(3.0)).toBe('full')
   })
 
-  it('returns full for text card at zoom 0.3', () => {
-    expect(getLodLevel(0.3, 'text')).toBe('full')
+  it('returns preview at zoom 0.29', () => {
+    expect(getLodLevel(0.29)).toBe('preview')
   })
 
-  it('returns full for note card at zoom 0.3 (unified threshold)', () => {
-    expect(getLodLevel(0.3, 'note')).toBe('full')
+  it('returns preview at zoom 0.15', () => {
+    expect(getLodLevel(0.15)).toBe('preview')
   })
 
-  it('returns full for markdown card at zoom 0.3 (unified threshold)', () => {
-    expect(getLodLevel(0.3, 'markdown')).toBe('full')
-  })
-
-  it('returns full for note card at zoom 0.5 (heavy boundary)', () => {
-    expect(getLodLevel(0.5, 'note')).toBe('full')
-  })
-
-  it('returns full for markdown card at zoom 0.5 (heavy boundary)', () => {
-    expect(getLodLevel(0.5, 'markdown')).toBe('full')
-  })
-
-  it('returns full for note card at zoom 0.49 (above heavy threshold)', () => {
-    expect(getLodLevel(0.49, 'note')).toBe('full')
-  })
-
-  it('returns dot for note card at zoom 0.14', () => {
-    expect(getLodLevel(0.14, 'note')).toBe('dot')
-  })
-
-  it('uses standard threshold for non-heavy types', () => {
-    expect(getLodLevel(0.35, 'code')).toBe('full')
-    expect(getLodLevel(0.35, 'terminal')).toBe('full')
-    expect(getLodLevel(0.35, 'image')).toBe('full')
+  it('returns preview at zoom 0.1 (min zoom)', () => {
+    expect(getLodLevel(0.1)).toBe('preview')
   })
 })
