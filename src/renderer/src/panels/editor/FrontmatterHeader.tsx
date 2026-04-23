@@ -53,7 +53,7 @@ const pillStyle: React.CSSProperties = {
   fontWeight: 500,
   letterSpacing: '0.08em',
   borderRadius: 999,
-  padding: '4px 10px',
+  padding: '2px 8px',
   border: `1px solid ${colors.border.default}`,
   backgroundColor: 'rgba(255, 255, 255, 0.04)',
   color: colors.text.primary,
@@ -70,7 +70,6 @@ const sectionLabelStyle: React.CSSProperties = {
 
 const rowLabelStyle: React.CSSProperties = {
   ...sectionLabelStyle,
-  paddingTop: '0.2rem',
   display: 'flex',
   alignItems: 'center',
   gap: '0.35rem'
@@ -250,7 +249,7 @@ function PropertyRow({
         display: 'grid',
         gridTemplateColumns: 'minmax(110px, 150px) minmax(0, 1fr)',
         columnGap: '1rem',
-        alignItems: 'start',
+        alignItems: 'center',
         paddingTop: isFirst ? 0 : '0.1rem'
       }}
       onMouseEnter={() => setHovered(true)}
@@ -282,6 +281,7 @@ function PropertyRow({
         {editable && (
           <TypeBadge
             type={pType}
+            visible={hovered}
             onTypeChange={(newType) => {
               const converted = convertValue(value, newType)
               onTypeChange(newType)
@@ -389,10 +389,9 @@ export function FrontmatterHeader({
             fontWeight: 600,
             border: `1px solid ${typeColor}60`,
             borderRadius: 999,
-            padding: '4px 10px',
+            padding: '2px 8px',
             display: 'inline-block',
-            backgroundColor: `${typeColor}10`,
-            boxShadow: `0 0 0 1px ${typeColor}14 inset`
+            backgroundColor: `${typeColor}10`
           }}
         >
           {artifactType}
@@ -617,7 +616,6 @@ function RelationshipRow({
     >
       <SectionLabel
         style={{
-          paddingTop: '0.2rem',
           display: 'flex',
           alignItems: 'center',
           gap: '0.35rem'

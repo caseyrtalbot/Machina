@@ -238,7 +238,7 @@ export function ListInput({ value, onChange }: ListInputProps) {
     fontWeight: 500,
     letterSpacing: '0.08em',
     borderRadius: 999,
-    padding: '4px 10px',
+    padding: '2px 8px',
     border: `1px solid ${colors.border.default}`,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     color: colors.text.primary,
@@ -382,10 +382,12 @@ const ALL_TYPES: PropertyType[] = ['text', 'number', 'boolean', 'date', 'list']
 interface TypeBadgeProps {
   type: PropertyType
   onTypeChange: (type: PropertyType) => void
+  visible?: boolean
 }
 
-export function TypeBadge({ type, onTypeChange }: TypeBadgeProps) {
+export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps) {
   const [open, setOpen] = useState(false)
+  const triggerVisible = visible || open
 
   return (
     <span className="relative" style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -397,15 +399,19 @@ export function TypeBadge({ type, onTypeChange }: TypeBadgeProps) {
           fontSize: '8px',
           letterSpacing: '0.1em',
           color: colors.text.muted,
-          opacity: 0.5,
+          opacity: triggerVisible ? 0.5 : 0,
+          pointerEvents: triggerVisible ? 'auto' : 'none',
           textTransform: 'uppercase',
           background: 'none',
           border: 'none',
           cursor: 'pointer',
-          padding: '0 2px'
+          padding: '0 2px',
+          transition: 'opacity 120ms'
         }}
-        className="hover:opacity-100 transition-opacity"
+        className="hover:opacity-100"
         aria-label={`Property type: ${type}. Click to change.`}
+        aria-hidden={!triggerVisible}
+        tabIndex={triggerVisible ? 0 : -1}
       >
         {TYPE_LABELS[type]}
       </button>
