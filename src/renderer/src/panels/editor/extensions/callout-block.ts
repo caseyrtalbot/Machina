@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { MarkdownTokenizer, MarkdownToken } from '@tiptap/core'
+import { colors, type CalloutPaletteKey } from '@renderer/design/tokens'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -10,54 +11,46 @@ declare module '@tiptap/core' {
   }
 }
 
-interface CalloutStyle {
-  readonly bg: string
-  readonly border: string
-}
-
-const CALLOUT_COLORS: Record<string, CalloutStyle> = {
+// Map every supported callout kind to one of the six palette slots in
+// `colors.callout`. Unknown kinds fall through to `muted`.
+const CALLOUT_PALETTE: Record<string, CalloutPaletteKey> = {
   // Info (blue)
-  note: { bg: 'rgba(56, 189, 248, 0.08)', border: '#38bdf8' },
-  info: { bg: 'rgba(56, 189, 248, 0.08)', border: '#38bdf8' },
-  abstract: { bg: 'rgba(56, 189, 248, 0.08)', border: '#38bdf8' },
-  summary: { bg: 'rgba(56, 189, 248, 0.08)', border: '#38bdf8' },
-  tldr: { bg: 'rgba(56, 189, 248, 0.08)', border: '#38bdf8' },
+  note: 'info',
+  info: 'info',
+  abstract: 'info',
+  summary: 'info',
+  tldr: 'info',
   // Success (green)
-  tip: { bg: 'rgba(52, 211, 153, 0.08)', border: '#34d399' },
-  success: { bg: 'rgba(52, 211, 153, 0.08)', border: '#34d399' },
-  check: { bg: 'rgba(52, 211, 153, 0.08)', border: '#34d399' },
-  done: { bg: 'rgba(52, 211, 153, 0.08)', border: '#34d399' },
-  hint: { bg: 'rgba(52, 211, 153, 0.08)', border: '#34d399' },
+  tip: 'success',
+  success: 'success',
+  check: 'success',
+  done: 'success',
+  hint: 'success',
   // Warning (amber)
-  warning: { bg: 'rgba(234, 179, 8, 0.08)', border: '#eab308' },
-  caution: { bg: 'rgba(234, 179, 8, 0.08)', border: '#eab308' },
-  attention: { bg: 'rgba(234, 179, 8, 0.08)', border: '#eab308' },
+  warning: 'warning',
+  caution: 'warning',
+  attention: 'warning',
   // Danger (red)
-  danger: { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444' },
-  error: { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444' },
-  fail: { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444' },
-  failure: { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444' },
-  missing: { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444' },
-  bug: { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444' },
+  danger: 'danger',
+  error: 'danger',
+  fail: 'danger',
+  failure: 'danger',
+  missing: 'danger',
+  bug: 'danger',
   // Important (purple)
-  important: { bg: 'rgba(168, 85, 247, 0.08)', border: '#a855f7' },
-  question: { bg: 'rgba(168, 85, 247, 0.08)', border: '#a855f7' },
-  help: { bg: 'rgba(168, 85, 247, 0.08)', border: '#a855f7' },
-  faq: { bg: 'rgba(168, 85, 247, 0.08)', border: '#a855f7' },
-  // Neutral (gray)
-  example: { bg: 'rgba(148, 163, 184, 0.08)', border: '#94a3b8' },
-  quote: { bg: 'rgba(148, 163, 184, 0.08)', border: '#94a3b8' },
-  cite: { bg: 'rgba(148, 163, 184, 0.08)', border: '#94a3b8' },
-  todo: { bg: 'rgba(148, 163, 184, 0.08)', border: '#94a3b8' }
+  important: 'important',
+  question: 'important',
+  help: 'important',
+  faq: 'important',
+  // Muted (neutral gray)
+  example: 'muted',
+  quote: 'muted',
+  cite: 'muted',
+  todo: 'muted'
 }
 
-const DEFAULT_CALLOUT_STYLE: CalloutStyle = {
-  bg: 'rgba(148, 163, 184, 0.08)',
-  border: '#94a3b8'
-}
-
-function getCalloutStyle(type: string): CalloutStyle {
-  return CALLOUT_COLORS[type] ?? DEFAULT_CALLOUT_STYLE
+function getCalloutStyle(type: string): { bg: string; border: string } {
+  return colors.callout[CALLOUT_PALETTE[type] ?? 'muted']
 }
 
 export const CalloutBlock = Node.create({
@@ -83,15 +76,15 @@ export const CalloutBlock = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     const type = (HTMLAttributes['data-callout-type'] as string) || 'note'
-    const colors = getCalloutStyle(type)
+    const style = getCalloutStyle(type)
 
     return [
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-callout-type': type,
         style: [
-          `background: ${colors.bg}`,
-          `border-left: 3px solid ${colors.border}`,
+          `background: ${style.bg}`,
+          `border-left: 3px solid ${style.border}`,
           'border-radius: 4px',
           'padding: 12px 16px',
           'margin: 8px 0'
@@ -101,7 +94,7 @@ export const CalloutBlock = Node.create({
         'div',
         {
           style: [
-            `color: ${colors.border}`,
+            `color: ${style.border}`,
             'font-size: 11px',
             'font-weight: 600',
             'text-transform: uppercase',

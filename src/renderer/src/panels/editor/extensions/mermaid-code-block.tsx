@@ -14,6 +14,16 @@ async function loadMermaid(): Promise<(typeof import('mermaid'))['default']> {
   return m
 }
 
+// Mermaid needs resolved hex strings at init time — it cannot parse CSS
+// custom properties. Theme CSS vars are static at runtime on this dark-only
+// app, so a one-shot getComputedStyle read matches the rest of the canvas/Pixi
+// pattern. Fallback covers non-browser test environments.
+function resolveCssVar(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
 function initMermaid(m: (typeof import('mermaid'))['default']): void {
   if (mermaidInitialized) return
   m.initialize({
@@ -24,7 +34,7 @@ function initMermaid(m: (typeof import('mermaid'))['default']): void {
       primaryColor: '#1e293b',
       primaryBorderColor: '#475569',
       primaryTextColor: '#e2e8f0',
-      lineColor: '#94a3b8',
+      lineColor: resolveCssVar('--color-text-secondary', '#9a9a9a'),
       secondaryColor: '#334155',
       tertiaryColor: '#1e293b',
       fontFamily: 'var(--font-mono)',

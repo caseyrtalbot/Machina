@@ -28,8 +28,39 @@ export const colors = {
     ready: '#4ec983', // ARTIFACT_COLORS.session emerald
     warning: '#dfa11a', // ARTIFACT_COLORS.pattern amber
     error: '#ff847d' // ARTIFACT_COLORS.constraint red
+  },
+  // Callout palette for `> [!TYPE]` blocks in the editor. Five semantic groups
+  // plus a neutral muted group. Warning/danger reuse `colors.claude.*` so the
+  // editor's callout accents stay consistent with other semantic surfaces.
+  callout: {
+    info: {
+      bg: 'color-mix(in srgb, #38bdf8 8%, transparent)',
+      border: '#38bdf8'
+    },
+    success: {
+      bg: 'color-mix(in srgb, #34d399 8%, transparent)',
+      border: '#34d399'
+    },
+    warning: {
+      bg: 'color-mix(in srgb, #dfa11a 8%, transparent)',
+      border: '#dfa11a'
+    },
+    danger: {
+      bg: 'color-mix(in srgb, #ff847d 8%, transparent)',
+      border: '#ff847d'
+    },
+    important: {
+      bg: 'color-mix(in srgb, #a855f7 8%, transparent)',
+      border: '#a855f7'
+    },
+    muted: {
+      bg: 'color-mix(in srgb, #94a3b8 8%, transparent)',
+      border: '#94a3b8'
+    }
   }
 } as const
+
+export type CalloutPaletteKey = keyof typeof colors.callout
 
 /* ── OKLCH Perceptually Uniform Palette ──────────────────────────────────
  * All artifact types use L=0.75, C=0.15 (varying only hue) for equal
