@@ -57,6 +57,52 @@ function getViewportCenter(): { x: number; y: number } {
   }
 }
 
+/** Surface dimensions in CSS pixels; falls back to a sensible default for tests. */
+function getSurfaceSize(): { width: number; height: number } {
+  const el = document.querySelector('[data-canvas-surface]')
+  return {
+    width: el?.clientWidth ?? 1920,
+    height: el?.clientHeight ?? 1080
+  }
+}
+
+/** Compute a viewport that fits the given nodes inside the surface with padding. */
+function fitViewportToNodes(
+  nodes: ReadonlyArray<{
+    position: { x: number; y: number }
+    size: { width: number; height: number }
+  }>,
+  surface: { width: number; height: number }
+): { x: number; y: number; zoom: number } {
+  if (nodes.length === 0) return { x: 0, y: 0, zoom: 1 }
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const n of nodes) {
+    minX = Math.min(minX, n.position.x)
+    minY = Math.min(minY, n.position.y)
+    maxX = Math.max(maxX, n.position.x + n.size.width)
+    maxY = Math.max(maxY, n.position.y + n.size.height)
+  }
+
+  const contentW = Math.max(1, maxX - minX)
+  const contentH = Math.max(1, maxY - minY)
+  const pad = 80
+
+  const zoomX = (surface.width - pad * 2) / contentW
+  const zoomY = (surface.height - pad * 2) / contentH
+  const zoom = Math.min(Math.max(Math.min(zoomX, zoomY), 0.1), 1)
+
+  const cx = minX + contentW / 2
+  const cy = minY + contentH / 2
+  const x = surface.width / 2 - cx * zoom
+  const y = surface.height / 2 - cy * zoom
+
+  return { x, y, zoom }
+}
+
 export function CanvasToolbar({
   canUndo,
   canRedo,
@@ -77,7 +123,8 @@ export function CanvasToolbar({
   const setViewport = useCanvasStore((s) => s.setViewport)
   const focusFrames = useCanvasStore((s) => s.focusFrames)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
-  const hasNodes = useCanvasStore((s) => s.nodes.length > 0)
+  const nodes = useCanvasStore((s) => s.nodes)
+  const hasNodes = nodes.length > 0
   const showAllEdges = useCanvasStore((s) => s.showAllEdges)
   const toggleShowAllEdges = useCanvasStore((s) => s.toggleShowAllEdges)
   const gridDotVisibility = useSettingsStore((s) => s.env.gridDotVisibility)
@@ -88,11 +135,13 @@ export function CanvasToolbar({
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
   const [agentFlyoutOpen, setAgentFlyoutOpen] = useState(false)
+  const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   const [loadedActions, setLoadedActions] = useState<ActionDefinition[]>([])
   const claudeStatus = useClaudeStatus()
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
   const agentFlyoutRef = useRef<HTMLDivElement>(null)
+  const zoomMenuRef = useRef<HTMLDivElement>(null)
 
   const sidebarSelectedPaths = useSidebarSelectionStore((s) => s.selectedPaths)
   const sidebarSelectedCount = sidebarSelectedPaths.size
@@ -127,7 +176,7 @@ export function CanvasToolbar({
   const clearEnabled = hasNodes && !isComputing
 
   useEffect(() => {
-    if (!tileMenuOpen && !envMenuOpen && !agentFlyoutOpen) return
+    if (!tileMenuOpen && !envMenuOpen && !agentFlyoutOpen && !zoomMenuOpen) return
 
     const handlePointerDown = (event: MouseEvent) => {
       if (tileMenuRef.current && !tileMenuRef.current.contains(event.target as Node)) {
@@ -139,6 +188,9 @@ export function CanvasToolbar({
       if (agentFlyoutRef.current && !agentFlyoutRef.current.contains(event.target as Node)) {
         setAgentFlyoutOpen(false)
       }
+      if (zoomMenuRef.current && !zoomMenuRef.current.contains(event.target as Node)) {
+        setZoomMenuOpen(false)
+      }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -146,6 +198,7 @@ export function CanvasToolbar({
         setTileMenuOpen(false)
         setEnvMenuOpen(false)
         setAgentFlyoutOpen(false)
+        setZoomMenuOpen(false)
       }
     }
 
@@ -155,11 +208,35 @@ export function CanvasToolbar({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [tileMenuOpen, envMenuOpen, agentFlyoutOpen])
+  }, [tileMenuOpen, envMenuOpen, agentFlyoutOpen, zoomMenuOpen])
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
-  const resetZoom = () => setViewport({ x: 0, y: 0, zoom: 1 })
+  const resetView = () => setViewport({ x: 0, y: 0, zoom: 1 })
+
+  const zoomToActualSize = () => {
+    const surface = getSurfaceSize()
+    const cx = (-viewport.x + surface.width / 2) / viewport.zoom
+    const cy = (-viewport.y + surface.height / 2) / viewport.zoom
+    const nextZoom = 1
+    setViewport({
+      x: surface.width / 2 - cx * nextZoom,
+      y: surface.height / 2 - cy * nextZoom,
+      zoom: nextZoom
+    })
+  }
+
+  const fitAll = () => {
+    if (nodes.length === 0) return
+    setViewport(fitViewportToNodes(nodes, getSurfaceSize()))
+  }
+
+  const fitSelection = () => {
+    if (selectedNodeIds.size === 0) return
+    const selected = nodes.filter((n) => selectedNodeIds.has(n.id))
+    if (selected.length === 0) return
+    setViewport(fitViewportToNodes(selected, getSurfaceSize()))
+  }
 
   const zoomPercent = Math.round(viewport.zoom * 100)
 
@@ -291,13 +368,92 @@ export function CanvasToolbar({
         </button>
         <Tip label="Zoom in" />
       </div>
-      <button
-        onClick={resetZoom}
-        className="canvas-toolbtn canvas-zoom-badge"
-        title={`${zoomPercent}% (click to reset)`}
-      >
-        {zoomPercent}%
-      </button>
+      <div ref={zoomMenuRef} style={{ position: 'relative' }}>
+        <div className="canvas-toolbtn-wrap">
+          <button
+            onClick={() => setZoomMenuOpen((prev) => !prev)}
+            className="canvas-toolbtn canvas-zoom-badge"
+            data-testid="canvas-zoom-menu"
+            aria-label={`Zoom ${zoomPercent}%`}
+            aria-haspopup="menu"
+            aria-expanded={zoomMenuOpen}
+          >
+            {zoomPercent}%
+          </button>
+          <Tip label="Zoom" />
+        </div>
+        {zoomMenuOpen && (
+          <div
+            className="sidebar-popover absolute flex flex-col py-1"
+            role="menu"
+            style={{
+              top: 0,
+              left: '100%',
+              marginLeft: 6,
+              minWidth: 170,
+              zIndex: 50
+            }}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="sidebar-popover-item"
+              style={{ color: colors.text.primary }}
+              onClick={() => {
+                zoomToActualSize()
+                setZoomMenuOpen(false)
+              }}
+            >
+              Zoom to 100%
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="sidebar-popover-item"
+              style={{
+                color: hasNodes ? colors.text.primary : colors.text.muted,
+                cursor: hasNodes ? 'pointer' : 'not-allowed'
+              }}
+              disabled={!hasNodes}
+              onClick={() => {
+                fitAll()
+                setZoomMenuOpen(false)
+              }}
+            >
+              Fit all
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="sidebar-popover-item"
+              style={{
+                color: hasSelection ? colors.text.primary : colors.text.muted,
+                cursor: hasSelection ? 'pointer' : 'not-allowed'
+              }}
+              disabled={!hasSelection}
+              onClick={() => {
+                fitSelection()
+                setZoomMenuOpen(false)
+              }}
+            >
+              Zoom to selection
+            </button>
+            <div className="sidebar-popover-divider mx-3 my-1" />
+            <button
+              type="button"
+              role="menuitem"
+              className="sidebar-popover-item"
+              style={{ color: colors.text.secondary }}
+              onClick={() => {
+                resetView()
+                setZoomMenuOpen(false)
+              }}
+            >
+              Reset view
+            </button>
+          </div>
+        )}
+      </div>
       <div className="canvas-toolbtn-wrap">
         <button onClick={zoomOut} className="canvas-toolbtn" aria-label="Zoom out">
           -
