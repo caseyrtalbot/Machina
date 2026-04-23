@@ -40,8 +40,10 @@ export function NoteCard({ node }: NoteCardProps) {
     [artifact]
   )
 
-  // Display type badge from artifact type
+  // Display type badge from artifact type. Hide when it would just uppercase-echo
+  // the title (e.g. a note titled "Database Reviewer" with type "Database Reviewer").
   const badgeLabel = artifact?.type?.toUpperCase() ?? 'NOTE'
+  const showBadge = badgeLabel.toLowerCase() !== title.toLowerCase()
 
   const html = useMemo(() => (body ? markdownToHtml(body) : ''), [body])
 
@@ -230,9 +232,11 @@ export function NoteCard({ node }: NoteCardProps) {
           </div>
         ) : (
           <div style={{ padding: '28px 28px 24px' }}>
-            <div style={{ marginBottom: 20 }}>
-              <CardBadge label={badgeLabel} />
-            </div>
+            {showBadge && (
+              <div style={{ marginBottom: 20 }}>
+                <CardBadge label={badgeLabel} />
+              </div>
+            )}
 
             {metadataEntries.length > 0 && <MetadataGrid entries={metadataEntries} />}
 
