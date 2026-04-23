@@ -51,7 +51,7 @@ import {
 import { rehydrateUiStore, useUiStore } from './store/ui-store'
 import { subscribeCanvasAutosave } from './store/canvas-autosave'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
-import type { ArtifactType } from '@shared/types'
+import type { Artifact, ArtifactType } from '@shared/types'
 import { isSystemArtifactKind } from '@shared/system-artifacts'
 import { useCanvasStore } from './store/canvas-store'
 import { useSettingsStore } from './store/settings-store'
@@ -1549,7 +1549,26 @@ export default function App() {
     const files = useVaultStore.getState().files
     const systemFiles = useVaultStore.getState().systemFiles
     const discoveredTypes = [...new Set(result.artifacts.map((a) => a.type))].sort()
-    const artifactById = new Map(result.artifacts.map((a) => [a.id, a]))
+
+    const artifactById: Record<string, Artifact> = {}
+    for (const a of result.artifacts) {
+      artifactById[a.id] = a
+    }
+
+    const edgeCountByArtifactId: Record<string, number> = {}
+    for (const e of result.graph.edges) {
+      edgeCountByArtifactId[e.source] = (edgeCountByArtifactId[e.source] ?? 0) + 1
+      edgeCountByArtifactId[e.target] = (edgeCountByArtifactId[e.target] ?? 0) + 1
+    }
+
+    const rawFileCount = result.artifacts.filter(
+      (a) =>
+        a.connections.length === 0 &&
+        a.clusters_with.length === 0 &&
+        a.tensions_with.length === 0 &&
+        a.related.length === 0 &&
+        a.tags.length === 0
+    ).length
 
     const updateTitles = <
       T extends {
@@ -1563,7 +1582,7 @@ export default function App() {
       entries.map((entry) => {
         if (!entry.path.endsWith('.md')) return entry
         const id = result.fileToId[entry.path]
-        const artifact = id ? artifactById.get(id) : undefined
+        const artifact = id ? artifactById[id] : undefined
         return artifact ? { ...entry, title: artifact.title, modified: artifact.modified } : entry
       })
 
@@ -1574,6 +1593,9 @@ export default function App() {
       fileToId: result.fileToId,
       artifactPathById: result.artifactPathById,
       discoveredTypes,
+      artifactById,
+      edgeCountByArtifactId,
+      rawFileCount,
       files: updateTitles(files),
       systemFiles: updateTitles(systemFiles)
     })
