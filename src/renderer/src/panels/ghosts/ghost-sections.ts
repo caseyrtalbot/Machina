@@ -1,6 +1,6 @@
 import type { GhostEntry } from '@shared/engine/ghost-index'
 
-export interface GhostSection {
+interface GhostSection {
   readonly label: string
   readonly ghosts: readonly GhostEntry[]
 }

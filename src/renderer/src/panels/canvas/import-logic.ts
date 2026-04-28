@@ -23,7 +23,7 @@ const CARD_SIZE = { width: 420, height: 340 }
 // Types
 // ---------------------------------------------------------------------------
 
-export interface TagInfo {
+interface TagInfo {
   readonly tag: string
   readonly count: number
 }

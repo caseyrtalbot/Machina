@@ -1,4 +1,4 @@
-export interface BuildActionLaunchScriptArgs {
+interface BuildActionLaunchScriptArgs {
   readonly actionName: string
   readonly scopeSummary: string
   readonly promptPath: string

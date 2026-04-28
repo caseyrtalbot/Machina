@@ -5,7 +5,7 @@ import type { CanvasMutationPlan } from './canvas-mutation-types'
 // Action Registry
 // ---------------------------------------------------------------------------
 
-export interface AgentActionDef {
+interface AgentActionDef {
   readonly id: string
   readonly label: string
   readonly description: string

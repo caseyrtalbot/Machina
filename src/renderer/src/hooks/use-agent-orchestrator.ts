@@ -33,12 +33,12 @@ import { buildGhostIndex } from '@shared/engine/ghost-index'
 
 export type AgentPhase = 'idle' | 'computing' | 'preview' | 'error'
 
-export interface AgentAnchor {
+interface AgentAnchor {
   readonly x: number // screen-space center x
   readonly y: number // screen-space y below which to place the card
 }
 
-export interface AgentOrchestratorState {
+interface AgentOrchestratorState {
   readonly phase: AgentPhase
   readonly activeAction: AgentActionName | null
   readonly pendingPlan: CanvasMutationPlan | null

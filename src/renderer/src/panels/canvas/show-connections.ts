@@ -8,7 +8,7 @@ import {
   type ContentMetrics
 } from './canvas-layout'
 
-export interface ShowConnectionsResult {
+interface ShowConnectionsResult {
   readonly newNodes: readonly CanvasNode[]
   readonly newEdges: readonly CanvasEdge[]
 }

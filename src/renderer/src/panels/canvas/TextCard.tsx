@@ -160,5 +160,5 @@ function TextCardImpl({ node }: TextCardProps) {
   )
 }
 
-export const TextCard = memo(TextCardImpl)
+const TextCard = memo(TextCardImpl)
 export default TextCard

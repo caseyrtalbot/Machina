@@ -1,7 +1,7 @@
 import matter from 'gray-matter'
 import { replaceSection } from '@shared/engine/section-rewriter'
 
-export interface SectionEditDeps {
+interface SectionEditDeps {
   readonly readFile: (path: string) => Promise<string>
   readonly writeDocument: (path: string, content: string) => Promise<void>
 }

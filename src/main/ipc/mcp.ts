@@ -11,7 +11,7 @@ export interface McpStatusProvider {
   toolCount(): number
 }
 
-export interface McpStatus {
+interface McpStatus {
   readonly running: boolean
   readonly toolCount: number
 }

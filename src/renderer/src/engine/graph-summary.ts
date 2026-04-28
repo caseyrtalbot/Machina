@@ -7,7 +7,7 @@
 
 import type { KnowledgeGraph, GraphNode, GraphEdge } from '@shared/types'
 
-export interface GraphSummaryOptions {
+interface GraphSummaryOptions {
   /** Max nodes to include (default: all) */
   readonly maxNodes?: number
   /** Include tag clusters section (default: true) */

@@ -16,8 +16,8 @@ import { readdirSync } from 'fs'
 // Types
 // ---------------------------------------------------------------------------
 
-export type DataCallback = (sessionId: string, data: string) => void
-export type ExitCallback = (sessionId: string, code: number) => void
+type DataCallback = (sessionId: string, data: string) => void
+type ExitCallback = (sessionId: string, code: number) => void
 
 export interface ReconnectResult {
   readonly scrollback: string

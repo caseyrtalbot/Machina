@@ -6,7 +6,7 @@ export interface WindowState {
   readonly isMaximized?: boolean
 }
 
-export interface DisplayLike {
+interface DisplayLike {
   readonly workArea: {
     readonly x: number
     readonly y: number
@@ -15,7 +15,7 @@ export interface DisplayLike {
   }
 }
 
-export interface WindowStateTarget {
+interface WindowStateTarget {
   getNormalBounds(): { x: number; y: number; width: number; height: number }
   isMaximized(): boolean
 }

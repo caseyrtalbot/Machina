@@ -9,13 +9,6 @@ export interface ActionDefinition {
   readonly custom?: boolean
 }
 
-/** Scope context serialized into terminal card metadata at spawn time. */
-export interface ActionScope {
-  readonly type: 'vault' | 'files'
-  readonly paths?: readonly string[]
-  readonly vaultPath: string
-}
-
 /**
  * Build the scope section of the system prompt from sidebar selection state.
  * Pure function -- no IPC, no side effects.

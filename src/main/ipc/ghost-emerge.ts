@@ -21,7 +21,7 @@ export interface ReferenceNote {
   readonly body: string
 }
 
-export interface EmergeResult {
+interface EmergeResult {
   readonly tags: string[]
   readonly origin: string
   readonly body: string

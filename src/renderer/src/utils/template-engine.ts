@@ -5,7 +5,7 @@
  * Substitution happens at creation time (not runtime rendering).
  */
 
-export interface TemplateContext {
+interface TemplateContext {
   readonly title: string
   readonly date: string // YYYY-MM-DD (local time)
   readonly time: string // HH:mm (local time)

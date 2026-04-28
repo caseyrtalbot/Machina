@@ -16,7 +16,7 @@ export interface ConnectManifest {
   readonly files: Readonly<Record<string, FileEntry>>
 }
 
-export interface ChangeSet {
+interface ChangeSet {
   readonly newFiles: readonly string[]
   readonly changedFiles: readonly string[]
   readonly unchangedFiles: readonly string[]

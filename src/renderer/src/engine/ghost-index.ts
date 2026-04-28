@@ -4,6 +4,5 @@ export {
   isPathGhost,
   stripWikilinksFromContext,
   extractContext,
-  type GhostEntry,
-  type GhostReference
+  type GhostEntry
 } from '@shared/engine/ghost-index'

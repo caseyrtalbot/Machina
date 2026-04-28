@@ -5,6 +5,7 @@
  * the codebase after the removal.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { access } from 'fs/promises'
 
 // Mock electron for IPC tests
 vi.mock('electron', () => ({
@@ -120,8 +121,9 @@ describe('AgentSpawner after sidecar removal', () => {
 // ---------------------------------------------------------------------------
 
 describe('librarian-monitor.ts removal', () => {
-  it('cannot be imported (file deleted)', async () => {
-    await expect(import('../../src/main/services/librarian-monitor')).rejects.toThrow()
+  it('does not exist', async () => {
+    const removedModule = new URL('../../src/main/services/librarian-monitor.ts', import.meta.url)
+    await expect(access(removedModule)).rejects.toThrow()
   })
 })
 

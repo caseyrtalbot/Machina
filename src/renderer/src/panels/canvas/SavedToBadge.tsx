@@ -1,6 +1,6 @@
 import { colors } from '../../design/tokens'
 
-export interface SavedToBadgeProps {
+interface SavedToBadgeProps {
   readonly relativePath: string
   readonly onOpen: () => void
 }
@@ -27,5 +27,3 @@ export function SavedToBadge({ relativePath, onOpen }: SavedToBadgeProps) {
     </button>
   )
 }
-
-export default SavedToBadge

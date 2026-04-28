@@ -6,7 +6,7 @@ import { colors, typography } from '../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import { TE_DIR } from '@shared/constants'
 
-export interface ClaudeContextResult {
+interface ClaudeContextResult {
   /** JSX for the title bar context summary. null for non-Claude cards. */
   readonly contextBadge: ReactNode
   /** Number of file cards Claude can see. */

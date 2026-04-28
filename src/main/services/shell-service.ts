@@ -2,8 +2,8 @@ import { randomUUID } from 'crypto'
 import { type SessionId, sessionId } from '@shared/types'
 import { PtyService, type ReconnectResult, type DiscoveredSession } from './pty-service'
 
-export type DataCallback = (id: SessionId, data: string) => void
-export type ExitCallback = (id: SessionId, code: number) => void
+type DataCallback = (id: SessionId, data: string) => void
+type ExitCallback = (id: SessionId, code: number) => void
 
 // ---------------------------------------------------------------------------
 // ShellService: thin facade over PtyService.
@@ -105,6 +105,3 @@ export class ShellService {
     this.pty.killAll()
   }
 }
-
-// Re-export types for consumers that import from shell-service
-export type { ReconnectResult, DiscoveredSession }

@@ -10,7 +10,7 @@
  * Pure functions only. No I/O, no Electron/React dependencies.
  */
 
-export interface WikilinkTarget {
+interface WikilinkTarget {
   /** The link target without heading/block-ref suffix */
   readonly target: string
   /** Heading anchor from [[Note#heading]] syntax, or null */
@@ -44,7 +44,7 @@ function stemFromTarget(target: string): string {
 }
 
 /** Minimal artifact shape needed for resolution — avoids coupling to full Artifact type. */
-export interface ResolvableArtifact {
+interface ResolvableArtifact {
   readonly id: string
   readonly title: string
 }

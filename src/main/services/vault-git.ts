@@ -8,7 +8,7 @@ const GIT_TIMEOUT_MS = 5000
 /** Presence of this file disables auto-commit for the vault. */
 const OPT_OUT_FLAG = 'no-auto-commit'
 
-export interface PreAgentCommitResult {
+interface PreAgentCommitResult {
   readonly committed: boolean
   readonly reason?: 'not-a-git-repo' | 'opted-out' | 'nothing-to-commit' | 'git-failed'
   readonly error?: string

@@ -3,7 +3,7 @@ import { relative } from 'path'
 import type { WorkbenchFileChangedEvent } from '@shared/workbench-types'
 import { TE_DIR } from '@shared/constants'
 
-export type ProjectFileCallback = (event: WorkbenchFileChangedEvent) => void
+type ProjectFileCallback = (event: WorkbenchFileChangedEvent) => void
 
 const IGNORE_PATTERNS = [
   /node_modules/,

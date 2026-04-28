@@ -4,7 +4,7 @@ import { logError } from '../utils/error-logger'
 
 type EditorMode = 'rich' | 'source'
 
-export interface Tab {
+interface Tab {
   readonly path: string
   readonly title: string
 }

@@ -1,4 +1,4 @@
-export interface FsError {
+interface FsError {
   readonly path: string
   readonly error: string
   readonly at: number

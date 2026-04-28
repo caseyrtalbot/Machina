@@ -49,7 +49,7 @@ export interface AggregateHealth {
   readonly lastInfraAt: number | null
 }
 
-export interface VaultFile {
+interface VaultFile {
   readonly path: string
   readonly filename: string
 }

@@ -1,6 +1,6 @@
 import type { SectionMap } from '../cluster-types'
 
-export interface RematchResult {
+interface RematchResult {
   readonly resolved: SectionMap
   readonly unresolved: readonly string[]
   readonly changed: boolean

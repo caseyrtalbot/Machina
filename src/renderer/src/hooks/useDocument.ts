@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { logError } from '../utils/error-logger'
 import { withTimeout } from '../utils/ipc-timeout'
 
-export interface UseDocumentResult {
+interface UseDocumentResult {
   /** Current file content (null while loading) */
   readonly content: string | null
   /** Whether the document has unsaved changes */

@@ -27,13 +27,13 @@ export const ENV_DEFAULTS: EnvironmentSettings = {
   sidebarFontSize: 13
 }
 
-export interface BaseRgb {
+interface BaseRgb {
   readonly r: number
   readonly g: number
   readonly b: number
 }
 
-export interface ThemeBaseColors {
+interface ThemeBaseColors {
   readonly canvasSurface: BaseRgb
   readonly cardBody: BaseRgb
 }
@@ -43,7 +43,7 @@ export const BASE_COLORS: ThemeBaseColors = {
   cardBody: { r: 10, g: 10, b: 14 }
 }
 
-export interface StructuralColors {
+interface StructuralColors {
   readonly border: { readonly default: string; readonly subtle: string }
   readonly text: { readonly primary: string; readonly secondary: string; readonly muted: string }
   readonly canvas: {

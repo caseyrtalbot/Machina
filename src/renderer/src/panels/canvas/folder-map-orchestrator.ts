@@ -28,11 +28,11 @@ export interface FolderMapProgress {
   readonly errorMessage?: string
 }
 
-export type ProgressCallback = (progress: FolderMapProgress) => void
+type ProgressCallback = (progress: FolderMapProgress) => void
 
 // ─── Orchestrator result ─────────────────────────────────────────────
 
-export interface FolderMapResult {
+interface FolderMapResult {
   readonly snapshot: ProjectMapSnapshot
   readonly nodes: readonly CanvasNode[]
   readonly edges: readonly CanvasEdge[]

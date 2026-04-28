@@ -15,9 +15,9 @@ import type { OntologyWorkerResponse } from './ontology-worker'
 import { applyOntologyResult } from './ontology-apply'
 import type { CommandStack } from './canvas-commands'
 
-export type OntologyPhase = 'idle' | 'processing' | 'preview' | 'error'
+type OntologyPhase = 'idle' | 'processing' | 'preview' | 'error'
 
-export interface OntologyOrchestratorState {
+interface OntologyOrchestratorState {
   readonly phase: OntologyPhase
   readonly errorMessage: string | null
   readonly pendingSnapshot: OntologySnapshot | null

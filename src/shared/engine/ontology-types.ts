@@ -1,5 +1,3 @@
-import type { TagTreeNode } from './tag-index'
-
 // --- Branded types ---
 
 export type GroupId = string & { readonly __brand: 'GroupId' }
@@ -118,52 +116,4 @@ export const EDGE_WEIGHT_TABLE: Readonly<Record<string, number>> = {
   related: 2,
   appears_in: 0,
   'co-occurrence': 0
-}
-
-// --- Agent Contract ---
-
-export interface OntologyAgentInput {
-  readonly cards: readonly {
-    readonly id: string
-    readonly title: string
-    readonly contentSnippet: string
-    readonly tags: readonly string[]
-    readonly links: readonly string[]
-    readonly concepts: readonly string[]
-  }[]
-  readonly existingSections: Readonly<Record<string, OntologyGroupNode>>
-  readonly vaultContext: {
-    readonly tagIndex: readonly TagTreeNode[]
-    readonly graphEdges: readonly {
-      readonly source: string
-      readonly target: string
-      readonly kind: string
-    }[]
-  }
-}
-
-export interface OntologyAgentProposal {
-  readonly sections: readonly {
-    readonly id: string
-    readonly label: string
-    readonly cardIds: readonly string[]
-    readonly reasoning: string
-    readonly parentSectionId?: string
-  }[]
-  readonly cardPlacements: readonly {
-    readonly cardId: string
-    readonly sectionId: string
-    readonly reasoning: string
-    readonly confidence: number
-  }[]
-  readonly suggestedConnections: readonly {
-    readonly fromCardId: string
-    readonly toCardId: string
-    readonly reasoning: string
-  }[]
-  readonly suggestedTags: readonly {
-    readonly cardId: string
-    readonly tag: string
-    readonly reasoning: string
-  }[]
 }

@@ -294,7 +294,7 @@ export interface ClusterLabel {
   readonly position: { readonly x: number; readonly y: number }
 }
 
-export interface SemanticLayoutResult {
+interface SemanticLayoutResult {
   readonly positions: ReadonlyMap<string, { readonly x: number; readonly y: number }>
   readonly labels: readonly ClusterLabel[]
 }

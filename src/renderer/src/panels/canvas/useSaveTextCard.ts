@@ -4,7 +4,7 @@ import { useVaultStore } from '../../store/vault-store'
 import { useCanvasStore } from '../../store/canvas-store'
 import { slugifyFilename, resolveNewPath, appendToExisting, hashContent } from './text-card-save'
 
-export type SaveResult =
+type SaveResult =
   | { readonly ok: true; readonly relativePath: string }
   | { readonly ok: false; readonly error: string }
 

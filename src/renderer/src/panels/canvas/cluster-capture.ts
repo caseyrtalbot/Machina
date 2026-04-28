@@ -1,7 +1,7 @@
 import type { ClusterDraft, ClusterSection } from '@shared/cluster-types'
 import type { CanvasNode, CanvasEdge } from '@shared/canvas-types'
 
-export interface CanvasSnapshotForCluster {
+interface CanvasSnapshotForCluster {
   readonly nodes: readonly CanvasNode[]
   readonly edges: readonly CanvasEdge[]
   /** cluster_id -> source artifact IDs consumed by that agent run */

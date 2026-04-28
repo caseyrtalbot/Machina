@@ -21,7 +21,7 @@ export const STALENESS_MULTIPLIER = 2.5
 // State
 // ---------------------------------------------------------------------------
 
-export interface VaultHealthState extends AggregateHealth {
+interface VaultHealthState extends AggregateHealth {
   setDerived: (health: DerivedHealth) => void
   setInfra: (health: InfraHealth) => void
   reset: () => void

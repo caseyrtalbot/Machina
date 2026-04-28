@@ -1,4 +1,4 @@
-export type LodLevel = 'full' | 'preview'
+type LodLevel = 'full' | 'preview'
 
 const LOD_FULL_THRESHOLD = 0.3
 

@@ -9,13 +9,13 @@ import type { ProjectMapNode, ProjectMapSnapshot } from '@shared/engine/project-
 import { computeCardSize, computeOptimalEdgeSides } from './canvas-layout'
 import { computeOriginOffset } from './import-logic'
 
-export interface TreeLayoutOptions {
+interface TreeLayoutOptions {
   readonly levelGap: number
   readonly siblingGap: number
   readonly clusterGap: number
 }
 
-export interface FolderMapLayoutResult {
+interface FolderMapLayoutResult {
   readonly nodes: readonly CanvasNode[]
   readonly edges: readonly CanvasEdge[]
 }

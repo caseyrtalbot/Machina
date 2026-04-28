@@ -4,7 +4,7 @@ import { colors } from '../../design/tokens'
 
 const MAX_RESULTS = 8
 
-export interface ConnectionAutocompleteProps {
+interface ConnectionAutocompleteProps {
   artifacts: readonly Artifact[]
   currentArtifactId: string
   existingConnections: readonly string[]

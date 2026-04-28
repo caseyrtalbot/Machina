@@ -8,7 +8,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import { HighlightMark } from '../editor/extensions/highlight-mark'
 import { colors } from '../../design/tokens'
 
-export interface RichTextCardEditorProps {
+interface RichTextCardEditorProps {
   readonly value: string
   readonly editing: boolean
   readonly onChange: (markdown: string) => void
@@ -100,5 +100,3 @@ export function RichTextCardEditor({
     </div>
   )
 }
-
-export default RichTextCardEditor

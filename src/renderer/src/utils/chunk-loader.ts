@@ -19,7 +19,7 @@ export function chunkArray<T>(items: readonly T[], size: number = DEFAULT_CHUNK_
   return chunks
 }
 
-export interface FileWithContent {
+interface FileWithContent {
   readonly path: string
   readonly content: string
 }

@@ -1,6 +1,6 @@
 export type TreeSortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
 
-export interface TreeFileEntry {
+interface TreeFileEntry {
   readonly path: string
   readonly modified: string
 }
@@ -17,12 +17,12 @@ export interface FlatTreeNode {
   modified: string
 }
 
-export interface IndexedTreeNode extends FlatTreeNode {
+interface IndexedTreeNode extends FlatTreeNode {
   readonly modified: string
   readonly sortType: string
 }
 
-export interface FileTreeIndex {
+interface FileTreeIndex {
   readonly root: string
   readonly nodesByPath: ReadonlyMap<string, IndexedTreeNode>
   readonly childPathsByParent: ReadonlyMap<string, readonly string[]>

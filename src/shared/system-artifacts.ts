@@ -75,7 +75,7 @@ export interface TensionArtifactFrontmatter extends BaseSystemArtifactFrontmatte
   readonly evidence_refs: readonly string[]
 }
 
-export type SystemArtifactFrontmatter =
+type SystemArtifactFrontmatter =
   | SessionArtifactFrontmatter
   | PatternArtifactFrontmatter
   | TensionArtifactFrontmatter

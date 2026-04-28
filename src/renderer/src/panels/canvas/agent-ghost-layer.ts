@@ -1,7 +1,7 @@
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import type { CanvasNode, CanvasNodeType } from '@shared/canvas-types'
 
-export interface GhostNode {
+interface GhostNode {
   readonly id: string
   readonly type: CanvasNodeType
   readonly position: { readonly x: number; readonly y: number }
@@ -10,7 +10,7 @@ export interface GhostNode {
   readonly isMoved: boolean
 }
 
-export interface GhostEdge {
+interface GhostEdge {
   readonly id: string
   readonly fromNode: string
   readonly toNode: string

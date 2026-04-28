@@ -3,12 +3,12 @@ import { colors } from '../../design/tokens'
 
 type Mode = 'new' | 'append'
 
-export interface SaveNewParams {
+interface SaveNewParams {
   readonly folder: string
   readonly filename: string
 }
 
-export interface SaveTextCardDialogProps {
+interface SaveTextCardDialogProps {
   readonly initialFilename: string
   readonly folders: readonly string[]
   readonly files: readonly string[]
@@ -206,5 +206,3 @@ export function SaveTextCardDialog({
     </div>
   )
 }
-
-export default SaveTextCardDialog

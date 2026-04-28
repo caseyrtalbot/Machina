@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { TextCard } from '../TextCard'
+import TextCard from '../TextCard'
 import { useCanvasStore } from '../../../store/canvas-store'
 import { hashContent } from '../text-card-save'
 

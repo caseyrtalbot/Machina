@@ -8,7 +8,7 @@ import { VaultIndex } from '@shared/engine/indexer'
 import { SearchEngine } from '@shared/engine/search-engine'
 import type { VaultQueryDeps } from './vault-query-facade'
 
-export interface FileEntry {
+interface FileEntry {
   readonly path: string
   readonly content: string
 }

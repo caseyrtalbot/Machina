@@ -10,7 +10,7 @@ import { HighlightMark } from '../../editor/extensions/highlight-mark'
 import { WikilinkNode } from '../../editor/extensions/wikilink-node'
 import { MachinaTableKit } from '../../editor/extensions/table-kit'
 
-export interface TiptapConfigOptions {
+interface TiptapConfigOptions {
   onWikilinkNavigate?: (target: string) => void
 }
 

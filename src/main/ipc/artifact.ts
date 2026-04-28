@@ -43,7 +43,3 @@ export function registerArtifactIpc(): void {
     await mat.unmaterialize(args.paths)
   })
 }
-
-export function getArtifactMaterializer(): ArtifactMaterializer {
-  return getMaterializer()
-}

@@ -16,7 +16,7 @@ import {
 
 // --- Input types ---
 
-export interface OntologyGroupingInput {
+interface OntologyGroupingInput {
   readonly cards: readonly {
     readonly id: string
     readonly type: string
@@ -717,7 +717,7 @@ function groupByOrigin(input: OntologyGroupingInput): OntologySnapshot {
   }
 }
 
-export type OntologyGroupBy = 'tags' | 'origin'
+type OntologyGroupBy = 'tags' | 'origin'
 
 // --- Main function ---
 

@@ -21,12 +21,12 @@ export interface VaultQueryDeps {
   readonly documentManager?: DocumentManager
 }
 
-export interface NeighborResult {
+interface NeighborResult {
   readonly nodes: readonly GraphNode[]
   readonly edges: readonly GraphEdge[]
 }
 
-export interface WriteFileOpts {
+interface WriteFileOpts {
   readonly agentId: string
   readonly expectedMtime?: string
 }

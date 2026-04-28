@@ -1,6 +1,6 @@
 import type { WebContents } from 'electron'
 
-export interface ExternalNavigationDeps {
+interface ExternalNavigationDeps {
   readonly openExternal: (url: string) => void | Promise<void>
   readonly rendererUrl?: string
 }

@@ -4,7 +4,7 @@
 
 import type { CanvasNode } from '@shared/canvas-types'
 
-export interface PlacementViewport {
+interface PlacementViewport {
   readonly x: number
   readonly y: number
   readonly zoom: number

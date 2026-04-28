@@ -6,7 +6,7 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { loadLanguageExtension, type SupportedLanguage } from './codemirror-languages'
 import { inferLanguage } from '../file-drop-utils'
 
-export interface CodeMirrorOptions {
+interface CodeMirrorOptions {
   readonly readOnly?: boolean
   readonly onUpdate?: (content: string) => void
   readonly fontSize?: string
