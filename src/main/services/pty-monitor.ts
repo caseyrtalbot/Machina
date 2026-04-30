@@ -49,7 +49,7 @@ export class PtyMonitor {
 
       return {
         sessionId,
-        tmuxName: `te-${sessionId}`,
+        displayName: `te-${sessionId}`,
         status,
         ...(pid !== undefined ? { pid } : {}),
         ...(currentCommand ? { currentCommand } : {}),

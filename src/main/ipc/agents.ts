@@ -20,7 +20,9 @@ export function registerAgentIpc(): void {
   })
 
   typedHandle('agent:kill', async (_payload) => {
-    // No-op: sidecar kill path removed. PTY sessions are killed via shell:kill.
+    // Deliberate stub. The sidecar process model was removed; PTY sessions are
+    // killed via shell:kill. This channel is retained so existing renderer call
+    // sites keep typechecking until they migrate. New code must not use it.
   })
 }
 

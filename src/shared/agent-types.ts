@@ -48,8 +48,8 @@ export interface AgentSidecar {
 /** Snapshot of one agent session as seen by PtyMonitor. */
 export interface AgentSidecarState {
   readonly sessionId: string
-  /** e.g. "te-abc123" (legacy name, kept for interface stability) */
-  readonly tmuxName: string
+  /** Human-readable session label, e.g. "te-abc123". */
+  readonly displayName: string
   readonly status: 'alive' | 'idle' | 'exited'
   /** PTY child PID */
   readonly pid?: number
