@@ -118,6 +118,33 @@ describe('PtyService', () => {
     expect(pty.resize).toHaveBeenCalledWith(100, 50)
   })
 
+  it('writeAgentInput() routes through pty.write with the agent payload', () => {
+    service.create('s1', '/tmp')
+    service.writeAgentInput('s1', '/help\r', 'batched')
+
+    expect(pty.write).toHaveBeenCalledWith('/help\r')
+  })
+
+  it('preserves enqueue order across mixed user/agent/raw writes', async () => {
+    service.create('s1', '/tmp')
+
+    service.write('s1', 'A')
+    service.writeAgentInput('s1', 'B', 'streaming')
+    service.sendRawKeys('s1', 'C')
+
+    // Allow any queued microtasks to settle.
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(pty.write.mock.calls.map((c) => c[0])).toEqual(['A', 'B', 'C'])
+  })
+
+  it('drops writes for unknown sessions without throwing', () => {
+    expect(() => service.write('missing', 'x')).not.toThrow()
+    expect(() => service.writeAgentInput('missing', 'x')).not.toThrow()
+    expect(() => service.sendRawKeys('missing', 'x')).not.toThrow()
+    expect(pty.write).not.toHaveBeenCalled()
+  })
+
   // -------------------------------------------------------------------------
   // kill()
   // -------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import { spawn, type IPty } from 'node-pty'
 import { execFileSync } from 'child_process'
 import { RingBuffer, DEFAULT_RING_BUFFER_BYTES } from './ring-buffer'
+import { PtyWriteQueue, type PtyWrite } from './pty-write-queue'
 import {
   getTerminfoDir,
   writeSessionMeta,
@@ -44,6 +45,7 @@ interface ManagedSession {
   readonly label: string | undefined
   readonly vaultPath: string | undefined
   readonly createdAt: string
+  readonly writeQueue: PtyWriteQueue
   connected: boolean
   reconnectQueue: string[]
 }
@@ -99,6 +101,7 @@ export class PtyService {
       label,
       vaultPath,
       createdAt: new Date().toISOString(),
+      writeQueue: new PtyWriteQueue(),
       connected: true,
       reconnectQueue: []
     }
@@ -222,12 +225,51 @@ export class PtyService {
   // Write / Resize / Kill
   // -----------------------------------------------------------------------
 
+  /**
+   * Enqueue a user command (typed in the prompt). Appends a carriage return
+   * so the shell executes it. Drained through the per-session write queue.
+   */
   write(sessionId: string, data: string): void {
-    this.sessions.get(sessionId)?.pty.write(data)
+    this.enqueueWrite(sessionId, { kind: 'bytes', data })
   }
 
+  /** Enqueue raw bytes (e.g. control chars, escape sequences) for direct write. */
   sendRawKeys(sessionId: string, data: string): void {
-    this.write(sessionId, data)
+    this.enqueueWrite(sessionId, { kind: 'bytes', data })
+  }
+
+  /**
+   * Enqueue input originating from a CLI agent. Carries `mode` so future
+   * arbitration policies can distinguish streamed token-by-token input
+   * (don't interleave) from batched input (interleave with user OK).
+   */
+  writeAgentInput(
+    sessionId: string,
+    data: string,
+    mode: 'streaming' | 'batched' = 'batched'
+  ): void {
+    this.enqueueWrite(sessionId, { kind: 'agent-input', mode, data })
+  }
+
+  /** Enqueue a typed write and kick the per-session drain. */
+  private enqueueWrite(sessionId: string, write: PtyWrite): void {
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+    session.writeQueue.enqueue(write)
+    void session.writeQueue.drain((w) => this.flushOne(session, w))
+  }
+
+  /** Apply one queued write to the underlying node-pty handle. */
+  private flushOne(session: ManagedSession, write: PtyWrite): void {
+    switch (write.kind) {
+      case 'command':
+        session.pty.write(`${write.text}\r`)
+        return
+      case 'bytes':
+      case 'agent-input':
+        session.pty.write(write.data)
+        return
+    }
   }
 
   resize(sessionId: string, cols: number, rows: number): void {
