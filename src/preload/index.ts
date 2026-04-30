@@ -120,7 +120,8 @@ const api = {
   agent: {
     getStates: () => typedInvoke('agent:get-states'),
     spawn: (request: AgentSpawnRequest) => typedInvoke('agent:spawn', request),
-    kill: (sessionId: string) => typedInvoke('agent:kill', { sessionId })
+    kill: (sessionId: string) => typedInvoke('agent:kill', { sessionId }),
+    listInstalled: () => typedInvoke('agent:list-installed')
   },
   actions: {
     list: () => typedInvoke('actions:list'),

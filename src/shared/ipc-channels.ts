@@ -16,6 +16,7 @@ import type {
 } from './agent-action-types'
 import type { CanvasMutationPlan } from './canvas-mutation-types'
 import type { ClaudeStatus } from './claude-status-types'
+import type { CLIAgentInstallation } from './cli-agents'
 import type { InfraHealth } from './engine/vault-health'
 import type { Block } from './engine/block-model'
 
@@ -181,6 +182,7 @@ export interface IpcChannels {
     response: { sessionId: string } | { error: string }
   }
   'agent:kill': { request: { sessionId: string }; response: void }
+  'agent:list-installed': { request: void; response: readonly CLIAgentInstallation[] }
   'agent-action:compute': {
     request: AgentActionRequest
     response: AgentActionResponse

@@ -11,17 +11,9 @@
 
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { CLI_AGENTS, type CLIAgentSpec } from '../../shared/cli-agents'
+import { CLI_AGENTS, type CLIAgentInstallation, type CLIAgentSpec } from '../../shared/cli-agents'
 
-/** Probe result shipped over `agent:list-installed`. */
-export interface CLIAgentInstallation {
-  readonly id: string
-  readonly displayName: string
-  readonly brandColor: string
-  readonly installed: boolean
-  readonly version: string | null
-  readonly error: string | null
-}
+export type { CLIAgentInstallation }
 
 /** Subset of `promisify(execFile)` we depend on. */
 export type ExecFn = (

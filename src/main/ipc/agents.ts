@@ -1,5 +1,6 @@
 import type { PtyMonitor } from '../services/pty-monitor'
 import type { AgentSpawner } from '../services/agent-spawner'
+import { detectInstalledAgents } from '../services/cli-agent-detector'
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 
@@ -24,6 +25,8 @@ export function registerAgentIpc(): void {
     // killed via shell:kill. This channel is retained so existing renderer call
     // sites keep typechecking until they migrate. New code must not use it.
   })
+
+  typedHandle('agent:list-installed', () => detectInstalledAgents())
 }
 
 export function setAgentServices(monitor: PtyMonitor | null, spawner: AgentSpawner | null): void {

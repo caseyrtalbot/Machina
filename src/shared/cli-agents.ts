@@ -77,3 +77,16 @@ export type CLIAgentId = (typeof CLI_AGENTS)[number]['id']
 export function getAgentSpec(id: string): CLIAgentSpec | null {
   return CLI_AGENTS.find((a) => a.id === id) ?? null
 }
+
+/**
+ * One row of probe output, as returned over the `agent:list-installed`
+ * IPC channel. Lives in shared so the renderer can type the response.
+ */
+export interface CLIAgentInstallation {
+  readonly id: string
+  readonly displayName: string
+  readonly brandColor: string
+  readonly installed: boolean
+  readonly version: string | null
+  readonly error: string | null
+}
