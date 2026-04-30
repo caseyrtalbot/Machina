@@ -52,6 +52,10 @@ export interface Block {
   readonly secrets: readonly SecretRef[]
 }
 
+export type Result<T, E = string> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: E }
+
 export function pendingBlock(id: string, metadata: BlockMetadata): Block {
   return {
     id: id as BlockId,
@@ -64,4 +68,59 @@ export function pendingBlock(id: string, metadata: BlockMetadata): Block {
     agentContext: null,
     secrets: []
   }
+}
+
+export function startBlock(block: Block, command: string, startedAt: number): Result<Block> {
+  if (block.state.kind !== 'pending') {
+    return { ok: false, error: `cannot start block in state ${block.state.kind}` }
+  }
+  return {
+    ok: true,
+    value: { ...block, command, state: { kind: 'running', startedAt } }
+  }
+}
+
+export function completeBlock(block: Block, exitCode: number, finishedAt: number): Result<Block> {
+  if (block.state.kind !== 'running') {
+    return { ok: false, error: `cannot complete block in state ${block.state.kind}` }
+  }
+  return {
+    ok: true,
+    value: {
+      ...block,
+      state: {
+        kind: 'completed',
+        startedAt: block.state.startedAt,
+        finishedAt,
+        exitCode
+      }
+    }
+  }
+}
+
+export function cancelBlock(block: Block, finishedAt: number): Result<Block> {
+  if (block.state.kind !== 'running') {
+    return { ok: false, error: `cannot cancel block in state ${block.state.kind}` }
+  }
+  return {
+    ok: true,
+    value: {
+      ...block,
+      state: { kind: 'cancelled', startedAt: block.state.startedAt, finishedAt }
+    }
+  }
+}
+
+export function appendOutput(block: Block, chunkBytes: Uint8Array, chunkText: string): Block {
+  if (chunkBytes.byteLength === 0 && chunkText.length === 0) {
+    return block
+  }
+  const merged = new Uint8Array(block.outputBytes.byteLength + chunkBytes.byteLength)
+  merged.set(block.outputBytes, 0)
+  merged.set(chunkBytes, block.outputBytes.byteLength)
+  return { ...block, outputBytes: merged, outputText: block.outputText + chunkText }
+}
+
+export function setAgentContext(block: Block, ctx: AgentContext): Block {
+  return { ...block, agentContext: ctx }
 }
