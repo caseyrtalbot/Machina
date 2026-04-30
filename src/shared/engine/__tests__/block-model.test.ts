@@ -129,6 +129,54 @@ describe('appendOutput', () => {
     expect(same.outputText).toBe('')
     expect(same.outputBytes.byteLength).toBe(0)
   })
+
+  it('flags secrets present in the appended chunk', () => {
+    const b = pendingBlock('b1', meta())
+    const secret = 'sk-ant-' + 'A'.repeat(50)
+    const text = `prefix ${secret} suffix`
+    const bytes = new TextEncoder().encode(text)
+    const out = appendOutput(b, bytes, text)
+    expect(out.secrets).toHaveLength(1)
+    expect(out.secrets[0]).toEqual({
+      kind: 'anthropic',
+      start: text.indexOf(secret),
+      end: text.indexOf(secret) + secret.length
+    })
+  })
+
+  it('flags a secret split across two chunks (rescans the overlap window)', () => {
+    const b = pendingBlock('b1', meta())
+    const secret = 'sk-ant-' + 'B'.repeat(50)
+    const head = secret.slice(0, 20)
+    const tail = secret.slice(20)
+    const enc = new TextEncoder()
+    const after1 = appendOutput(b, enc.encode(head), head)
+    expect(after1.secrets).toEqual([])
+    const after2 = appendOutput(after1, enc.encode(tail), tail)
+    expect(after2.outputText).toBe(secret)
+    expect(after2.secrets).toHaveLength(1)
+    expect(after2.secrets[0]).toEqual({
+      kind: 'anthropic',
+      start: 0,
+      end: secret.length
+    })
+  })
+
+  it('preserves earlier secrets that fall outside the overlap window', () => {
+    const b = pendingBlock('b1', meta())
+    const enc = new TextEncoder()
+    const earlySecret = 'sk-ant-' + 'C'.repeat(50)
+    const earlyChunk = `${earlySecret} `
+    const filler = 'x'.repeat(2000)
+    const lateSecret = 'AKIAIOSFODNN7EXAMPLE'
+    const after1 = appendOutput(b, enc.encode(earlyChunk), earlyChunk)
+    expect(after1.secrets).toHaveLength(1)
+    const after2 = appendOutput(after1, enc.encode(filler), filler)
+    const after3 = appendOutput(after2, enc.encode(lateSecret), lateSecret)
+    expect(after3.secrets).toHaveLength(2)
+    expect(after3.secrets[0].kind).toBe('anthropic')
+    expect(after3.secrets[1].kind).toBe('aws-access')
+  })
 })
 
 describe('setAgentContext', () => {

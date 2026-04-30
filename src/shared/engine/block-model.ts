@@ -5,6 +5,8 @@
  * Inspired by Warp's terminal/model/block.rs (concept-borrowed, clean-room TS).
  */
 
+import { scanSecrets, SECRET_RESCAN_OVERLAP } from './secrets'
+
 export type BlockId = string & { readonly __brand: 'BlockId' }
 
 export type ShellType = 'zsh' | 'bash' | 'fish' | 'sh'
@@ -118,7 +120,21 @@ export function appendOutput(block: Block, chunkBytes: Uint8Array, chunkText: st
   const merged = new Uint8Array(block.outputBytes.byteLength + chunkBytes.byteLength)
   merged.set(block.outputBytes, 0)
   merged.set(chunkBytes, block.outputBytes.byteLength)
-  return { ...block, outputBytes: merged, outputText: block.outputText + chunkText }
+  const outputText = block.outputText + chunkText
+
+  // Re-scan only the new chunk plus an overlap window so a secret split across
+  // two chunks still flags. Secrets fully outside the rescan region are kept.
+  const rescanStart = Math.max(0, block.outputText.length - SECRET_RESCAN_OVERLAP)
+  const rescanRegion = outputText.slice(rescanStart)
+  const newRefs = scanSecrets(rescanRegion).map((s) => ({
+    kind: s.kind,
+    start: s.start + rescanStart,
+    end: s.end + rescanStart
+  }))
+  const kept = block.secrets.filter((s) => s.end <= rescanStart)
+  const secrets = [...kept, ...newRefs]
+
+  return { ...block, outputBytes: merged, outputText, secrets }
 }
 
 export function setAgentContext(block: Block, ctx: AgentContext): Block {
