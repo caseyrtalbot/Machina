@@ -93,6 +93,13 @@ describe('PtyService', () => {
     )
   })
 
+  it('exposes TE_SESSION_ID in the spawned env so shell hooks can activate', () => {
+    service.create('s4', '/tmp')
+    const lastCall = mockSpawn.mock.calls[mockSpawn.mock.calls.length - 1]
+    const opts = lastCall[2] as { env: Record<string, string> }
+    expect(opts.env.TE_SESSION_ID).toBe('s4')
+  })
+
   // -------------------------------------------------------------------------
   // write() / sendRawKeys() / resize()
   // -------------------------------------------------------------------------

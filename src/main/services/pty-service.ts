@@ -88,7 +88,7 @@ export class PtyService {
       cols: c,
       rows: r,
       cwd,
-      env: buildEnv()
+      env: buildEnv(sessionId)
     })
 
     const ringBuffer = new RingBuffer(DEFAULT_RING_BUFFER_BYTES)
@@ -365,7 +365,7 @@ export class PtyService {
 // Environment builder
 // ---------------------------------------------------------------------------
 
-function buildEnv(): Record<string, string> {
+function buildEnv(sessionId: string): Record<string, string> {
   const env = { ...(process.env as Record<string, string>) }
 
   if (!env.LANG || !env.LANG.includes('UTF-8')) {
@@ -373,6 +373,8 @@ function buildEnv(): Record<string, string> {
   }
   env.COLORTERM = 'truecolor'
   env.PROMPT_EOL_MARK = ''
+  // Activates resources/shell-hooks/te.* — see docs/architecture/block-protocol.md.
+  env.TE_SESSION_ID = sessionId
 
   const terminfoDir = getTerminfoDir()
   if (terminfoDir) {
