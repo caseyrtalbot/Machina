@@ -1,8 +1,17 @@
 import { ShellService } from '../services/shell-service'
 import { typedHandle, typedHandleWithEvent } from '../typed-ipc'
 import { register, unregister, getWebContents } from '../services/session-router'
+import { BlockWatcher } from '../services/block-watcher'
+import type { SessionId } from '@shared/types'
 
 const shellService = new ShellService()
+
+const blockWatcher = new BlockWatcher({
+  onUpdate: ({ sessionId, block }) => {
+    const wc = getWebContents(sessionId as SessionId)
+    if (wc) wc.send('block:update', { sessionId: sessionId as SessionId, block })
+  }
+})
 
 const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/
 
@@ -15,10 +24,15 @@ function assertValidSessionId(id: string): void {
 export function registerShellIpc(): void {
   shellService.setCallbacks(
     (sessionId, data) => {
+      // Run block detection alongside the renderer-bound stream. The detector
+      // is non-destructive: xterm.js silently absorbs unrecognized OSC 1337
+      // sequences, so the same data can flow to both consumers.
+      blockWatcher.observe(sessionId, data)
       const wc = getWebContents(sessionId)
       if (wc) wc.send('terminal:data', { sessionId, data })
     },
     (sessionId, code) => {
+      blockWatcher.closeSession(sessionId)
       const wc = getWebContents(sessionId)
       if (wc) wc.send('terminal:exit', { sessionId, code })
       unregister(sessionId)

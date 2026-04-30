@@ -11,6 +11,7 @@ import type {
 } from '../shared/workbench-types'
 
 import type { AgentSidecarState, AgentSpawnRequest } from '../shared/agent-types'
+import type { Block } from '../shared/engine/block-model'
 import type {
   AgentActionRequest,
   AgentActionResponse,
@@ -188,7 +189,9 @@ const api = {
       typedOn('app:will-quit', callback),
     claudeStatusChanged: (callback: (data: ClaudeStatus) => void) =>
       typedOn('claude:status-changed', callback),
-    healthReport: (callback: (data: InfraHealth) => void) => typedOn('health:report', callback)
+    healthReport: (callback: (data: InfraHealth) => void) => typedOn('health:report', callback),
+    blockUpdate: (callback: (data: { sessionId: SessionId; block: Block }) => void) =>
+      typedOn('block:update', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path })

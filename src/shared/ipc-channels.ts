@@ -17,6 +17,7 @@ import type {
 import type { CanvasMutationPlan } from './canvas-mutation-types'
 import type { ClaudeStatus } from './claude-status-types'
 import type { InfraHealth } from './engine/vault-health'
+import type { Block } from './engine/block-model'
 
 export interface IpcChannels {
   // --- Filesystem ---
@@ -257,6 +258,10 @@ export interface IpcEvents {
 
   // Health monitoring events (main -> renderer)
   'health:report': InfraHealth
+
+  // Block protocol events (main -> renderer): one snapshot per block transition.
+  // See docs/architecture/block-protocol.md.
+  'block:update': { sessionId: SessionId; block: Block }
 }
 
 export type IpcChannel = keyof IpcChannels
