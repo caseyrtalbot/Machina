@@ -77,6 +77,8 @@
     "p-limit": "^7.3.0",
     "pdfjs-dist": "^5.5.207",
     "pixi.js": "^8.17.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
