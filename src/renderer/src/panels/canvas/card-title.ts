@@ -47,6 +47,10 @@ export function getCanvasNodeTitle(
       return node.content?.split('/').pop() || 'File View'
     case 'system-artifact':
       return String(node.metadata?.title ?? '') || 'System Artifact'
+    case 'terminal-block': {
+      const cmd = String(node.metadata?.command ?? '').trim()
+      return cmd.length > 0 ? cmd.slice(0, 40) : 'Block'
+    }
     default: {
       const type: string = node.type
       return type.charAt(0).toUpperCase() + type.slice(1)

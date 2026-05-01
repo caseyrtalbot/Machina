@@ -43,7 +43,8 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   'system-artifact': ['markdown', 'text'],
   'file-view': ['text'],
   'agent-session': [],
-  'project-folder': []
+  'project-folder': [],
+  'terminal-block': []
 } as const
 
 function ConvertMenu({

@@ -22,6 +22,7 @@ import type { ArtifactOrigin } from './panels/sidebar/origin-utils'
 import { useSidebarSelectionStore } from './store/sidebar-selection-store'
 import { useAgentStates } from './hooks/use-agent-states'
 import { useClaudeStatusInit } from './hooks/use-claude-status'
+import { useBlockUpdates } from './hooks/use-block-updates'
 import { EditorSplitView } from './panels/editor/EditorSplitView'
 import { ActivityBar } from './components/ActivityBar'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
@@ -621,6 +622,9 @@ function ConnectedSidebar({
 
   // Claude CLI status detection (install + auth)
   useClaudeStatusInit()
+
+  // Bridge `block:update` IPC into the block-store
+  useBlockUpdates()
 
   // Ground-truth: any vault agent (librarian/curator) alive?
   const allAgentStates = useAgentStates()

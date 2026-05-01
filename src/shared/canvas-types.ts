@@ -1,4 +1,5 @@
 import type { OntologySnapshot, OntologyLayoutResult } from './engine/ontology-types'
+import type { AgentContext, BlockId } from './engine/block-model'
 
 export type CanvasNodeType =
   | 'text'
@@ -13,6 +14,7 @@ export type CanvasNodeType =
   | 'file-view'
   | 'agent-session'
   | 'project-folder'
+  | 'terminal-block'
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left'
 
 // --- Per-type metadata (discriminated by node.type) ---
@@ -35,6 +37,17 @@ export interface PdfNodeMeta {
   readonly src: string
   readonly pageCount: number
   readonly currentPage: number
+}
+
+export interface TerminalBlockNodeMeta {
+  readonly sessionId: string
+  readonly blockId: BlockId
+  readonly command: string
+  readonly exitCode: number | null
+  readonly startedAtMs: number | null
+  readonly finishedAtMs: number | null
+  readonly cwd: string | null
+  readonly agentContext: AgentContext | null
 }
 
 export interface SystemArtifactNodeMeta {
@@ -115,7 +128,8 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   'system-artifact': { width: 240, height: 120 },
   'file-view': { width: 300, height: 200 },
   'agent-session': { width: 260, height: 160 },
-  'project-folder': { width: 200, height: 60 }
+  'project-folder': { width: 200, height: 60 },
+  'terminal-block': { width: 320, height: 140 }
 }
 
 const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
@@ -130,7 +144,8 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   'system-artifact': { width: 300, height: 180 },
   'file-view': { width: 480, height: 320 },
   'agent-session': { width: 320, height: 240 },
-  'project-folder': { width: 260, height: 80 }
+  'project-folder': { width: 260, height: 80 },
+  'terminal-block': { width: 420, height: 200 }
 }
 
 export function getMinSize(type: CanvasNodeType): { width: number; height: number } {
@@ -161,7 +176,8 @@ export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
   'system-artifact': { label: 'Artifact', icon: '\u25C6', category: 'tools' },
   'file-view': { label: 'File View', icon: '\u25B7', category: 'tools' },
   'agent-session': { label: 'Agent Session', icon: '\u25C9', category: 'tools' },
-  'project-folder': { label: 'Folder', icon: '\u{1F4C1}', category: 'tools' }
+  'project-folder': { label: 'Folder', icon: '\u{1F4C1}', category: 'tools' },
+  'terminal-block': { label: 'Block', icon: '$', category: 'tools' }
 }
 
 // --- Default metadata per type ---
@@ -195,6 +211,17 @@ export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown
       return { sessionId: '', status: 'idle', filesTouched: [], startedAt: 0, lastActivity: 0 }
     case 'project-folder':
       return { relativePath: '', rootPath: '', childCount: 0, collapsed: false }
+    case 'terminal-block':
+      return {
+        sessionId: '',
+        blockId: '',
+        command: '',
+        exitCode: null,
+        startedAtMs: null,
+        finishedAtMs: null,
+        cwd: null,
+        agentContext: null
+      }
     default:
       return {}
   }

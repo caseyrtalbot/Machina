@@ -19,7 +19,8 @@ const ALL_TYPES: CanvasNodeType[] = [
   'system-artifact',
   'file-view',
   'agent-session',
-  'project-folder'
+  'project-folder',
+  'terminal-block'
 ]
 
 describe('canvas-types registration completeness', () => {
@@ -97,5 +98,25 @@ describe('canvas-types registration completeness', () => {
   it('project-folder default size is 260x80', () => {
     const size = getDefaultSize('project-folder')
     expect(size).toEqual({ width: 260, height: 80 })
+  })
+
+  it('terminal-block default metadata has expected shape', () => {
+    const meta = getDefaultMetadata('terminal-block')
+    expect(meta).toMatchObject({
+      sessionId: '',
+      blockId: '',
+      command: '',
+      exitCode: null,
+      startedAtMs: null,
+      finishedAtMs: null,
+      cwd: null,
+      agentContext: null
+    })
+  })
+
+  it('terminal-block has correct card type info', () => {
+    const info = CARD_TYPE_INFO['terminal-block']
+    expect(info.label).toBe('Block')
+    expect(info.category).toBe('tools')
   })
 })
