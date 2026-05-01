@@ -1,17 +1,22 @@
 import { useRef, useEffect, useCallback, useState, useMemo, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
+import { useBlockStore } from '../../store/block-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeContext } from '../../hooks/useClaudeContext'
 import { useClaudeStatus } from '../../hooks/use-claude-status'
 import { buildCanvasContext } from '../../engine/context-serializer'
+import { buildBlockProjection, pickPinnableBlock } from './block-pin'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
+import type { Block } from '@shared/engine/block-model'
 import { type SessionId, sessionId as toSessionId } from '@shared/types'
 
 interface TerminalCardProps {
   readonly node: CanvasNode
 }
+
+const EMPTY_BLOCKS: readonly Block[] = []
 
 type TerminalWebviewElement = HTMLElement & {
   focus: () => void
@@ -68,7 +73,11 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
   const removeNode = useCanvasStore((s) => s.removeNode)
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
+  const addNode = useCanvasStore((s) => s.addNode)
   const setFocusedTerminal = useCanvasStore((s) => s.setFocusedTerminal)
+  const sessionBlocks = useBlockStore((s) =>
+    node.content ? (s.blocksBySession[node.content] ?? EMPTY_BLOCKS) : EMPTY_BLOCKS
+  )
   const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
   const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -301,6 +310,13 @@ export function TerminalCard({ node }: TerminalCardProps) {
     }
   }, [node.id, updateContent])
 
+  const handlePinLatestBlock = useCallback(() => {
+    const block = pickPinnableBlock(sessionBlocks)
+    if (!block) return
+    const projection = buildBlockProjection(node, block)
+    addNode(projection)
+  }, [sessionBlocks, node, addNode])
+
   const handleActivateContentClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const wv = webviewRef.current
     if (!wv) return
@@ -328,6 +344,31 @@ export function TerminalCard({ node }: TerminalCardProps) {
       title={displayTitle}
       onClose={handleClose}
       onActivateContentClick={handleActivateContentClick}
+      headerActions={
+        sessionBlocks.length > 0 ? (
+          <button
+            type="button"
+            data-testid="terminal-pin-block"
+            onClick={(e) => {
+              e.stopPropagation()
+              handlePinLatestBlock()
+            }}
+            title="Pin latest block to canvas"
+            className="canvas-card__action-btn flex items-center justify-center rounded"
+            style={{
+              width: 24,
+              height: 24,
+              fontSize: 11,
+              color: colors.text.muted,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            ⊕
+          </button>
+        ) : null
+      }
       titleExtra={
         isClaudeCard && (!claudeStatus.installed || !claudeStatus.authenticated) ? (
           <span

@@ -4,7 +4,8 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { useBlockStore } from '../../store/block-store'
 import { colors, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
-import type { Block, BlockState } from '@shared/engine/block-model'
+import type { Block, BlockState, SecretRef } from '@shared/engine/block-model'
+import { segmentOutput, maskSegmentText } from '@shared/engine/block-output-segments'
 import { formatElapsed } from '@shared/format-elapsed'
 
 interface BlockCardProps {
@@ -32,7 +33,7 @@ interface ResolvedBlock {
   readonly command: string
   readonly cwd: string | null
   readonly outputText: string
-  readonly secretCount: number
+  readonly secrets: readonly SecretRef[]
   readonly state: ResolvedState
 }
 
@@ -41,7 +42,7 @@ function resolveFromBlock(block: Block): ResolvedBlock {
     command: block.command,
     cwd: block.metadata.cwd,
     outputText: block.outputText,
-    secretCount: block.secrets.length,
+    secrets: block.secrets,
     state: block.state as ResolvedState
   }
 }
@@ -51,7 +52,7 @@ function resolveFromMetadata(meta: Readonly<Record<string, unknown>>): ResolvedB
     command: (meta.command as string | undefined) ?? '',
     cwd: (meta.cwd as string | null | undefined) ?? null,
     outputText: '',
-    secretCount: 0,
+    secrets: [],
     state: {
       kind: 'archived',
       startedAtMs: (meta.startedAtMs as number | null | undefined) ?? null,
@@ -88,6 +89,54 @@ function exitOk(state: ResolvedState): boolean | undefined {
   if (state.kind === 'completed') return state.exitCode === 0
   if (state.kind === 'archived' && state.exitCode != null) return state.exitCode === 0
   return undefined
+}
+
+function renderOutput(
+  text: string,
+  secrets: readonly SecretRef[],
+  revealed: boolean
+): React.ReactNode {
+  if (text.length === 0) return ''
+  if (secrets.length === 0) return text
+  const segments = segmentOutput(text, secrets)
+  return segments.map((seg, i) => {
+    if (!seg.secret) return <span key={i}>{seg.text}</span>
+    if (revealed) {
+      return (
+        <span
+          key={i}
+          data-testid="block-secret"
+          data-secret-kind={seg.secret.kind}
+          data-revealed="true"
+          style={{
+            background: 'color-mix(in srgb, currentColor 8%, transparent)',
+            borderRadius: 2,
+            padding: '0 2px'
+          }}
+          title={`${seg.secret.kind} (revealed)`}
+        >
+          {seg.text}
+        </span>
+      )
+    }
+    return (
+      <span
+        key={i}
+        data-testid="block-secret"
+        data-secret-kind={seg.secret.kind}
+        data-revealed="false"
+        style={{
+          background: 'color-mix(in srgb, currentColor 12%, transparent)',
+          borderRadius: 2,
+          padding: '0 2px',
+          letterSpacing: '0.04em'
+        }}
+        title={`${seg.secret.kind} (hidden — click reveal to show)`}
+      >
+        {maskSegmentText(seg.text)}
+      </span>
+    )
+  })
 }
 
 function elapsedFor(state: BlockState | ResolvedState, now: number): string | null {
@@ -189,7 +238,7 @@ function BlockCardInner({ node }: BlockCardProps) {
                 {elapsed}
               </span>
             ) : null}
-            {resolved.secretCount > 0 ? (
+            {resolved.secrets.length > 0 ? (
               <button
                 type="button"
                 data-testid="block-reveal-toggle"
@@ -208,7 +257,7 @@ function BlockCardInner({ node }: BlockCardProps) {
                   letterSpacing: '0.06em'
                 }}
               >
-                {revealed ? 'hide' : `reveal (${resolved.secretCount})`}
+                {revealed ? 'hide' : `reveal (${resolved.secrets.length})`}
               </button>
             ) : null}
           </div>
@@ -216,7 +265,8 @@ function BlockCardInner({ node }: BlockCardProps) {
 
         <pre
           data-testid="block-output"
-          data-secrets={String(resolved.secretCount)}
+          data-secrets={String(resolved.secrets.length)}
+          data-revealed={String(revealed)}
           style={{
             margin: 0,
             flex: 1,
@@ -229,7 +279,8 @@ function BlockCardInner({ node }: BlockCardProps) {
             wordBreak: 'break-word'
           }}
         >
-          {resolved.outputText || (stateKind === 'running' ? '…' : '')}
+          {renderOutput(resolved.outputText, resolved.secrets, revealed) ||
+            (stateKind === 'running' ? '…' : '')}
         </pre>
       </div>
     </CardShell>

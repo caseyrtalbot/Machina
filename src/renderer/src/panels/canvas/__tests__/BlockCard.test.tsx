@@ -221,4 +221,32 @@ describe('BlockCard', () => {
       (screen.getByTestId('block-reveal-toggle') as HTMLElement).getAttribute('data-revealed')
     ).toBe('true')
   })
+
+  it('masks secret text by default and reveals on toggle (5.6)', async () => {
+    const fake = 'AKIA' + 'IOSFODNN7EXAMPLE'
+    useBlockStore
+      .getState()
+      .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
+    const { BlockCard } = await import('../BlockCard')
+    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    const output = screen.getByTestId('block-output')
+    expect(output.textContent).not.toContain(fake)
+    expect(output.textContent).toContain('AWS_ACCESS_KEY_ID=')
+    expect(output.textContent ?? '').toContain('•'.repeat(fake.length))
+
+    fireEvent.click(screen.getByTestId('block-reveal-toggle'))
+    expect(screen.getByTestId('block-output').textContent).toContain(fake)
+  })
+
+  it('renders unmasked output when there are no secrets (5.6)', async () => {
+    useBlockStore
+      .getState()
+      .applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hello world\n'))
+    const { BlockCard } = await import('../BlockCard')
+    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    const output = screen.getByTestId('block-output')
+    expect(output.textContent).toContain('hello world')
+    expect(output.textContent).not.toContain('•')
+    expect(screen.queryByTestId('block-reveal-toggle')).toBeNull()
+  })
 })
