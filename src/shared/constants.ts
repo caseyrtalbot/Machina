@@ -4,3 +4,7 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isDevRuntime = import.meta.env.DEV && !(import.meta.env as any).VITEST
 export const TE_DIR = isDevRuntime ? '.machina-dev' : '.machina'
+
+export const THREADS_DIR = 'threads'
+export const THREADS_ARCHIVE_DIR = 'threads/archive'
+export const THREADS_CONFIG_FILE = 'config.json'
