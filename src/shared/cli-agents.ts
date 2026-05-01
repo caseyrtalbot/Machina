@@ -10,6 +10,12 @@
  * Concept-borrowed from Warp's `cli/agents/registry.rs`. Clean-room TypeScript.
  */
 
+import {
+  claudeToolCallParser,
+  codexToolCallParser,
+  geminiToolCallParser
+} from './cli-agent-parsers'
+
 export interface CLIAgentSpec {
   /** Stable identifier used on the wire and in IPC payloads. */
   readonly id: string
@@ -51,7 +57,8 @@ export const CLI_AGENTS = [
     brandColor: '#cc785c',
     cliBinary: 'claude',
     versionFlag: '--version',
-    detectVersionRegex: /(\d+\.\d+\.\d+)/
+    detectVersionRegex: /(\d+\.\d+\.\d+)/,
+    toolCallParser: claudeToolCallParser
   },
   {
     id: 'codex',
@@ -59,7 +66,8 @@ export const CLI_AGENTS = [
     brandColor: '#8c8c8c',
     cliBinary: 'codex',
     versionFlag: '--version',
-    detectVersionRegex: /codex(?:-cli)?\s+v?(\d+\.\d+\.\d+)/i
+    detectVersionRegex: /codex(?:-cli)?\s+v?(\d+\.\d+\.\d+)/i,
+    toolCallParser: codexToolCallParser
   },
   {
     id: 'gemini',
@@ -67,7 +75,8 @@ export const CLI_AGENTS = [
     brandColor: '#4285f4',
     cliBinary: 'gemini',
     versionFlag: '--version',
-    detectVersionRegex: /gemini(?:-cli)?\s+v?(\d+\.\d+\.\d+)/i
+    detectVersionRegex: /gemini(?:-cli)?\s+v?(\d+\.\d+\.\d+)/i,
+    toolCallParser: geminiToolCallParser
   }
 ] as const satisfies readonly CLIAgentSpec[]
 
