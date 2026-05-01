@@ -25,6 +25,8 @@ import { useClaudeStatusInit } from './hooks/use-claude-status'
 import { useBlockUpdates } from './hooks/use-block-updates'
 import { EditorSplitView } from './panels/editor/EditorSplitView'
 import { ActivityBar } from './components/ActivityBar'
+import { AgentShell } from './panels/agent-shell/AgentShell'
+import { AGENT_SHELL_FEATURE_FLAG } from '@shared/constants'
 import { useTabStore, TAB_DEFINITIONS } from './store/tab-store'
 import type { TabType } from './store/tab-store'
 import { CommandPalette, type CommandItem } from './design/components/CommandPalette'
@@ -920,6 +922,9 @@ function ResizableSidebar({
 }
 
 function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
+  // Dev-time override: localStorage.setItem('TE_AGENT_SHELL_V1', '1') then reload
+  const useAgentShell =
+    typeof window !== 'undefined' && window.localStorage?.getItem(AGENT_SHELL_FEATURE_FLAG) === '1'
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -1480,24 +1485,34 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
           } as React.CSSProperties
         }
       />
-      {/* Docked activity bar */}
-      <ActivityBar
-        onToggleSidebar={toggleSidebar}
-        sidebarExpanded={sidebarExpanded}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
-      {/* Docked sidebar with draggable divider */}
-      <ResizableSidebar
-        onLoadVault={onLoadVault}
-        onOpenSettings={() => setSettingsOpen(true)}
-        collapsed={!sidebarExpanded}
-      />
-      {/* Content area fills remaining space */}
-      <div className="flex-1 overflow-hidden">
-        <PanelErrorBoundary name="Content">
-          <ContentArea />
-        </PanelErrorBoundary>
-      </div>
+      {useAgentShell ? (
+        <div className="flex-1 overflow-hidden">
+          <PanelErrorBoundary name="AgentShell">
+            <AgentShell />
+          </PanelErrorBoundary>
+        </div>
+      ) : (
+        <>
+          {/* Docked activity bar */}
+          <ActivityBar
+            onToggleSidebar={toggleSidebar}
+            sidebarExpanded={sidebarExpanded}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+          {/* Docked sidebar with draggable divider */}
+          <ResizableSidebar
+            onLoadVault={onLoadVault}
+            onOpenSettings={() => setSettingsOpen(true)}
+            collapsed={!sidebarExpanded}
+          />
+          {/* Content area fills remaining space */}
+          <div className="flex-1 overflow-hidden">
+            <PanelErrorBoundary name="Content">
+              <ContentArea />
+            </PanelErrorBoundary>
+          </div>
+        </>
+      )}
       <CommandPalette
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}

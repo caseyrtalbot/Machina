@@ -8,3 +8,5 @@ export const TE_DIR = isDevRuntime ? '.machina-dev' : '.machina'
 export const THREADS_DIR = 'threads'
 export const THREADS_ARCHIVE_DIR = 'threads/archive'
 export const THREADS_CONFIG_FILE = 'config.json'
+
+export const AGENT_SHELL_FEATURE_FLAG = 'TE_AGENT_SHELL_V1'
