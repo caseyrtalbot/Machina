@@ -226,6 +226,47 @@ export interface IpcChannels {
   // --- Health ---
   'health:heartbeat': { request: { at: number }; response: void }
   'health:request-tick': { request: void; response: void }
+
+  // --- Threads ---
+  'thread:list': {
+    request: { vaultPath: string }
+    response: import('./thread-types').Thread[]
+  }
+  'thread:list-archived': {
+    request: { vaultPath: string }
+    response: import('./thread-types').Thread[]
+  }
+  'thread:read': {
+    request: { vaultPath: string; id: string }
+    response: import('./thread-types').Thread
+  }
+  'thread:save': {
+    request: { vaultPath: string; thread: import('./thread-types').Thread }
+    response: void
+  }
+  'thread:create': {
+    request: {
+      vaultPath: string
+      agent: import('./agent-identity').AgentIdentity
+      model: string
+      title?: string
+    }
+    response: import('./thread-types').Thread
+  }
+  'thread:archive': { request: { vaultPath: string; id: string }; response: void }
+  'thread:unarchive': { request: { vaultPath: string; id: string }; response: void }
+  'thread:delete': { request: { vaultPath: string; id: string }; response: void }
+  'thread:read-config': {
+    request: { vaultPath: string }
+    response: import('./thread-storage-types').VaultMachinaConfig
+  }
+  'thread:write-config': {
+    request: {
+      vaultPath: string
+      config: import('./thread-storage-types').VaultMachinaConfig
+    }
+    response: void
+  }
 }
 
 export interface IpcEvents {

@@ -22,6 +22,9 @@ import type { ClaudeStatus } from '../shared/claude-status-types'
 import type { AgentArtifactDraft, MaterializeResult } from '../shared/agent-artifact-types'
 import type { CLIAgentSessionStatus } from '../shared/cli-agent-session-types'
 import type { InfraHealth } from '../shared/engine/vault-health'
+import type { Thread } from '../shared/thread-types'
+import type { AgentIdentity } from '../shared/agent-identity'
+import type { VaultMachinaConfig } from '../shared/thread-storage-types'
 
 const api = {
   window: {
@@ -156,6 +159,21 @@ const api = {
     saveContent: (path: string, content: string) =>
       typedInvoke('doc:save-content', { path, content }),
     getContent: (path: string) => typedInvoke('doc:get-content', { path })
+  },
+  thread: {
+    list: (vaultPath: string) => typedInvoke('thread:list', { vaultPath }),
+    listArchived: (vaultPath: string) => typedInvoke('thread:list-archived', { vaultPath }),
+    read: (vaultPath: string, id: string) => typedInvoke('thread:read', { vaultPath, id }),
+    save: (vaultPath: string, thread: Thread) => typedInvoke('thread:save', { vaultPath, thread }),
+    create: (vaultPath: string, agent: AgentIdentity, model: string, title?: string) =>
+      typedInvoke('thread:create', { vaultPath, agent, model, title }),
+    archive: (vaultPath: string, id: string) => typedInvoke('thread:archive', { vaultPath, id }),
+    unarchive: (vaultPath: string, id: string) =>
+      typedInvoke('thread:unarchive', { vaultPath, id }),
+    delete: (vaultPath: string, id: string) => typedInvoke('thread:delete', { vaultPath, id }),
+    readConfig: (vaultPath: string) => typedInvoke('thread:read-config', { vaultPath }),
+    writeConfig: (vaultPath: string, config: VaultMachinaConfig) =>
+      typedInvoke('thread:write-config', { vaultPath, config })
   },
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getHomePath: () => homedir(),

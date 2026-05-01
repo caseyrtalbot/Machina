@@ -18,6 +18,7 @@ import { registerArtifactIpc } from './ipc/artifact'
 import { registerGhostEmergeIpc } from './ipc/ghost-emerge'
 import { registerHealthIpc, setHealthMonitor, emitHealthReport } from './ipc/health'
 import { registerClaudeStatusIpc } from './ipc/claude-status'
+import { registerThreadIpc } from './ipc/thread-ipc'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { PtyMonitor } from './services/pty-monitor'
 import { AgentSpawner } from './services/agent-spawner'
@@ -283,6 +284,7 @@ app.whenReady().then(() => {
   registerArtifactIpc()
   registerGhostEmergeIpc()
   registerHealthIpc()
+  registerThreadIpc()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
