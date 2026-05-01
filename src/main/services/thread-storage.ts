@@ -13,6 +13,14 @@ import {
 } from '../../shared/thread-storage-types'
 import { encodeThread, decodeThread } from './thread-md'
 
+const SAFE_ID = /^[a-z0-9-]+$/
+
+function assertSafeId(id: string): void {
+  if (!SAFE_ID.test(id)) {
+    throw new Error(`Invalid thread id: ${JSON.stringify(id)}`)
+  }
+}
+
 export class ThreadStorage {
   constructor(private readonly vaultPath: string) {}
 
@@ -34,6 +42,7 @@ export class ThreadStorage {
   }
 
   async saveThread(t: Thread): Promise<void> {
+    assertSafeId(t.id)
     await this.ensureDirs()
     const file = path.join(this.threadsRoot(), `${t.id}.md`)
     const tmp = `${file}.tmp`
@@ -42,6 +51,7 @@ export class ThreadStorage {
   }
 
   async readThread(id: string): Promise<Thread> {
+    assertSafeId(id)
     const file = path.join(this.threadsRoot(), `${id}.md`)
     const md = await fs.readFile(file, 'utf8')
     const t = decodeThread(md)
@@ -77,6 +87,7 @@ export class ThreadStorage {
   }
 
   async archiveThread(id: string): Promise<void> {
+    assertSafeId(id)
     const t = await this.readThread(id)
     const year = new Date(t.started).getUTCFullYear().toString()
     const dst = path.join(this.archiveRoot(), year, `${id}.md`)
@@ -85,6 +96,7 @@ export class ThreadStorage {
   }
 
   async unarchiveThread(id: string): Promise<void> {
+    assertSafeId(id)
     const yearDirs = await safeReaddir(this.archiveRoot())
     for (const y of yearDirs) {
       const candidate = path.join(this.archiveRoot(), y, `${id}.md`)
@@ -97,6 +109,7 @@ export class ThreadStorage {
   }
 
   async deleteThread(id: string): Promise<void> {
+    assertSafeId(id)
     const file = path.join(this.threadsRoot(), `${id}.md`)
     await fs.rm(file, { force: true })
   }

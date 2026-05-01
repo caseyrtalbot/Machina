@@ -80,6 +80,17 @@ describe('ThreadStorage', () => {
     expect(cfg.welcomed).toBe(false)
   })
 
+  it('rejects ids that contain path separators or escape sequences', async () => {
+    const bad = ['../../etc/passwd', 'foo/bar', 'foo\\bar', '..', '', 'Foo', 'a b']
+    for (const id of bad) {
+      await expect(store.readThread(id)).rejects.toThrow(/Invalid thread id/)
+      await expect(store.archiveThread(id)).rejects.toThrow(/Invalid thread id/)
+      await expect(store.unarchiveThread(id)).rejects.toThrow(/Invalid thread id/)
+      await expect(store.deleteThread(id)).rejects.toThrow(/Invalid thread id/)
+      await expect(store.saveThread({ ...sample(id) })).rejects.toThrow(/Invalid thread id/)
+    }
+  })
+
   it('writeConfig persists', async () => {
     await store.writeConfig({
       defaultAgent: 'cli-claude',

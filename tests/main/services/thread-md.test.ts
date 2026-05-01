@@ -71,6 +71,24 @@ describe('thread-md encode/decode', () => {
     expect(decodeThread(encodeThread(empty)).messages).toEqual([])
   })
 
+  it('roundtrips dock_state covering all DockTab kinds', () => {
+    const t: Thread = {
+      ...sample(),
+      dockState: {
+        tabs: [
+          { kind: 'canvas', id: 'block-protocol' },
+          { kind: 'editor', path: 'docs/x.md' },
+          { kind: 'terminal', sessionId: 'sess-7' },
+          { kind: 'graph' },
+          { kind: 'ghosts' },
+          { kind: 'health' }
+        ]
+      }
+    }
+    const back = decodeThread(encodeThread(t))
+    expect(back.dockState.tabs).toEqual(t.dockState.tabs)
+  })
+
   it('a tool call without a result roundtrips with no result', () => {
     const oneCall: Thread = {
       ...sample(),
