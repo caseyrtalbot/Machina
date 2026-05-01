@@ -1,0 +1,4 @@
+{"kind":"pty-bytes","data":"\u001b]1337;te-prompt-start\u0007"}
+{"kind":"pty-bytes","data":"\u001b]1337;te-command-start;cwd=/tmp;ts=1000;shell=zsh;user=casey;host=spark\u0007"}
+{"kind":"pty-bytes","data":"ls\r\nfile1.txt  file2.txt\r\n"}
+{"kind":"pty-bytes","data":"\u001b]1337;te-command-end;exit=0;ts=1100\u0007"}

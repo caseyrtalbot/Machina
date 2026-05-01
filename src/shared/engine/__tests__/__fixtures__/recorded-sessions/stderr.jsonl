@@ -1,0 +1,4 @@
+{"kind":"pty-bytes","data":"\u001b]1337;te-prompt-start\u0007"}
+{"kind":"pty-bytes","data":"\u001b]1337;te-command-start;cwd=/tmp;ts=2000;shell=zsh\u0007"}
+{"kind":"pty-bytes","data":"ls /nope\r\nls: /nope: No such file or directory\r\n"}
+{"kind":"pty-bytes","data":"\u001b]1337;te-command-end;exit=1;ts=2050\u0007"}

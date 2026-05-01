@@ -1,0 +1,4 @@
+{"kind":"pty-bytes","data":"\u001b]1337;te-prompt-start\u0007"}
+{"kind":"pty-bytes","data":"\u001b]1337;te-command-start;cwd=/tmp;ts=3000;shell=zsh\u0007"}
+{"kind":"pty-bytes","data":"sleep 99\r\n^C\r\n"}
+{"kind":"pty-bytes","data":"\u001b]1337;te-command-end;exit=130;ts=3010\u0007"}
