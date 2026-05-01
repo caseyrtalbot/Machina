@@ -17,6 +17,7 @@ import type {
 import type { CanvasMutationPlan } from './canvas-mutation-types'
 import type { ClaudeStatus } from './claude-status-types'
 import type { CLIAgentInstallation } from './cli-agents'
+import type { CLIAgentSessionStatus } from './cli-agent-session-types'
 import type { InfraHealth } from './engine/vault-health'
 import type { Block } from './engine/block-model'
 
@@ -264,6 +265,13 @@ export interface IpcEvents {
   // Block protocol events (main -> renderer): one snapshot per block transition.
   // See docs/architecture/block-protocol.md.
   'block:update': { sessionId: SessionId; block: Block }
+
+  // CLI agent session listener (main -> renderer). status-changed fires only
+  // when the session transitions between in-progress / success / blocked;
+  // context-updated fires when the latest tool call or response changes
+  // without a status transition. See cli-agent-session-listener.ts.
+  'cli-agent:session-status-changed': CLIAgentSessionStatus
+  'cli-agent:context-updated': CLIAgentSessionStatus
 }
 
 export type IpcChannel = keyof IpcChannels

@@ -2,20 +2,33 @@ import { ShellService } from '../services/shell-service'
 import { typedHandle, typedHandleWithEvent } from '../typed-ipc'
 import { register, unregister, getWebContents } from '../services/session-router'
 import { BlockWatcher } from '../services/block-watcher'
+import { CLIAgentSessionListener } from '../services/cli-agent-session-listener'
 import { getMainWindow } from '../window-registry'
 import type { SessionId } from '@shared/types'
 
 const shellService = new ShellService()
 
+function sendToMainWindow<T>(channel: string, payload: T): void {
+  const win = getMainWindow()
+  const wc = win?.webContents
+  if (wc && !wc.isDestroyed()) {
+    wc.send(channel, payload)
+  }
+}
+
+const cliAgentListener = new CLIAgentSessionListener({
+  onStatus: (status) => sendToMainWindow('cli-agent:session-status-changed', status),
+  onContext: (status) => sendToMainWindow('cli-agent:context-updated', status)
+})
+
 const blockWatcher = new BlockWatcher({
   onUpdate: ({ sessionId, block }) => {
     // block:update is consumed by the renderer's block-store + BlockCard,
     // not by the terminal webview. Route to the main BrowserWindow.
-    const win = getMainWindow()
-    const wc = win?.webContents
-    if (wc && !wc.isDestroyed()) {
-      wc.send('block:update', { sessionId: sessionId as SessionId, block })
-    }
+    sendToMainWindow('block:update', { sessionId: sessionId as SessionId, block })
+    // Same snapshot feeds the CLI agent session listener so tool-call /
+    // status changes emit on cli-agent:* channels.
+    cliAgentListener.observe(sessionId, block)
   }
 })
 
@@ -39,6 +52,7 @@ export function registerShellIpc(): void {
     },
     (sessionId, code) => {
       blockWatcher.closeSession(sessionId)
+      cliAgentListener.closeSession(sessionId)
       const wc = getWebContents(sessionId)
       if (wc) wc.send('terminal:exit', { sessionId, code })
       unregister(sessionId)

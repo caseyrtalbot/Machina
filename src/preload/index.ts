@@ -20,6 +20,7 @@ import type {
 import type { CanvasMutationPlan } from '../shared/canvas-mutation-types'
 import type { ClaudeStatus } from '../shared/claude-status-types'
 import type { AgentArtifactDraft, MaterializeResult } from '../shared/agent-artifact-types'
+import type { CLIAgentSessionStatus } from '../shared/cli-agent-session-types'
 import type { InfraHealth } from '../shared/engine/vault-health'
 
 const api = {
@@ -192,7 +193,11 @@ const api = {
       typedOn('claude:status-changed', callback),
     healthReport: (callback: (data: InfraHealth) => void) => typedOn('health:report', callback),
     blockUpdate: (callback: (data: { sessionId: SessionId; block: Block }) => void) =>
-      typedOn('block:update', callback)
+      typedOn('block:update', callback),
+    cliAgentSessionStatus: (callback: (data: CLIAgentSessionStatus) => void) =>
+      typedOn('cli-agent:session-status-changed', callback),
+    cliAgentContextUpdated: (callback: (data: CLIAgentSessionStatus) => void) =>
+      typedOn('cli-agent:context-updated', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path })
