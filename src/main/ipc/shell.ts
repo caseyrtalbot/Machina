@@ -2,14 +2,20 @@ import { ShellService } from '../services/shell-service'
 import { typedHandle, typedHandleWithEvent } from '../typed-ipc'
 import { register, unregister, getWebContents } from '../services/session-router'
 import { BlockWatcher } from '../services/block-watcher'
+import { getMainWindow } from '../window-registry'
 import type { SessionId } from '@shared/types'
 
 const shellService = new ShellService()
 
 const blockWatcher = new BlockWatcher({
   onUpdate: ({ sessionId, block }) => {
-    const wc = getWebContents(sessionId as SessionId)
-    if (wc) wc.send('block:update', { sessionId: sessionId as SessionId, block })
+    // block:update is consumed by the renderer's block-store + BlockCard,
+    // not by the terminal webview. Route to the main BrowserWindow.
+    const win = getMainWindow()
+    const wc = win?.webContents
+    if (wc && !wc.isDestroyed()) {
+      wc.send('block:update', { sessionId: sessionId as SessionId, block })
+    }
   }
 })
 

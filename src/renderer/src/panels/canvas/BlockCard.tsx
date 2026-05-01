@@ -6,6 +6,12 @@ import { colors, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { Block, BlockState, SecretRef } from '@shared/engine/block-model'
 import { segmentOutput, maskSegmentText } from '@shared/engine/block-output-segments'
+import {
+  stripTerminalControls,
+  extractCommand,
+  dropPromptHeader
+} from '@shared/engine/terminal-text'
+import { scanSecrets } from '@shared/engine/secrets'
 import { formatElapsed } from '@shared/format-elapsed'
 
 interface BlockCardProps {
@@ -38,11 +44,23 @@ interface ResolvedBlock {
 }
 
 function resolveFromBlock(block: Block): ResolvedBlock {
+  // Block.outputText accumulates raw PTY bytes including ANSI/OSC noise and
+  // the prompt-redraw bytes that fire between prompt-start and command-start.
+  // Strip control sequences, then peel the prompt header off for display.
+  const cleaned = stripTerminalControls(block.outputText)
+  const cmdFromOutput = extractCommand(cleaned)
+  const outputText = dropPromptHeader(cleaned)
+  // Re-scan secrets on the displayed text so offsets align with what the user
+  // sees. If the cleaned text is unchanged, reuse the engine's scan verbatim.
+  const secrets =
+    outputText === block.outputText
+      ? block.secrets
+      : scanSecrets(outputText).map((s) => ({ start: s.start, end: s.end, kind: s.kind }))
   return {
-    command: block.command,
+    command: block.command || cmdFromOutput,
     cwd: block.metadata.cwd,
-    outputText: block.outputText,
-    secrets: block.secrets,
+    outputText,
+    secrets,
     state: block.state as ResolvedState
   }
 }
