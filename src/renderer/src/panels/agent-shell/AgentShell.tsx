@@ -76,17 +76,33 @@ function WindowDragRegion() {
   // window. Sits above the three-pane layout (no overlap), which keeps
   // interactive elements pointer-clickable without per-button no-drag wiring.
   // 28px also clears the traffic lights at trafficLightPosition { x: 12, y: 12 }.
+  //
+  // The drag region is inset 8px from the left and right and 2px from the top
+  // so macOS keeps ownership of the corner / edge resize hit zones. Without
+  // these gutters, the drag region wins over OS resize at the corners and the
+  // top portion of the side edges, which makes the window feel un-resizable.
   return (
     <div
       data-testid="window-drag-region"
       aria-hidden
       style={{
+        display: 'flex',
         height: 28,
         flexShrink: 0,
-        // @ts-expect-error -- Electron-only CSS property
-        WebkitAppRegion: 'drag'
+        paddingTop: 2,
+        paddingLeft: 8,
+        paddingRight: 8,
+        boxSizing: 'border-box'
       }}
-    />
+    >
+      <div
+        style={{
+          flex: 1,
+          // @ts-expect-error -- Electron-only CSS property
+          WebkitAppRegion: 'drag'
+        }}
+      />
+    </div>
   )
 }
 

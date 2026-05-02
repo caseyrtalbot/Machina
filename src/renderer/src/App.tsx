@@ -56,16 +56,6 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
         color: colors.text.primary
       }}
     >
-      {/* Titlebar drag region — transparent overlay for macOS traffic lights */}
-      <div
-        className="absolute top-0 left-0 right-0 z-50 pointer-events-none"
-        style={
-          {
-            height: 28,
-            WebkitAppRegion: 'drag'
-          } as React.CSSProperties
-        }
-      />
       <div className="flex-1 overflow-hidden">
         <PanelErrorBoundary name="AgentShell">
           <AgentShell onOpenSettings={() => setSettingsOpen(true)} />
