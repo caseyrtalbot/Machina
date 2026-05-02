@@ -16,6 +16,7 @@ interface ThreadState {
   pendingApprovalsByThreadId: Record<string, ToolCall[]>
   pendingToolCallsByThreadId: Record<string, Array<{ call: ToolCall; result?: ToolResult }>>
   dockTabsByThreadId: Record<string, DockTab[]>
+  dockCollapsed: boolean
 
   setVaultPath: (p: string) => void
   loadThreads: () => Promise<void>
@@ -33,6 +34,7 @@ interface ThreadState {
   addDockTab: (tab: DockTab) => void
   removeDockTab: (index: number) => void
   reorderDockTab: (from: number, to: number) => void
+  toggleDock: () => void
 }
 
 const initial = {
@@ -43,7 +45,8 @@ const initial = {
   streamingByThreadId: {} as Record<string, string>,
   pendingApprovalsByThreadId: {} as Record<string, ToolCall[]>,
   pendingToolCallsByThreadId: {} as Record<string, Array<{ call: ToolCall; result?: ToolResult }>>,
-  dockTabsByThreadId: {} as Record<string, DockTab[]>
+  dockTabsByThreadId: {} as Record<string, DockTab[]>,
+  dockCollapsed: false
 }
 
 export const useThreadStore = create<ThreadState>((set, get) => ({
@@ -249,7 +252,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       tabs.splice(to, 0, it)
       return { dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs } }
     })
-  }
+  },
+
+  toggleDock: () => set((s) => ({ dockCollapsed: !s.dockCollapsed }))
 }))
 
 async function validateTabs(
