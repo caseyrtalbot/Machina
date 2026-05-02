@@ -7,7 +7,11 @@ import type { DockTab } from '@shared/dock-types'
 
 const EMPTY_TABS: readonly DockTab[] = []
 
-export function SurfaceDock() {
+export interface SurfaceDockProps {
+  readonly width?: number
+}
+
+export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
   const id = useThreadStore((s) => s.activeThreadId)
   const tabs = useThreadStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
   const collapsed = useThreadStore((s) => s.dockCollapsed)
@@ -25,8 +29,8 @@ export function SurfaceDock() {
   return (
     <aside
       style={{
-        width: 480,
-        borderLeft: `1px solid ${colors.border.default}`,
+        width,
+        flexShrink: 0,
         display: 'flex',
         flexDirection: 'column'
       }}

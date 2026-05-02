@@ -9,6 +9,7 @@ import type { AgentIdentity } from '@shared/agent-identity'
 
 export interface ThreadSidebarProps {
   readonly onOpenSettings?: () => void
+  readonly width?: number
 }
 
 interface MenuTarget {
@@ -16,7 +17,7 @@ interface MenuTarget {
   readonly position: ContextMenuPosition
 }
 
-export function ThreadSidebar({ onOpenSettings }: ThreadSidebarProps = {}) {
+export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProps = {}) {
   const threadsById = useThreadStore((s) => s.threadsById)
   const activeId = useThreadStore((s) => s.activeThreadId)
   const selectThread = useThreadStore((s) => s.selectThread)
@@ -52,8 +53,8 @@ export function ThreadSidebar({ onOpenSettings }: ThreadSidebarProps = {}) {
   return (
     <aside
       style={{
-        width: 240,
-        borderRight: `1px solid ${colors.border.default}`,
+        width,
+        flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         height: '100%'

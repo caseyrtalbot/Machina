@@ -21,9 +21,17 @@ interface ThreadState {
   inFlightByThreadId: Record<string, boolean>
   dockTabsByThreadId: Record<string, DockTab[]>
   dockCollapsed: boolean
+  /** Pixel width of the thread sidebar (left pane). Persisted in vault config. */
+  sidebarWidth: number
+  /** Pixel width of the surface dock (right pane). Persisted in vault config. */
+  dockWidth: number
 
   setVaultPath: (p: string) => void
   loadThreads: () => Promise<void>
+  loadLayout: () => Promise<void>
+  setSidebarWidth: (w: number) => void
+  setDockWidth: (w: number) => void
+  persistLayout: () => Promise<void>
   selectThread: (id: string) => Promise<void>
   createThread: (agent: AgentIdentity, model: string, title?: string) => Promise<Thread>
   archiveThread: (id: string) => Promise<void>
@@ -58,7 +66,21 @@ const initial = {
   runIdByThreadId: {} as Record<string, string>,
   inFlightByThreadId: {} as Record<string, boolean>,
   dockTabsByThreadId: {} as Record<string, DockTab[]>,
-  dockCollapsed: false
+  dockCollapsed: false,
+  sidebarWidth: 240,
+  dockWidth: 480
+}
+
+/** Sidebar pixel bounds. Min lets two columns of metadata + pill fit. */
+const SIDEBAR_MIN = 200
+/** Dock pixel bounds. Min lets the tab strip + a useful panel render. */
+const DOCK_MIN = 280
+const PANE_MAX_RATIO = 0.7
+
+function clampPaneWidth(w: number, min: number): number {
+  const innerWidth = typeof window === 'undefined' ? 1920 : window.innerWidth
+  const max = Math.max(min, Math.floor(innerWidth * PANE_MAX_RATIO))
+  return Math.max(min, Math.min(max, Math.round(w)))
 }
 
 export const useThreadStore = create<ThreadState>((set, get) => ({
@@ -77,6 +99,31 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       dockByThread[t.id] = t.dockState.tabs.slice()
     }
     set({ threadsById: byId, dockTabsByThreadId: dockByThread })
+  },
+
+  loadLayout: async () => {
+    const v = get().vaultPath
+    if (!v) return
+    const cfg = await window.api.thread.readConfig(v)
+    set({
+      sidebarWidth: clampPaneWidth(cfg.sidebarWidth ?? 240, SIDEBAR_MIN),
+      dockWidth: clampPaneWidth(cfg.dockWidth ?? 480, DOCK_MIN)
+    })
+  },
+
+  setSidebarWidth: (w) => set({ sidebarWidth: clampPaneWidth(w, SIDEBAR_MIN) }),
+
+  setDockWidth: (w) => set({ dockWidth: clampPaneWidth(w, DOCK_MIN) }),
+
+  persistLayout: async () => {
+    const v = get().vaultPath
+    if (!v) return
+    const cfg = await window.api.thread.readConfig(v)
+    await window.api.thread.writeConfig(v, {
+      ...cfg,
+      sidebarWidth: get().sidebarWidth,
+      dockWidth: get().dockWidth
+    })
   },
 
   selectThread: async (id) => {

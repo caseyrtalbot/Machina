@@ -38,6 +38,17 @@ export const colors = {
     addedBg: 'color-mix(in srgb, #4ec983 10%, transparent)',
     removedBg: 'color-mix(in srgb, #ff847d 10%, transparent)'
   },
+  // Dock tab strip palette. Hover/active backgrounds are token-tinted off the
+  // primary text so they pick up the user's accent through CSS vars instead of
+  // a hardcoded gray. Active fg switches to primary; idle is secondary.
+  tab: {
+    bg: 'transparent',
+    bgHover: 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)',
+    bgActive: 'var(--color-bg-elevated)',
+    fg: 'var(--color-text-secondary)',
+    fgActive: 'var(--color-text-primary)',
+    border: 'var(--color-border-default)'
+  },
   // Callout palette for `> [!TYPE]` blocks in the editor. Five semantic groups
   // plus a neutral muted group. Warning/danger reuse `colors.claude.*` so the
   // editor's callout accents stay consistent with other semantic surfaces.

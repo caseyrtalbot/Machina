@@ -6,6 +6,7 @@ import { ThreadSidebar } from './ThreadSidebar'
 import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
+import { ResizeHandle } from './ResizeHandle'
 import { useAgentShellKeybindings } from './keybindings'
 import { colors } from '../../design/tokens'
 
@@ -17,7 +18,14 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const setVaultPath = useThreadStore((s) => s.setVaultPath)
   const loadThreads = useThreadStore((s) => s.loadThreads)
+  const loadLayout = useThreadStore((s) => s.loadLayout)
   const toggleDock = useThreadStore((s) => s.toggleDock)
+  const dockCollapsed = useThreadStore((s) => s.dockCollapsed)
+  const sidebarWidth = useThreadStore((s) => s.sidebarWidth)
+  const dockWidth = useThreadStore((s) => s.dockWidth)
+  const setSidebarWidth = useThreadStore((s) => s.setSidebarWidth)
+  const setDockWidth = useThreadStore((s) => s.setDockWidth)
+  const persistLayout = useThreadStore((s) => s.persistLayout)
 
   // Boot-route once per vaultPath: select the most recent thread or create a
   // welcome thread on first launch. Ref guard prevents StrictMode double-mount
@@ -29,7 +37,7 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
     if (bootedForVaultRef.current === vaultPath) return
     bootedForVaultRef.current = vaultPath
     void (async () => {
-      await loadThreads()
+      await Promise.all([loadThreads(), loadLayout()])
       const store = useThreadStore.getState()
       if (store.activeThreadId) return
       const threads = Object.values(store.threadsById)
@@ -40,7 +48,7 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
         await store.createThread('machina-native', 'claude-sonnet-4-6', 'Welcome')
       }
     })()
-  }, [vaultPath, setVaultPath, loadThreads])
+  }, [vaultPath, setVaultPath, loadThreads, loadLayout])
 
   useThreadStreaming()
 
@@ -61,9 +69,23 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
     >
       <WindowDragRegion />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <ThreadSidebar onOpenSettings={onOpenSettings} />
+        <ThreadSidebar onOpenSettings={onOpenSettings} width={sidebarWidth} />
+        <ResizeHandle
+          side="sidebar"
+          width={sidebarWidth}
+          onChange={setSidebarWidth}
+          onCommit={() => void persistLayout()}
+        />
         <ThreadPanel />
-        <SurfaceDock />
+        {!dockCollapsed && (
+          <ResizeHandle
+            side="dock"
+            width={dockWidth}
+            onChange={setDockWidth}
+            onCommit={() => void persistLayout()}
+          />
+        )}
+        <SurfaceDock width={dockWidth} />
       </div>
       <CommandPalette open={paletteOpen} onClose={closePalette} />
       <WelcomeTooltip vaultPath={vaultPath} />

@@ -5,6 +5,7 @@ import { colors } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 
 const EMPTY_TABS: readonly DockTab[] = []
+const TAB_BAR_HEIGHT = 28
 
 interface TabMenuTarget {
   readonly index: number
@@ -24,6 +25,7 @@ export function DockTabBar({
   const add = useThreadStore((s) => s.addDockTab)
   const [adderOpen, setAdderOpen] = useState(false)
   const [menu, setMenu] = useState<TabMenuTarget | null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   function newTab(kind: DockTabKind) {
     setAdderOpen(false)
@@ -51,7 +53,6 @@ export function DockTabBar({
   }
 
   function closeOthers(keep: number) {
-    // remove from highest index to lowest, skipping `keep`
     const indices: number[] = []
     for (let i = 0; i < tabs.length; i += 1) if (i !== keep) indices.push(i)
     indices.reverse().forEach((i) => remove(i))
@@ -62,43 +63,91 @@ export function DockTabBar({
   }
 
   return (
-    <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border.default}` }}>
-      {tabs.map((t, i) => (
-        <button
-          key={i}
-          onClick={() => onActivate(i)}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            setMenu({ index: i, position: { x: e.clientX, y: e.clientY } })
-          }}
-          style={{
-            padding: '4px 12px',
-            background: i === activeIndex ? colors.bg.elevated : 'transparent',
-            border: 'none',
-            color: 'inherit',
-            cursor: 'pointer'
-          }}
-        >
-          {t.kind}
-          <span
-            onClick={(e) => {
-              e.stopPropagation()
-              remove(i)
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        height: TAB_BAR_HEIGHT,
+        flexShrink: 0,
+        borderBottom: `1px solid ${colors.tab.border}`
+      }}
+    >
+      {tabs.map((t, i) => {
+        const isActive = i === activeIndex
+        const isHovered = hoveredIndex === i
+        return (
+          <button
+            key={i}
+            onClick={() => onActivate(i)}
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex((cur) => (cur === i ? null : cur))}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setMenu({ index: i, position: { x: e.clientX, y: e.clientY } })
             }}
-            style={{ marginLeft: 8, opacity: 0.6 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '0 10px',
+              height: '100%',
+              background: isActive
+                ? colors.tab.bgActive
+                : isHovered
+                  ? colors.tab.bgHover
+                  : colors.tab.bg,
+              border: 'none',
+              borderRight: `1px solid ${colors.tab.border}`,
+              color: isActive ? colors.tab.fgActive : colors.tab.fg,
+              fontSize: 12,
+              cursor: 'pointer',
+              transition: 'background 100ms ease-out, color 100ms ease-out'
+            }}
           >
-            ×
-          </span>
-        </button>
-      ))}
-      <div style={{ position: 'relative' }}>
+            <span>{t.kind}</span>
+            <span
+              role="button"
+              aria-label={`close ${t.kind} tab`}
+              onClick={(e) => {
+                e.stopPropagation()
+                remove(i)
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                fontSize: 11,
+                lineHeight: 1,
+                color: colors.text.muted,
+                opacity: isActive || isHovered ? 1 : 0,
+                transition: 'opacity 100ms ease-out',
+                pointerEvents: isActive || isHovered ? 'auto' : 'none'
+              }}
+            >
+              ×
+            </span>
+          </button>
+        )
+      })}
+      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch' }}>
         <button
+          aria-label="Add tab"
+          title="Add tab"
           onClick={() => setAdderOpen((v) => !v)}
           style={{
-            padding: '4px 8px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: '100%',
             background: 'transparent',
             border: 'none',
-            color: 'inherit',
+            color: colors.text.muted,
+            fontSize: 14,
+            lineHeight: 1,
             cursor: 'pointer'
           }}
         >
@@ -108,10 +157,11 @@ export function DockTabBar({
           <div
             style={{
               position: 'absolute',
-              top: 28,
+              top: TAB_BAR_HEIGHT,
               right: 0,
               background: colors.bg.elevated,
               border: `1px solid ${colors.border.default}`,
+              minWidth: 120,
               zIndex: 10
             }}
           >
@@ -119,7 +169,12 @@ export function DockTabBar({
               <div
                 key={k}
                 onClick={() => newTab(k)}
-                style={{ padding: '4px 12px', cursor: 'pointer' }}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  color: colors.text.secondary,
+                  cursor: 'pointer'
+                }}
               >
                 {k}
               </div>
