@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
+import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { colors, borderRadius } from '../../design/tokens'
 
 export function ThreadPanel() {
@@ -9,6 +10,9 @@ export function ThreadPanel() {
   const t = useThreadStore((s) => (activeId ? (s.threadsById[activeId] ?? null) : null))
   const streaming = useThreadStore((s) =>
     activeId ? (s.streamingByThreadId[activeId] ?? null) : null
+  )
+  const pendingTools = useThreadStore((s) =>
+    activeId ? (s.pendingToolCallsByThreadId[activeId] ?? null) : null
   )
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -18,7 +22,7 @@ export function ThreadPanel() {
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     if (atBottom) el.scrollTop = el.scrollHeight
-  }, [t?.messages.length, streaming])
+  }, [t?.messages.length, streaming, pendingTools?.length])
 
   if (!t) {
     return (
@@ -92,8 +96,61 @@ export function ThreadPanel() {
             />
           )
         })}
+        <InflightAssistant
+          messages={t.messages}
+          streaming={streaming}
+          pendingTools={pendingTools}
+        />
       </div>
       <ThreadInputBar />
     </section>
+  )
+}
+
+function InflightAssistant({
+  messages,
+  streaming,
+  pendingTools
+}: {
+  readonly messages: ReadonlyArray<{ role: string }>
+  readonly streaming: string | null
+  readonly pendingTools: ReadonlyArray<{
+    call: import('@shared/thread-types').ToolCall
+    result?: import('@shared/thread-types').ToolResult
+  }> | null
+}) {
+  const last = messages[messages.length - 1]
+  if (last?.role === 'assistant') return null
+  const hasText = streaming !== null && streaming.length > 0
+  const hasTools = pendingTools !== null && pendingTools.length > 0
+  if (!hasText && !hasTools) return null
+  return (
+    <article
+      data-role="assistant"
+      data-inflight="true"
+      style={{ padding: 16, borderBottom: `1px solid ${colors.border.subtle}` }}
+    >
+      <h3
+        style={{
+          fontSize: 11,
+          color: colors.text.muted,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          margin: 0,
+          marginBottom: 4
+        }}
+      >
+        Machina
+      </h3>
+      {hasText && (
+        <div className="prose" style={{ whiteSpace: 'pre-wrap' }}>
+          {streaming}
+        </div>
+      )}
+      {hasTools &&
+        pendingTools!.map((tc, i) => (
+          <ToolCallRenderer key={tc.call.id ?? i} call={tc.call} result={tc.result} />
+        ))}
+    </article>
   )
 }
