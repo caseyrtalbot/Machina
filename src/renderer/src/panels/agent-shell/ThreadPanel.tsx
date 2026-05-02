@@ -3,7 +3,9 @@ import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { colors, borderRadius } from '../../design/tokens'
+import { agentPillStyle } from './agent-color'
+import { agentTag } from './agent-tag'
+import { colors, borderRadius, typography } from '../../design/tokens'
 
 export function ThreadPanel() {
   const activeId = useThreadStore((s) => s.activeThreadId)
@@ -51,38 +53,35 @@ export function ThreadPanel() {
     >
       <header
         style={{
-          padding: 12,
-          borderBottom: `1px solid ${colors.border.default}`,
+          padding: '12px 20px',
+          borderBottom: `1px solid ${colors.border.subtle}`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 12
         }}
       >
-        <span>{t.title}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          style={{
+            fontFamily: typography.fontFamily.display,
+            fontSize: 14,
+            fontWeight: 500,
+            color: colors.text.primary,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {t.title}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {t.agent === 'machina-native' && (
-            <button
+            <AutoAcceptToggle
+              on={t.autoAcceptSession === true}
               onClick={() => void toggleAutoAccept(t.id)}
-              title={
-                t.autoAcceptSession
-                  ? 'Auto-accept on: writes apply without approval'
-                  : 'Auto-accept off: writes require approval'
-              }
-              style={{
-                fontSize: 11,
-                padding: '2px 8px',
-                borderRadius: borderRadius.inline,
-                border: `1px solid ${colors.border.default}`,
-                background: t.autoAcceptSession ? colors.bg.elevated : 'transparent',
-                color: t.autoAcceptSession ? colors.text.primary : colors.text.muted,
-                cursor: 'pointer'
-              }}
-            >
-              Auto-accept: {t.autoAcceptSession ? 'on' : 'off'}
-            </button>
+            />
           )}
-          <span style={{ fontSize: 11, color: colors.text.muted }}>{t.agent}</span>
+          <AgentBadge agent={t.agent} />
         </div>
       </header>
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
@@ -107,6 +106,88 @@ export function ThreadPanel() {
   )
 }
 
+function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={
+        on
+          ? 'Auto-accept on: writes apply without approval'
+          : 'Auto-accept off: writes require approval'
+      }
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        fontFamily: typography.fontFamily.body,
+        fontSize: typography.metadata.size,
+        letterSpacing: typography.metadata.letterSpacing,
+        textTransform: typography.metadata.textTransform,
+        padding: '4px 10px',
+        borderRadius: borderRadius.tool,
+        border: `1px solid ${on ? colors.accent.default : colors.border.subtle}`,
+        background: on
+          ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
+          : 'transparent',
+        color: on ? colors.text.primary : colors.text.muted,
+        cursor: 'pointer',
+        transition: 'background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out'
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 22,
+          height: 12,
+          borderRadius: 999,
+          background: on
+            ? colors.accent.default
+            : 'color-mix(in srgb, var(--color-text-primary) 18%, transparent)',
+          position: 'relative',
+          flexShrink: 0,
+          transition: 'background 120ms ease-out'
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: on ? 12 : 2,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: on ? colors.bg.base : colors.text.primary,
+            transition: 'left 120ms ease-out, background 120ms ease-out'
+          }}
+        />
+      </span>
+      <span>auto-accept</span>
+    </button>
+  )
+}
+
+function AgentBadge({ agent }: { readonly agent: import('@shared/agent-identity').AgentIdentity }) {
+  const pill = agentPillStyle(agent)
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        fontFamily: typography.fontFamily.body,
+        fontSize: typography.metadata.size,
+        letterSpacing: '0.04em',
+        padding: '3px 10px',
+        borderRadius: 999,
+        background: pill.background,
+        border: pill.border,
+        color: pill.color
+      }}
+    >
+      {agentTag(agent)}
+    </span>
+  )
+}
+
 function InflightAssistant({
   messages,
   streaming,
@@ -128,22 +209,22 @@ function InflightAssistant({
     <article
       data-role="assistant"
       data-inflight="true"
-      style={{ padding: 16, borderBottom: `1px solid ${colors.border.subtle}` }}
+      style={{ padding: '20px 24px', borderBottom: `1px solid ${colors.border.subtle}` }}
     >
-      <h3
+      <div
         style={{
-          fontSize: 11,
+          fontFamily: typography.fontFamily.body,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-          margin: 0,
-          marginBottom: 4
+          marginBottom: 10
         }}
       >
         Machina
-      </h3>
+      </div>
       {hasText && (
-        <div className="prose" style={{ whiteSpace: 'pre-wrap' }}>
+        <div className="thread-prose" style={{ whiteSpace: 'pre-wrap' }}>
           {streaming}
         </div>
       )}

@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
 import { agentTag } from './agent-tag'
-import { colors, borderRadius } from '../../design/tokens'
+import { agentPillStyle } from './agent-color'
+import { colors, borderRadius, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 import type { AgentIdentity } from '@shared/agent-identity'
 
@@ -60,15 +61,17 @@ export function ThreadSidebar({ onOpenSettings }: ThreadSidebarProps = {}) {
     >
       <header
         style={{
-          padding: 12,
-          fontSize: 12,
+          padding: '14px 14px 12px',
+          fontFamily: typography.fontFamily.body,
+          fontSize: typography.metadata.size,
+          letterSpacing: '0.12em',
+          textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
-          textTransform: 'uppercase',
-          letterSpacing: 0.4,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 8
+          gap: 8,
+          borderBottom: `1px solid ${colors.border.subtle}`
         }}
       >
         <span
@@ -131,7 +134,7 @@ export function ThreadSidebar({ onOpenSettings }: ThreadSidebarProps = {}) {
           />
         ))}
       </ul>
-      <footer style={{ padding: 8, borderTop: `1px solid ${colors.border.default}` }}>
+      <footer style={{ padding: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
         {pickerOpen ? (
           <NewThreadPicker
             onPick={(a) => {
@@ -141,20 +144,7 @@ export function ThreadSidebar({ onOpenSettings }: ThreadSidebarProps = {}) {
             onCancel={() => setPickerOpen(false)}
           />
         ) : (
-          <button
-            onClick={() => setPickerOpen(true)}
-            style={{
-              width: '100%',
-              padding: 4,
-              background: 'transparent',
-              border: `1px dashed ${colors.border.default}`,
-              color: colors.text.primary,
-              borderRadius: borderRadius.inline,
-              cursor: 'pointer'
-            }}
-          >
-            + New thread
-          </button>
+          <NewThreadButton onClick={() => setPickerOpen(true)} />
         )}
       </footer>
       {menu && (
@@ -218,6 +208,13 @@ function ThreadRow({
     else onContextMenu(e.clientX, e.clientY)
   }
 
+  const pill = agentPillStyle(agent)
+  const rowBg = isActive
+    ? colors.bg.elevated
+    : hovered
+      ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
+      : 'transparent'
+
   return (
     <li
       data-testid="thread-row"
@@ -230,14 +227,15 @@ function ThreadRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: 8,
+        padding: '8px 12px 8px 10px',
         cursor: isRenaming ? 'text' : 'pointer',
-        background: isActive ? colors.bg.elevated : 'transparent',
+        background: rowBg,
         borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
         display: 'flex',
         flexDirection: 'column',
-        gap: 4,
-        position: 'relative'
+        gap: 6,
+        position: 'relative',
+        transition: 'background 100ms ease-out'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -247,8 +245,10 @@ function ThreadRow({
           <span
             style={{
               flex: 1,
-              color: colors.text.primary,
+              color: isActive ? colors.text.primary : colors.text.secondary,
+              fontFamily: typography.fontFamily.body,
               fontSize: 13,
+              fontWeight: isActive ? 500 : 400,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -289,17 +289,59 @@ function ThreadRow({
       <span
         style={{
           display: 'inline-block',
+          fontFamily: typography.fontFamily.body,
           fontSize: 10,
-          padding: '1px 6px',
-          borderRadius: borderRadius.inline,
-          background: colors.bg.elevated,
-          color: colors.text.muted,
+          letterSpacing: '0.04em',
+          padding: '1px 8px',
+          borderRadius: 999,
+          background: pill.background,
+          border: pill.border,
+          color: pill.color,
           alignSelf: 'flex-start'
         }}
       >
         {agentTag(agent)}
       </span>
     </li>
+  )
+}
+
+function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '100%',
+        padding: '8px 10px',
+        background: hovered
+          ? 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)'
+          : 'transparent',
+        border: 'none',
+        color: hovered ? colors.text.primary : colors.text.secondary,
+        borderRadius: borderRadius.inline,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        fontFamily: typography.fontFamily.body,
+        fontSize: 12,
+        textAlign: 'left',
+        transition: 'background 120ms ease-out, color 120ms ease-out'
+      }}
+    >
+      <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden style={{ flexShrink: 0 }}>
+        <path
+          d="M5.5 1V10 M1 5.5H10"
+          stroke="currentColor"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span>New thread</span>
+    </button>
   )
 }
 
