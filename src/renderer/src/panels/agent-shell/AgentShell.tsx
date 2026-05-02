@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useThreadStore } from '../../store/thread-store'
 import { useThreadStreaming } from '../../hooks/use-thread-streaming'
@@ -19,10 +19,27 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
   const loadThreads = useThreadStore((s) => s.loadThreads)
   const toggleDock = useThreadStore((s) => s.toggleDock)
 
+  // Boot-route once per vaultPath: select the most recent thread or create a
+  // welcome thread on first launch. Ref guard prevents StrictMode double-mount
+  // from creating duplicate welcome threads.
+  const bootedForVaultRef = useRef<string | null>(null)
   useEffect(() => {
     if (!vaultPath) return
     setVaultPath(vaultPath)
-    void loadThreads()
+    if (bootedForVaultRef.current === vaultPath) return
+    bootedForVaultRef.current = vaultPath
+    void (async () => {
+      await loadThreads()
+      const store = useThreadStore.getState()
+      if (store.activeThreadId) return
+      const threads = Object.values(store.threadsById)
+      if (threads.length > 0) {
+        const sorted = [...threads].sort((a, b) => b.lastMessage.localeCompare(a.lastMessage))
+        await store.selectThread(sorted[0].id)
+      } else {
+        await store.createThread('machina-native', 'claude-sonnet-4-6', 'Welcome')
+      }
+    })()
   }, [vaultPath, setVaultPath, loadThreads])
 
   useThreadStreaming()

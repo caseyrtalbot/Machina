@@ -21,7 +21,16 @@ beforeEach(() => {
       list: vi.fn().mockResolvedValue([]),
       listArchived: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
-      create: vi.fn(),
+      create: vi.fn().mockImplementation(async (_v: string, agent: string, model: string) => ({
+        id: 'welcome-1',
+        agent,
+        model,
+        started: '2026-05-01T00:00:00.000Z',
+        lastMessage: '2026-05-01T00:00:00.000Z',
+        title: 'Welcome',
+        dockState: { tabs: [] },
+        messages: []
+      })),
       archive: vi.fn().mockResolvedValue(undefined),
       unarchive: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
