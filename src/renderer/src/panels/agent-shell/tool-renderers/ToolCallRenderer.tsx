@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors } from '../../../design/tokens'
+import { ListVaultCard } from './ListVaultCard'
 import { ReadNoteCard } from './ReadNoteCard'
 import { ToolErrorCard } from './ToolErrorCard'
 
@@ -16,6 +17,8 @@ export function ToolCallRenderer({
   switch (call.kind) {
     case 'read_note':
       return <ReadNoteCard call={call} result={result} />
+    case 'list_vault':
+      return <ListVaultCard call={call} result={result} />
     default:
       return (
         <div style={{ fontSize: 11, color: colors.text.muted, marginTop: 8 }}>

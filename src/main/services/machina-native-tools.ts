@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { glob } from 'glob'
 import type { ToolErrorCode } from '@shared/thread-types'
 
 export interface ToolContext {
@@ -39,6 +40,26 @@ async function readNote(rel: string, ctx: ToolContext): Promise<NativeToolResult
   }
 }
 
+async function listVault(
+  globs: readonly string[] | undefined,
+  ctx: ToolContext
+): Promise<NativeToolResult> {
+  const patterns = globs && globs.length > 0 ? [...globs] : ['**/*.md']
+  try {
+    const matches = await glob(patterns, {
+      cwd: ctx.vaultPath,
+      ignore: ['.machina/**'],
+      nodir: true,
+      dot: false
+    })
+    matches.sort()
+    return { ok: true, output: { paths: matches } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: { code: 'IO_TRANSIENT', message } }
+  }
+}
+
 export async function callTool(
   name: string,
   input: Record<string, unknown>,
@@ -51,6 +72,14 @@ export async function callTool(
         return { ok: false, error: { code: 'IO_FATAL', message: 'read_note: missing path' } }
       }
       return readNote(p, ctx)
+    }
+    case 'list_vault': {
+      const raw = input.globs
+      const globs =
+        Array.isArray(raw) && raw.every((g): g is string => typeof g === 'string')
+          ? (raw as string[])
+          : undefined
+      return listVault(globs, ctx)
     }
     default:
       return { ok: false, error: { code: 'IO_FATAL', message: `unknown tool: ${name}` } }

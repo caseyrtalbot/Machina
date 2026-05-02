@@ -51,6 +51,14 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
   if (name === 'read_note' && typeof input.path === 'string') {
     return { id, kind: 'read_note', args: { path: input.path } }
   }
+  if (name === 'list_vault') {
+    const raw = input.globs
+    const globs =
+      Array.isArray(raw) && raw.every((g): g is string => typeof g === 'string')
+        ? (raw as string[])
+        : undefined
+    return { id, kind: 'list_vault', args: globs ? { globs } : {} }
+  }
   return null
 }
 

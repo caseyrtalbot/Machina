@@ -24,4 +24,21 @@ export const READ_NOTE_TOOL: NativeToolSpec = {
   }
 }
 
-export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [READ_NOTE_TOOL]
+export const LIST_VAULT_TOOL: NativeToolSpec = {
+  name: 'list_vault',
+  description:
+    'List notes in the vault matching one or more glob patterns. Returns matched paths relative to the vault root. Defaults to "**/*.md" when globs is omitted. Always ignores ".machina/**".',
+  input_schema: {
+    type: 'object',
+    properties: {
+      globs: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Glob patterns relative to vault root. Defaults to ["**/*.md"].'
+      }
+    },
+    required: []
+  }
+}
+
+export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [READ_NOTE_TOOL, LIST_VAULT_TOOL]
