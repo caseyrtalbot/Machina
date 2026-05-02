@@ -73,7 +73,7 @@ describe('ThemeProvider environment CSS vars', () => {
     render(createElement(ThemeProvider, null, createElement('div', null, 'themed')))
 
     const rootStyle = document.documentElement.style
-    expect(rootStyle.getPropertyValue('--chrome-rail-bg')).toBe('rgba(8, 8, 10, 0.34)')
+    expect(rootStyle.getPropertyValue('--chrome-rail-bg')).toBe('rgba(17, 17, 19, 0.34)')
     expect(rootStyle.getPropertyValue('--env-card-blur')).toBe('18px')
     expect(rootStyle.getPropertyValue('--env-card-title-font-size')).toBe('14px')
     expect(rootStyle.getPropertyValue('--env-card-body-font-size')).toBe('16px')

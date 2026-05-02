@@ -55,6 +55,7 @@ export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProp
       style={{
         width,
         flexShrink: 0,
+        background: colors.bg.rail,
         display: 'flex',
         flexDirection: 'column',
         height: '100%'

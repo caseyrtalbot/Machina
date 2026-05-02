@@ -4,21 +4,27 @@ export const colors = {
   bg: {
     base: 'var(--color-bg-base)',
     surface: 'var(--color-bg-surface)',
-    elevated: 'var(--color-bg-elevated)'
+    elevated: 'var(--color-bg-elevated)',
+    chrome: 'var(--color-bg-chrome)',
+    rail: 'var(--color-bg-rail)'
   },
   border: {
     default: 'var(--color-border-default)',
-    subtle: 'var(--border-subtle)'
+    subtle: 'var(--border-subtle)',
+    strong: 'var(--color-border-strong)'
   },
   text: {
     primary: 'var(--color-text-primary)',
     secondary: 'var(--color-text-secondary)',
-    muted: 'var(--color-text-muted)'
+    muted: 'var(--color-text-muted)',
+    disabled: 'var(--color-text-disabled)'
   },
   accent: {
     default: 'var(--color-accent-default)',
     hover: 'var(--color-accent-hover)',
-    muted: 'var(--color-accent-muted)'
+    muted: 'var(--color-accent-muted)',
+    soft: 'var(--color-accent-soft)',
+    line: 'var(--color-accent-line)'
   },
   semantic: {
     cluster: '#3dca8d',

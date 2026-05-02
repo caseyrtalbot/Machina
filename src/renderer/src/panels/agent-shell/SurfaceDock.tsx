@@ -31,6 +31,7 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
       style={{
         width,
         flexShrink: 0,
+        background: colors.bg.rail,
         display: 'flex',
         flexDirection: 'column'
       }}

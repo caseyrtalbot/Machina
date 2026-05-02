@@ -13,8 +13,8 @@ interface Props {
 
 const PILL_PADDING = '4px 10px'
 const BLOCK_PADDING = '10px 12px'
-const ERROR_BG = 'color-mix(in srgb, #ff847d 8%, transparent)'
-const ERROR_BORDER = 'color-mix(in srgb, #ff847d 35%, transparent)'
+const ERROR_BG = `color-mix(in srgb, ${colors.claude.error} 8%, transparent)`
+const ERROR_BORDER = `color-mix(in srgb, ${colors.claude.error} 35%, transparent)`
 
 export function ToolCardShell({ variant, children, inline, onContextMenu, style }: Props) {
   const isError = variant === 'error'

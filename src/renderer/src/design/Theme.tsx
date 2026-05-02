@@ -3,12 +3,19 @@ import { spacing, typography, transitions } from './tokens'
 import {
   STRUCTURAL_COLORS,
   BASE_COLORS,
-  ACCENT_HEX,
+  CHROME_BG_HEX,
   ENV_DEFAULTS,
-  computeAccentVariants,
   type EnvironmentSettings
 } from './themes'
+import { applyAccentCssVars } from './apply-accent'
+import { ACCENT_PRESETS } from './accent-presets'
 import { useSettingsStore } from '../store/settings-store'
+
+function resolveAccentHex(accentId: string, customHex: string): string {
+  if (accentId === 'custom') return customHex
+  const preset = ACCENT_PRESETS.find((p) => p.id === accentId)
+  return preset?.hex ?? customHex
+}
 
 interface EnvContext {
   readonly cardBlur: number
@@ -58,22 +65,35 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   root.style.setProperty('--canvas-card-title-bg', `rgba(0, 0, 0, ${env.cardHeaderDarkness / 100})`)
 
   const { r, g, b } = base.canvasSurface
-  const railOp = env.activityBarOpacity / 100
-  root.style.setProperty('--color-bg-base', `rgba(${r}, ${g}, ${b}, ${railOp})`)
-  root.style.setProperty(
-    '--color-bg-surface',
-    `rgba(${r}, ${g}, ${b}, ${Math.min(railOp + 0.07, 1)})`
-  )
-  root.style.setProperty(
-    '--color-bg-elevated',
-    `rgba(${r}, ${g}, ${b}, ${Math.min(railOp + 0.13, 1)})`
-  )
+  // Sidebar / thread / dock surfaces are SOLID. The center (thread) reads
+  // as the lit focal layer at `--color-bg-base`; side rails (sidebar +
+  // dock + settings) recess by a user-tuned amount via `--color-bg-rail`.
+  // `--color-bg-surface` and `--color-bg-elevated` are subtle hover lifts
+  // for tab strips, pills, and active-row backgrounds.
+  const lift = (amt: number): string => {
+    const lc = (c: number): number => Math.min(255, Math.round(c + (255 - c) * amt))
+    return `rgb(${lc(r)}, ${lc(g)}, ${lc(b)})`
+  }
+  const drop = (amt: number): string => {
+    const dc = (c: number): number => Math.max(0, Math.round(c * (1 - amt)))
+    return `rgb(${dc(r)}, ${dc(g)}, ${dc(b)})`
+  }
+  // activityBarOpacity (0-100) is reinterpreted as the rail recess percent:
+  // 0 leaves rails identical to the thread; 100 drives them to pure black.
+  const railRecess = Math.max(0, Math.min(100, env.activityBarOpacity)) / 100
+  root.style.setProperty('--color-bg-base', `rgb(${r}, ${g}, ${b})`)
+  root.style.setProperty('--color-bg-surface', lift(0.04))
+  root.style.setProperty('--color-bg-elevated', lift(0.1))
+  root.style.setProperty('--color-bg-rail', drop(railRecess))
 
   root.style.setProperty('--color-border-default', structural.border.default)
   root.style.setProperty('--border-subtle', structural.border.subtle)
+  root.style.setProperty('--color-border-strong', structural.border.strong)
   root.style.setProperty('--color-text-primary', structural.text.primary)
   root.style.setProperty('--color-text-secondary', structural.text.secondary)
   root.style.setProperty('--color-text-muted', structural.text.muted)
+  root.style.setProperty('--color-text-disabled', structural.text.disabled)
+  root.style.setProperty('--color-bg-chrome', CHROME_BG_HEX)
   root.style.setProperty('--canvas-card-border', structural.canvas.cardBorder)
   root.style.setProperty('--canvas-text-heading', structural.canvas.textHeading)
   root.style.setProperty('--canvas-blockquote-bar', structural.canvas.blockquoteBar)
@@ -99,33 +119,18 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   )
 }
 
-function applyAccentCssVars(): void {
-  const root = document.documentElement
-  const accent = computeAccentVariants(ACCENT_HEX)
-  root.style.setProperty('--color-accent-default', accent.default)
-  root.style.setProperty('--color-accent-hover', accent.hover)
-  root.style.setProperty('--color-accent-muted', accent.muted)
-
-  const [r, g, b] = [
-    parseInt(ACCENT_HEX.slice(1, 3), 16),
-    parseInt(ACCENT_HEX.slice(3, 5), 16),
-    parseInt(ACCENT_HEX.slice(5, 7), 16)
-  ]
-  root.style.setProperty('--neon-glow', `0 0 8px rgba(${r}, ${g}, ${b}, 0.15)`)
-  root.style.setProperty('--color-accent-focus', `rgba(${r}, ${g}, ${b}, 0.3)`)
-  root.style.setProperty('--color-accent-subtle', `rgba(${r}, ${g}, ${b}, 0.15)`)
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const env = useSettingsStore((s) => s.env)
+  const accentId = useSettingsStore((s) => s.accentId)
+  const customAccentHex = useSettingsStore((s) => s.customAccentHex)
 
   useLayoutEffect(() => {
     applyEnvCssVars(env)
   }, [env])
 
   useLayoutEffect(() => {
-    applyAccentCssVars()
-  }, [])
+    applyAccentCssVars(resolveAccentHex(accentId, customAccentHex))
+  }, [accentId, customAccentHex])
 
   const ctx = useMemo<ThemeContextType>(
     () => ({

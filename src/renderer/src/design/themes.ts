@@ -1,7 +1,14 @@
 // src/renderer/src/design/themes.ts
 
-/** Hardcoded accent color -- near-white for high contrast against dark base */
-export const ACCENT_HEX = '#ebebeb'
+/** Default accent. "Ember" coral from the Console direction palette.
+ * Overridable at runtime via `applyAccentCssVars(hex)`; settings will
+ * eventually persist a chosen preset (see `accent-presets.ts`). */
+export const ACCENT_HEX = '#ff8c5a'
+
+/** Cool blue-slate chrome layer (titlebar, status bar, deepest rail).
+ * One step darker than the canvas surface so the OS chrome reads as
+ * a recessed frame around the surface. */
+export const CHROME_BG_HEX = '#070a0e'
 
 export interface EnvironmentSettings {
   readonly canvasTranslucency: number
@@ -38,14 +45,26 @@ interface ThemeBaseColors {
   readonly cardBody: BaseRgb
 }
 
+// Black-gray slate base. canvasSurface (#111113) sits ABOVE the card body
+// (#0a0a0c) so canvas cards read as recessed objects, not floating above the
+// surface. Console-direction layering, neutralized hue.
 export const BASE_COLORS: ThemeBaseColors = {
-  canvasSurface: { r: 8, g: 8, b: 10 },
-  cardBody: { r: 10, g: 10, b: 14 }
+  canvasSurface: { r: 17, g: 17, b: 19 },
+  cardBody: { r: 10, g: 10, b: 12 }
 }
 
 interface StructuralColors {
-  readonly border: { readonly default: string; readonly subtle: string }
-  readonly text: { readonly primary: string; readonly secondary: string; readonly muted: string }
+  readonly border: {
+    readonly default: string
+    readonly subtle: string
+    readonly strong: string
+  }
+  readonly text: {
+    readonly primary: string
+    readonly secondary: string
+    readonly muted: string
+    readonly disabled: string
+  }
   readonly canvas: {
     readonly cardBorder: string
     readonly textHeading: string
@@ -53,14 +72,23 @@ interface StructuralColors {
   }
 }
 
+// Neutral gray-black hairline / text palette. Borders are white-tinted so they
+// stay legible against the solid #111113 surface; text returns to a near-white
+// → muted-gray scale that pairs cleanly with the warm Ember accent.
 export const STRUCTURAL_COLORS: StructuralColors = {
   border: {
-    default: 'rgba(255, 255, 255, 0.20)',
-    subtle: 'rgba(255, 255, 255, 0.14)'
+    default: 'rgba(255, 255, 255, 0.18)',
+    subtle: 'rgba(255, 255, 255, 0.08)',
+    strong: 'rgba(255, 255, 255, 0.28)'
   },
-  text: { primary: '#ebebeb', secondary: '#9a9a9a', muted: '#585858' },
+  text: {
+    primary: '#ebebeb',
+    secondary: '#9a9a9a',
+    muted: '#585858',
+    disabled: '#3e3e3e'
+  },
   canvas: {
-    cardBorder: 'rgba(255, 255, 255, 0.18)',
+    cardBorder: 'rgba(255, 255, 255, 0.16)',
     textHeading: '#f2f2f2',
     blockquoteBar: '#555555'
   }

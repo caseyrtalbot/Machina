@@ -3,7 +3,7 @@ import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
 import { colors } from '../design/tokens'
-import { BASE_COLORS } from '../design/themes'
+import { ACCENT_PRESETS } from '../design/accent-presets'
 import { FontPicker } from './FontPicker'
 
 interface SettingsModalProps {
@@ -120,6 +120,71 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h3 className="settings-section-heading">{children}</h3>
 }
 
+interface AccentPreviewRowProps {
+  readonly accentId: string
+  readonly customHex: string
+  readonly onPick: (id: string) => void
+}
+
+function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(8, 1fr)',
+        gap: 6,
+        padding: '4px 16px 12px'
+      }}
+    >
+      {ACCENT_PRESETS.map((p) => {
+        const active = accentId === p.id
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onPick(p.id)}
+            title={`${p.label} · ${p.hex}`}
+            aria-label={p.label}
+            style={{
+              width: 22,
+              height: 22,
+              padding: 0,
+              borderRadius: 4,
+              background: p.hex,
+              border: active ? `2px solid ${colors.text.primary}` : '1px solid transparent',
+              cursor: 'pointer',
+              boxShadow: active ? `0 0 0 1px ${p.hex}` : 'none'
+            }}
+          />
+        )
+      })}
+      <button
+        type="button"
+        onClick={() => onPick('custom')}
+        title="Custom hex"
+        aria-label="Custom"
+        style={{
+          width: 22,
+          height: 22,
+          padding: 0,
+          borderRadius: 4,
+          background: accentId === 'custom' ? customHex : 'transparent',
+          border:
+            accentId === 'custom'
+              ? `2px solid ${colors.text.primary}`
+              : `1px dashed ${colors.border.default}`,
+          color: colors.text.muted,
+          fontSize: 12,
+          lineHeight: '18px',
+          cursor: 'pointer'
+        }}
+      >
+        {accentId === 'custom' ? '' : '+'}
+      </button>
+    </div>
+  )
+}
+
 export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -132,6 +197,10 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   const env = useSettingsStore((s) => s.env)
   const setEnv = useSettingsStore((s) => s.setEnv)
   const resetEnv = useSettingsStore((s) => s.resetEnv)
+  const accentId = useSettingsStore((s) => s.accentId)
+  const customAccentHex = useSettingsStore((s) => s.customAccentHex)
+  const setAccentId = useSettingsStore((s) => s.setAccentId)
+  const setCustomAccentHex = useSettingsStore((s) => s.setCustomAccentHex)
   const defaultEditorMode = useSettingsStore((s) => s.defaultEditorMode)
   const autosaveInterval = useSettingsStore((s) => s.autosaveInterval)
   const spellCheck = useSettingsStore((s) => s.spellCheck)
@@ -204,7 +273,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       <div
         className="settings-shell flex flex-col h-full w-full"
         style={{
-          backgroundColor: `rgb(${BASE_COLORS.canvasSurface.r}, ${BASE_COLORS.canvasSurface.g}, ${BASE_COLORS.canvasSurface.b})`,
+          backgroundColor: colors.bg.rail,
           borderLeft: `1px solid ${colors.border.default}`,
           boxShadow: isOpen ? '-8px 0 32px rgba(0, 0, 0, 0.3)' : 'none'
         }}
@@ -241,6 +310,35 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
         {/* Single scrollable content */}
         <div className="settings-content flex-1 overflow-y-auto">
+          {/* ── Appearance ── */}
+          <SectionHeading>Appearance</SectionHeading>
+          <SettingRow label="Accent">
+            <SelectInput
+              value={accentId}
+              options={[
+                ...ACCENT_PRESETS.map((p) => ({
+                  value: p.id,
+                  label: `${p.label} · ${p.hex}`
+                })),
+                { value: 'custom', label: 'Custom…' }
+              ]}
+              onChange={setAccentId}
+            />
+          </SettingRow>
+          {accentId === 'custom' && (
+            <SettingRow label="Hex">
+              <input
+                type="text"
+                value={customAccentHex}
+                onChange={(e) => setCustomAccentHex(e.target.value)}
+                spellCheck={false}
+                className="settings-select text-xs rounded"
+                style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+              />
+            </SettingRow>
+          )}
+          <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
+
           {/* ── Typography ── */}
           <SectionHeading>Typography</SectionHeading>
           <SettingRow label="Font">
@@ -333,13 +431,13 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             />
           </SettingRow>
 
-          {/* ── Chrome ── */}
-          <SectionHeading>Chrome</SectionHeading>
-          <SettingRow label="Panel Opacity">
+          {/* ── Surfaces ── */}
+          <SectionHeading>Surfaces</SectionHeading>
+          <SettingRow label="Side Rails">
             <SliderInput
               value={env.activityBarOpacity}
-              min={20}
-              max={80}
+              min={0}
+              max={60}
               step={1}
               unit="%"
               onChange={(v) => setEnv('activityBarOpacity', v)}

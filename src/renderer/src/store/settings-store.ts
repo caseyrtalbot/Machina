@@ -1,12 +1,17 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { ENV_DEFAULTS, type EnvironmentSettings } from '../design/themes'
+import { DEFAULT_ACCENT_ID } from '../design/accent-presets'
 
 interface SettingsState {
   readonly env: EnvironmentSettings
   readonly displayFont: string
   readonly bodyFont: string
   readonly monoFont: string
+  /** Accent preset id from `accent-presets.ts`, or `'custom'` for a hex pick. */
+  readonly accentId: string
+  /** Hex used when `accentId === 'custom'`. */
+  readonly customAccentHex: string
   readonly defaultEditorMode: 'rich' | 'source'
   readonly autosaveInterval: number
   readonly spellCheck: boolean
@@ -27,6 +32,8 @@ interface SettingsActions {
   setDisplayFont: (value: string) => void
   setBodyFont: (value: string) => void
   setMonoFont: (value: string) => void
+  setAccentId: (value: string) => void
+  setCustomAccentHex: (value: string) => void
   setDefaultEditorMode: (value: 'rich' | 'source') => void
   setAutosaveInterval: (value: number) => void
   setSpellCheck: (value: boolean) => void
@@ -47,6 +54,8 @@ export const useSettingsStore = create<SettingsStore>()(
       displayFont: 'Manrope',
       bodyFont: 'Manrope',
       monoFont: 'Space Mono',
+      accentId: DEFAULT_ACCENT_ID,
+      customAccentHex: '#ff8c5a',
       defaultEditorMode: 'rich',
       autosaveInterval: 1500,
       spellCheck: false,
@@ -62,6 +71,8 @@ export const useSettingsStore = create<SettingsStore>()(
       setDisplayFont: (value) => set({ displayFont: value }),
       setBodyFont: (value) => set({ bodyFont: value }),
       setMonoFont: (value) => set({ monoFont: value }),
+      setAccentId: (value) => set({ accentId: value }),
+      setCustomAccentHex: (value) => set({ customAccentHex: value }),
       setDefaultEditorMode: (value) => set({ defaultEditorMode: value }),
       setAutosaveInterval: (value) => set({ autosaveInterval: value }),
       setSpellCheck: (value) => set({ spellCheck: value }),
@@ -74,7 +85,7 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'machina-settings',
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -137,6 +148,12 @@ export const useSettingsStore = create<SettingsStore>()(
           if (existingEnv) {
             delete existingEnv.panelLightness
           }
+        }
+
+        if (version < 9) {
+          // v8 → v9: introduce accent picker (Console-direction palette).
+          if (typeof state.accentId !== 'string') state.accentId = DEFAULT_ACCENT_ID
+          if (typeof state.customAccentHex !== 'string') state.customAccentHex = '#ff8c5a'
         }
 
         return state as unknown as SettingsState & SettingsActions
