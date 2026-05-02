@@ -59,6 +59,18 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
         : undefined
     return { id, kind: 'list_vault', args: globs ? { globs } : {} }
   }
+  if (name === 'search_vault' && typeof input.query === 'string') {
+    const rawPaths = input.paths
+    const paths =
+      Array.isArray(rawPaths) && rawPaths.every((p): p is string => typeof p === 'string')
+        ? (rawPaths as string[])
+        : undefined
+    return {
+      id,
+      kind: 'search_vault',
+      args: paths ? { query: input.query, paths } : { query: input.query }
+    }
+  }
   return null
 }
 

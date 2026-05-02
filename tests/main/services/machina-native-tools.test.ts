@@ -119,3 +119,81 @@ describe('machina-native-tools list_vault', () => {
     }
   })
 })
+
+describe('machina-native-tools search_vault', () => {
+  it('returns hits with path/line/snippet', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'first line\nthe needle is here\nthird line\n')
+      writeFileSync(path.join(v, 'b.md'), 'no match\nstill no match\n')
+      const res = await callTool(
+        'search_vault',
+        { query: 'needle' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const hits = (
+          res.output as { hits: Array<{ path: string; line: number; snippet: string }> }
+        ).hits
+        expect(hits.length).toBe(1)
+        expect(hits[0].path).toBe('a.md')
+        expect(hits[0].line).toBe(2)
+        expect(hits[0].snippet).toContain('needle')
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects empty query', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool('search_vault', {}, { vaultPath: v, autoAccept: false })
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('IO_FATAL')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns zero hits for misses without erroring', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'hello world\n')
+      const res = await callTool(
+        'search_vault',
+        { query: 'definitely-not-present-xyz' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const hits = (res.output as { hits: unknown[] }).hits
+        expect(hits).toEqual([])
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('ignores .machina/**', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'no match here\n')
+      mkdirSync(path.join(v, '.machina'), { recursive: true })
+      writeFileSync(path.join(v, '.machina', 'state.md'), 'should not match needle\n')
+      const res = await callTool(
+        'search_vault',
+        { query: 'needle' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const hits = (res.output as { hits: unknown[] }).hits
+        expect(hits).toEqual([])
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})

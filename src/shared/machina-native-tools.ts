@@ -41,4 +41,30 @@ export const LIST_VAULT_TOOL: NativeToolSpec = {
   }
 }
 
-export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [READ_NOTE_TOOL, LIST_VAULT_TOOL]
+export const SEARCH_VAULT_TOOL: NativeToolSpec = {
+  name: 'search_vault',
+  description:
+    'Search vault notes for a literal or regex string (ripgrep). Returns up to 200 hits with path, line number, and a trimmed snippet. Always ignores ".machina/**".',
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'String to search for. Case-sensitive; ripgrep regex syntax.'
+      },
+      paths: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Optional sub-paths within the vault to scope the search. Defaults to the whole vault.'
+      }
+    },
+    required: ['query']
+  }
+}
+
+export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
+  READ_NOTE_TOOL,
+  LIST_VAULT_TOOL,
+  SEARCH_VAULT_TOOL
+]
