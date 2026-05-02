@@ -25,6 +25,7 @@ import type { InfraHealth } from '../shared/engine/vault-health'
 import type { Thread } from '../shared/thread-types'
 import type { AgentIdentity } from '../shared/agent-identity'
 import type { VaultMachinaConfig } from '../shared/thread-storage-types'
+import type { IpcEventData } from '../shared/ipc-channels'
 
 const api = {
   window: {
@@ -163,7 +164,16 @@ const api = {
   agentNative: {
     hasKey: () => typedInvoke('agent-native:has-key'),
     setKey: (key: string) => typedInvoke('agent-native:set-key', { key }),
-    clearKey: () => typedInvoke('agent-native:clear-key')
+    clearKey: () => typedInvoke('agent-native:clear-key'),
+    run: (req: {
+      vaultPath: string
+      threadId: string
+      model: string
+      systemPrompt: string
+      userMessage: string
+      historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
+    }) => typedInvoke('agent-native:run', req),
+    abort: (runId: string) => typedInvoke('agent-native:abort', { runId })
   },
   thread: {
     list: (vaultPath: string) => typedInvoke('thread:list', { vaultPath }),
@@ -220,7 +230,9 @@ const api = {
     cliAgentSessionStatus: (callback: (data: CLIAgentSessionStatus) => void) =>
       typedOn('cli-agent:session-status-changed', callback),
     cliAgentContextUpdated: (callback: (data: CLIAgentSessionStatus) => void) =>
-      typedOn('cli-agent:context-updated', callback)
+      typedOn('cli-agent:context-updated', callback),
+    agentNativeEvent: (callback: (data: IpcEventData<'agent-native:event'>) => void) =>
+      typedOn('agent-native:event', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path })

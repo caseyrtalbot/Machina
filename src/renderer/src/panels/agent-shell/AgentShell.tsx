@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useThreadStore } from '../../store/thread-store'
+import { useThreadStreaming } from '../../hooks/use-thread-streaming'
 import { ThreadSidebar } from './ThreadSidebar'
 import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
@@ -19,6 +20,8 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
     setVaultPath(vaultPath)
     void loadThreads()
   }, [vaultPath, setVaultPath, loadThreads])
+
+  useThreadStreaming()
 
   return (
     <div data-testid="agent-shell" style={{ display: 'flex', height: '100%', width: '100%' }}>

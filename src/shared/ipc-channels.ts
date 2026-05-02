@@ -272,7 +272,24 @@ export interface IpcChannels {
   'agent-native:has-key': { request: void; response: boolean }
   'agent-native:set-key': { request: { key: string }; response: void }
   'agent-native:clear-key': { request: void; response: void }
+  'agent-native:run': {
+    request: {
+      vaultPath: string
+      threadId: string
+      model: string
+      systemPrompt: string
+      userMessage: string
+      historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
+    }
+    response: { runId: string }
+  }
+  'agent-native:abort': { request: { runId: string }; response: void }
 }
+
+export type AgentNativeEventBody =
+  | { kind: 'text'; text: string }
+  | { kind: 'message_end' }
+  | { kind: 'error'; code: import('./thread-types').ToolErrorCode; message: string }
 
 export interface IpcEvents {
   'terminal:data': { sessionId: SessionId; data: string }
@@ -311,6 +328,9 @@ export interface IpcEvents {
   // Block protocol events (main -> renderer): one snapshot per block transition.
   // See docs/architecture/block-protocol.md.
   'block:update': { sessionId: SessionId; block: Block }
+
+  // Machina Native streaming events (main -> renderer)
+  'agent-native:event': { runId: string; threadId: string } & AgentNativeEventBody
 
   // CLI agent session listener (main -> renderer). status-changed fires only
   // when the session transitions between in-progress / success / blocked;

@@ -3,6 +3,9 @@ import type { Thread, ThreadMessage, ToolCall } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 
+const MACHINA_NATIVE_SYSTEM_PROMPT =
+  'You are Machina, a thoughtful assistant for the user’s vault. Keep replies concise and grounded.'
+
 interface ThreadState {
   vaultPath: string | null
   activeThreadId: string | null
@@ -123,7 +126,25 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       return { threadsById: { ...s.threadsById, [id]: next } }
     })
     const t = get().threadsById[id]
-    if (t) await window.api.thread.save(v, t)
+    if (!t) return
+    await window.api.thread.save(v, t)
+
+    if (t.agent !== 'machina-native') return
+    const history = t.messages
+      .slice(0, -1)
+      .flatMap((m) =>
+        m.role === 'user' || m.role === 'assistant'
+          ? [{ role: m.role, content: m.body } as const]
+          : []
+      )
+    await window.api.agentNative.run({
+      vaultPath: v,
+      threadId: id,
+      model: t.model,
+      systemPrompt: MACHINA_NATIVE_SYSTEM_PROMPT,
+      userMessage: text,
+      historyMessages: history
+    })
   },
 
   appendAssistantStreamChunk: (threadId, chunk) =>
