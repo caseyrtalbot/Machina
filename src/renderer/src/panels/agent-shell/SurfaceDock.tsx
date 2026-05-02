@@ -32,7 +32,7 @@ export function SurfaceDock() {
             data-testid="dock-empty-state"
             style={{ padding: 24, color: colors.text.muted, fontSize: 13 }}
           >
-            no surface tabs yet — hit + to open canvas, editor, graph, ghosts, or health
+            no surface tabs yet, hit + to open canvas, editor, graph, ghosts, or health
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ import type { AgentNativeApprovalPreview } from '@shared/ipc-channels'
 const SEARCH_HIT_LIMIT = 200
 const SEARCH_PER_FILE_LIMIT = 20
 const SEARCH_SNIPPET_LEN = 200
+const CANVAS_ID_RE = /^[a-zA-Z0-9_-]+$/
 
 interface ApprovalDecision {
   readonly accept: boolean
@@ -453,6 +454,16 @@ async function searchVault(
   if (!query) {
     return { ok: false, error: { code: 'IO_FATAL', message: 'search_vault: empty query' } }
   }
+  if (paths && paths.length > 0) {
+    for (const p of paths) {
+      if (!safeJoin(ctx.vaultPath, p)) {
+        return {
+          ok: false,
+          error: { code: 'PATH_OUT_OF_VAULT', message: `path escapes vault: ${p}` }
+        }
+      }
+    }
+  }
   const scope = paths && paths.length > 0 ? [...paths] : ['.']
   const rgResult = await searchWithRipgrep(query, scope, ctx.vaultPath)
   if (rgResult.ok) return rgResult
@@ -526,6 +537,12 @@ export async function callTool(
       if (!id) {
         return { ok: false, error: { code: 'IO_FATAL', message: 'read_canvas: missing canvasId' } }
       }
+      if (!CANVAS_ID_RE.test(id)) {
+        return {
+          ok: false,
+          error: { code: 'PATH_OUT_OF_VAULT', message: `invalid canvasId: ${id}` }
+        }
+      }
       return readCanvas(id, ctx)
     }
     case 'pin_to_canvas': {
@@ -535,6 +552,12 @@ export async function callTool(
         return {
           ok: false,
           error: { code: 'IO_FATAL', message: 'pin_to_canvas: missing canvasId' }
+        }
+      }
+      if (!CANVAS_ID_RE.test(id)) {
+        return {
+          ok: false,
+          error: { code: 'PATH_OUT_OF_VAULT', message: `invalid canvasId: ${id}` }
         }
       }
       if (!rawCard || typeof rawCard !== 'object') {

@@ -196,6 +196,78 @@ describe('machina-native-tools search_vault', () => {
       rmSync(v, { recursive: true, force: true })
     }
   })
+
+  it('rejects a paths[] entry that escapes the vault', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'search_vault',
+        { query: 'needle', paths: ['../../etc'] },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('machina-native-tools canvasId validation', () => {
+  it('rejects read_canvas with a traversal canvasId', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'read_canvas',
+        { canvasId: '../../evil' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects pin_to_canvas with a traversal canvasId', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'pin_to_canvas',
+        { canvasId: '../escape', card: { title: 'x' } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts read_canvas with a normal alphanumeric canvasId', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      mkdirSync(path.join(v, '.machina', 'canvas'), { recursive: true })
+      writeFileSync(
+        path.join(v, '.machina', 'canvas', 'main.json'),
+        JSON.stringify({ nodes: [], edges: [] })
+      )
+      const res = await callTool(
+        'read_canvas',
+        { canvasId: 'main' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('machina-native-tools write_note', () => {
