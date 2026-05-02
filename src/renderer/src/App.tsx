@@ -922,9 +922,15 @@ function ResizableSidebar({
 }
 
 function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
-  // Dev-time override: localStorage.setItem('TE_AGENT_SHELL_V1', '1') then reload
-  const useAgentShell =
-    typeof window !== 'undefined' && window.localStorage?.getItem(AGENT_SHELL_FEATURE_FLAG) === '1'
+  // Default ON in dev, OFF in production. Override either way with
+  // localStorage.setItem('TE_AGENT_SHELL_V1', '1' | '0') and reload.
+  const useAgentShell = (() => {
+    if (typeof window === 'undefined') return false
+    const stored = window.localStorage?.getItem(AGENT_SHELL_FEATURE_FLAG)
+    if (stored === '1') return true
+    if (stored === '0') return false
+    return import.meta.env.DEV
+  })()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
