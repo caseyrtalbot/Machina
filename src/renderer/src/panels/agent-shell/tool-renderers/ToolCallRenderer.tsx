@@ -2,6 +2,8 @@ import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors } from '../../../design/tokens'
 import { EditNoteCard } from './EditNoteCard'
 import { ListVaultCard } from './ListVaultCard'
+import { PinToCanvasCard } from './PinToCanvasCard'
+import { ReadCanvasCard } from './ReadCanvasCard'
 import { ReadNoteCard } from './ReadNoteCard'
 import { SearchVaultCard } from './SearchVaultCard'
 import { ToolErrorCard } from './ToolErrorCard'
@@ -32,6 +34,10 @@ export function ToolCallRenderer({
       return <ListVaultCard call={call} result={result} />
     case 'search_vault':
       return <SearchVaultCard call={call} result={result} />
+    case 'read_canvas':
+      return <ReadCanvasCard call={call} result={result} />
+    case 'pin_to_canvas':
+      return <PinToCanvasCard call={call} result={result} />
     default:
       return (
         <div style={{ fontSize: 11, color: colors.text.muted, marginTop: 8 }}>

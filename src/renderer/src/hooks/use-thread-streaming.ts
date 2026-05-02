@@ -17,6 +17,14 @@ export function useThreadStreaming(): void {
         if (call) startToolCall(evt.threadId, call)
       } else if (evt.kind === 'tool_call_persisted') {
         appendToolCall(evt.threadId, evt.call, evt.result)
+        if (evt.call.kind === 'pin_to_canvas' && evt.result.ok) {
+          const out = evt.result.output as { cardId?: string } | null
+          window.dispatchEvent(
+            new CustomEvent('machina:canvas:card-added', {
+              detail: { canvasId: evt.call.args.canvasId, cardId: out?.cardId ?? '' }
+            })
+          )
+        }
       } else if (evt.kind === 'message_end') {
         void finalize(evt.threadId)
       } else if (evt.kind === 'error') {

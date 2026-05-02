@@ -366,6 +366,85 @@ async function editNote(
   }
 }
 
+interface CanvasFileShape {
+  nodes?: unknown[]
+  edges?: unknown[]
+  [k: string]: unknown
+}
+
+interface PinCardInput {
+  readonly title: string
+  readonly content?: string
+  readonly position?: { x: number; y: number }
+  readonly refs?: readonly string[]
+}
+
+function canvasFilePath(vault: string, canvasId: string): string {
+  return path.join(vault, '.machina', 'canvas', `${canvasId}.json`)
+}
+
+async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToolResult> {
+  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  try {
+    const raw = await fs.readFile(file, 'utf8')
+    const parsed = JSON.parse(raw) as CanvasFileShape
+    return {
+      ok: true,
+      output: {
+        cards: Array.isArray(parsed.nodes) ? parsed.nodes : [],
+        edges: Array.isArray(parsed.edges) ? parsed.edges : []
+      }
+    }
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException
+    if (e.code === 'ENOENT') {
+      return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+    }
+    return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+  }
+}
+
+function newCardId(): string {
+  return `card_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+async function pinToCanvas(
+  canvasId: string,
+  card: PinCardInput,
+  ctx: ToolContext
+): Promise<NativeToolResult> {
+  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  let canvas: CanvasFileShape
+  try {
+    canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException
+    if (e.code === 'ENOENT') {
+      return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+    }
+    return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+  }
+  const cardId = newCardId()
+  const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes] : []
+  nodes.push({
+    id: cardId,
+    type: 'note',
+    title: card.title,
+    content: card.content ?? '',
+    x: card.position?.x ?? 0,
+    y: card.position?.y ?? 0,
+    refs: card.refs ?? []
+  })
+  const next: CanvasFileShape = { ...canvas, nodes }
+  try {
+    await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+    return { ok: true, output: { cardId, canvasId } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: { code: 'IO_FATAL', message } }
+  }
+}
+
 async function searchVault(
   query: string,
   paths: readonly string[] | undefined,
@@ -441,6 +520,52 @@ export async function callTool(
         return { ok: false, error: { code: 'IO_FATAL', message: 'edit_note: missing replace' } }
       }
       return editNote(p, find, replace, ctx)
+    }
+    case 'read_canvas': {
+      const id = typeof input.canvasId === 'string' ? input.canvasId : null
+      if (!id) {
+        return { ok: false, error: { code: 'IO_FATAL', message: 'read_canvas: missing canvasId' } }
+      }
+      return readCanvas(id, ctx)
+    }
+    case 'pin_to_canvas': {
+      const id = typeof input.canvasId === 'string' ? input.canvasId : null
+      const rawCard = input.card
+      if (!id) {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'pin_to_canvas: missing canvasId' }
+        }
+      }
+      if (!rawCard || typeof rawCard !== 'object') {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'pin_to_canvas: missing card' }
+        }
+      }
+      const c = rawCard as Record<string, unknown>
+      const title = typeof c.title === 'string' ? c.title : null
+      if (!title) {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'pin_to_canvas: card.title is required' }
+        }
+      }
+      const content = typeof c.content === 'string' ? c.content : undefined
+      const rawPos = c.position
+      let position: { x: number; y: number } | undefined
+      if (rawPos && typeof rawPos === 'object') {
+        const pos = rawPos as Record<string, unknown>
+        if (typeof pos.x === 'number' && typeof pos.y === 'number') {
+          position = { x: pos.x, y: pos.y }
+        }
+      }
+      const rawRefs = c.refs
+      const refs =
+        Array.isArray(rawRefs) && rawRefs.every((r): r is string => typeof r === 'string')
+          ? (rawRefs as string[])
+          : undefined
+      return pinToCanvas(id, { title, content, position, refs }, ctx)
     }
     default:
       return { ok: false, error: { code: 'IO_FATAL', message: `unknown tool: ${name}` } }

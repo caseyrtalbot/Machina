@@ -108,10 +108,55 @@ export const EDIT_NOTE_TOOL: NativeToolSpec = {
   }
 }
 
+export const READ_CANVAS_TOOL: NativeToolSpec = {
+  name: 'read_canvas',
+  description:
+    'Read a canvas by id from .machina/canvas/<id>.json. Returns the cards and edges currently pinned to it. Errors with CANVAS_NOT_FOUND if the canvas does not exist.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      canvasId: { type: 'string', description: 'Canvas id (basename without extension).' }
+    },
+    required: ['canvasId']
+  }
+}
+
+export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
+  name: 'pin_to_canvas',
+  description:
+    'Pin a card to a canvas at .machina/canvas/<id>.json. Returns the new card id. Not subject to the approval gate; pinning is reversible.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      canvasId: { type: 'string', description: 'Canvas id (basename without extension).' },
+      card: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          content: { type: 'string' },
+          position: {
+            type: 'object',
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' }
+            },
+            required: ['x', 'y']
+          },
+          refs: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['title']
+      }
+    },
+    required: ['canvasId', 'card']
+  }
+}
+
 export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
   READ_NOTE_TOOL,
   LIST_VAULT_TOOL,
   SEARCH_VAULT_TOOL,
   WRITE_NOTE_TOOL,
-  EDIT_NOTE_TOOL
+  EDIT_NOTE_TOOL,
+  READ_CANVAS_TOOL,
+  PIN_TO_CANVAS_TOOL
 ]

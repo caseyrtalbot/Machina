@@ -91,6 +91,46 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
       args: paths ? { query: input.query, paths } : { query: input.query }
     }
   }
+  if (name === 'read_canvas' && typeof input.canvasId === 'string') {
+    return { id, kind: 'read_canvas', args: { canvasId: input.canvasId } }
+  }
+  if (
+    name === 'pin_to_canvas' &&
+    typeof input.canvasId === 'string' &&
+    input.card &&
+    typeof input.card === 'object'
+  ) {
+    const c = input.card as Record<string, unknown>
+    if (typeof c.title === 'string') {
+      const content = typeof c.content === 'string' ? c.content : undefined
+      const rawPos = c.position
+      let position: { x: number; y: number } | undefined
+      if (rawPos && typeof rawPos === 'object') {
+        const pos = rawPos as Record<string, unknown>
+        if (typeof pos.x === 'number' && typeof pos.y === 'number') {
+          position = { x: pos.x, y: pos.y }
+        }
+      }
+      const rawRefs = c.refs
+      const refs =
+        Array.isArray(rawRefs) && rawRefs.every((r): r is string => typeof r === 'string')
+          ? (rawRefs as string[])
+          : undefined
+      return {
+        id,
+        kind: 'pin_to_canvas',
+        args: {
+          canvasId: input.canvasId,
+          card: {
+            title: c.title,
+            ...(content !== undefined ? { content } : {}),
+            ...(position ? { position } : {}),
+            ...(refs ? { refs } : {})
+          }
+        }
+      }
+    }
+  }
   return null
 }
 
