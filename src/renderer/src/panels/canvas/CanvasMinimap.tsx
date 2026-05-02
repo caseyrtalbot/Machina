@@ -214,8 +214,8 @@ export function CanvasMinimap({
           top: toMiniY(vpRect.y),
           width: Math.max(4, vpRect.width * scale),
           height: Math.max(4, vpRect.height * scale),
-          border: '1px solid rgba(255, 255, 255, 0.25)',
-          backgroundColor: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid color-mix(in srgb, var(--color-accent-default) 70%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)',
           borderRadius: 2,
           cursor: 'grab',
           pointerEvents: 'auto'

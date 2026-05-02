@@ -153,7 +153,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
         backgroundColor: floatingPanel.glass.popoverBg,
         backdropFilter: floatingPanel.glass.popoverBlur,
         WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
-        border: '1px solid rgba(255, 255, 255, 0.06)',
+        border: '1px solid var(--color-border-subtle)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
         transition: `opacity ${transitions.tooltip}`,
         fontSize: '13px'
@@ -180,7 +180,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
             )}
           </button>
           {action.separator && (
-            <div className="my-1" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }} />
+            <div className="my-1" style={{ borderTop: '1px solid var(--color-border-subtle)' }} />
           )}
         </div>
       ))}

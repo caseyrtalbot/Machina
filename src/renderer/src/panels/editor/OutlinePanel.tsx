@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import { extractHeadings, findActiveHeading, type HeadingEntry } from './outline-utils'
 
 interface OutlinePanelProps {
@@ -65,7 +65,13 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
     return (
       <div
         className="flex items-center justify-center h-full"
-        style={{ color: colors.text.muted, fontSize: 12 }}
+        style={{
+          color: colors.text.muted,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 11,
+          textTransform: 'uppercase',
+          letterSpacing: typography.metadata.letterSpacing
+        }}
       >
         No headings
       </div>
@@ -77,20 +83,24 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
 
   return (
     <div className="h-full overflow-y-auto py-2 scrollbar-hover">
+      {/* Console-direction section label: typography.metadata tokens */}
       <div
         className="px-3 pb-2"
         style={{
           color: colors.text.muted,
-          fontSize: 'var(--env-sidebar-tertiary-font-size, 10px)',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase'
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
+          fontWeight: 600
         }}
       >
         Outline
       </div>
       <nav>
         {headings.map((heading, i) => {
-          const indent = (heading.level - minLevel) * 12
+          const depth = heading.level - minLevel
+          const indent = depth * 12
           const isActive = i === activeIndex
 
           return (
@@ -99,6 +109,7 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
               onClick={() => handleClick(heading.pos)}
               className="outline-heading-row"
               style={{
+                position: 'relative',
                 display: 'block',
                 width: '100%',
                 textAlign: 'left',
@@ -106,13 +117,22 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
                 paddingRight: 12,
                 paddingTop: 3,
                 paddingBottom: 3,
-                fontSize: 12,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 11,
                 lineHeight: '18px',
                 color: isActive ? colors.accent.default : colors.text.secondary,
-                background: isActive ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                border: 'none',
+                background: isActive
+                  ? 'color-mix(in srgb, var(--color-accent-default) 8%, transparent)'
+                  : 'transparent',
+                // Hairline indent guide for nested headings: a left border on the
+                // button itself, offset to sit just inside the indent column.
+                borderLeft:
+                  depth > 0 ? `1px solid ${colors.border.subtle}` : '1px solid transparent',
+                borderTop: 'none',
+                borderRight: 'none',
+                borderBottom: 'none',
                 cursor: 'pointer',
-                borderRadius: 0,
+                borderRadius: borderRadius.card,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -120,12 +140,13 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
               }}
               onMouseEnter={(e) => {
                 if (!isActive) e.currentTarget.style.color = colors.text.primary
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'
+                e.currentTarget.style.background =
+                  'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
               }}
               onMouseLeave={(e) => {
                 if (!isActive) e.currentTarget.style.color = colors.text.secondary
                 e.currentTarget.style.background = isActive
-                  ? 'rgba(255, 255, 255, 0.04)'
+                  ? 'color-mix(in srgb, var(--color-accent-default) 8%, transparent)'
                   : 'transparent'
               }}
               title={heading.text}

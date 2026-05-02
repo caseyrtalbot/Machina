@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import type { PropertyValue } from './markdown-utils'
 
 // ── Type inference ──
@@ -59,7 +59,7 @@ export function convertValue(value: PropertyValue, toType: PropertyType): Proper
 
 const inputStyle: React.CSSProperties = {
   color: colors.text.secondary,
-  fontFamily: 'var(--font-mono)',
+  fontFamily: typography.fontFamily.mono,
   fontSize: '11px',
   background: 'transparent',
   border: 0
@@ -81,9 +81,11 @@ export function BooleanInput({ value, onChange }: BooleanInputProps) {
       style={{
         width: 30,
         height: 16,
-        borderRadius: 8,
+        // Console: hairline-square toggle. Track stays subtly hinted (2px) so
+        // the moving indicator inside reads as a square block, not a pill.
+        borderRadius: borderRadius.inline,
         border: `1px solid ${colors.border.default}`,
-        backgroundColor: value ? `${colors.accent.default}40` : 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: value ? `${colors.accent.default}40` : 'var(--color-bg-surface)',
         position: 'relative',
         cursor: 'pointer',
         padding: 0
@@ -97,7 +99,7 @@ export function BooleanInput({ value, onChange }: BooleanInputProps) {
           left: value ? 14 : 2,
           width: 10,
           height: 10,
-          borderRadius: '50%',
+          borderRadius: borderRadius.inline,
           backgroundColor: value ? colors.accent.default : colors.text.muted,
           transition: 'left 0.15s ease'
         }}
@@ -230,17 +232,18 @@ export function ListInput({ value, onChange }: ListInputProps) {
     }
   }
 
+  // Console-direction list pill: hairline-square, mono 10px, surface bg.
   const pillStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: typography.fontFamily.mono,
     fontSize: '10px',
     fontWeight: 500,
     letterSpacing: '0.08em',
-    borderRadius: 999,
+    borderRadius: borderRadius.inline,
     padding: '2px 8px',
     border: `1px solid ${colors.border.default}`,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'var(--color-bg-surface)',
     color: colors.text.primary,
     lineHeight: 1.4
   }
@@ -417,10 +420,11 @@ export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full mt-1 z-40 rounded shadow-lg overflow-hidden"
+          className="absolute left-0 top-full mt-1 z-40 shadow-lg overflow-hidden"
           style={{
             backgroundColor: colors.bg.elevated,
             border: `1px solid ${colors.border.default}`,
+            borderRadius: borderRadius.inline,
             minWidth: 56
           }}
         >

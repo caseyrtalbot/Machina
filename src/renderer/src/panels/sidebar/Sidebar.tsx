@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 import { rewriteWikilinks } from '@engine/rename-links'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { useVaultStore } from '../../store/vault-store'
-import { colors, getArtifactColor } from '../../design/tokens'
+import { borderRadius, colors, getArtifactColor, typography } from '../../design/tokens'
 import { FileContextMenu } from './FileContextMenu'
 import { FileTree } from './FileTree'
 import { SearchBar } from './SearchBar'
@@ -143,7 +143,7 @@ function ActionBar({
             style={{
               transform: filesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
               transition: 'transform 150ms ease-out',
-              color: 'rgba(255, 255, 255, 0.25)'
+              color: colors.text.muted
             }}
           >
             <path
@@ -155,15 +155,48 @@ function ActionBar({
             />
           </svg>
           <span className="sidebar-section-copy">
-            <span className="sidebar-section-label">Files</span>
-            <span className="sidebar-section-count">{fileCount}</span>
+            {/* Console section header: muted mono 10px / 0.14em uppercase. */}
+            <span
+              className="sidebar-section-label"
+              style={{
+                color: colors.text.muted,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: typography.metadata.size,
+                letterSpacing: typography.metadata.letterSpacing,
+                textTransform: typography.metadata.textTransform,
+                fontWeight: 600
+              }}
+            >
+              Files
+            </span>
+            {/* Right-aligned count in disabled-text gray, recedes behind the
+                section label. */}
+            <span
+              className="sidebar-section-count"
+              style={{
+                color: colors.text.disabled,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: typography.metadata.size,
+                letterSpacing: typography.metadata.letterSpacing,
+                fontVariantNumeric: 'tabular-nums'
+              }}
+            >
+              {fileCount}
+            </span>
           </span>
         </button>
         <div className="flex items-center gap-0.5">
           <button
             onClick={onNewFile}
             className="sidebar-icon-button"
-            style={{ color: colors.text.muted }}
+            // Console icon button: 24×24, square inline radius, muted icon
+            // color. Background lift on hover lives in the CSS class.
+            style={{
+              color: colors.text.muted,
+              width: 24,
+              height: 24,
+              borderRadius: borderRadius.inline
+            }}
             title="New file"
             aria-label="New file"
           >
@@ -182,7 +215,12 @@ function ActionBar({
           <button
             onClick={cycleSortMode}
             className="sidebar-icon-button"
-            style={{ color: colors.text.muted }}
+            style={{
+              color: colors.text.muted,
+              width: 24,
+              height: 24,
+              borderRadius: borderRadius.inline
+            }}
             title={`Sort: ${SORT_LABELS[sortMode]}`}
             aria-label={`Sort: ${SORT_LABELS[sortMode]}. Click to cycle.`}
           >
@@ -240,9 +278,17 @@ function SystemArtifactCollections({
 
         return (
           <div key={kind} className="mb-3 last:mb-0">
+            {/* Console section header: muted mono 10px / 0.14em uppercase. */}
             <div
               className="px-2 pb-2 sidebar-section-label"
-              style={{ color: colors.text.muted, opacity: 0.7 }}
+              style={{
+                color: colors.text.muted,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: typography.metadata.size,
+                letterSpacing: typography.metadata.letterSpacing,
+                textTransform: typography.metadata.textTransform,
+                fontWeight: 600
+              }}
             >
               {prettyKind(kind)}
             </div>
@@ -258,6 +304,12 @@ function SystemArtifactCollections({
                     className="file-row-hover flex items-center gap-2 px-2 py-1.5 text-left transition-colors"
                     data-active={isActive ? 'true' : 'false'}
                     title={item.path}
+                    // Console row: 2px accent left-stripe when active so this
+                    // matches FileTree/Bookmarks treatment.
+                    style={{
+                      borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
+                      borderRadius: borderRadius.inline
+                    }}
                   >
                     <span
                       className="shrink-0 rounded-full"

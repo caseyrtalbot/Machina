@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { DockTabBar } from './DockTabBar'
 import { DockTabContent } from './DockTabContent'
-import { colors } from '../../design/tokens'
+import { colors, typography } from '../../design/tokens'
 import type { DockTab } from '@shared/dock-types'
 
 const EMPTY_TABS: readonly DockTab[] = []
@@ -43,7 +43,14 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
         ) : (
           <div
             data-testid="dock-empty-state"
-            style={{ padding: 24, color: colors.text.muted, fontSize: 13 }}
+            style={{
+              padding: 24,
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 11,
+              letterSpacing: '0.04em',
+              lineHeight: 1.6
+            }}
           >
             no surface tabs yet, hit + to open canvas, editor, graph, ghosts, or health
           </div>

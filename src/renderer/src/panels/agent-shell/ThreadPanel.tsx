@@ -78,19 +78,30 @@ export function ThreadPanel() {
           gap: 12
         }}
       >
-        <span
+        <div
           style={{
-            fontFamily: typography.fontFamily.display,
-            fontSize: 14,
-            fontWeight: 500,
-            color: colors.text.primary,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            minWidth: 0,
+            flex: 1
           }}
         >
-          {t.title}
-        </span>
+          {streaming !== null && <LiveDot />}
+          <span
+            style={{
+              fontFamily: typography.fontFamily.body,
+              fontSize: 14,
+              fontWeight: 500,
+              color: colors.text.primary,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {t.title}
+          </span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {t.agent === 'machina-native' && (
             <AutoAcceptToggle
@@ -157,7 +168,7 @@ function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
         right: 20,
         width: 28,
         height: 28,
-        borderRadius: '50%',
+        borderRadius: borderRadius.round,
         background: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,
         color: colors.text.secondary,
@@ -201,12 +212,12 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        fontFamily: typography.fontFamily.body,
+        fontFamily: typography.fontFamily.mono,
         fontSize: typography.metadata.size,
         letterSpacing: typography.metadata.letterSpacing,
         textTransform: typography.metadata.textTransform,
         padding: '4px 10px',
-        borderRadius: borderRadius.tool,
+        borderRadius: borderRadius.inline,
         border: `1px solid ${on ? colors.accent.default : colors.border.subtle}`,
         background: on
           ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
@@ -248,17 +259,36 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
   )
 }
 
+function LiveDot() {
+  return (
+    <span
+      aria-hidden
+      data-testid="thread-live-dot"
+      style={{
+        display: 'inline-block',
+        width: 6,
+        height: 6,
+        borderRadius: '50%',
+        background: colors.accent.default,
+        flexShrink: 0,
+        animation: 'te-pulse 1.4s ease-in-out infinite'
+      }}
+    />
+  )
+}
+
 function AgentBadge({ agent }: { readonly agent: import('@shared/agent-identity').AgentIdentity }) {
   const pill = agentPillStyle(agent)
   return (
     <span
       style={{
         display: 'inline-block',
-        fontFamily: typography.fontFamily.body,
+        fontFamily: typography.fontFamily.mono,
         fontSize: typography.metadata.size,
-        letterSpacing: '0.04em',
-        padding: '3px 10px',
-        borderRadius: 999,
+        letterSpacing: typography.metadata.letterSpacing,
+        textTransform: typography.metadata.textTransform,
+        padding: '3px 8px',
+        borderRadius: borderRadius.inline,
         background: pill.background,
         border: pill.border,
         color: pill.color
@@ -294,7 +324,7 @@ function InflightAssistant({
     >
       <div
         style={{
-          fontFamily: typography.fontFamily.body,
+          fontFamily: typography.fontFamily.mono,
           fontSize: typography.metadata.size,
           letterSpacing: typography.metadata.letterSpacing,
           textTransform: typography.metadata.textTransform,

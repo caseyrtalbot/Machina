@@ -6,7 +6,7 @@ import {
   type DragFileData,
   type DragMoveData
 } from '../canvas/file-drop-utils'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import { useSettingsStore } from '../../store/settings-store'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { RenameInput } from './FileContextMenu'
@@ -34,10 +34,10 @@ import {
 function treeGuideColor(emphasis: 'rest' | 'active' = 'rest'): string {
   switch (emphasis) {
     case 'active':
-      return 'rgba(255, 255, 255, 0.12)'
+      return 'var(--color-border-default)'
     case 'rest':
     default:
-      return 'rgba(255, 255, 255, 0.06)'
+      return 'var(--color-border-subtle)'
   }
 }
 
@@ -470,8 +470,22 @@ export const FileTree = memo(function FileTree({
             }
           }
           if (needsHeader) {
+            // Console section header: muted mono 10px / 0.14em uppercase.
+            // Inline override so date headers stay tokenized even though the
+            // .date-separator base class lives in the sidebar CSS.
             dateHeader = (
-              <div key={`date-${dateKey}`} className="date-separator">
+              <div
+                key={`date-${dateKey}`}
+                className="date-separator"
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: typography.metadata.size,
+                  letterSpacing: typography.metadata.letterSpacing,
+                  textTransform: typography.metadata.textTransform,
+                  fontWeight: 600
+                }}
+              >
                 {formatDateLabel(node.modified)}
               </div>
             )
@@ -571,19 +585,24 @@ function DirectoryRow({
       onDragEnd={onDragEnd}
       onMouseUp={(e) => e.currentTarget.removeAttribute('draggable')}
       className="tree-directory-row flex items-center py-[2px] transition-colors"
+      // Console: square inline radius, mono icons, primary text. Matches
+      // FileRow's left-stripe contract via a transparent border so depth
+      // alignment stays pixel-true with active file rows.
       style={{
-        paddingLeft: node.depth === 0 ? 8 : undefined,
+        paddingLeft: node.depth === 0 ? 4 : undefined,
         paddingRight: 8,
         marginTop: node.depth === 0 ? 6 : undefined,
-        color: 'var(--color-text-primary)',
+        color: colors.text.primary,
         fontFamily: treeFontFamily,
         fontWeight: 500,
         fontSize: treeFontSize,
         letterSpacing: '0.02em',
+        borderLeft: '2px solid transparent',
+        borderRadius: borderRadius.inline,
         ...indentBorderStyle(node.depth)
       }}
     >
-      <span className="mr-1 flex items-center" style={{ color: 'var(--color-text-muted)' }}>
+      <span className="mr-1 flex items-center" style={{ color: colors.text.muted }}>
         <Chevron isExpanded={!isCollapsed} />
       </span>
       <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
@@ -599,11 +618,15 @@ function DirectoryRow({
         <span className="truncate flex-1">{node.name}</span>
       )}
       {!isRenaming && node.itemCount > 0 && (
+        // Right-aligned item count: console mono 10px in disabled-text gray so
+        // the count recedes behind the folder name.
         <span
           className="ml-auto"
           style={{
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--env-sidebar-tertiary-font-size)',
+            color: colors.text.disabled,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: 10,
+            letterSpacing: 0,
             fontVariantNumeric: 'tabular-nums'
           }}
         >
@@ -697,11 +720,17 @@ function FileRow({
       onDoubleClick={() => (onFileDoubleClick ?? onFileSelect)(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
       className="flex items-center py-[2px] file-row-hover"
+      // Console row: 12px text, hairline 2px accent left-stripe when active
+      // (transparent on idle so the indent grid stays aligned), 4px paddingLeft
+      // for the icon area at depth 0; nested rows pick up indent from
+      // indentBorderStyle. Square inline radius.
       style={{
-        paddingLeft: node.depth === 0 ? 24 : undefined,
+        paddingLeft: node.depth === 0 ? 4 : undefined,
         paddingRight: 8,
         fontFamily: treeFontFamily,
         fontSize: treeFontSize,
+        borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
+        borderRadius: borderRadius.inline,
         ...indentBorderStyle(node.depth, isActive)
       }}
     >

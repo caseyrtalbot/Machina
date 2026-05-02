@@ -23,7 +23,7 @@ import DragHandle from '@tiptap/extension-drag-handle'
 import { MachinaTableKit } from './extensions/table-kit'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import { useDocument } from '../../hooks/useDocument'
 import { resolveWikilinkTarget, parseWikilinkTarget } from '@shared/engine/wikilink-resolver'
 import { OutlinePanel } from './OutlinePanel'
@@ -330,34 +330,56 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
         <div
           className="flex items-center justify-between px-4 py-2 shrink-0"
           style={{
-            backgroundColor: 'rgba(234, 179, 8, 0.12)',
-            borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
-            color: '#eab308'
+            // Console callout: 2px accent left-bar + accent-soft tint
+            borderLeft: `2px solid ${colors.claude.warning}`,
+            backgroundColor: 'color-mix(in srgb, #dfa11a 10%, transparent)',
+            borderBottom: `1px solid ${colors.border.subtle}`,
+            color: colors.claude.warning,
+            fontFamily: typography.fontFamily.mono
           }}
         >
-          <span className="text-xs font-medium">
-            File changed on disk (modified by another process)
+          <span
+            style={{
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontWeight: 600
+            }}
+          >
+            File changed on disk
           </span>
           <span className="flex gap-2">
             <button
-              className="text-xs px-2 py-0.5 rounded hover:opacity-80"
+              className="hover:opacity-80"
               style={{
-                backgroundColor: 'rgba(234, 179, 8, 0.2)',
-                color: '#eab308',
-                border: 'none',
-                cursor: 'pointer'
+                fontSize: '10px',
+                padding: '2px 8px',
+                borderRadius: borderRadius.inline,
+                backgroundColor: 'transparent',
+                color: colors.claude.warning,
+                border: `1px solid ${colors.claude.warning}`,
+                cursor: 'pointer',
+                fontFamily: typography.fontFamily.mono,
+                textTransform: 'uppercase',
+                letterSpacing: typography.metadata.letterSpacing
               }}
               onClick={handleReloadFromDisk}
             >
               Reload from disk
             </button>
             <button
-              className="text-xs px-2 py-0.5 rounded hover:opacity-80"
+              className="hover:opacity-80"
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                fontSize: '10px',
+                padding: '2px 8px',
+                borderRadius: borderRadius.inline,
+                backgroundColor: 'transparent',
                 color: colors.text.secondary,
-                border: 'none',
-                cursor: 'pointer'
+                border: `1px solid ${colors.border.default}`,
+                cursor: 'pointer',
+                fontFamily: typography.fontFamily.mono,
+                textTransform: 'uppercase',
+                letterSpacing: typography.metadata.letterSpacing
               }}
               onClick={handleKeepMine}
             >

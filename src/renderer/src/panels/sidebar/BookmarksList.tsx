@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useUiStore } from '../../store/ui-store'
 import { useVaultStore } from '../../store/vault-store'
-import { colors, transitions } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 interface BookmarksListProps {
   activeFilePath: string | null
@@ -37,16 +37,29 @@ export function BookmarksList({ activeFilePath, onFileSelect }: BookmarksListPro
           <span
             style={{ color: colors.text.muted, fontSize: 'var(--env-sidebar-tertiary-font-size)' }}
           >
-            {expanded ? '\u25BE' : '\u25B8'}
+            {expanded ? '▾' : '▸'}
           </span>
+          {/* Console section header: mono 10px / 0.14em uppercase, muted */}
           <span
-            className="uppercase font-medium tracking-[0.04em]"
-            style={{ color: colors.text.muted, fontSize: 'var(--env-sidebar-tertiary-font-size)' }}
+            style={{
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              fontWeight: 600
+            }}
           >
             Bookmarks
           </span>
           <span
-            style={{ color: colors.text.muted, fontSize: 'var(--env-sidebar-tertiary-font-size)' }}
+            style={{
+              color: colors.text.disabled,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              fontVariantNumeric: 'tabular-nums'
+            }}
           >
             {bookmarkedPaths.length}
           </span>
@@ -66,9 +79,14 @@ export function BookmarksList({ activeFilePath, onFileSelect }: BookmarksListPro
                   e.preventDefault()
                   toggleBookmark(item.path)
                 }}
-                className="file-row-hover flex items-center gap-2 px-2 py-1 text-left rounded"
+                className="file-row-hover flex items-center gap-2 px-2 py-1 text-left"
                 style={{
-                  backgroundColor: isActive ? colors.accent.muted : 'transparent',
+                  // Active rows pick up a 2px accent left-stripe + brighter
+                  // background, matching the tree row treatment.
+                  background: isActive ? 'var(--color-bg-elevated)' : 'transparent',
+                  borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
+                  borderRadius: borderRadius.inline,
+                  paddingLeft: 6,
                   transition: transitions.hover
                 }}
                 title={`${item.path}\nRight-click to remove`}
@@ -86,7 +104,7 @@ export function BookmarksList({ activeFilePath, onFileSelect }: BookmarksListPro
                   className="truncate flex-1"
                   style={{
                     color: isActive ? colors.text.primary : colors.text.secondary,
-                    fontSize: 'var(--env-sidebar-font-size)'
+                    fontSize: 12
                   }}
                 >
                   {item.title}

@@ -52,70 +52,85 @@ export function ThreadInputBar() {
     <div
       style={{
         position: 'relative',
-        borderTop: `1px solid ${colors.border.default}`,
+        borderTop: `1px solid ${colors.border.subtle}`,
         padding: 12,
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: 8
+        background: colors.bg.base
       }}
     >
       {pickerOpen && <AgentPicker onPick={pickAgent} onCancel={() => setPickerOpen(false)} />}
-      <textarea
-        ref={ref}
-        value={text}
-        rows={1}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="Ask anything…   Cmd+K · /"
+      <div
+        className="thread-input-box"
         style={{
-          flex: 1,
-          resize: 'none',
-          minHeight: MIN_INPUT_HEIGHT,
-          maxHeight: MAX_INPUT_HEIGHT,
-          background: 'transparent',
-          color: colors.text.primary,
-          border: 'none',
-          outline: 'none',
-          padding: 0,
-          fontFamily: typography.fontFamily.body,
-          fontSize: 14,
-          lineHeight: 1.5
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 8,
+          padding: '10px 12px',
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: borderRadius.inline,
+          transition: 'border-color 120ms ease-out, box-shadow 120ms ease-out'
         }}
-      />
-      {inFlight && activeId && (
-        <button
-          type="button"
-          data-testid="thread-input-stop"
-          aria-label="Stop"
-          title="Stop the in-flight agent run"
-          onClick={() => void cancelActive(activeId)}
+      >
+        <textarea
+          ref={ref}
+          value={text}
+          rows={1}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Ask anything…   Cmd+K · /"
           style={{
-            flexShrink: 0,
-            padding: '4px 12px',
+            flex: 1,
+            resize: 'none',
+            minHeight: MIN_INPUT_HEIGHT,
+            maxHeight: MAX_INPUT_HEIGHT,
             background: 'transparent',
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: borderRadius.inline,
-            color: colors.text.secondary,
-            cursor: 'pointer',
-            fontSize: 12,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6
+            color: colors.text.primary,
+            border: 'none',
+            outline: 'none',
+            padding: 0,
+            fontFamily: typography.fontFamily.body,
+            fontSize: 14,
+            lineHeight: 1.5
           }}
-        >
-          <span
-            aria-hidden
+        />
+        {inFlight && activeId && (
+          <button
+            type="button"
+            data-testid="thread-input-stop"
+            aria-label="Stop"
+            title="Stop the in-flight agent run"
+            onClick={() => void cancelActive(activeId)}
             style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              background: colors.claude.error,
-              borderRadius: 1
+              flexShrink: 0,
+              padding: '4px 10px',
+              background: 'transparent',
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.inline,
+              color: colors.text.secondary,
+              cursor: 'pointer',
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6
             }}
-          />
-          Stop
-        </button>
-      )}
+          >
+            <span
+              aria-hidden
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                background: colors.claude.error,
+                borderRadius: 1
+              }}
+            />
+            Stop
+          </button>
+        )}
+      </div>
     </div>
   )
 }

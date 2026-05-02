@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors } from '../design/tokens'
+import { colors, borderRadius, typography } from '../design/tokens'
 import { ACCENT_PRESETS } from '../design/accent-presets'
 import { FontPicker } from './FontPicker'
 
@@ -72,17 +72,26 @@ function Toggle({ value, onChange, ariaLabel }: ToggleProps) {
       aria-checked={value}
       aria-label={ariaLabel}
       onClick={() => onChange(!value)}
-      className="settings-toggle w-9 h-5 rounded-full relative transition-colors flex-shrink-0"
+      className="settings-toggle relative transition-colors flex-shrink-0"
       style={{
-        backgroundColor: value ? 'rgba(255, 255, 255, 0.3)' : colors.bg.elevated,
-        border: `1px solid ${value ? 'rgba(255, 255, 255, 0.4)' : colors.border.default}`
+        width: 36,
+        height: 20,
+        borderRadius: borderRadius.inline,
+        backgroundColor: value ? colors.accent.soft : 'transparent',
+        border: `1px solid ${value ? colors.accent.default : colors.border.default}`,
+        padding: 0
       }}
     >
       <span
-        className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-transform"
+        className="absolute transition-transform"
         style={{
-          backgroundColor: value ? '#fff' : colors.text.muted,
-          left: value ? 'calc(100% - 1rem)' : '2px'
+          top: 3,
+          width: 12,
+          height: 12,
+          borderRadius: borderRadius.inline,
+          backgroundColor: value ? colors.accent.default : colors.text.muted,
+          left: value ? 'calc(100% - 15px)' : 3,
+          transition: 'left 150ms ease-out, background-color 150ms ease-out'
         }}
       />
     </button>
@@ -131,9 +140,9 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(8, 1fr)',
+        gridTemplateColumns: 'repeat(8, 24px)',
         gap: 6,
-        padding: '4px 16px 12px'
+        padding: '4px 0 14px'
       }}
     >
       {ACCENT_PRESETS.map((p) => {
@@ -146,14 +155,15 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
             title={`${p.label} · ${p.hex}`}
             aria-label={p.label}
             style={{
-              width: 22,
-              height: 22,
+              width: 24,
+              height: 24,
               padding: 0,
-              borderRadius: 4,
+              borderRadius: borderRadius.inline,
               background: p.hex,
-              border: active ? `2px solid ${colors.text.primary}` : '1px solid transparent',
+              border: `1px solid ${active ? colors.text.primary : colors.border.default}`,
               cursor: 'pointer',
-              boxShadow: active ? `0 0 0 1px ${p.hex}` : 'none'
+              boxShadow: active ? `0 0 0 1px ${colors.text.primary}` : 'none',
+              transition: 'box-shadow 120ms ease-out, border-color 120ms ease-out'
             }}
           />
         )
@@ -164,18 +174,20 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
         title="Custom hex"
         aria-label="Custom"
         style={{
-          width: 22,
-          height: 22,
+          width: 24,
+          height: 24,
           padding: 0,
-          borderRadius: 4,
+          borderRadius: borderRadius.inline,
           background: accentId === 'custom' ? customHex : 'transparent',
           border:
             accentId === 'custom'
-              ? `2px solid ${colors.text.primary}`
+              ? `1px solid ${colors.text.primary}`
               : `1px dashed ${colors.border.default}`,
+          boxShadow: accentId === 'custom' ? `0 0 0 1px ${colors.text.primary}` : 'none',
           color: colors.text.muted,
-          fontSize: 12,
-          lineHeight: '18px',
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 11,
+          lineHeight: '20px',
           cursor: 'pointer'
         }}
       >
@@ -264,7 +276,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       aria-labelledby="settings-dialog-title"
       className="fixed top-0 right-0 bottom-0 z-40 flex"
       style={{
-        width: 340,
+        width: 360,
         transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 200ms ease-out',
         pointerEvents: isOpen ? 'auto' : 'none'
@@ -273,16 +285,41 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       <div
         className="settings-shell flex flex-col h-full w-full"
         style={{
-          backgroundColor: colors.bg.rail,
-          borderLeft: `1px solid ${colors.border.default}`,
-          boxShadow: isOpen ? '-8px 0 32px rgba(0, 0, 0, 0.3)' : 'none'
+          backgroundColor: colors.bg.elevated,
+          borderLeft: `1px solid ${colors.border.strong}`,
+          boxShadow: isOpen ? '-24px 0 48px rgba(0, 0, 0, 0.6)' : 'none'
         }}
       >
         {/* Header */}
-        <div className="settings-header flex items-center justify-between px-4 pt-10 pb-3 flex-shrink-0">
-          <div className="flex flex-col gap-1">
-            <span className="settings-kicker">Workspace</span>
-            <span id="settings-dialog-title" className="settings-title">
+        <div
+          className="settings-header flex items-center justify-between px-4 pt-10 pb-3 flex-shrink-0"
+          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
+        >
+          <div className="flex flex-col gap-2">
+            <span
+              className="settings-kicker"
+              style={{
+                fontFamily: typography.fontFamily.mono,
+                fontSize: typography.metadata.size,
+                letterSpacing: typography.metadata.letterSpacing,
+                textTransform: typography.metadata.textTransform,
+                color: colors.text.muted
+              }}
+            >
+              Workspace
+            </span>
+            <span
+              id="settings-dialog-title"
+              className="settings-title"
+              style={{
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 12,
+                letterSpacing: typography.metadata.letterSpacing,
+                textTransform: typography.metadata.textTransform,
+                color: colors.text.primary,
+                fontWeight: 500
+              }}
+            >
               Settings
             </span>
           </div>
@@ -292,14 +329,15 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             onClick={onClose}
             className="settings-close-btn"
             aria-label="Close settings"
+            style={{ borderRadius: borderRadius.inline }}
           >
             <svg
-              width={14}
-              height={14}
+              width={12}
+              height={12}
               viewBox="0 0 14 14"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1.4"
               strokeLinecap="round"
             >
               <line x1="3" y1="3" x2="11" y2="11" />
@@ -490,13 +528,24 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                 <line x1="7" y1="6" x2="7" y2="10" />
               </svg>
               <div className="flex flex-col min-w-0">
-                <span className="text-xs truncate" style={{ color: colors.text.primary }}>
+                <span
+                  className="truncate"
+                  style={{
+                    color: colors.text.primary,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 12
+                  }}
+                >
                   {vaultName ?? 'No vault'}
                 </span>
                 <span
-                  className="text-[10px] truncate"
+                  className="truncate"
                   title={vaultPath ?? ''}
-                  style={{ color: colors.text.muted }}
+                  style={{
+                    color: colors.text.muted,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 10
+                  }}
                 >
                   {vaultPath ?? 'Select a vault to get started'}
                 </span>
@@ -505,7 +554,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             <button
               type="button"
               onClick={onChangeVault}
-              className="settings-button text-xs transition-colors flex-shrink-0"
+              className="settings-button transition-colors flex-shrink-0"
               style={{ color: colors.text.secondary }}
             >
               {vaultPath ? 'Change' : 'Open'}
@@ -514,24 +563,44 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
           {/* ── machina-native ── */}
           <SectionHeading>machina-native</SectionHeading>
-          <div className="settings-vault-card">
+          <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
             <div className="flex flex-col min-w-0 gap-2 w-full">
-              <span className="text-xs" style={{ color: colors.text.primary }}>
+              <span
+                style={{
+                  color: colors.text.primary,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 12
+                }}
+              >
                 Anthropic API key
               </span>
               {hasKey === null ? (
-                <span className="text-[10px]" style={{ color: colors.text.muted }}>
+                <span
+                  style={{
+                    color: colors.text.muted,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 10
+                  }}
+                >
                   checking...
                 </span>
               ) : hasKey ? (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px]" style={{ color: colors.text.muted }}>
+                  <span
+                    style={{
+                      color: colors.text.muted,
+                      fontFamily: typography.fontFamily.mono,
+                      fontSize: typography.metadata.size,
+                      letterSpacing: typography.metadata.letterSpacing,
+                      textTransform: typography.metadata.textTransform
+                    }}
+                  >
                     Key configured
                   </span>
                   <button
                     type="button"
                     onClick={clearKey}
-                    className="settings-button text-xs transition-colors flex-shrink-0"
+                    className="settings-button transition-colors flex-shrink-0"
                     style={{ color: colors.text.secondary }}
                   >
                     Clear
@@ -544,15 +613,25 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                     value={keyDraft}
                     onChange={(e) => setKeyDraft(e.target.value)}
                     placeholder="sk-ant-..."
-                    className="settings-select text-xs rounded"
-                    style={{ width: '100%' }}
+                    className="settings-select"
+                    style={{
+                      width: '100%',
+                      fontFamily: typography.fontFamily.mono,
+                      fontSize: 12
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') void saveKey()
                     }}
                   />
                   <div className="flex items-center justify-between gap-2">
                     {keyError && (
-                      <span className="text-[10px]" style={{ color: 'rgba(255, 120, 120, 0.9)' }}>
+                      <span
+                        style={{
+                          color: colors.claude.error,
+                          fontFamily: typography.fontFamily.mono,
+                          fontSize: 10
+                        }}
+                      >
                         {keyError}
                       </span>
                     )}
@@ -560,9 +639,10 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                       type="button"
                       onClick={() => void saveKey()}
                       disabled={!keyDraft.trim()}
-                      className="settings-button text-xs transition-colors flex-shrink-0 ml-auto"
+                      className="settings-primary-button transition-colors flex-shrink-0 ml-auto"
                       style={{
-                        color: keyDraft.trim() ? colors.text.primary : colors.text.muted
+                        color: keyDraft.trim() ? colors.text.primary : colors.text.muted,
+                        opacity: keyDraft.trim() ? 1 : 0.5
                       }}
                     >
                       Save
@@ -570,7 +650,14 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                   </div>
                 </div>
               )}
-              <span className="text-[10px]" style={{ color: colors.text.muted }}>
+              <span
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 10,
+                  lineHeight: 1.5
+                }}
+              >
                 Stored encrypted via Electron safeStorage. Override with ANTHROPIC_API_KEY.
               </span>
             </div>
@@ -581,7 +668,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             <button
               type="button"
               onClick={resetEnv}
-              className="settings-button text-xs transition-colors"
+              className="settings-button transition-colors"
               style={{ color: colors.text.muted }}
             >
               Reset to Defaults

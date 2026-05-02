@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { colors, borderRadius } from '../../design/tokens'
+import { colors, borderRadius, typography } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { buildIndex, buildPaletteItems, searchPalette, type PaletteItem } from './palette-sources'
 
@@ -8,6 +8,32 @@ const KIND_LABEL: Record<PaletteItem['kind'], string> = {
   file: 'file',
   surface: 'surface',
   action: 'action'
+}
+
+function PaletteFooterHint({
+  label,
+  keyLabel
+}: {
+  readonly label: string
+  readonly keyLabel: string
+}) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+      <span
+        style={{
+          padding: '1px 5px',
+          background: 'transparent',
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: borderRadius.inline,
+          fontSize: 10,
+          color: colors.text.muted
+        }}
+      >
+        {keyLabel}
+      </span>
+      <span>{label}</span>
+    </span>
+  )
 }
 
 export function CommandPalette({
@@ -76,11 +102,13 @@ export function CommandPalette({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.4)',
+        background: 'rgba(0,0,0,0.55)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingTop: '15vh',
+        paddingTop: '12vh',
         zIndex: 100
       }}
     >
@@ -88,44 +116,100 @@ export function CommandPalette({
         onClick={(e) => e.stopPropagation()}
         style={{
           background: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: borderRadius.container,
-          padding: 12,
-          width: 520,
+          border: `1px solid ${colors.border.strong}`,
+          borderRadius: borderRadius.tool,
+          width: 560,
           maxHeight: '60vh',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow:
+            '0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)'
         }}
       >
-        <input
-          ref={inputRef}
-          autoFocus
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Search threads, files, surfaces, actions…"
+        <div
           style={{
-            width: '100%',
-            padding: 8,
-            background: colors.bg.base,
-            color: colors.text.primary,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: borderRadius.inline,
-            outline: 'none'
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '12px 16px',
+            borderBottom: `1px solid ${colors.border.subtle}`
           }}
-        />
+        >
+          <span
+            aria-hidden
+            style={{
+              color: colors.accent.default,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 14,
+              fontWeight: 600,
+              lineHeight: 1
+            }}
+          >
+            ❯
+          </span>
+          <input
+            ref={inputRef}
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Search threads, files, surfaces, actions…"
+            style={{
+              flex: 1,
+              padding: 0,
+              background: 'transparent',
+              color: colors.text.primary,
+              border: 'none',
+              outline: 'none',
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 14,
+              lineHeight: 1.4
+            }}
+          />
+          <span
+            style={{
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 10,
+              color: colors.text.muted,
+              letterSpacing: '0.05em'
+            }}
+          >
+            {results.length} {results.length === 1 ? 'result' : 'results'}
+          </span>
+          <span
+            style={{
+              padding: '2px 6px',
+              background: 'transparent',
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.inline,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 10,
+              color: colors.text.muted
+            }}
+          >
+            esc
+          </span>
+        </div>
         <ul
           role="listbox"
           style={{
-            margin: '8px 0 0 0',
-            padding: 0,
+            margin: 0,
+            padding: '6px 0',
             listStyle: 'none',
             overflowY: 'auto',
             flex: 1
           }}
         >
           {results.length === 0 && (
-            <li style={{ padding: 8, fontSize: 12, color: colors.text.muted }}>
+            <li
+              style={{
+                padding: '10px 18px',
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 12,
+                color: colors.text.muted
+              }}
+            >
               {canCreateThread
                 ? `No matches. Press Enter to create a new thread named "${trimmedQuery}".`
                 : 'Start typing to search.'}
@@ -141,30 +225,43 @@ export function CommandPalette({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => void it.run()}
                 style={{
-                  padding: '6px 8px',
-                  borderRadius: borderRadius.inline,
-                  background: isActive ? colors.bg.base : 'transparent',
+                  padding: '8px 18px',
+                  background: isActive ? colors.bg.surface : 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8
+                  gap: 12,
+                  position: 'relative',
+                  borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
+                  paddingLeft: isActive ? 16 : 18
                 }}
               >
                 <span
                   style={{
-                    fontSize: 10,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 9,
                     textTransform: 'uppercase',
+                    letterSpacing: '0.12em',
                     color: colors.text.muted,
-                    minWidth: 56
+                    width: 64,
+                    flexShrink: 0
                   }}
                 >
                   {KIND_LABEL[it.kind]}
                 </span>
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minWidth: 0,
+                    flex: 1,
+                    gap: 2
+                  }}
+                >
                   <span
                     style={{
                       color: colors.text.primary,
-                      fontSize: 13,
+                      fontSize: 12,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -176,7 +273,8 @@ export function CommandPalette({
                     <span
                       style={{
                         color: colors.text.muted,
-                        fontSize: 11,
+                        fontFamily: typography.fontFamily.mono,
+                        fontSize: 10,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -190,6 +288,22 @@ export function CommandPalette({
             )
           })}
         </ul>
+        <div
+          style={{
+            display: 'flex',
+            gap: 14,
+            padding: '8px 18px',
+            borderTop: `1px solid ${colors.border.subtle}`,
+            background: colors.bg.base,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: 10,
+            color: colors.text.disabled
+          }}
+        >
+          <PaletteFooterHint label="navigate" keyLabel="↑↓" />
+          <PaletteFooterHint label="open" keyLabel="↵" />
+          <PaletteFooterHint label="dismiss" keyLabel="esc" />
+        </div>
       </div>
     </div>
   )

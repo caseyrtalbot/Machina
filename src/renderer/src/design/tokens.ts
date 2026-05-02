@@ -165,9 +165,11 @@ export const typography = {
     body: 'var(--font-body, system-ui, sans-serif)',
     mono: 'var(--font-mono, "JetBrains Mono", monospace)'
   },
+  // Console-direction metadata labels: tight uppercase mono with wide tracking.
+  // Used for section headers, pill labels, and chrome row labels.
   metadata: {
-    size: '11px',
-    letterSpacing: '0.05em',
+    size: '10px',
+    letterSpacing: '0.14em',
     textTransform: 'uppercase' as const
   }
 } as const
@@ -182,7 +184,12 @@ export const transitions = {
   commandPalette: '150ms ease-out'
 } as const
 
-export const borderRadius = { container: 6, inline: 4, tool: 8, card: 0, round: '50%' } as const
+// Console-direction radii: hairline-square. Cards sit flat (0px), pills and
+// inline chips get a 2px hint, tool/container surfaces stay at 4px so panels
+// don't feel knife-edged. Reach for `card: 0` for canvas cards and modal
+// surfaces; `inline: 2` for pills/chips/tabs; `tool: 4` for tool cards and
+// toolbars; `container: 4` for panel-level containers.
+export const borderRadius = { container: 4, inline: 2, tool: 4, card: 0, round: '50%' } as const
 
 /**
  * Z-index scale. Higher numbers paint on top.

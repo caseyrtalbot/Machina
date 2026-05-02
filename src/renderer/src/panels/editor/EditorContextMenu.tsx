@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { colors, transitions } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 export interface ContextMenuAction {
   label: string
@@ -38,22 +38,29 @@ export function EditorContextMenu({ x, y, actions, onClose }: EditorContextMenuP
   if (actions.length === 0) return null
 
   return (
+    // Console-direction: hairline border, near-square corners, mono labels.
     <div
       ref={menuRef}
-      className="fixed z-50 py-1 rounded-md shadow-lg min-w-[160px]"
+      className="fixed z-50 py-1 shadow-lg min-w-[160px]"
       style={{
         left: x,
         top: y,
         backgroundColor: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: borderRadius.inline
       }}
     >
       {actions.map((action) => (
         <button
           key={action.label}
           type="button"
-          className="w-full text-left px-3 py-1.5 text-sm focus-ring interactive-hover"
-          style={{ color: colors.text.primary, transition: transitions.hover }}
+          className="w-full text-left px-3 py-1.5 focus-ring interactive-hover"
+          style={{
+            color: colors.text.primary,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: 12,
+            transition: transitions.hover
+          }}
           onClick={() => {
             action.onClick()
             onClose()

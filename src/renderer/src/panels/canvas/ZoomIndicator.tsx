@@ -1,5 +1,5 @@
 import { useCanvasStore } from '../../store/canvas-store'
-import { colors, typography } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 
 export function ZoomIndicator() {
   const zoom = useCanvasStore((s) => s.viewport.zoom)
@@ -11,9 +11,13 @@ export function ZoomIndicator() {
   return (
     <div
       key={zoomPercent}
-      className="canvas-zoom-indicator absolute bottom-3 right-3 px-3 py-1.5 rounded-md pointer-events-none"
+      className="canvas-zoom-indicator absolute bottom-3 right-3 pointer-events-none"
       style={{
-        color: colors.text.muted,
+        padding: '3px 10px',
+        background: 'color-mix(in srgb, var(--canvas-card-bg) 92%, transparent)',
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: borderRadius.inline,
+        color: colors.text.secondary,
         fontFamily: typography.fontFamily.mono,
         fontSize: 10,
         letterSpacing: '0.16em',

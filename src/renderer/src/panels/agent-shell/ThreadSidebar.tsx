@@ -64,9 +64,9 @@ export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProp
       <header
         style={{
           padding: '14px 14px 12px',
-          fontFamily: typography.fontFamily.body,
+          fontFamily: typography.fontFamily.mono,
           fontSize: typography.metadata.size,
-          letterSpacing: '0.12em',
+          letterSpacing: typography.metadata.letterSpacing,
           textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
           display: 'flex',
@@ -248,9 +248,10 @@ function ThreadRow({
             style={{
               flex: 1,
               color: isActive ? colors.text.primary : colors.text.secondary,
-              fontFamily: typography.fontFamily.body,
-              fontSize: 13,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 12,
               fontWeight: isActive ? 500 : 400,
+              letterSpacing: '0.01em',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -291,11 +292,12 @@ function ThreadRow({
       <span
         style={{
           display: 'inline-block',
-          fontFamily: typography.fontFamily.body,
-          fontSize: 10,
-          letterSpacing: '0.04em',
-          padding: '1px 8px',
-          borderRadius: 999,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 9,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          padding: '1px 6px',
+          borderRadius: borderRadius.inline,
           background: pill.background,
           border: pill.border,
           color: pill.color,
@@ -320,19 +322,21 @@ function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
         width: '100%',
         padding: '8px 10px',
         background: hovered
-          ? 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)'
+          ? 'color-mix(in srgb, var(--color-accent-default) 8%, transparent)'
           : 'transparent',
-        border: 'none',
-        color: hovered ? colors.text.primary : colors.text.secondary,
+        border: `1px solid ${hovered ? colors.accent.line : 'transparent'}`,
+        color: hovered ? colors.accent.default : colors.text.muted,
         borderRadius: borderRadius.inline,
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        fontFamily: typography.fontFamily.body,
-        fontSize: 12,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: typography.metadata.size,
+        letterSpacing: typography.metadata.letterSpacing,
+        textTransform: typography.metadata.textTransform,
         textAlign: 'left',
-        transition: 'background 120ms ease-out, color 120ms ease-out'
+        transition: 'background 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out'
       }}
     >
       <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden style={{ flexShrink: 0 }}>
@@ -343,7 +347,7 @@ function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
           strokeLinecap="round"
         />
       </svg>
-      <span>New thread</span>
+      <span>New Thread</span>
     </button>
   )
 }
@@ -380,7 +384,8 @@ function RenameInput({
         border: `1px solid ${colors.border.default}`,
         borderRadius: borderRadius.inline,
         color: colors.text.primary,
-        fontSize: 13,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: 12,
         padding: '2px 6px',
         outline: 'none',
         minWidth: 0
@@ -403,17 +408,22 @@ function NewThreadPicker({
     'cli-gemini'
   ]
   return (
-    <div role="menu" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div role="menu" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {AGENTS.map((a) => (
         <button
           key={a}
           onClick={() => onPick(a)}
           style={{
             textAlign: 'left',
-            padding: 6,
+            padding: '6px 8px',
             background: 'transparent',
-            border: 'none',
-            color: 'inherit',
+            border: `1px solid ${colors.border.subtle}`,
+            borderRadius: borderRadius.inline,
+            color: colors.text.secondary,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: typography.metadata.size,
+            letterSpacing: typography.metadata.letterSpacing,
+            textTransform: typography.metadata.textTransform,
             cursor: 'pointer'
           }}
         >
@@ -424,8 +434,11 @@ function NewThreadPicker({
         onClick={onCancel}
         style={{
           textAlign: 'left',
-          padding: 6,
-          fontSize: 11,
+          padding: '6px 8px',
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
           background: 'transparent',
           border: 'none',

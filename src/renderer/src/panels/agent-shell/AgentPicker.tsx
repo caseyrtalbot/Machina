@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { agentTag } from './agent-tag'
-import { colors, borderRadius } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 
 const AGENTS: readonly AgentIdentity[] = ['machina-native', 'cli-claude', 'cli-codex', 'cli-gemini']
 
@@ -50,12 +50,14 @@ export function AgentPicker({
       role="menu"
       style={{
         position: 'absolute',
-        bottom: 50,
-        left: 12,
+        bottom: 64,
+        left: 24,
         background: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,
-        padding: 6,
-        borderRadius: borderRadius.container
+        padding: 4,
+        borderRadius: borderRadius.tool,
+        minWidth: 160,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.4)'
       }}
     >
       {AGENTS.map((a, i) => {
@@ -68,11 +70,17 @@ export function AgentPicker({
             onMouseEnter={() => setActive(i)}
             onClick={() => onPick(a)}
             style={{
-              padding: '4px 8px',
+              padding: '6px 10px',
               cursor: 'pointer',
               borderRadius: borderRadius.inline,
-              background: isActive ? colors.bg.base : 'transparent',
-              color: colors.text.primary
+              background: isActive
+                ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
+                : 'transparent',
+              color: isActive ? colors.accent.default : colors.text.secondary,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform
             }}
           >
             /{agentTag(a)}
@@ -83,9 +91,12 @@ export function AgentPicker({
         role="menuitem"
         onClick={onCancel}
         style={{
-          padding: '4px 8px',
+          padding: '6px 10px',
           cursor: 'pointer',
-          fontSize: 11,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
           color: colors.text.muted
         }}
       >

@@ -25,7 +25,7 @@ export function ThreadMessage({ message, streamingBody }: Props) {
     >
       <div
         style={{
-          fontFamily: typography.fontFamily.body,
+          fontFamily: typography.fontFamily.mono,
           fontSize: typography.metadata.size,
           letterSpacing: typography.metadata.letterSpacing,
           textTransform: typography.metadata.textTransform,

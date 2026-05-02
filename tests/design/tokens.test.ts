@@ -37,8 +37,10 @@ describe('design tokens', () => {
 
 describe('extended design tokens', () => {
   it('has border-radius constants', () => {
-    expect(borderRadius.container).toBe(6)
-    expect(borderRadius.inline).toBe(4)
+    // Console-direction radii: hairline-square. See `tokens.ts`.
+    expect(borderRadius.container).toBe(4)
+    expect(borderRadius.inline).toBe(2)
+    expect(borderRadius.tool).toBe(4)
     expect(borderRadius.card).toBe(0)
     expect(borderRadius.round).toBe('50%')
   })

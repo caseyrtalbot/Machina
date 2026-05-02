@@ -340,7 +340,7 @@ body {
 }
 
 .sidebar-search-input::placeholder {
-  color: var(--color-text-secondary);
+  color: var(--color-text-disabled);
   opacity: 1;
   letter-spacing: 0.02em;
 }
@@ -910,23 +910,25 @@ body {
   background: rgba(255, 255, 255, 0.04);
 }
 
-/* Active tab: matches content bg, sits above bottom border to break it */
+/* Active tab: matches content bg, sits above bottom border to break it.
+   Console treatment: accent underline + subtle inset highlight, no rounded chrome. */
 .editor-file-tab[data-active='true'] {
   background: var(--color-bg-base);
   z-index: 2;
   box-shadow:
+    inset 0 -1.5px 0 var(--color-accent-default),
     inset 0 1px 0 color-mix(in srgb, white 6%, transparent),
     0 1px 0 var(--color-bg-base);
 }
 
 .editor-file-tab__title {
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
+  max-width: 200px;
   color: var(--color-text-muted);
   transition: color 120ms ease-out;
 }
@@ -967,7 +969,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--color-text-secondary);
+  background: var(--color-accent-default);
 }
 
 .editor-file-tab[data-dirty='true'] .editor-file-tab__dirty-dot {
@@ -1165,8 +1167,8 @@ body {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
+  height: 2px;
+  border-radius: 1px;
   background: var(--color-border-default);
   cursor: pointer;
 }
@@ -1177,7 +1179,7 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--color-text-primary);
+  background: var(--color-accent-default);
   border: none;
   cursor: pointer;
   transition: transform 0.15s ease;
@@ -1795,6 +1797,16 @@ body {
 }
 
 /*
+ * Thread input box: Console-style focus ring. The wrapper div uses inline
+ * styles for the resting border and background; this rule layers an accent
+ * border + 1px halo when any descendant (textarea, button) has focus.
+ */
+.thread-input-box:focus-within {
+  border-color: var(--color-accent-line) !important;
+  box-shadow: 0 0 0 1px var(--color-accent-default);
+}
+
+/*
  * Thread prose: typography scope for ThreadMessage body content rendered by
  * react-markdown. Mirrors the editor's proportional rhythm so a thread reads
  * like a typeset note that contains a conversation. Lives in CSS so heading
@@ -2003,11 +2015,13 @@ body {
   position: absolute;
   overflow: hidden;
   border: 1px solid var(--chrome-panel-border);
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--canvas-hud-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 6px 16px rgba(0, 0, 0, 0.36);
 }
 
 .canvas-minimap__label {
@@ -2025,41 +2039,47 @@ body {
 
 .canvas-zoom-indicator {
   border: 1px solid var(--chrome-panel-border);
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--canvas-hud-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 4px 12px rgba(0, 0, 0, 0.32);
 }
 
 .terminal-pill {
   border-radius: 999px;
 }
 
-/* ─── Settings Drawer ─── */
+/* ─── Settings Drawer (Console direction) ─── */
 
 .settings-shell {
-  background: var(--color-bg-surface);
+  background: var(--color-bg-elevated);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
 }
 
 .settings-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .settings-kicker {
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 500;
   color: var(--color-text-muted);
 }
 
 .settings-title {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--color-text-primary);
 }
 
@@ -2067,12 +2087,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
+  cursor: pointer;
   transition:
     background-color 150ms ease-out,
     border-color 150ms ease-out,
@@ -2080,38 +2101,38 @@ body {
 }
 
 .settings-close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  border-color: var(--color-border-default);
   color: var(--color-text-secondary);
 }
 
 .settings-content {
-  padding: 16px 16px 24px;
+  padding: 8px 16px 24px;
 }
 
 .settings-section-heading {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 20px 0 8px;
-  font-family: var(--font-body);
+  margin: 20px 0 6px;
+  font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 500;
   color: var(--color-text-muted);
 }
 
 .settings-section-heading:first-child {
-  margin-top: 0;
+  margin-top: 12px;
 }
 
 .settings-section-heading::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--border-subtle);
 }
 
 .settings-row {
@@ -2119,23 +2140,29 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-row + .settings-row {
+  /* dividers stay between rows; first row keeps its own bottom-border */
 }
 
 .settings-label {
   font-family: var(--font-body);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.35;
-  letter-spacing: 0.01em;
-  color: var(--color-text-secondary);
+  letter-spacing: 0;
+  color: var(--color-text-primary);
   flex-shrink: 0;
 }
 
 .settings-value {
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
+  color: var(--color-text-secondary);
 }
 
 .settings-field {
@@ -2148,11 +2175,16 @@ body {
 
 .settings-input,
 .settings-select {
-  min-height: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
+  min-height: 26px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 2px;
+  background: transparent;
   color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .settings-input {
@@ -2160,17 +2192,27 @@ body {
 }
 
 .settings-select {
-  padding: 0 8px;
+  padding: 0 22px 0 8px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 11px) 50%,
+    calc(100% - 7px) 50%;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
 }
 
 .settings-input:focus-visible,
 .settings-select:focus-visible {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: var(--color-accent-default);
 }
 
 .settings-toggle {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
 }
 
 .settings-vault-card {
@@ -2179,15 +2221,18 @@ body {
   justify-content: space-between;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  margin: 4px 0 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-default);
+  background: color-mix(in srgb, var(--color-text-primary) 2%, transparent);
 }
 
 .settings-footer {
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
 }
 
 .settings-button,
@@ -2195,13 +2240,15 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  min-height: 24px;
   padding: 0 10px;
-  border-radius: 4px;
-  font-family: var(--font-body);
-  font-size: 11px;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   line-height: 1;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
   transition:
     background-color 150ms ease-out,
     border-color 150ms ease-out,
@@ -2209,21 +2256,30 @@ body {
 }
 
 .settings-button {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+  color: var(--color-text-secondary);
 }
 
 .settings-primary-button {
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-accent-default);
+  background: var(--color-accent-default);
+  color: var(--color-bg-base);
+}
+
+.settings-button:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  border-color: var(--color-border-strong);
   color: var(--color-text-primary);
 }
 
-.settings-button:hover,
 .settings-primary-button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.20);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.settings-primary-button:disabled {
+  cursor: not-allowed;
 }
 
 /* ─── Entrance Utilities ─── */

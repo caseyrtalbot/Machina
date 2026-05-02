@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { FileText } from '@phosphor-icons/react'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useSettingsStore } from '../../store/settings-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -110,7 +110,7 @@ export function DailyNoteSection({
       <button
         className="flex items-center gap-1.5 w-full text-left mb-1"
         style={{
-          color: colors.text.secondary,
+          color: colors.text.muted,
           background: 'none',
           border: 'none',
           cursor: 'pointer',
@@ -124,6 +124,7 @@ export function DailyNoteSection({
         >
           ▼
         </span>
+        {/* Console section header: muted mono 10px / 0.14em uppercase. */}
         <SectionLabel style={{ color: 'inherit' }}>Daily Notes</SectionLabel>
       </button>
 
@@ -145,7 +146,17 @@ export function DailyNoteSection({
             >
               ‹
             </button>
-            <span style={{ color: colors.text.secondary, fontSize: '11px', fontWeight: 500 }}>
+            {/* Mono numeric/month label — sits visually with the rest of the
+                console chrome instead of looking like sentence text. */}
+            <span
+              style={{
+                color: colors.text.secondary,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 11,
+                fontWeight: 500,
+                letterSpacing: '0.04em'
+              }}
+            >
               {formatMonthYear(year, month)}
             </span>
             <button
@@ -170,7 +181,14 @@ export function DailyNoteSection({
               <div
                 key={i}
                 className="text-center"
-                style={{ color: colors.text.secondary, fontSize: '9px', lineHeight: '16px' }}
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 9,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  lineHeight: '16px'
+                }}
               >
                 {label}
               </div>
@@ -193,15 +211,15 @@ export function DailyNoteSection({
                   key={dateStr}
                   onDoubleClick={() => handleDayClick(day)}
                   style={{
-                    background: isToday ? '#ffffff' : 'none',
+                    // Today gets the warm accent fill rather than pure white
+                    // so the calendar reads consistently with the rest of the
+                    // Console palette.
+                    background: isToday ? colors.accent.default : 'none',
                     border: 'none',
-                    borderRadius: '4px',
-                    color: isToday
-                      ? '#0a0a0c'
-                      : hasNote
-                        ? 'var(--color-text-primary)'
-                        : colors.text.secondary,
+                    borderRadius: borderRadius.inline,
+                    color: isToday ? '#0a0a0c' : hasNote ? colors.text.primary : colors.text.muted,
                     cursor: 'pointer',
+                    fontFamily: typography.fontFamily.mono,
                     fontSize: '10px',
                     fontWeight: hasNote || isToday ? 600 : 400,
                     lineHeight: '20px',
@@ -234,14 +252,19 @@ export function DailyNoteSection({
           <button
             onClick={goToToday}
             className="w-full mt-1.5"
+            // Console: minimal hairline button — transparent ground, mono
+            // uppercase 10px label. No filled pills.
             style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: '4px',
-              color: colors.text.secondary,
+              background: 'transparent',
+              border: `1px solid ${colors.border.subtle}`,
+              borderRadius: borderRadius.inline,
+              color: colors.text.muted,
               cursor: 'pointer',
-              fontSize: '10px',
-              padding: '3px 0',
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              padding: '4px 0',
               textAlign: 'center'
             }}
           >

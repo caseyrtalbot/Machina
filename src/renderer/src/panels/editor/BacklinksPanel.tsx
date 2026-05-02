@@ -1,5 +1,11 @@
 import type { Artifact } from '@shared/types'
-import { getArtifactColor, colors, transitions } from '../../design/tokens'
+import {
+  borderRadius,
+  colors,
+  getArtifactColor,
+  transitions,
+  typography
+} from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useUiStore } from '../../store/ui-store'
 
@@ -80,20 +86,48 @@ function BacklinkItem({
     <button
       type="button"
       onClick={() => onNavigate(artifact.id)}
-      className="w-full text-left px-4 py-2 flex flex-col gap-0.5 focus-ring interactive-hover"
-      style={{ borderRadius: 0 }}
+      className="w-full text-left flex flex-col gap-0.5 focus-ring interactive-hover"
+      style={{
+        borderRadius: borderRadius.card,
+        // Console: 12px vertical / 32px horizontal padding aligns with the
+        // chrome row scale used elsewhere in the editor.
+        padding: '8px 32px',
+        fontFamily: typography.fontFamily.mono
+      }}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: typeColor }} />
+        {/* Square chip dot — replaces the round one to match the hairline-square aesthetic */}
         <span
-          className="text-xs truncate"
-          style={{ color: colors.text.primary, transition: transitions.hover }}
+          aria-hidden="true"
+          style={{
+            width: 8,
+            height: 8,
+            backgroundColor: typeColor,
+            borderRadius: borderRadius.inline,
+            flexShrink: 0
+          }}
+        />
+        <span
+          className="truncate"
+          style={{
+            color: colors.text.primary,
+            fontSize: '11px',
+            transition: transitions.hover
+          }}
         >
           {artifact.title}
         </span>
       </div>
       {context && (
-        <p className="text-xs truncate pl-4" style={{ color: colors.text.muted }} title={context}>
+        <p
+          className="truncate"
+          style={{
+            color: colors.text.muted,
+            fontSize: '11px',
+            paddingLeft: 16
+          }}
+          title={context}
+        >
           {context}
         </p>
       )}
@@ -122,22 +156,48 @@ export function BacklinksPanel({
   if (backlinks.length === 0) return null
 
   return (
-    <div>
+    // Console: hairline top border separates the backlinks bar from the
+    // editor body. Padding 12 / 32 matches the breadcrumb row scale.
+    <div
+      style={{
+        borderTop: `1px solid ${colors.border.subtle}`
+      }}
+    >
       {/* Header row */}
       <button
         type="button"
         onClick={() => toggle(currentNotePath)}
-        className="w-full flex items-center justify-between px-4 py-2 focus-ring interactive-hover"
-        style={{ transition: transitions.hover }}
+        className="w-full flex items-center justify-between focus-ring interactive-hover"
+        style={{
+          padding: '12px 32px',
+          transition: transitions.hover,
+          fontFamily: typography.fontFamily.mono
+        }}
       >
-        <SectionLabel>Backlinks</SectionLabel>
+        <SectionLabel
+          style={{
+            fontSize: '11px',
+            letterSpacing: typography.metadata.letterSpacing
+          }}
+        >
+          Backlinks
+        </SectionLabel>
         <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: colors.text.muted }}>
+          <span
+            style={{
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: '11px'
+            }}
+          >
             {backlinks.length}
           </span>
           <span
-            className="text-xs"
-            style={{ color: colors.text.muted, transition: transitions.hover }}
+            style={{
+              color: colors.text.muted,
+              fontSize: '11px',
+              transition: transitions.hover
+            }}
           >
             {collapsed ? '\u25BE' : '\u25B4'}
           </span>
@@ -146,7 +206,7 @@ export function BacklinksPanel({
 
       {/* Backlink list */}
       {!collapsed && (
-        <div className="pb-2">
+        <div style={{ paddingBottom: 8 }}>
           {backlinks.map((artifact) => (
             <BacklinkItem
               key={artifact.id}

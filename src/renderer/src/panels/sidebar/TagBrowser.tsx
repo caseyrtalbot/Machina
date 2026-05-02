@@ -3,7 +3,7 @@ import { useVaultStore } from '../../store/vault-store'
 import { useSidebarFilterStore } from '../../store/sidebar-filter-store'
 import { buildTagIndex } from '@engine/tag-index'
 import type { TagTreeNode } from '@engine/tag-index'
-import { colors, transitions } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 
 function TagNode({
@@ -32,7 +32,11 @@ function TagNode({
         style={{
           paddingLeft: 8 + depth * 12,
           transition: transitions.hover,
-          backgroundColor: isSelected ? colors.accent.muted : 'transparent'
+          backgroundColor: isSelected ? colors.accent.soft : 'transparent',
+          // Active tag rows pick up the accent left-stripe; idle rows get a
+          // matching transparent stripe so the indent grid stays aligned.
+          borderLeft: `2px solid ${isSelected ? colors.accent.default : 'transparent'}`,
+          borderRadius: borderRadius.inline
         }}
       >
         {hasChildren && (
@@ -124,24 +128,21 @@ export function TagBrowser() {
         <div className="flex items-center gap-1.5">
           <span
             style={{
-              color: colors.text.secondary,
+              color: colors.text.muted,
               fontSize: 'var(--env-sidebar-tertiary-font-size)'
             }}
           >
             {expanded ? '\u25BE' : '\u25B8'}
           </span>
-          <SectionLabel
-            style={{
-              color: colors.text.secondary,
-              fontSize: 'var(--env-sidebar-tertiary-font-size)'
-            }}
-          >
-            Tags
-          </SectionLabel>
+          {/* Console section header: muted mono 10px / 0.14em uppercase. */}
+          <SectionLabel style={{ color: colors.text.muted }}>Tags</SectionLabel>
           <span
             style={{
-              color: colors.text.secondary,
-              fontSize: 'var(--env-sidebar-tertiary-font-size)'
+              color: colors.text.disabled,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              fontVariantNumeric: 'tabular-nums'
             }}
           >
             {tagTree.length}
@@ -149,10 +150,18 @@ export function TagBrowser() {
         </div>
         {expanded && (
           <span
-            className="uppercase px-1 rounded"
+            // Operator pill (AND/OR) uses the same hairline 2px chip recipe as
+            // workspace chips for visual consistency across sidebar chrome.
             style={{
-              color: colors.text.secondary,
-              fontSize: 'var(--env-sidebar-tertiary-font-size)'
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              padding: '2px 6px',
+              border: `1px solid ${colors.border.subtle}`,
+              borderRadius: borderRadius.inline,
+              lineHeight: 1
             }}
             onClick={(e) => {
               e.stopPropagation()
@@ -170,7 +179,23 @@ export function TagBrowser() {
           {selectedTags.length > 0 && (
             <div className="tag-browser__chips">
               {selectedTags.map((tag) => (
-                <span key={tag} className="tag-browser__chip inline-flex items-center">
+                <span
+                  key={tag}
+                  className="tag-browser__chip inline-flex items-center"
+                  // Console: hairline accent-tint pill — transparent ground so the
+                  // chip reads as an outline, not a filled tag from the artifact
+                  // palette.
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${colors.accent.line}`,
+                    borderRadius: borderRadius.inline,
+                    color: colors.accent.default,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 11,
+                    letterSpacing: 0,
+                    padding: '2px 6px'
+                  }}
+                >
                   {tag}
                   <button
                     type="button"

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import type { DockTab } from '@shared/dock-types'
-import { colors } from '../../design/tokens'
+import { colors, typography } from '../../design/tokens'
 
 const LazyCanvasView = lazy(() =>
   import('../canvas/CanvasView').then((m) => ({ default: m.CanvasView }))
@@ -24,7 +24,20 @@ const LazyHealth = lazy(() =>
 export function DockTabContent({ tab }: { readonly tab: DockTab }) {
   return (
     <Suspense
-      fallback={<div style={{ padding: 24, color: colors.text.muted }}>loading {tab.kind}…</div>}
+      fallback={
+        <div
+          style={{
+            padding: 24,
+            color: colors.text.muted,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: typography.metadata.size,
+            letterSpacing: typography.metadata.letterSpacing,
+            textTransform: typography.metadata.textTransform
+          }}
+        >
+          loading {tab.kind}…
+        </div>
+      }
     >
       {renderTab(tab)}
     </Suspense>

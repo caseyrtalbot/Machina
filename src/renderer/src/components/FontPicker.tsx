@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { colors } from '../design/tokens'
+import { colors, borderRadius, typography } from '../design/tokens'
 import {
   ALL_FONT_OPTIONS,
   FONT_CATEGORIES,
@@ -94,16 +94,29 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="text-xs px-2 py-1 rounded flex items-center gap-1.5 min-w-[140px] justify-between"
+        className="flex items-center justify-between"
         style={{
-          backgroundColor: colors.bg.elevated,
+          minWidth: 140,
+          minHeight: 26,
+          padding: '0 8px',
+          gap: 6,
+          backgroundColor: 'transparent',
           color: colors.text.primary,
           border: `1px solid ${colors.border.default}`,
-          fontFamily: buildFontFamilyValue(value)
+          borderRadius: borderRadius.inline,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 12,
+          letterSpacing: 0,
+          cursor: 'pointer'
         }}
       >
-        <span className="truncate">{value}</span>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <span
+          className="truncate"
+          style={{ fontFamily: buildFontFamilyValue(value), fontSize: 12 }}
+        >
+          {value}
+        </span>
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0 }}>
           <path
             d="M2.5 4L5 6.5L7.5 4"
             stroke="currentColor"
@@ -117,45 +130,68 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
       {/* Dropdown */}
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 rounded-lg overflow-hidden shadow-xl"
+          className="absolute right-0 top-full z-50 overflow-hidden"
           style={{
+            marginTop: 4,
             width: 280,
             backgroundColor: colors.bg.elevated,
-            border: `1px solid ${colors.border.default}`,
-            boxShadow: '0 12px 40px rgba(0,0,0,0.5)'
+            border: `1px solid ${colors.border.strong}`,
+            borderRadius: borderRadius.tool,
+            boxShadow: '0 24px 48px rgba(0,0,0,0.6)'
           }}
         >
           {/* Search input */}
-          <div className="p-2 border-b" style={{ borderColor: colors.border.default }}>
+          <div
+            style={{
+              padding: 8,
+              borderBottom: `1px solid ${colors.border.subtle}`
+            }}
+          >
             <input
               ref={searchRef}
               type="text"
               placeholder="Search fonts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-2 py-1 text-xs rounded outline-none"
+              className="w-full outline-none"
               style={{
-                backgroundColor: colors.bg.base,
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
                 color: colors.text.primary,
-                border: `1px solid ${colors.border.default}`
+                border: `1px solid ${colors.border.default}`,
+                borderRadius: borderRadius.inline,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 12
               }}
             />
           </div>
 
           {/* Category filters */}
           <div
-            className="flex gap-0.5 px-2 py-1.5 border-b"
-            style={{ borderColor: colors.border.default }}
+            className="flex"
+            style={{
+              gap: 4,
+              padding: '6px 8px',
+              borderBottom: `1px solid ${colors.border.subtle}`
+            }}
           >
             {FONT_CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setCategory(cat)}
-                className="text-[10px] px-1.5 py-0.5 rounded capitalize transition-colors"
+                className="transition-colors"
                 style={{
-                  backgroundColor: category === cat ? colors.accent.muted : 'transparent',
-                  color: category === cat ? colors.accent.default : colors.text.muted
+                  padding: '2px 6px',
+                  borderRadius: borderRadius.inline,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: typography.metadata.size,
+                  letterSpacing: typography.metadata.letterSpacing,
+                  textTransform: typography.metadata.textTransform,
+                  backgroundColor: category === cat ? colors.accent.soft : 'transparent',
+                  border: `1px solid ${category === cat ? colors.accent.default : 'transparent'}`,
+                  color: category === cat ? colors.accent.default : colors.text.muted,
+                  cursor: 'pointer'
                 }}
               >
                 {cat === 'all' ? 'All' : cat}
@@ -164,9 +200,17 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
           </div>
 
           {/* Font list */}
-          <div ref={listRef} className="max-h-[240px] overflow-y-auto">
+          <div ref={listRef} className="overflow-y-auto" style={{ maxHeight: 240 }}>
             {filteredFonts.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-center" style={{ color: colors.text.muted }}>
+              <div
+                className="text-center"
+                style={{
+                  padding: '16px 12px',
+                  fontSize: 12,
+                  fontFamily: typography.fontFamily.mono,
+                  color: colors.text.muted
+                }}
+              >
                 No fonts match &ldquo;{search}&rdquo;
               </div>
             ) : (
@@ -184,22 +228,34 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
                     }}
                     onMouseEnter={() => handleHover(font)}
                     onMouseLeave={() => setPreviewFont(null)}
-                    className="w-full text-left px-3 py-1.5 flex items-center justify-between transition-colors text-xs"
+                    className="w-full text-left flex items-center justify-between transition-colors"
                     style={{
+                      padding: '6px 12px',
+                      borderBottom: `1px solid ${colors.border.subtle}`,
                       backgroundColor: isSelected
-                        ? colors.accent.muted
+                        ? colors.accent.soft
                         : isHovered
-                          ? colors.bg.surface
+                          ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
                           : 'transparent',
                       color: isSelected ? colors.accent.default : colors.text.primary,
                       fontFamily:
-                        isHovered || isSelected ? buildFontFamilyValue(font.name) : undefined
+                        isHovered || isSelected
+                          ? buildFontFamilyValue(font.name)
+                          : typography.fontFamily.mono,
+                      fontSize: 12,
+                      cursor: 'pointer'
                     }}
                   >
                     <span className="truncate">{font.name}</span>
                     <span
-                      className="text-[10px] ml-2 flex-shrink-0"
-                      style={{ color: colors.text.muted }}
+                      className="ml-2 flex-shrink-0"
+                      style={{
+                        color: colors.text.muted,
+                        fontFamily: typography.fontFamily.mono,
+                        fontSize: typography.metadata.size,
+                        letterSpacing: typography.metadata.letterSpacing,
+                        textTransform: typography.metadata.textTransform
+                      }}
                     >
                       {font.category}
                     </span>
@@ -211,8 +267,15 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
 
           {/* Footer count */}
           <div
-            className="px-3 py-1.5 border-t text-[10px]"
-            style={{ borderColor: colors.border.default, color: colors.text.muted }}
+            style={{
+              padding: '6px 12px',
+              borderTop: `1px solid ${colors.border.subtle}`,
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform
+            }}
           >
             {filteredFonts.length} font{filteredFonts.length !== 1 ? 's' : ''}
           </div>

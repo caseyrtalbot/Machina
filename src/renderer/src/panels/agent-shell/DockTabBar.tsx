@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { DOCK_TAB_KINDS, type DockTab, type DockTabKind } from '@shared/dock-types'
-import { colors, zIndex } from '../../design/tokens'
+import { borderRadius, colors, typography, zIndex } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 
 const EMPTY_TABS: readonly DockTab[] = []
@@ -109,17 +109,18 @@ export function DockTabBar({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              padding: '0 10px',
+              padding: '0 12px',
               height: '100%',
-              background: isActive
-                ? colors.tab.bgActive
-                : isHovered
-                  ? colors.tab.bgHover
-                  : colors.tab.bg,
+              background: isHovered && !isActive ? colors.tab.bgHover : 'transparent',
               border: 'none',
-              borderRight: `1px solid ${colors.tab.border}`,
+              borderBottom: isActive
+                ? `1.5px solid ${colors.accent.default}`
+                : `1px solid transparent`,
               color: isActive ? colors.tab.fgActive : colors.tab.fg,
-              fontSize: 12,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
               cursor: 'pointer',
               transition: 'background 100ms ease-out, color 100ms ease-out'
             }}
@@ -138,7 +139,7 @@ export function DockTabBar({
                 justifyContent: 'center',
                 width: 14,
                 height: 14,
-                borderRadius: 3,
+                borderRadius: borderRadius.inline,
                 fontSize: 11,
                 lineHeight: 1,
                 color: colors.text.muted,
@@ -170,7 +171,7 @@ export function DockTabBar({
             height: '100%',
             background: 'transparent',
             border: 'none',
-            color: colors.text.secondary,
+            color: colors.text.muted,
             fontSize: 14,
             lineHeight: 1,
             cursor: 'pointer'
@@ -202,10 +203,15 @@ export function DockTabBar({
                   onMouseLeave={() => setHoveredAdderItem((cur) => (cur === k ? null : cur))}
                   style={{
                     padding: '6px 10px',
-                    fontSize: 12,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: typography.metadata.size,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
                     color: isHovered ? colors.text.primary : colors.text.secondary,
-                    background: isHovered ? 'rgba(255,255,255,0.07)' : 'transparent',
-                    borderRadius: 6,
+                    background: isHovered
+                      ? 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)'
+                      : 'transparent',
+                    borderRadius: borderRadius.inline,
                     cursor: 'pointer'
                   }}
                 >

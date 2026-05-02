@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
-import { colors, canvasTokens, typography } from '../../design/tokens'
+import { borderRadius, colors, canvasTokens, typography } from '../../design/tokens'
 import { useEnv } from '../../design/Theme'
 import {
   startConnectionDrag,
@@ -302,18 +302,18 @@ export function CardShell({
         background: isTerminalCard
           ? '#050607'
           : `linear-gradient(180deg, color-mix(in srgb, var(--canvas-card-bg) 96%, white 4%), var(--canvas-card-bg))`,
-        borderRadius: 10,
+        borderRadius: borderRadius.tool,
         border:
           isFocused || isLocked
-            ? '1px solid color-mix(in srgb, var(--color-accent-default) 36%, var(--canvas-card-border))'
+            ? '1px solid color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border))'
             : `1px solid ${canvasTokens.cardBorder}`,
         boxShadow: isLocked
-          ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 28%, transparent), 0 28px 48px rgba(0, 0, 0, 0.36)'
+          ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 32%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 18px 36px rgba(0, 0, 0, 0.32)'
           : isFocused
-            ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 24%, transparent), 0 24px 44px rgba(0, 0, 0, 0.32)'
+            ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 26%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 14px 30px rgba(0, 0, 0, 0.28)'
             : isSelected
-              ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 38%, transparent), 0 22px 40px rgba(0, 0, 0, 0.28)'
-              : '0 18px 36px rgba(0, 0, 0, 0.26)',
+              ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 42%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 26px rgba(0, 0, 0, 0.24)'
+              : '0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 22px rgba(0, 0, 0, 0.22)',
         overflow: 'hidden',
         contain: isTerminalCard ? undefined : 'layout style',
         backdropFilter:
@@ -340,16 +340,16 @@ export function CardShell({
         setHoveredNode(null)
       }}
     >
-      {/* Title bar */}
+      {/* Title bar — Console card header band: lighter than body, hairline border. */}
       <div
         className="canvas-card__titlebar flex items-center justify-between shrink-0 select-none"
         style={{
-          padding: '8px 11px',
+          padding: '7px 11px',
           background: isTerminalCard
             ? 'linear-gradient(180deg, rgba(3, 3, 5, 0.96), rgba(3, 3, 5, 0.9))'
-            : `linear-gradient(180deg, color-mix(in srgb, var(--canvas-card-title-bg) 86%, var(--color-bg-base)), color-mix(in srgb, var(--canvas-card-title-bg) 58%, transparent))`,
+            : `color-mix(in srgb, var(--canvas-card-bg) 70%, var(--color-bg-elevated))`,
           borderBottom: `1px solid ${canvasTokens.cardBorder}`,
-          borderRadius: '9px 9px 0 0',
+          borderRadius: `${borderRadius.tool - 1}px ${borderRadius.tool - 1}px 0 0`,
           cursor: 'grab'
         }}
         onPointerDown={onDragStart}
@@ -362,7 +362,7 @@ export function CardShell({
               fontFamily: typography.fontFamily.mono,
               fontSize: cardTitleFontSize - 0.25,
               lineHeight: 1,
-              fontWeight: 600,
+              fontWeight: 500,
               color: colors.text.secondary,
               opacity: 0.94,
               direction: 'rtl',
@@ -390,8 +390,17 @@ export function CardShell({
         </span>
         {node.metadata?.scope === 'project' && (
           <span
-            className="canvas-card__badge px-1.5 py-0.5 rounded shrink-0 ml-2"
-            style={{ color: '#818cf8', fontSize: 9 }}
+            className="canvas-card__badge shrink-0 ml-2"
+            style={{
+              color: '#818cf8',
+              fontSize: 9,
+              fontFamily: typography.fontFamily.mono,
+              letterSpacing: '0.14em',
+              padding: '1px 6px',
+              borderRadius: borderRadius.inline,
+              border: '1px solid color-mix(in srgb, #818cf8 32%, transparent)',
+              background: 'color-mix(in srgb, #818cf8 10%, transparent)'
+            }}
           >
             PROJECT
           </span>
@@ -538,7 +547,7 @@ export function CardShell({
             top: 0,
             bottom: 0,
             width: 2,
-            borderRadius: '10px 0 0 10px',
+            borderRadius: `${borderRadius.tool - 1}px 0 0 ${borderRadius.tool - 1}px`,
             backgroundColor:
               origin === 'source' ? 'rgba(96, 165, 250, 0.5)' : 'rgba(74, 222, 128, 0.4)',
             pointerEvents: 'none',

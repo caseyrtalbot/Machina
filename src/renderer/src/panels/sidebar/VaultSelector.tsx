@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useThreadStore } from '../../store/thread-store'
 
@@ -143,25 +143,66 @@ export function VaultSelector({
           }}
           className="sidebar-vault-button"
           data-open={open ? 'true' : 'false'}
-          style={{ color: colors.text.primary }}
+          style={{
+            color: colors.text.primary,
+            // Console: square hairline frame, inline radius. The card itself
+            // stays flat; only the icon box gets accent-tint.
+            borderRadius: borderRadius.inline,
+            gap: 10
+          }}
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: colors.text.muted, flexShrink: 0 }}
+          {/* Accent-tinted icon box (28×28) — anchors the vault card with
+              the warm Ember accent without coloring the whole row. */}
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+              borderRadius: borderRadius.inline,
+              background: colors.accent.soft,
+              border: `1px solid ${colors.accent.line}`
+            }}
           >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
+            <svg
+              width={14}
+              height={14}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ color: colors.accent.default }}
+            >
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </span>
           <span className="sidebar-vault-copy">
-            <span className="sidebar-vault-name truncate">{currentName}</span>
+            <span
+              className="sidebar-vault-name truncate"
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                letterSpacing: 0,
+                color: colors.text.primary
+              }}
+            >
+              {currentName}
+            </span>
             {currentPath && (
-              <span className="sidebar-vault-path truncate" title={currentPath}>
+              <span
+                className="sidebar-vault-path truncate"
+                title={currentPath}
+                style={{
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 10,
+                  letterSpacing: 0,
+                  color: colors.text.muted
+                }}
+              >
                 {currentPath}
               </span>
             )}

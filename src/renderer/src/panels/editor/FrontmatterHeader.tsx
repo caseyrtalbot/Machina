@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Artifact } from '@shared/types'
-import { colors, getArtifactColor, typography } from '../../design/tokens'
+import { borderRadius, colors, getArtifactColor, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useVaultStore } from '../../store/vault-store'
 import { serializeFrontmatter, type PropertyValue } from './markdown-utils'
@@ -45,17 +45,21 @@ export function buildMetadataEntries(artifact: Artifact): readonly MetadataEntry
 
 // ── Shared styles ──
 
+// Console-direction pill: hairline-square (radius 2), mono 10px, surface bg.
+// Key/value pills use the `colors.text.muted` → `colors.text.primary` pattern
+// applied at the call site; this base only carries chrome.
 const pillStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  fontFamily: 'var(--font-mono)',
+  gap: '0.4rem',
+  fontFamily: typography.fontFamily.mono,
   fontSize: '10px',
   fontWeight: 500,
   letterSpacing: '0.08em',
-  borderRadius: 999,
+  borderRadius: borderRadius.inline,
   padding: '2px 8px',
   border: `1px solid ${colors.border.default}`,
-  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  backgroundColor: 'var(--color-bg-surface)',
   color: colors.text.primary,
   lineHeight: 1.4
 }
@@ -141,10 +145,11 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
 
       {isOpen && (
         <div
-          className="absolute left-0 top-full mt-1 z-30 rounded-md shadow-lg overflow-hidden"
+          className="absolute left-0 top-full mt-1 z-30 shadow-lg overflow-hidden"
           style={{
             backgroundColor: colors.bg.elevated,
             border: `1px solid ${colors.border.default}`,
+            borderRadius: borderRadius.inline,
             minWidth: 160
           }}
         >
@@ -378,23 +383,27 @@ export function FrontmatterHeader({
       }}
       className="px-8 pt-5"
     >
-      {/* Type badge with neon border */}
+      {/* Console-direction type pill: square 2px radius, hairline border, mono caps */}
       <div style={{ marginBottom: '1rem' }}>
         <span
           style={{
-            color: typeColor,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            fontFamily: typography.fontFamily.mono,
             textTransform: 'uppercase',
-            letterSpacing: '0.14em',
-            fontSize: '10px',
+            letterSpacing: typography.metadata.letterSpacing,
+            fontSize: typography.metadata.size,
             fontWeight: 600,
             border: `1px solid ${typeColor}60`,
-            borderRadius: 999,
+            borderRadius: borderRadius.inline,
             padding: '2px 8px',
-            display: 'inline-block',
-            backgroundColor: `${typeColor}10`
+            backgroundColor: `${typeColor}10`,
+            color: typeColor
           }}
         >
-          {artifactType}
+          <span style={{ color: colors.text.muted }}>type</span>
+          <span style={{ color: typeColor }}>{artifactType}</span>
         </span>
       </div>
 

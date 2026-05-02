@@ -41,10 +41,21 @@ vi.mock('../../../store/settings-store', () => ({
 
 vi.mock('../../../design/tokens', () => ({
   colors: {
-    text: { primary: '#fff', secondary: '#aaa', muted: '#555' },
-    accent: { default: '#7c3aed', hover: '#8b5cf6', muted: 'rgba(124,58,237,0.1)' },
+    text: { primary: '#fff', secondary: '#aaa', muted: '#555', disabled: '#333' },
+    accent: {
+      default: '#7c3aed',
+      hover: '#8b5cf6',
+      muted: 'rgba(124,58,237,0.1)',
+      soft: 'rgba(124,58,237,0.14)',
+      line: 'rgba(124,58,237,0.45)'
+    },
     claude: { warning: '#f00' },
     semantic: { tension: '#ecaa0b' }
+  },
+  borderRadius: { container: 4, inline: 2, tool: 4, card: 0, round: '50%' },
+  typography: {
+    fontFamily: { display: 'system-ui', body: 'system-ui', mono: 'monospace' },
+    metadata: { size: '10px', letterSpacing: '0.14em', textTransform: 'uppercase' as const }
   }
 }))
 

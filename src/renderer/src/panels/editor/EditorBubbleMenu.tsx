@@ -1,6 +1,6 @@
 import { BubbleMenu } from '@tiptap/react/menus'
 import type { Editor } from '@tiptap/react'
-import { colors, floatingPanel } from '../../design/tokens'
+import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
 
 interface EditorBubbleMenuProps {
   readonly editor: Editor
@@ -21,25 +21,35 @@ function FormatButton({ active, onClick, title, children }: FormatButtonProps) {
       aria-label={title}
       aria-pressed={active}
       style={{
-        width: 30,
-        height: 30,
+        width: 28,
+        height: 28,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 4,
+        // Console: hairline-square buttons. Active state uses accent-muted bg
+        // and accent-default fg; the radius hint (2px) keeps focus rings clean.
+        borderRadius: borderRadius.inline,
         border: 'none',
         cursor: 'pointer',
-        fontSize: 13,
-        fontWeight: active ? 700 : 400,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: 12,
+        fontWeight: active ? 600 : 400,
         backgroundColor: active ? 'var(--color-accent-muted)' : 'transparent',
         color: active ? 'var(--color-accent-default)' : colors.text.secondary,
-        transition: 'background-color 100ms ease'
+        transition: 'background-color 100ms ease, color 100ms ease'
       }}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'
+        if (!active) {
+          e.currentTarget.style.backgroundColor =
+            'color-mix(in srgb, var(--color-text-primary) 6%, transparent)'
+          e.currentTarget.style.color = colors.text.primary
+        }
       }}
       onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.backgroundColor = 'transparent'
+        if (!active) {
+          e.currentTarget.style.backgroundColor = 'transparent'
+          e.currentTarget.style.color = colors.text.secondary
+        }
       }}
     >
       {children}
@@ -64,7 +74,10 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         style={{
           backgroundColor: floatingPanel.glass.bg,
           backdropFilter: floatingPanel.glass.blur,
-          borderRadius: 8,
+          // Console-direction: hairline border on a near-square chrome surface.
+          // Tool radius (4px) keeps shadow corners clean; full square felt knife-edged.
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: borderRadius.tool,
           boxShadow: floatingPanel.shadowCompact
         }}
       >
@@ -107,9 +120,9 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         >
           <span
             style={{
-              backgroundColor: 'rgba(234, 179, 8, 0.3)',
+              backgroundColor: 'color-mix(in srgb, #dfa11a 30%, transparent)',
               padding: '0 3px',
-              borderRadius: 2,
+              borderRadius: borderRadius.inline,
               fontSize: 12,
               lineHeight: 1
             }}
@@ -118,11 +131,13 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
           </span>
         </FormatButton>
 
+        {/* Hairline divider — matches the chrome border weight */}
         <div
+          aria-hidden="true"
           style={{
             width: 1,
             height: 16,
-            backgroundColor: 'rgba(255,255,255,0.1)',
+            backgroundColor: colors.border.subtle,
             margin: '0 2px'
           }}
         />

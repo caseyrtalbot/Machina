@@ -8,7 +8,7 @@ import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
 import { ResizeHandle } from './ResizeHandle'
 import { useAgentShellKeybindings } from './keybindings'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 
 export interface AgentShellProps {
   readonly onOpenSettings?: () => void
@@ -116,7 +116,7 @@ function WindowDragRegion() {
         paddingRight: 8,
         boxSizing: 'border-box',
         background: colors.bg.chrome,
-        borderBottom: `1px solid ${colors.border.default}`
+        borderBottom: `1px solid ${colors.border.subtle}`
       }}
     >
       <div
@@ -167,8 +167,9 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
         padding: '14px 16px',
         background: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,
-        borderRadius: 8,
+        borderRadius: borderRadius.tool,
         color: colors.text.primary,
+        fontFamily: typography.fontFamily.body,
         fontSize: 13,
         lineHeight: 1.5,
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
@@ -184,11 +185,14 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
         onClick={dismiss}
         style={{
           background: 'transparent',
-          border: `1px solid ${colors.border.subtle}`,
+          border: `1px solid ${colors.border.default}`,
           color: colors.text.secondary,
           padding: '4px 10px',
-          borderRadius: 4,
-          fontSize: 12,
+          borderRadius: borderRadius.inline,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
           cursor: 'pointer'
         }}
       >
