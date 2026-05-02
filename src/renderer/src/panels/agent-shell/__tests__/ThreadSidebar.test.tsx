@@ -67,4 +67,39 @@ describe('ThreadSidebar', () => {
       expect(useThreadStore.getState().activeThreadId).toBe('b')
     })
   })
+
+  it('right-click on a row opens the context menu with archive/delete/rename', () => {
+    render(<ThreadSidebar />)
+    const row = screen.getAllByTestId('thread-row')[0]
+    fireEvent.contextMenu(row, { clientX: 50, clientY: 50 })
+    expect(screen.getByText('Rename')).toBeTruthy()
+    expect(screen.getByText('Archive')).toBeTruthy()
+    expect(screen.getByText('Delete')).toBeTruthy()
+  })
+
+  it('clicking Archive in the context menu calls archiveThread', async () => {
+    render(<ThreadSidebar />)
+    const row = screen.getAllByTestId('thread-row')[0]
+    fireEvent.contextMenu(row, { clientX: 50, clientY: 50 })
+    fireEvent.click(screen.getByText('Archive'))
+    await vi.waitFor(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((window as any).api.thread.archive).toHaveBeenCalled()
+    })
+  })
+
+  it('Rename → typing → Enter persists the new title', async () => {
+    render(<ThreadSidebar />)
+    const row = screen.getAllByTestId('thread-row')[0]
+    fireEvent.contextMenu(row, { clientX: 50, clientY: 50 })
+    fireEvent.click(screen.getByText('Rename'))
+    const input = row.querySelector('input') as HTMLInputElement
+    expect(input).toBeTruthy()
+    fireEvent.change(input, { target: { value: 'Renamed' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => {
+      const titles = Object.values(useThreadStore.getState().threadsById).map((t) => t.title)
+      expect(titles).toContain('Renamed')
+    })
+  })
 })

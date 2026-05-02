@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { borderRadius, colors } from '../../../design/tokens'
+import { copyText, useToolCardMenu } from './useToolCardMenu'
 
 type CliCommandCall = Extract<ToolCall, { kind: 'cli_command' }>
 
@@ -15,9 +16,23 @@ export function CliCommandCard({
   const exitCode = exitCodeFromResult(result)
   const ok = result?.ok === true
   const output = outputFromResult(result)
+  const { onContextMenu, menu } = useToolCardMenu([
+    {
+      id: 'copy-command',
+      label: 'Copy command',
+      onSelect: () => void copyText(call.args.command)
+    },
+    {
+      id: 'copy-output',
+      label: 'Copy output',
+      disabled: !output,
+      onSelect: () => void copyText(output)
+    }
+  ])
 
   return (
     <div
+      onContextMenu={onContextMenu}
       style={{
         marginTop: 8,
         border: `1px solid ${colors.border.default}`,
@@ -73,6 +88,7 @@ export function CliCommandCard({
           {output || '(no output)'}
         </pre>
       )}
+      {menu}
     </div>
   )
 }

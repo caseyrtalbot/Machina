@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors, borderRadius } from '../../../design/tokens'
+import { copyText, useToolCardMenu } from './useToolCardMenu'
 
 type WriteNoteCall = Extract<ToolCall, { kind: 'write_note' }>
 
@@ -17,6 +18,29 @@ export function WriteNoteCard({
   const accepted = settled && result.ok
   const rejected = settled && !result.ok
   const [submitting, setSubmitting] = useState(false)
+  const { onContextMenu, menu } = useToolCardMenu([
+    {
+      id: 'copy-diff',
+      label: 'Copy diff',
+      onSelect: () =>
+        void copyText(
+          call.args.content
+            .split('\n')
+            .map((l) => `+ ${l}`)
+            .join('\n')
+        )
+    },
+    {
+      id: 'copy-content',
+      label: 'Copy content',
+      onSelect: () => void copyText(call.args.content)
+    },
+    {
+      id: 'copy-path',
+      label: 'Copy path',
+      onSelect: () => void copyText(call.args.path)
+    }
+  ])
 
   async function decide(accept: boolean) {
     if (settled || submitting) return
@@ -33,6 +57,7 @@ export function WriteNoteCard({
 
   return (
     <div
+      onContextMenu={onContextMenu}
       style={{
         marginTop: 8,
         padding: 8,
@@ -116,6 +141,7 @@ export function WriteNoteCard({
             : `${result.error.code}: ${result.error.message}`}
         </div>
       )}
+      {menu}
     </div>
   )
 }

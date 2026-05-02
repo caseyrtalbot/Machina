@@ -72,6 +72,28 @@ describe('thread-store', () => {
     expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
   })
 
+  it('renameThread updates the title and persists', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: { a: sampleThread('a') }
+    })
+    await useThreadStore.getState().renameThread('a', '  New title  ')
+    expect(useThreadStore.getState().threadsById['a'].title).toBe('New title')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalled()
+  })
+
+  it('renameThread ignores empty/whitespace input', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: { a: sampleThread('a') }
+    })
+    await useThreadStore.getState().renameThread('a', '   ')
+    expect(useThreadStore.getState().threadsById['a'].title).toBe('Sample')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).not.toHaveBeenCalled()
+  })
+
   it('toggleAutoAccept flips the per-thread autoAcceptSession flag and persists', async () => {
     useThreadStore.setState({
       vaultPath: '/v',

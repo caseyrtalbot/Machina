@@ -25,6 +25,7 @@ interface ThreadState {
   archiveThread: (id: string) => Promise<void>
   unarchiveThread: (id: string) => Promise<void>
   deleteThread: (id: string) => Promise<void>
+  renameThread: (id: string, title: string) => Promise<void>
 
   appendUserMessage: (text: string) => Promise<void>
   appendAssistantStreamChunk: (threadId: string, chunk: string) => void
@@ -162,6 +163,21 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
     })
+  },
+
+  renameThread: async (id, title) => {
+    const v = get().vaultPath
+    if (!v) return
+    const trimmed = title.trim()
+    if (!trimmed) return
+    set((s) => {
+      const t = s.threadsById[id]
+      if (!t || t.title === trimmed) return s
+      const next: Thread = { ...t, title: trimmed }
+      return { threadsById: { ...s.threadsById, [id]: next } }
+    })
+    const t = get().threadsById[id]
+    if (t) await window.api.thread.save(v, t)
   },
 
   appendUserMessage: async (text) => {
