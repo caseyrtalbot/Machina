@@ -267,6 +267,11 @@ export interface IpcChannels {
     }
     response: void
   }
+
+  // --- Machina Native (Anthropic SDK) ---
+  'agent-native:has-key': { request: void; response: boolean }
+  'agent-native:set-key': { request: { key: string }; response: void }
+  'agent-native:clear-key': { request: void; response: void }
 }
 
 export interface IpcEvents {

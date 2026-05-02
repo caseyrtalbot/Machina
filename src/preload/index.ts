@@ -160,6 +160,11 @@ const api = {
       typedInvoke('doc:save-content', { path, content }),
     getContent: (path: string) => typedInvoke('doc:get-content', { path })
   },
+  agentNative: {
+    hasKey: () => typedInvoke('agent-native:has-key'),
+    setKey: (key: string) => typedInvoke('agent-native:set-key', { key }),
+    clearKey: () => typedInvoke('agent-native:clear-key')
+  },
   thread: {
     list: (vaultPath: string) => typedInvoke('thread:list', { vaultPath }),
     listArchived: (vaultPath: string) => typedInvoke('thread:list-archived', { vaultPath }),

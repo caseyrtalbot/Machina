@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { colors } from '../design/tokens'
@@ -158,6 +158,32 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   }, [isOpen])
 
   const vaultName = vaultPath?.split('/').pop() ?? null
+
+  const [hasKey, setHasKey] = useState<boolean | null>(null)
+  const [keyDraft, setKeyDraft] = useState('')
+  const [keyError, setKeyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    void window.api.agentNative.hasKey().then(setHasKey)
+  }, [isOpen])
+
+  const saveKey = async (): Promise<void> => {
+    if (!keyDraft.trim()) return
+    try {
+      await window.api.agentNative.setKey(keyDraft.trim())
+      setKeyDraft('')
+      setKeyError(null)
+      setHasKey(true)
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const clearKey = async (): Promise<void> => {
+    await window.api.agentNative.clearKey()
+    setHasKey(false)
+  }
 
   return (
     <div
@@ -383,6 +409,70 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             >
               {vaultPath ? 'Change' : 'Open'}
             </button>
+          </div>
+
+          {/* ── machina-native ── */}
+          <SectionHeading>machina-native</SectionHeading>
+          <div className="settings-vault-card">
+            <div className="flex flex-col min-w-0 gap-2 w-full">
+              <span className="text-xs" style={{ color: colors.text.primary }}>
+                Anthropic API key
+              </span>
+              {hasKey === null ? (
+                <span className="text-[10px]" style={{ color: colors.text.muted }}>
+                  checking...
+                </span>
+              ) : hasKey ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px]" style={{ color: colors.text.muted }}>
+                    Key configured
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearKey}
+                    className="settings-button text-xs transition-colors flex-shrink-0"
+                    style={{ color: colors.text.secondary }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="password"
+                    value={keyDraft}
+                    onChange={(e) => setKeyDraft(e.target.value)}
+                    placeholder="sk-ant-..."
+                    className="settings-select text-xs rounded"
+                    style={{ width: '100%' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void saveKey()
+                    }}
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    {keyError && (
+                      <span className="text-[10px]" style={{ color: 'rgba(255, 120, 120, 0.9)' }}>
+                        {keyError}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void saveKey()}
+                      disabled={!keyDraft.trim()}
+                      className="settings-button text-xs transition-colors flex-shrink-0 ml-auto"
+                      style={{
+                        color: keyDraft.trim() ? colors.text.primary : colors.text.muted
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+              <span className="text-[10px]" style={{ color: colors.text.muted }}>
+                Stored encrypted via Electron safeStorage. Override with ANTHROPIC_API_KEY.
+              </span>
+            </div>
           </div>
 
           {/* ── Reset ── */}

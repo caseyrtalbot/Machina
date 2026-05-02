@@ -1494,7 +1494,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
       {useAgentShell ? (
         <div className="flex-1 overflow-hidden">
           <PanelErrorBoundary name="AgentShell">
-            <AgentShell />
+            <AgentShell onOpenSettings={() => setSettingsOpen(true)} />
           </PanelErrorBoundary>
         </div>
       ) : (

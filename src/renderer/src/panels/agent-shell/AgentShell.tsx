@@ -5,7 +5,11 @@ import { ThreadSidebar } from './ThreadSidebar'
 import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 
-export function AgentShell() {
+export interface AgentShellProps {
+  readonly onOpenSettings?: () => void
+}
+
+export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const setVaultPath = useThreadStore((s) => s.setVaultPath)
   const loadThreads = useThreadStore((s) => s.loadThreads)
@@ -18,7 +22,7 @@ export function AgentShell() {
 
   return (
     <div data-testid="agent-shell" style={{ display: 'flex', height: '100%', width: '100%' }}>
-      <ThreadSidebar />
+      <ThreadSidebar onOpenSettings={onOpenSettings} />
       <ThreadPanel />
       <SurfaceDock />
     </div>

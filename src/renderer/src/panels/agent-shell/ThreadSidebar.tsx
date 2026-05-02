@@ -5,7 +5,11 @@ import { agentTag } from './agent-tag'
 import { colors, borderRadius } from '../../design/tokens'
 import type { AgentIdentity } from '@shared/agent-identity'
 
-export function ThreadSidebar() {
+export interface ThreadSidebarProps {
+  readonly onOpenSettings?: () => void
+}
+
+export function ThreadSidebar({ onOpenSettings }: ThreadSidebarProps = {}) {
   const threadsById = useThreadStore((s) => s.threadsById)
   const activeId = useThreadStore((s) => s.activeThreadId)
   const selectThread = useThreadStore((s) => s.selectThread)
@@ -36,10 +40,56 @@ export function ThreadSidebar() {
           fontSize: 12,
           color: colors.text.muted,
           textTransform: 'uppercase',
-          letterSpacing: 0.4
+          letterSpacing: 0.4,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8
         }}
       >
-        {vaultName}
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            minWidth: 0
+          }}
+        >
+          {vaultName}
+        </span>
+        {onOpenSettings && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="Open settings"
+            title="Settings"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 2,
+              cursor: 'pointer',
+              color: colors.text.muted,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <svg
+              width={14}
+              height={14}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="8" cy="8" r="2.2" />
+              <path d="M8 1.5v1.6M8 12.9v1.6M2.6 8H1M15 8h-1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1" />
+            </svg>
+          </button>
+        )}
       </header>
       <ul style={{ flex: 1, overflowY: 'auto', listStyle: 'none', margin: 0, padding: 0 }}>
         {sorted.map((t) => (
