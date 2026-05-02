@@ -265,6 +265,107 @@ async function writeNote(
   }
 }
 
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle.length === 0) return 0
+  let count = 0
+  let from = 0
+  while (true) {
+    const idx = haystack.indexOf(needle, from)
+    if (idx === -1) break
+    count++
+    from = idx + needle.length
+  }
+  return count
+}
+
+function countNewlines(s: string): number {
+  let n = 0
+  for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) n++
+  return n
+}
+
+async function editNote(
+  rel: string,
+  find: string,
+  replace: string,
+  ctx: ToolContext
+): Promise<NativeToolResult> {
+  const abs = safeJoin(ctx.vaultPath, rel)
+  if (!abs) {
+    return {
+      ok: false,
+      error: { code: 'PATH_OUT_OF_VAULT', message: `path escapes vault: ${rel}` }
+    }
+  }
+  let content: string
+  try {
+    content = await fs.readFile(abs, 'utf8')
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException
+    if (e.code === 'ENOENT') {
+      return { ok: false, error: { code: 'FILE_NOT_FOUND', message: `not found: ${rel}` } }
+    }
+    return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+  }
+
+  if (find.length === 0) {
+    return {
+      ok: false,
+      error: { code: 'EDIT_FIND_NOT_FOUND', message: 'edit_note: find string is empty' }
+    }
+  }
+  const occurrences = countOccurrences(content, find)
+  if (occurrences === 0) {
+    return {
+      ok: false,
+      error: { code: 'EDIT_FIND_NOT_FOUND', message: `find not present in ${rel}` }
+    }
+  }
+  if (occurrences > 1) {
+    return {
+      ok: false,
+      error: {
+        code: 'EDIT_FIND_NOT_UNIQUE',
+        message: `find matched ${occurrences} times in ${rel}`,
+        hint: 'add more surrounding context to make the find unique'
+      }
+    }
+  }
+
+  if (!ctx.autoAccept && ctx.toolUseId && ctx.emitPending) {
+    ctx.emitPending(ctx.toolUseId, {
+      approvalKind: 'edit_note',
+      preview: { path: rel, find, replace }
+    })
+    const decision = await awaitApproval(ctx.toolUseId)
+    if (!decision.accept) {
+      return {
+        ok: false,
+        error: {
+          code: 'IO_TRANSIENT',
+          message: 'rejected by user',
+          hint: decision.rejectReason
+        }
+      }
+    }
+  }
+
+  const next = content.replace(find, replace)
+  try {
+    await fs.writeFile(abs, next, 'utf8')
+    return {
+      ok: true,
+      output: {
+        path: rel,
+        diff_stats: { added: countNewlines(replace), removed: countNewlines(find) }
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: { code: 'IO_FATAL', message } }
+  }
+}
+
 async function searchVault(
   query: string,
   paths: readonly string[] | undefined,
@@ -325,6 +426,21 @@ export async function callTool(
         return { ok: false, error: { code: 'IO_FATAL', message: 'write_note: missing content' } }
       }
       return writeNote(p, content, ctx)
+    }
+    case 'edit_note': {
+      const p = typeof input.path === 'string' ? input.path : null
+      const find = typeof input.find === 'string' ? input.find : null
+      const replace = typeof input.replace === 'string' ? input.replace : null
+      if (!p) {
+        return { ok: false, error: { code: 'IO_FATAL', message: 'edit_note: missing path' } }
+      }
+      if (find == null) {
+        return { ok: false, error: { code: 'IO_FATAL', message: 'edit_note: missing find' } }
+      }
+      if (replace == null) {
+        return { ok: false, error: { code: 'IO_FATAL', message: 'edit_note: missing replace' } }
+      }
+      return editNote(p, find, replace, ctx)
     }
     default:
       return { ok: false, error: { code: 'IO_FATAL', message: `unknown tool: ${name}` } }

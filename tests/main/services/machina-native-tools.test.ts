@@ -345,3 +345,176 @@ describe('machina-native-tools write_note', () => {
     }
   })
 })
+
+describe('machina-native-tools edit_note', () => {
+  it('replaces a unique find with autoAccept and returns diff_stats', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'one\ntwo\nthree\n')
+      const res = await callTool(
+        'edit_note',
+        { path: 'a.md', find: 'two', replace: 'TWO\nadded' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as {
+          path: string
+          diff_stats: { added: number; removed: number }
+        }
+        expect(out.path).toBe('a.md')
+        expect(out.diff_stats).toEqual({ added: 1, removed: 0 })
+      }
+      expect(readFileSync(path.join(v, 'a.md'), 'utf8')).toBe('one\nTWO\nadded\nthree\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('reports FILE_NOT_FOUND when the file is missing', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'edit_note',
+        { path: 'missing.md', find: 'x', replace: 'y' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('FILE_NOT_FOUND')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('reports EDIT_FIND_NOT_FOUND when the find is absent', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'hello world\n')
+      const res = await callTool(
+        'edit_note',
+        { path: 'a.md', find: 'goodbye', replace: 'farewell' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('EDIT_FIND_NOT_FOUND')
+      expect(readFileSync(path.join(v, 'a.md'), 'utf8')).toBe('hello world\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('reports EDIT_FIND_NOT_UNIQUE when the find matches multiple times', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'hi\nhi\nhi\n')
+      const res = await callTool(
+        'edit_note',
+        { path: 'a.md', find: 'hi', replace: 'yo' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('EDIT_FIND_NOT_UNIQUE')
+        expect(res.error.hint).toContain('surrounding context')
+      }
+      expect(readFileSync(path.join(v, 'a.md'), 'utf8')).toBe('hi\nhi\nhi\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects path traversal', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'edit_note',
+        { path: '../escape.md', find: 'x', replace: 'y' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('blocks on emitPending and writes on decideApproval(accept=true)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'gated.md'), 'before\nNEEDLE\nafter\n')
+      let pendingId: string | null = null
+      let pendingReplace: string | null = null
+      const promise = callTool(
+        'edit_note',
+        { path: 'gated.md', find: 'NEEDLE', replace: 'FOUND' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          toolUseId: 'toolu_edit_1',
+          emitPending: (id, preview) => {
+            pendingId = id
+            if (preview.approvalKind === 'edit_note') pendingReplace = preview.preview.replace
+          }
+        }
+      )
+      await new Promise((r) => setTimeout(r, 20))
+      expect(pendingId).toBe('toolu_edit_1')
+      expect(pendingReplace).toBe('FOUND')
+      // File should still hold the original content until approval lands.
+      expect(readFileSync(path.join(v, 'gated.md'), 'utf8')).toBe('before\nNEEDLE\nafter\n')
+
+      decideApproval('toolu_edit_1', true)
+      const res = await promise
+      expect(res.ok).toBe(true)
+      expect(readFileSync(path.join(v, 'gated.md'), 'utf8')).toBe('before\nFOUND\nafter\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns rejection error and leaves the file alone on accept=false', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'r.md'), 'keep\nME\nplease\n')
+      const promise = callTool(
+        'edit_note',
+        { path: 'r.md', find: 'ME', replace: 'YOU' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          toolUseId: 'toolu_edit_2',
+          emitPending: () => {}
+        }
+      )
+      await new Promise((r) => setTimeout(r, 20))
+      decideApproval('toolu_edit_2', false, 'no thanks')
+
+      const res = await promise
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('IO_TRANSIENT')
+        expect(res.error.message).toBe('rejected by user')
+        expect(res.error.hint).toBe('no thanks')
+      }
+      expect(readFileSync(path.join(v, 'r.md'), 'utf8')).toBe('keep\nME\nplease\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects empty find as EDIT_FIND_NOT_FOUND', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'anything\n')
+      const res = await callTool(
+        'edit_note',
+        { path: 'a.md', find: '', replace: 'x' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('EDIT_FIND_NOT_FOUND')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})

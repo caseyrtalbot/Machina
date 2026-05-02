@@ -83,9 +83,35 @@ export const WRITE_NOTE_TOOL: NativeToolSpec = {
   }
 }
 
+export const EDIT_NOTE_TOOL: NativeToolSpec = {
+  name: 'edit_note',
+  description:
+    'Edit a vault note by literal find/replace. The find string must appear exactly once in the file or the call fails loudly. The user is shown a diff and must accept before the file is written, unless the thread is in auto-accept mode. Returns the edited path and added/removed line counts.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'Path relative to vault root (e.g. "ideas/spark.md").'
+      },
+      find: {
+        type: 'string',
+        description:
+          'Literal text to find. Must appear exactly once in the file. Include surrounding context to disambiguate.'
+      },
+      replace: {
+        type: 'string',
+        description: 'Replacement text. Empty string removes the matched span.'
+      }
+    },
+    required: ['path', 'find', 'replace']
+  }
+}
+
 export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
   READ_NOTE_TOOL,
   LIST_VAULT_TOOL,
   SEARCH_VAULT_TOOL,
-  WRITE_NOTE_TOOL
+  WRITE_NOTE_TOOL,
+  EDIT_NOTE_TOOL
 ]

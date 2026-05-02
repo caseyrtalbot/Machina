@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors } from '../../../design/tokens'
+import { EditNoteCard } from './EditNoteCard'
 import { ListVaultCard } from './ListVaultCard'
 import { ReadNoteCard } from './ReadNoteCard'
 import { SearchVaultCard } from './SearchVaultCard'
@@ -17,6 +18,9 @@ export function ToolCallRenderer({
   // shows "you rejected this write" instead of a generic error chip).
   if (call.kind === 'write_note') {
     return <WriteNoteCard call={call} result={result} />
+  }
+  if (call.kind === 'edit_note') {
+    return <EditNoteCard call={call} result={result} />
   }
   if (result && !result.ok) {
     return <ToolErrorCard call={call} error={result.error} />

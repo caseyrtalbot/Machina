@@ -67,6 +67,18 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
   ) {
     return { id, kind: 'write_note', args: { path: input.path, content: input.content } }
   }
+  if (
+    name === 'edit_note' &&
+    typeof input.path === 'string' &&
+    typeof input.find === 'string' &&
+    typeof input.replace === 'string'
+  ) {
+    return {
+      id,
+      kind: 'edit_note',
+      args: { path: input.path, find: input.find, replace: input.replace }
+    }
+  }
   if (name === 'search_vault' && typeof input.query === 'string') {
     const rawPaths = input.paths
     const paths =
