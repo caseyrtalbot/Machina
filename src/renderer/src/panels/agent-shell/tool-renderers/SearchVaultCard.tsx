@@ -1,7 +1,8 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, borderRadius } from '../../../design/tokens'
+import { colors, typography } from '../../../design/tokens'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
+import { ToolCardShell } from './ToolCardShell'
 
 type SearchVaultCall = Extract<ToolCall, { kind: 'search_vault' }>
 
@@ -22,23 +23,10 @@ export function SearchVaultCard({
 }) {
   if (!result) {
     return (
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '2px 10px',
-          borderRadius: borderRadius.inline,
-          background: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`,
-          fontSize: 12,
-          color: colors.text.muted,
-          marginTop: 8
-        }}
-      >
-        <span style={{ opacity: 0.6 }}>🔍</span>
-        searching for &ldquo;{call.args.query}&rdquo;…
-      </div>
+      <ToolCardShell variant="pill" inline style={{ gap: 6, color: colors.text.muted }}>
+        <SearchGlyph />
+        <span>searching for &ldquo;{call.args.query}&rdquo;…</span>
+      </ToolCardShell>
     )
   }
   if (!result.ok) return null
@@ -55,26 +43,30 @@ export function SearchVaultCard({
   }
 
   return (
-    <div
-      style={{
-        marginTop: 8,
-        padding: 8,
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline,
-        fontSize: 12
-      }}
-    >
-      <div style={{ color: colors.text.muted, marginBottom: 6 }}>
-        <span style={{ opacity: 0.7, marginRight: 6 }}>🔍</span>
-        {hits.length} {hits.length === 1 ? 'hit' : 'hits'} for &ldquo;{call.args.query}&rdquo;
+    <ToolCardShell variant="block">
+      <div
+        style={{
+          color: colors.text.muted,
+          marginBottom: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform
+        }}
+      >
+        <SearchGlyph />
+        <span>
+          {hits.length} {hits.length === 1 ? 'hit' : 'hits'} for &ldquo;{call.args.query}&rdquo;
+        </span>
       </div>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {hits.slice(0, PREVIEW_LIMIT).map((h, i) => (
           <li
             key={`${h.path}:${h.line}:${i}`}
             style={{
-              padding: '4px 0',
+              padding: '5px 0',
               borderBottom:
                 i === Math.min(hits.length, PREVIEW_LIMIT) - 1
                   ? 'none'
@@ -89,6 +81,7 @@ export function SearchVaultCard({
               }}
               style={{
                 fontSize: 12,
+                fontFamily: typography.fontFamily.mono,
                 color: colors.text.primary,
                 textDecoration: 'none'
               }}
@@ -99,8 +92,9 @@ export function SearchVaultCard({
               style={{
                 display: 'block',
                 fontSize: 11,
+                fontFamily: typography.fontFamily.mono,
                 color: colors.text.muted,
-                marginTop: 2,
+                marginTop: 3,
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}
@@ -110,11 +104,26 @@ export function SearchVaultCard({
           </li>
         ))}
         {hits.length > PREVIEW_LIMIT && (
-          <li style={{ padding: '4px 0', color: colors.text.muted }}>
+          <li style={{ padding: '5px 0', color: colors.text.muted }}>
             … {hits.length - PREVIEW_LIMIT} more
           </li>
         )}
       </ul>
-    </div>
+    </ToolCardShell>
+  )
+}
+
+function SearchGlyph() {
+  return (
+    <svg
+      aria-hidden
+      width={11}
+      height={11}
+      viewBox="0 0 11 11"
+      style={{ flexShrink: 0, opacity: 0.7 }}
+    >
+      <circle cx={4.5} cy={4.5} r={3.5} fill="none" stroke="currentColor" strokeWidth={1} />
+      <path d="M7.5 7.5 L10 10" stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+    </svg>
   )
 }

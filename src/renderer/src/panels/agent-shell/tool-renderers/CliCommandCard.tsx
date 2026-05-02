@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { borderRadius, colors } from '../../../design/tokens'
+import { borderRadius, colors, typography } from '../../../design/tokens'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
+import { ToolCardShell } from './ToolCardShell'
 
 type CliCommandCall = Extract<ToolCall, { kind: 'cli_command' }>
 
@@ -31,15 +32,12 @@ export function CliCommandCard({
   ])
 
   return (
-    <div
+    <ToolCardShell
+      variant="block"
       onContextMenu={onContextMenu}
       style={{
-        marginTop: 8,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.container,
-        background: colors.bg.elevated,
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 12,
+        padding: 0,
+        fontFamily: typography.fontFamily.mono,
         overflow: 'hidden'
       }}
     >
@@ -51,7 +49,7 @@ export function CliCommandCard({
           alignItems: 'center',
           gap: 8,
           width: '100%',
-          padding: '6px 10px',
+          padding: '8px 12px',
           background: 'transparent',
           border: 'none',
           color: colors.text.primary,
@@ -76,20 +74,23 @@ export function CliCommandCard({
         <pre
           style={{
             margin: 0,
-            padding: '8px 10px',
+            padding: '10px 12px',
             borderTop: `1px solid ${colors.border.subtle}`,
+            background: colors.bg.base,
             color: colors.text.secondary,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             maxHeight: 360,
-            overflow: 'auto'
+            overflow: 'auto',
+            fontSize: 11.5,
+            lineHeight: 1.55
           }}
         >
           {output || '(no output)'}
         </pre>
       )}
       {menu}
-    </div>
+    </ToolCardShell>
   )
 }
 

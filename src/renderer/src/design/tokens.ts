@@ -29,6 +29,15 @@ export const colors = {
     warning: '#dfa11a', // ARTIFACT_COLORS.pattern amber
     error: '#ff847d' // ARTIFACT_COLORS.constraint red
   },
+  // Diff line colors. Reuse the ready/error palette so + and - read the same
+  // semantic green/red used elsewhere in the app. Background tints stay below
+  // 12% mix so they sit comfortably inside an elevated tool-card surface.
+  diff: {
+    added: '#4ec983',
+    removed: '#ff847d',
+    addedBg: 'color-mix(in srgb, #4ec983 10%, transparent)',
+    removedBg: 'color-mix(in srgb, #ff847d 10%, transparent)'
+  },
   // Callout palette for `> [!TYPE]` blocks in the editor. Five semantic groups
   // plus a neutral muted group. Warning/danger reuse `colors.claude.*` so the
   // editor's callout accents stay consistent with other semantic surfaces.
@@ -156,7 +165,7 @@ export const transitions = {
   commandPalette: '150ms ease-out'
 } as const
 
-export const borderRadius = { container: 6, inline: 4, card: 0, round: '50%' } as const
+export const borderRadius = { container: 6, inline: 4, tool: 8, card: 0, round: '50%' } as const
 
 export const EDGE_KIND_COLORS: Record<string, string> = {
   connection: '#667383', // oklch(0.55 0.03 255) neutral slate

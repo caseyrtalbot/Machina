@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, borderRadius } from '../../../design/tokens'
+import { colors, borderRadius, typography } from '../../../design/tokens'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
+import { ToolCardShell } from './ToolCardShell'
 
 type WriteNoteCall = Extract<ToolCall, { kind: 'write_note' }>
 
@@ -56,61 +57,69 @@ export function WriteNoteCard({
   const status = !settled ? 'awaiting approval' : accepted ? 'accepted' : 'rejected'
 
   return (
-    <div
-      onContextMenu={onContextMenu}
-      style={{
-        marginTop: 8,
-        padding: 8,
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline,
-        fontSize: 12
-      }}
-    >
+    <ToolCardShell variant="block" onContextMenu={onContextMenu}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ color: colors.text.primary }}>
-          <span style={{ color: 'var(--diff-add, #4caf50)', marginRight: 6 }}>+</span>
+        <div style={{ color: colors.text.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: colors.diff.added, fontFamily: typography.fontFamily.mono }}>
+            +
+          </span>
           <strong>{call.args.path}</strong>
         </div>
-        <span style={{ fontSize: 11, color: colors.text.muted }}>{status}</span>
+        <span
+          style={{
+            fontSize: typography.metadata.size,
+            letterSpacing: typography.metadata.letterSpacing,
+            textTransform: typography.metadata.textTransform,
+            color: colors.text.muted
+          }}
+        >
+          {status}
+        </span>
       </div>
       <pre
         style={{
-          margin: '6px 0 0 0',
-          padding: 6,
-          maxHeight: 200,
+          margin: '8px 0 0 0',
+          padding: '8px 10px',
+          maxHeight: 220,
           overflow: 'auto',
-          fontSize: 11,
+          fontSize: 11.5,
+          lineHeight: 1.55,
           background: colors.bg.base,
-          borderRadius: 4,
+          borderRadius: borderRadius.inline,
           border: `1px solid ${colors.border.subtle}`,
-          fontFamily:
-            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
+          fontFamily: typography.fontFamily.mono
         }}
       >
         {lines.slice(0, PREVIEW_LIMIT).map((l, i) => (
-          <div key={i}>
-            <span style={{ color: 'var(--diff-add, #4caf50)' }}>+ </span>
+          <div
+            key={i}
+            style={{
+              background: colors.diff.addedBg,
+              color: colors.text.primary,
+              padding: '0 4px'
+            }}
+          >
+            <span style={{ color: colors.diff.added, marginRight: 6 }}>+</span>
             {l || ' '}
           </div>
         ))}
         {lines.length > PREVIEW_LIMIT && (
-          <div style={{ color: colors.text.muted, marginTop: 4 }}>
+          <div style={{ color: colors.text.muted, marginTop: 4, padding: '0 4px' }}>
             … {lines.length - PREVIEW_LIMIT} more lines
           </div>
         )}
       </pre>
       {!settled && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
           <button
             onClick={() => void decide(true)}
             disabled={submitting}
             style={{
-              padding: '4px 12px',
+              padding: '5px 14px',
               fontSize: 12,
               borderRadius: borderRadius.inline,
-              border: `1px solid ${colors.border.default}`,
-              background: colors.bg.base,
+              border: `1px solid ${colors.accent.default}`,
+              background: 'color-mix(in srgb, var(--color-accent-default) 14%, transparent)',
               color: colors.text.primary,
               cursor: submitting ? 'wait' : 'pointer'
             }}
@@ -121,7 +130,7 @@ export function WriteNoteCard({
             onClick={() => void decide(false)}
             disabled={submitting}
             style={{
-              padding: '4px 12px',
+              padding: '5px 14px',
               fontSize: 12,
               borderRadius: borderRadius.inline,
               border: `1px solid ${colors.border.default}`,
@@ -135,13 +144,13 @@ export function WriteNoteCard({
         </div>
       )}
       {rejected && (
-        <div style={{ marginTop: 6, fontSize: 11, color: colors.text.muted }}>
+        <div style={{ marginTop: 8, fontSize: 11, color: colors.text.muted }}>
           {result.error.code === 'IO_TRANSIENT' && result.error.message === 'rejected by user'
             ? 'You rejected this write.'
             : `${result.error.code}: ${result.error.message}`}
         </div>
       )}
       {menu}
-    </div>
+    </ToolCardShell>
   )
 }

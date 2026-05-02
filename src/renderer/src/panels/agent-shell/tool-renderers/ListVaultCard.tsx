@@ -1,7 +1,8 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, borderRadius } from '../../../design/tokens'
+import { colors, typography } from '../../../design/tokens'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
+import { ToolCardShell } from './ToolCardShell'
 
 type ListVaultCall = Extract<ToolCall, { kind: 'list_vault' }>
 
@@ -16,23 +17,10 @@ export function ListVaultCard({
 }) {
   if (!result) {
     return (
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '2px 10px',
-          borderRadius: borderRadius.inline,
-          background: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`,
-          fontSize: 12,
-          color: colors.text.muted,
-          marginTop: 8
-        }}
-      >
-        <span style={{ opacity: 0.6 }}>📁</span>
-        listing vault…
-      </div>
+      <ToolCardShell variant="pill" inline style={{ gap: 6, color: colors.text.muted }}>
+        <FolderGlyph />
+        <span>listing vault…</span>
+      </ToolCardShell>
     )
   }
   if (!result.ok) return null
@@ -51,46 +39,79 @@ export function ListVaultCard({
   }
 
   return (
-    <details
-      style={{
-        marginTop: 8,
-        padding: 8,
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline,
-        fontSize: 12
-      }}
+    <ToolCardShell variant="block" style={{ padding: 0 }}>
+      <details>
+        <summary
+          style={{
+            cursor: 'pointer',
+            color: colors.text.primary,
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <FolderGlyph />
+          <span>
+            {paths.length} {paths.length === 1 ? 'file' : 'files'}
+          </span>
+          <span style={{ color: colors.text.muted, fontFamily: typography.fontFamily.mono }}>
+            · {globsLabel}
+          </span>
+        </summary>
+        <ul
+          style={{
+            margin: 0,
+            padding: '6px 12px 10px 24px',
+            listStyle: 'none',
+            borderTop: `1px solid ${colors.border.subtle}`
+          }}
+        >
+          {paths.slice(0, PREVIEW_LIMIT).map((p) => (
+            <li key={p} style={{ padding: '2px 0' }}>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  openInEditor(p)
+                }}
+                style={{
+                  color: colors.text.primary,
+                  textDecoration: 'none',
+                  fontSize: 12,
+                  fontFamily: typography.fontFamily.mono
+                }}
+              >
+                {p}
+              </a>
+            </li>
+          ))}
+          {paths.length > PREVIEW_LIMIT && (
+            <li style={{ padding: '2px 0', color: colors.text.muted }}>
+              … {paths.length - PREVIEW_LIMIT} more
+            </li>
+          )}
+        </ul>
+      </details>
+    </ToolCardShell>
+  )
+}
+
+function FolderGlyph() {
+  return (
+    <svg
+      aria-hidden
+      width={12}
+      height={11}
+      viewBox="0 0 12 11"
+      style={{ flexShrink: 0, opacity: 0.7 }}
     >
-      <summary style={{ cursor: 'pointer', color: colors.text.primary }}>
-        <span style={{ opacity: 0.6, marginRight: 6 }}>📁</span>
-        {paths.length} {paths.length === 1 ? 'file' : 'files'}
-        <span style={{ marginLeft: 6, opacity: 0.5 }}>· {globsLabel}</span>
-      </summary>
-      <ul style={{ margin: '6px 0 0 0', padding: 0, listStyle: 'none' }}>
-        {paths.slice(0, PREVIEW_LIMIT).map((p) => (
-          <li key={p} style={{ padding: '2px 0' }}>
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                openInEditor(p)
-              }}
-              style={{
-                color: colors.text.primary,
-                textDecoration: 'none',
-                fontSize: 12
-              }}
-            >
-              {p}
-            </a>
-          </li>
-        ))}
-        {paths.length > PREVIEW_LIMIT && (
-          <li style={{ padding: '2px 0', color: colors.text.muted }}>
-            … {paths.length - PREVIEW_LIMIT} more
-          </li>
-        )}
-      </ul>
-    </details>
+      <path
+        d="M.5 2.5A1 1 0 0 1 1.5 1.5h3l1.2 1.5h5.3a1 1 0 0 1 1 1V9.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1v-7z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1}
+      />
+    </svg>
   )
 }

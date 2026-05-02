@@ -1,6 +1,7 @@
 import type { ToolCall, ToolError } from '@shared/thread-types'
-import { borderRadius } from '../../../design/tokens'
+import { colors, typography } from '../../../design/tokens'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
+import { ToolCardShell } from './ToolCardShell'
 
 export function ToolErrorCard({
   call,
@@ -23,21 +24,23 @@ export function ToolErrorCard({
     }
   ])
   return (
-    <div
-      onContextMenu={onContextMenu}
-      style={{
-        padding: 8,
-        background: 'rgba(255, 80, 80, 0.06)',
-        border: '1px solid rgba(255, 80, 80, 0.4)',
-        borderRadius: borderRadius.inline,
-        marginTop: 8
-      }}
-    >
-      <div style={{ fontSize: 12 }}>
-        {call.kind} · {error.code}: {error.message}
+    <ToolCardShell variant="error" onContextMenu={onContextMenu}>
+      <div
+        style={{
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
+          color: colors.diff.removed,
+          marginBottom: 4
+        }}
+      >
+        {call.kind} · {error.code}
       </div>
-      {error.hint && <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{error.hint}</div>}
+      <div style={{ fontSize: 12, color: colors.text.primary }}>{error.message}</div>
+      {error.hint && (
+        <div style={{ fontSize: 11, color: colors.text.muted, marginTop: 4 }}>{error.hint}</div>
+      )}
       {menu}
-    </div>
+    </ToolCardShell>
   )
 }

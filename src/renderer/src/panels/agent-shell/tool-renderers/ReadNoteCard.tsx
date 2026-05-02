@@ -1,8 +1,9 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, borderRadius } from '../../../design/tokens'
+import { colors } from '../../../design/tokens'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
+import { ToolCardShell } from './ToolCardShell'
 
 type ReadNoteCall = Extract<ToolCall, { kind: 'read_note' }>
 
@@ -25,7 +26,7 @@ export function ReadNoteCard({
     }
   ])
 
-  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     e.preventDefault()
     const vault = useVaultStore.getState().vaultPath
     if (!vault) return
@@ -35,30 +36,50 @@ export function ReadNoteCard({
 
   return (
     <>
-      <a
-        href="#"
-        onClick={handleClick}
+      <ToolCardShell
+        variant="pill"
+        inline
         onContextMenu={onContextMenu}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '2px 10px',
-          borderRadius: borderRadius.inline,
-          background: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`,
-          fontSize: 12,
-          color: colors.text.primary,
-          textDecoration: 'none',
-          marginTop: 8,
-          cursor: 'pointer'
-        }}
+        style={{ cursor: 'pointer', gap: 6 }}
       >
-        <span style={{ opacity: 0.6 }}>📄</span>
-        {call.args.path}
-        {lines && <span style={{ opacity: 0.6 }}>· {lines}</span>}
-      </a>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleClick(e as unknown as React.MouseEvent<HTMLDivElement>)
+            }
+          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          <FileGlyph />
+          <span style={{ color: colors.text.primary }}>{call.args.path}</span>
+          {lines && <span style={{ color: colors.text.muted }}>· {lines}</span>}
+        </div>
+      </ToolCardShell>
       {menu}
     </>
+  )
+}
+
+function FileGlyph() {
+  return (
+    <svg
+      aria-hidden
+      width={11}
+      height={13}
+      viewBox="0 0 11 13"
+      style={{ flexShrink: 0, opacity: 0.65 }}
+    >
+      <path
+        d="M1 1.5A1 1 0 0 1 2 .5h4.5L10 4v7.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1.5z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1}
+      />
+      <path d="M6.5 .5V4H10" fill="none" stroke="currentColor" strokeWidth={1} />
+    </svg>
   )
 }

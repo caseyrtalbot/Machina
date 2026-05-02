@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, borderRadius } from '../../../design/tokens'
+import { colors, typography } from '../../../design/tokens'
+import { ToolCardShell } from './ToolCardShell'
 
 type PinCall = Extract<ToolCall, { kind: 'pin_to_canvas' }>
 
@@ -21,20 +22,8 @@ export function PinToCanvasCard({
   const refs = call.args.card.refs ?? []
 
   return (
-    <div
-      style={{
-        marginTop: 8,
-        padding: '6px 10px',
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline,
-        fontSize: 12,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8
-      }}
-    >
-      <span style={{ opacity: 0.7 }}>📌</span>
+    <ToolCardShell variant="block" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <PinGlyph />
       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
         <div
           style={{
@@ -53,9 +42,37 @@ export function PinToCanvasCard({
           </div>
         )}
       </div>
-      <span style={{ fontSize: 11, color: colors.text.muted, whiteSpace: 'nowrap' }}>
-        {!settled ? 'pinning…' : succeeded ? `pinned · ${cardId}` : 'failed'}
+      <span
+        style={{
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
+          color: colors.text.muted,
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {!settled ? 'pinning' : succeeded ? `pinned · ${cardId}` : 'failed'}
       </span>
-    </div>
+    </ToolCardShell>
+  )
+}
+
+function PinGlyph() {
+  return (
+    <svg
+      aria-hidden
+      width={11}
+      height={13}
+      viewBox="0 0 11 13"
+      style={{ flexShrink: 0, opacity: 0.7 }}
+    >
+      <path
+        d="M5.5 .5 L8.5 3.5 L7.2 4.8 L8 8.5 L3 8.5 L3.8 4.8 L2.5 3.5 Z M5.5 8.5 L5.5 12.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1}
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
