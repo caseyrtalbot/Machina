@@ -1072,14 +1072,17 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
     }
   }, [])
 
+  // In agent-shell mode the agent shell owns Cmd-K (palette), Cmd-/
+  // (collapse dock), and Cmd-W (close dock tab). Hide those handlers from
+  // the legacy global keybinder so we don't fire two listeners at once.
   useKeyboard({
-    onCommandPalette: () => setPaletteOpen(true),
+    onCommandPalette: useAgentShell ? undefined : () => setPaletteOpen(true),
     onQuickSwitcher: () => setQuickSwitcherOpen(true),
     onCycleView: toggleView,
-    onToggleSourceMode: toggleSourceMode,
+    onToggleSourceMode: useAgentShell ? undefined : toggleSourceMode,
     onToggleSidebar: toggleSidebar,
     onOpenDailyNote: handleOpenDailyNote,
-    onCloseTab: handleCloseTab,
+    onCloseTab: useAgentShell ? undefined : handleCloseTab,
     onGoBack: goBack,
     onGoForward: goForward,
     onSplitEditor: handleSplitEditor,
