@@ -145,7 +145,7 @@ export function DockTabBar({
             height: '100%',
             background: 'transparent',
             border: 'none',
-            color: colors.text.muted,
+            color: colors.text.secondary,
             fontSize: 14,
             lineHeight: 1,
             cursor: 'pointer'

@@ -313,6 +313,7 @@ function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
   return (
     <button
       onClick={onClick}
+      title="New thread"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
