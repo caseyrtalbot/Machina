@@ -127,8 +127,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 12, y: 12 },
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
+    backgroundColor: '#111113',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

@@ -33,7 +33,8 @@ export function ThreadPanel() {
           flex: 1,
           minWidth: 480,
           padding: 24,
-          color: colors.text.muted
+          color: colors.text.muted,
+          background: colors.bg.base
         }}
       >
         No thread selected.
@@ -48,7 +49,8 @@ export function ThreadPanel() {
         flexDirection: 'column',
         flex: 1,
         minWidth: 480,
-        height: '100%'
+        height: '100%',
+        background: colors.bg.base
       }}
     >
       <header

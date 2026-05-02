@@ -114,7 +114,8 @@ function WindowDragRegion() {
         paddingTop: 2,
         paddingLeft: 8,
         paddingRight: 8,
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        background: colors.bg.chrome
       }}
     >
       <div
