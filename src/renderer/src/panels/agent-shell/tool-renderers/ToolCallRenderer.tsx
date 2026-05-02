@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors } from '../../../design/tokens'
+import { CliCommandCard } from './CliCommandCard'
 import { EditNoteCard } from './EditNoteCard'
 import { ListVaultCard } from './ListVaultCard'
 import { PinToCanvasCard } from './PinToCanvasCard'
@@ -23,6 +24,10 @@ export function ToolCallRenderer({
   }
   if (call.kind === 'edit_note') {
     return <EditNoteCard call={call} result={result} />
+  }
+  // cli_command renders its own ok/failed states with an exit-code badge.
+  if (call.kind === 'cli_command') {
+    return <CliCommandCard call={call} result={result} />
   }
   if (result && !result.ok) {
     return <ToolErrorCard call={call} error={result.error} />

@@ -183,6 +183,13 @@ const api = {
     writeConfig: (vaultPath: string, config: VaultMachinaConfig) =>
       typedInvoke('thread:write-config', { vaultPath, config })
   },
+  cliThread: {
+    spawn: (req: { threadId: string; identity: AgentIdentity; cwd: string }) =>
+      typedInvoke('cli-thread:spawn', req),
+    input: (req: { threadId: string; identity: AgentIdentity; text: string }) =>
+      typedInvoke('cli-thread:input', req),
+    close: (threadId: string) => typedInvoke('cli-thread:close', { threadId })
+  },
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getHomePath: () => homedir(),
   getTerminalPreloadPath: () => join(__dirname, 'terminal-webview.js'),

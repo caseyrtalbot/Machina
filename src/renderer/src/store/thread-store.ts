@@ -95,6 +95,24 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       dockTabsByThreadId: { ...s.dockTabsByThreadId, [t.id]: t.dockState.tabs.slice() },
       activeThreadId: t.id
     }))
+    if (agent !== 'machina-native') {
+      const result = await window.api.cliThread.spawn({ threadId: t.id, identity: agent, cwd: v })
+      if (!result.ok) {
+        const sysMsg: ThreadMessage = {
+          role: 'system',
+          body: result.error,
+          sentAt: new Date().toISOString()
+        }
+        set((s) => {
+          const cur = s.threadsById[t.id]
+          if (!cur) return s
+          const next: Thread = { ...cur, messages: [...cur.messages, sysMsg] }
+          return { threadsById: { ...s.threadsById, [t.id]: next } }
+        })
+        const cur = get().threadsById[t.id]
+        if (cur) await window.api.thread.save(v, cur)
+      }
+    }
     return t
   },
 
@@ -122,6 +140,10 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   deleteThread: async (id) => {
     const v = get().vaultPath
     if (!v) return
+    const t = get().threadsById[id]
+    if (t && t.agent !== 'machina-native') {
+      await window.api.cliThread.close(id)
+    }
     await window.api.thread.delete(v, id)
     set((s) => {
       const next = { ...s.threadsById }
@@ -158,7 +180,10 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     if (!t) return
     await window.api.thread.save(v, t)
 
-    if (t.agent !== 'machina-native') return
+    if (t.agent !== 'machina-native') {
+      await window.api.cliThread.input({ threadId: id, identity: t.agent, text })
+      return
+    }
     const history = t.messages
       .slice(0, -1)
       .flatMap((m) =>

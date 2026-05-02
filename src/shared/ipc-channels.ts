@@ -276,6 +276,25 @@ export interface IpcChannels {
     request: { toolUseId: string; accept: boolean; rejectReason?: string }
     response: void
   }
+
+  // --- CLI Agent Threads (Phase 8) ---
+  'cli-thread:spawn': {
+    request: {
+      threadId: string
+      identity: import('./agent-identity').AgentIdentity
+      cwd: string
+    }
+    response: { ok: true; sessionId: string } | { ok: false; error: string }
+  }
+  'cli-thread:input': {
+    request: {
+      threadId: string
+      identity: import('./agent-identity').AgentIdentity
+      text: string
+    }
+    response: { ok: boolean }
+  }
+  'cli-thread:close': { request: { threadId: string }; response: void }
 }
 
 export type AgentNativeApprovalPreview =

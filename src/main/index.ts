@@ -19,6 +19,7 @@ import { registerHealthIpc, setHealthMonitor, emitHealthReport } from './ipc/hea
 import { registerClaudeStatusIpc } from './ipc/claude-status'
 import { registerThreadIpc } from './ipc/thread-ipc'
 import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
+import { registerCliThreadIpc } from './ipc/cli-thread'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { PtyMonitor } from './services/pty-monitor'
 import { AgentSpawner } from './services/agent-spawner'
@@ -285,6 +286,7 @@ app.whenReady().then(() => {
   registerHealthIpc()
   registerThreadIpc()
   registerAgentNativeIpc()
+  registerCliThreadIpc()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
