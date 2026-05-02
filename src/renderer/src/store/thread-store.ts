@@ -15,6 +15,10 @@ interface ThreadState {
   streamingByThreadId: Record<string, string>
   pendingApprovalsByThreadId: Record<string, ToolCall[]>
   pendingToolCallsByThreadId: Record<string, Array<{ call: ToolCall; result?: ToolResult }>>
+  /** Active machina-native runId per thread (cleared on message_end / error). */
+  runIdByThreadId: Record<string, string>
+  /** True while a turn is in flight for the thread (cleared when it settles). */
+  inFlightByThreadId: Record<string, boolean>
   dockTabsByThreadId: Record<string, DockTab[]>
   dockCollapsed: boolean
 
@@ -33,6 +37,8 @@ interface ThreadState {
   appendPendingToolCall: (threadId: string, call: ToolCall, result: ToolResult) => void
   finalizeAssistantMessage: (threadId: string) => Promise<void>
   appendCliMessage: (threadId: string, message: ThreadMessage) => Promise<void>
+  setRunId: (threadId: string, runId: string | null) => void
+  cancelActive: (threadId: string) => Promise<void>
   toggleAutoAccept: (threadId: string) => Promise<void>
 
   addDockTab: (tab: DockTab) => void
@@ -49,6 +55,8 @@ const initial = {
   streamingByThreadId: {} as Record<string, string>,
   pendingApprovalsByThreadId: {} as Record<string, ToolCall[]>,
   pendingToolCallsByThreadId: {} as Record<string, Array<{ call: ToolCall; result?: ToolResult }>>,
+  runIdByThreadId: {} as Record<string, string>,
+  inFlightByThreadId: {} as Record<string, boolean>,
   dockTabsByThreadId: {} as Record<string, DockTab[]>,
   dockCollapsed: false
 }
@@ -155,11 +163,17 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       delete tools[id]
       const dock = { ...s.dockTabsByThreadId }
       delete dock[id]
+      const runs = { ...s.runIdByThreadId }
+      delete runs[id]
+      const flight = { ...s.inFlightByThreadId }
+      delete flight[id]
       return {
         threadsById: next,
         streamingByThreadId: stream,
         pendingToolCallsByThreadId: tools,
         dockTabsByThreadId: dock,
+        runIdByThreadId: runs,
+        inFlightByThreadId: flight,
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
     })
@@ -196,6 +210,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     if (!t) return
     await window.api.thread.save(v, t)
 
+    set((s) => ({ inFlightByThreadId: { ...s.inFlightByThreadId, [id]: true } }))
+
     if (t.agent !== 'machina-native') {
       await window.api.cliThread.input({ threadId: id, identity: t.agent, text })
       return
@@ -207,7 +223,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
           ? [{ role: m.role, content: m.body } as const]
           : []
       )
-    await window.api.agentNative.run({
+    const { runId } = await window.api.agentNative.run({
       vaultPath: v,
       threadId: id,
       model: t.model,
@@ -216,6 +232,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       historyMessages: history,
       autoAccept: t.autoAcceptSession ?? false
     })
+    set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
   },
 
   appendAssistantStreamChunk: (threadId, chunk) =>
@@ -275,10 +292,16 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       delete stream[threadId]
       const tools = { ...s.pendingToolCallsByThreadId }
       delete tools[threadId]
+      const runs = { ...s.runIdByThreadId }
+      delete runs[threadId]
+      const flight = { ...s.inFlightByThreadId }
+      delete flight[threadId]
       return {
         threadsById: { ...s.threadsById, [threadId]: next },
         streamingByThreadId: stream,
-        pendingToolCallsByThreadId: tools
+        pendingToolCallsByThreadId: tools,
+        runIdByThreadId: runs,
+        inFlightByThreadId: flight
       }
     })
     const t = get().threadsById[threadId]
@@ -296,10 +319,36 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         messages: [...t.messages, message],
         lastMessage: message.sentAt
       }
-      return { threadsById: { ...s.threadsById, [threadId]: next } }
+      const flight = { ...s.inFlightByThreadId }
+      delete flight[threadId]
+      return { threadsById: { ...s.threadsById, [threadId]: next }, inFlightByThreadId: flight }
     })
     const t = get().threadsById[threadId]
     if (t) await window.api.thread.save(v, t)
+  },
+
+  setRunId: (threadId, runId) =>
+    set((s) => {
+      const next = { ...s.runIdByThreadId }
+      if (runId === null) delete next[threadId]
+      else next[threadId] = runId
+      return { runIdByThreadId: next }
+    }),
+
+  cancelActive: async (threadId) => {
+    const t = get().threadsById[threadId]
+    if (!t) return
+    if (t.agent === 'machina-native') {
+      const runId = get().runIdByThreadId[threadId]
+      if (runId) await window.api.agentNative.abort(runId)
+    } else {
+      await window.api.cliThread.cancel(threadId)
+    }
+    set((s) => {
+      const flight = { ...s.inFlightByThreadId }
+      delete flight[threadId]
+      return { inFlightByThreadId: flight }
+    })
   },
 
   toggleAutoAccept: async (threadId) => {

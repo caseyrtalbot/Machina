@@ -108,6 +108,18 @@ export class CliThreadSpawner {
     this.sessionByThread.delete(threadId)
   }
 
+  /**
+   * Send Ctrl+C (`\x03`) into the PTY to interrupt the current `claude --print`
+   * (or codex/gemini) invocation. Leaves the PTY open so the next user message
+   * can spawn a new invocation in the same shell.
+   */
+  cancel(threadId: string): boolean {
+    const sid = this.sessionByThread.get(threadId)
+    if (!sid) return false
+    this.opts.shellService.sendRawKeys(brandSessionId(sid), '\x03')
+    return true
+  }
+
   /** Look up the bound session id for `threadId`, if any. */
   getSessionId(threadId: string): string | undefined {
     return this.sessionByThread.get(threadId)

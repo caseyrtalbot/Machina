@@ -72,6 +72,34 @@ describe('thread-store', () => {
     expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
   })
 
+  it('cancelActive on a machina-native thread calls agentNative.abort with the runId', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.agentNative = { abort: vi.fn().mockResolvedValue(undefined) }
+    useThreadStore.setState({
+      threadsById: { a: sampleThread('a') },
+      runIdByThreadId: { a: 'r-7' },
+      inFlightByThreadId: { a: true }
+    })
+    await useThreadStore.getState().cancelActive('a')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.agentNative.abort).toHaveBeenCalledWith('r-7')
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+  })
+
+  it('cancelActive on a CLI thread calls cliThread.cancel with the threadId', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { cancel: vi.fn().mockResolvedValue({ ok: true }) }
+    const cliThread = { ...sampleThread('a'), agent: 'cli-claude' as const }
+    useThreadStore.setState({
+      threadsById: { a: cliThread },
+      inFlightByThreadId: { a: true }
+    })
+    await useThreadStore.getState().cancelActive('a')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.cliThread.cancel).toHaveBeenCalledWith('a')
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+  })
+
   it('renameThread updates the title and persists', async () => {
     useThreadStore.setState({
       vaultPath: '/v',

@@ -295,6 +295,7 @@ export interface IpcChannels {
     response: { ok: boolean }
   }
   'cli-thread:close': { request: { threadId: string }; response: void }
+  'cli-thread:cancel': { request: { threadId: string }; response: { ok: boolean } }
 }
 
 export type AgentNativeApprovalPreview =

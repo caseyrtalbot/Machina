@@ -3,21 +3,22 @@ import type { KeyboardEvent } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { AgentPicker } from './AgentPicker'
 import type { AgentIdentity } from '@shared/agent-identity'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
 
 export function ThreadInputBar() {
   const activeId = useThreadStore((s) => s.activeThreadId)
-  const threadsById = useThreadStore((s) => s.threadsById)
   const appendUser = useThreadStore((s) => s.appendUserMessage)
   const createThread = useThreadStore((s) => s.createThread)
+  const cancelActive = useThreadStore((s) => s.cancelActive)
+  const inFlight = useThreadStore((s) =>
+    activeId ? Boolean(s.inFlightByThreadId[activeId]) : false
+  )
   const [text, setText] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
 
-  const isThreadStart = activeId ? threadsById[activeId]?.messages.length === 0 : false
-
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (text === '' && e.key === '/' && isThreadStart) {
+    if (text === '' && e.key === '/') {
       e.preventDefault()
       setPickerOpen(true)
       return
@@ -41,7 +42,10 @@ export function ThreadInputBar() {
       style={{
         position: 'relative',
         borderTop: `1px solid ${colors.border.default}`,
-        padding: 12
+        padding: 12,
+        display: 'flex',
+        alignItems: 'flex-end',
+        gap: 8
       }}
     >
       {pickerOpen && <AgentPicker onPick={pickAgent} onCancel={() => setPickerOpen(false)} />}
@@ -52,7 +56,7 @@ export function ThreadInputBar() {
         onKeyDown={onKeyDown}
         placeholder="Ask anything…   Cmd+K · /"
         style={{
-          width: '100%',
+          flex: 1,
           resize: 'none',
           minHeight: 32,
           background: 'transparent',
@@ -63,6 +67,40 @@ export function ThreadInputBar() {
           fontSize: 14
         }}
       />
+      {inFlight && activeId && (
+        <button
+          type="button"
+          data-testid="thread-input-stop"
+          aria-label="Stop"
+          title="Stop the in-flight agent run"
+          onClick={() => void cancelActive(activeId)}
+          style={{
+            flexShrink: 0,
+            padding: '4px 12px',
+            background: 'transparent',
+            border: `1px solid ${colors.border.default}`,
+            borderRadius: borderRadius.inline,
+            color: colors.text.secondary,
+            cursor: 'pointer',
+            fontSize: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              background: colors.claude.error,
+              borderRadius: 1
+            }}
+          />
+          Stop
+        </button>
+      )}
     </div>
   )
 }

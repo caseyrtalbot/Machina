@@ -27,4 +27,9 @@ export function registerCliThreadIpc(): void {
   typedHandle('cli-thread:close', async ({ threadId }) => {
     getSpawner().close(threadId)
   })
+
+  typedHandle('cli-thread:cancel', async ({ threadId }) => {
+    const ok = getSpawner().cancel(threadId)
+    return { ok }
+  })
 }

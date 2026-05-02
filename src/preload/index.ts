@@ -188,7 +188,8 @@ const api = {
       typedInvoke('cli-thread:spawn', req),
     input: (req: { threadId: string; identity: AgentIdentity; text: string }) =>
       typedInvoke('cli-thread:input', req),
-    close: (threadId: string) => typedInvoke('cli-thread:close', { threadId })
+    close: (threadId: string) => typedInvoke('cli-thread:close', { threadId }),
+    cancel: (threadId: string) => typedInvoke('cli-thread:cancel', { threadId })
   },
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getHomePath: () => homedir(),
