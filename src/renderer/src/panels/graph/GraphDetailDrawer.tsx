@@ -3,7 +3,7 @@ import { useVaultStore } from '@renderer/store/vault-store'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useEditorStore } from '@renderer/store/editor-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { useViewStore } from '@renderer/store/view-store'
+import { useThreadStore } from '@renderer/store/thread-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { colors, floatingPanel, getArtifactColor, transitions } from '../../design/tokens'
 import { buildGhostIndex } from '../../engine/ghost-index'
@@ -109,14 +109,14 @@ export function GraphDetailDrawer() {
   const handleOpenInEditor = () => {
     if (!artifact || !filePath) return
     useEditorStore.getState().setActiveNote(filePath)
-    useViewStore.getState().setContentView('editor')
+    useThreadStore.getState().addDockTab({ kind: 'editor', path: filePath })
   }
 
   const handleNavigateBacklink = (id: string) => {
     const path = artifactPathById[id]
     if (path) {
       useEditorStore.getState().setActiveNote(path)
-      useViewStore.getState().setContentView('editor')
+      useThreadStore.getState().addDockTab({ kind: 'editor', path })
     }
   }
 

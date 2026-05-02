@@ -37,7 +37,6 @@ import { CanvasWelcomeCard, EmptyCanvasHint } from './CanvasEmptyStates'
 import { useSaveTextCard } from './useSaveTextCard'
 import { SaveTextCardDialog } from './SaveTextCardDialog'
 import { slugifyFilename } from './text-card-save'
-import { useTabStore } from '../../store/tab-store'
 import {
   mapFolderToCanvas,
   cancelFolderMap,
@@ -128,7 +127,6 @@ export function CanvasView(): React.ReactElement {
   const fileToId = useVaultStore((s) => s.fileToId)
   const artifactPathById = useVaultStore((s) => s.artifactPathById)
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
-  const activeTabId = useTabStore((s) => s.activeTabId)
 
   // Load existing default canvas from .machina/ if one exists.
   // The default canvas is a system file — never pollutes the vault root.
@@ -534,15 +532,16 @@ export function CanvasView(): React.ReactElement {
     return () => useCanvasStore.getState().setCenterOnNode(null)
   }, [containerSize])
 
-  // Auto-save debounce
+  // Auto-save debounce. CanvasView only mounts inside an active dock tab via
+  // DockTabContent, so we no longer need to gate on the legacy active-tab id.
   useEffect(() => {
-    if (activeTabId !== 'canvas' || !filePath || !isDirty) return
+    if (!filePath || !isDirty) return
     const timer = setTimeout(async () => {
       await saveCanvas(filePath, toCanvasFile())
       markSaved()
     }, 500)
     return () => clearTimeout(timer)
-  }, [activeTabId, filePath, isDirty, toCanvasFile, markSaved])
+  }, [filePath, isDirty, toCanvasFile, markSaved])
 
   // Folder-map: trigger analysis when a folder path is set.
   // We capture the path, clear pendingFolderMap immediately, and run the orchestrator.

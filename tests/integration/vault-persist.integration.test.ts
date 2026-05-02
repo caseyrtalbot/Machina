@@ -10,7 +10,6 @@ vi.stubGlobal('window', {
   }
 })
 
-// Stub localStorage for tab-store persist middleware
 vi.stubGlobal('localStorage', {
   getItem: vi.fn().mockReturnValue(null),
   setItem: vi.fn(),
@@ -34,7 +33,6 @@ vi.mock('@shared/system-artifacts', () => ({
 
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useEditorStore } from '@renderer/store/editor-store'
-import { useViewStore } from '@renderer/store/view-store'
 import {
   getUiState,
   setUiState,
@@ -75,8 +73,6 @@ function resetStores(): void {
     historyStack: [],
     historyIndex: -1
   })
-
-  useViewStore.setState({ contentView: 'canvas' })
 }
 
 function resetUiState(): void {
@@ -108,7 +104,6 @@ describe('vault-persist integration', () => {
           version: 2,
           lastOpenNote: null,
           panelLayout: { sidebarWidth: 300 },
-          contentView: 'editor',
           fileTreeCollapseState: { '/docs': true },
           selectedNodeId: 'node-42',
           recentFiles: ['a.md', 'b.md']
@@ -116,7 +111,6 @@ describe('vault-persist integration', () => {
       })
 
       useEditorStore.setState({ activeNotePath: '/test/vault/notes/hello.md' })
-      useViewStore.setState({ contentView: 'canvas' })
       setUiState({ backlinkCollapsed: { 'note-1': true } })
 
       // Drain debounce from setUiState and clear mocks
@@ -134,7 +128,6 @@ describe('vault-persist integration', () => {
         version: 2,
         lastOpenNote: '/test/vault/notes/hello.md',
         panelLayout: { sidebarWidth: 300 },
-        contentView: 'canvas',
         fileTreeCollapseState: { '/docs': true },
         selectedNodeId: 'node-42',
         recentFiles: ['a.md', 'b.md'],
@@ -145,7 +138,6 @@ describe('vault-persist integration', () => {
     it('uses defaults when vault state is null', () => {
       useVaultStore.setState({ vaultPath: '/v', state: null })
       useEditorStore.setState({ activeNotePath: null })
-      useViewStore.setState({ contentView: 'editor' })
 
       flushVaultState()
 
@@ -155,34 +147,9 @@ describe('vault-persist integration', () => {
       expect(state.version).toBe(1)
       expect(state.lastOpenNote).toBeNull()
       expect(state.panelLayout).toEqual({ sidebarWidth: 280 })
-      expect(state.contentView).toBe('editor')
       expect(state.fileTreeCollapseState).toEqual({})
       expect(state.selectedNodeId).toBeNull()
       expect(state.recentFiles).toEqual([])
-    })
-
-    it('falls back to existing contentView for non-persistable view types', () => {
-      useVaultStore.setState({
-        vaultPath: '/v',
-        state: {
-          version: 1,
-          lastOpenNote: null,
-          panelLayout: { sidebarWidth: 280, terminalWidth: 360 },
-          contentView: 'canvas',
-          terminalSessions: [],
-          fileTreeCollapseState: {},
-          selectedNodeId: null,
-          recentFiles: []
-        }
-      })
-
-      // 'graph' is not in PERSISTABLE_VIEWS set
-      useViewStore.setState({ contentView: 'graph' })
-
-      flushVaultState()
-
-      const state = writeStateMock.mock.calls[0][1]
-      expect(state.contentView).toBe('canvas')
     })
   })
 
@@ -217,37 +184,7 @@ describe('vault-persist integration', () => {
     })
   })
 
-  // ─── 3. subscribeVaultPersist triggers on contentView change ─────────────
-
-  describe('subscribeVaultPersist on contentView', () => {
-    it('schedules a persist when contentView changes', () => {
-      useVaultStore.setState({ vaultPath: '/v' })
-      const unsub = subscribeVaultPersist()
-
-      useViewStore.setState({ contentView: 'editor' })
-      vi.advanceTimersByTime(1000)
-
-      expect(writeStateMock).toHaveBeenCalledOnce()
-      expect(writeStateMock.mock.calls[0][1].contentView).toBe('editor')
-
-      unsub()
-    })
-
-    it('does not trigger when contentView stays the same', () => {
-      useVaultStore.setState({ vaultPath: '/v' })
-      useViewStore.setState({ contentView: 'editor' })
-      const unsub = subscribeVaultPersist()
-
-      useViewStore.setState({ contentView: 'editor' })
-      vi.advanceTimersByTime(1000)
-
-      expect(writeStateMock).not.toHaveBeenCalled()
-
-      unsub()
-    })
-  })
-
-  // ─── 4. Debounce: rapid changes produce one write after 1s ──────────────
+  // ─── 3. Debounce: rapid changes produce one write after 1s ──────────────
 
   describe('debounce behavior', () => {
     it('coalesces rapid store changes into a single write after 1s', () => {
@@ -294,7 +231,7 @@ describe('vault-persist integration', () => {
     })
   })
 
-  // ─── 5. flushVaultState fires immediately ────────────────────────────────
+  // ─── 4. flushVaultState fires immediately ────────────────────────────────
 
   describe('flushVaultState', () => {
     it('writes immediately without waiting for debounce', () => {
@@ -346,7 +283,7 @@ describe('vault-persist integration', () => {
     })
   })
 
-  // ─── 6. rehydrateUiState populates from vault store ─────────────────────
+  // ─── 5. rehydrateUiState populates from vault store ─────────────────────
 
   describe('rehydrateUiState', () => {
     it('populates uiState from vault store state.ui', () => {
@@ -355,7 +292,6 @@ describe('vault-persist integration', () => {
           version: 1,
           lastOpenNote: null,
           panelLayout: { sidebarWidth: 280 },
-          contentView: 'editor',
           fileTreeCollapseState: {},
           selectedNodeId: null,
           recentFiles: [],
@@ -388,7 +324,6 @@ describe('vault-persist integration', () => {
           version: 1,
           lastOpenNote: null,
           panelLayout: { sidebarWidth: 280 },
-          contentView: 'editor',
           fileTreeCollapseState: {},
           selectedNodeId: null,
           recentFiles: []
@@ -434,7 +369,6 @@ describe('vault-persist integration', () => {
           version: 1,
           lastOpenNote: null,
           panelLayout: { sidebarWidth: 280 },
-          contentView: 'editor',
           fileTreeCollapseState: {},
           selectedNodeId: null,
           recentFiles: [],
@@ -452,7 +386,7 @@ describe('vault-persist integration', () => {
     })
   })
 
-  // ─── 7. Unsubscribe stops triggering writes ─────────────────────────────
+  // ─── 6. Unsubscribe stops triggering writes ─────────────────────────────
 
   describe('unsubscribe', () => {
     it('stops scheduling persists after unsubscribe', () => {
@@ -470,19 +404,6 @@ describe('vault-persist integration', () => {
 
       // Further changes should not trigger writes
       useEditorStore.setState({ activeNotePath: '/v/after.md' })
-      vi.advanceTimersByTime(2000)
-
-      expect(writeStateMock).not.toHaveBeenCalled()
-    })
-
-    it('stops scheduling persists for contentView after unsubscribe', () => {
-      useVaultStore.setState({ vaultPath: '/v' })
-      useViewStore.setState({ contentView: 'editor' })
-      const unsub = subscribeVaultPersist()
-
-      unsub()
-
-      useViewStore.setState({ contentView: 'canvas' })
       vi.advanceTimersByTime(2000)
 
       expect(writeStateMock).not.toHaveBeenCalled()

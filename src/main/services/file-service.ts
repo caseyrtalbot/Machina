@@ -248,7 +248,6 @@ export class FileService {
       version: 1,
       lastOpenNote: null,
       panelLayout: { sidebarWidth: 240 },
-      contentView: 'editor',
       fileTreeCollapseState: {},
       selectedNodeId: null,
       recentFiles: []

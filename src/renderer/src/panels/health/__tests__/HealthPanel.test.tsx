@@ -50,22 +50,16 @@ vi.mock('../../../store/vault-store', () => ({
   )
 }))
 
-vi.mock('../../../store/tab-store', () => ({
-  useTabStore: Object.assign(
+vi.mock('../../../store/thread-store', () => ({
+  useThreadStore: Object.assign(
     vi.fn((selector) =>
       selector({
-        tabs: [],
-        activeTabId: 'editor',
-        openTab: vi.fn(),
-        activateTab: vi.fn()
+        addDockTab: vi.fn()
       })
     ),
     {
       getState: vi.fn(() => ({
-        tabs: [],
-        activeTabId: 'editor',
-        openTab: vi.fn(),
-        activateTab: vi.fn()
+        addDockTab: vi.fn()
       }))
     }
   )
@@ -239,18 +233,14 @@ describe('HealthPanel', () => {
     expect(screen.getByText('Stale worker index')).toBeDefined()
   })
 
-  it('clicking file link calls openTab and setActiveNote', async () => {
+  it('clicking file link calls setActiveNote and adds an editor dock tab', async () => {
     const now = Date.now()
-    const mockOpenTab = vi.fn()
+    const mockAddDockTab = vi.fn()
     const mockSetActiveNote = vi.fn()
 
-    // Re-wire tab-store mock for this test
-    const { useTabStore } = await import('../../../store/tab-store')
-    ;(useTabStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-      tabs: [],
-      activeTabId: 'editor',
-      openTab: mockOpenTab,
-      activateTab: vi.fn()
+    const { useThreadStore } = await import('../../../store/thread-store')
+    ;(useThreadStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+      addDockTab: mockAddDockTab
     })
 
     const { useEditorStore } = await import('../../../store/editor-store')
@@ -279,8 +269,8 @@ describe('HealthPanel', () => {
     const fileLink = screen.getByText('broken.md')
     fireEvent.click(fileLink)
 
-    expect(mockOpenTab).toHaveBeenCalled()
     expect(mockSetActiveNote).toHaveBeenCalledWith('/vault/broken.md')
+    expect(mockAddDockTab).toHaveBeenCalledWith({ kind: 'editor', path: '/vault/broken.md' })
   })
 
   it('refresh button disables for 500ms after click', async () => {

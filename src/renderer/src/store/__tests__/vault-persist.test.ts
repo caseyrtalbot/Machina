@@ -21,7 +21,6 @@ vi.mock('../editor-store', async (importOriginal) => {
 import { registerQuitHandler, subscribeVaultPersist } from '../vault-persist'
 import { useEditorStore } from '../editor-store'
 import { useVaultStore } from '../vault-store'
-import { useViewStore } from '../view-store'
 
 function deferredPromise() {
   let resolve!: () => void
@@ -61,7 +60,6 @@ describe('registerQuitHandler', () => {
         version: 1,
         lastOpenNote: null,
         panelLayout: { sidebarWidth: 280 },
-        contentView: 'editor',
         fileTreeCollapseState: {},
         selectedNodeId: null,
         recentFiles: []
@@ -79,8 +77,6 @@ describe('registerQuitHandler', () => {
       historyStack: [],
       historyIndex: -1
     })
-
-    useViewStore.setState({ contentView: 'editor' })
   })
 
   it('waits for every flush before sending quitReady', async () => {
@@ -132,7 +128,6 @@ describe('writePersist updates vault store', () => {
         version: 1,
         lastOpenNote: null,
         panelLayout: { sidebarWidth: 280 },
-        contentView: 'editor',
         fileTreeCollapseState: {},
         selectedNodeId: null,
         recentFiles: ['old-file.md']
@@ -150,8 +145,6 @@ describe('writePersist updates vault store', () => {
       historyStack: ['/vault/notes/first.md', '/vault/notes/second.md', '/vault/notes/hello.md'],
       historyIndex: 2
     })
-
-    useViewStore.setState({ contentView: 'editor' })
   })
 
   afterEach(() => {

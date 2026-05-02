@@ -153,7 +153,6 @@ export interface VaultState {
   version: number
   lastOpenNote: string | null
   panelLayout: { sidebarWidth: number }
-  contentView: 'editor' | 'canvas' | 'skills'
   fileTreeCollapseState: Record<string, boolean>
   selectedNodeId: string | null
   recentFiles: string[]

@@ -3,7 +3,6 @@ import { notifyError } from '../utils/error-logger'
 import { flushCanvasSave } from './canvas-autosave'
 import { useVaultStore } from './vault-store'
 import { flushPendingSave, useEditorStore } from './editor-store'
-import { useViewStore } from './view-store'
 
 const DEFAULT_UI_STATE: UiPersistedState = {
   backlinkCollapsed: {},
@@ -47,8 +46,6 @@ export function rehydrateUiState(): void {
 /**
  * Gather current state from all stores into a VaultState object.
  */
-const PERSISTABLE_VIEWS = new Set(['editor', 'canvas'])
-
 const MAX_RECENT_FILES = 50
 
 function buildRecentFiles(historyStack: readonly string[], existing: readonly string[]): string[] {
@@ -74,17 +71,12 @@ function buildRecentFiles(historyStack: readonly string[], existing: readonly st
 function gatherVaultState(): VaultState {
   const vault = useVaultStore.getState()
   const editor = useEditorStore.getState()
-  const view = useViewStore.getState()
   const existing = vault.state
-  const contentView = PERSISTABLE_VIEWS.has(view.contentView)
-    ? (view.contentView as VaultState['contentView'])
-    : (existing?.contentView ?? 'editor')
 
   return {
     version: existing?.version ?? 1,
     lastOpenNote: editor.activeNotePath,
     panelLayout: { sidebarWidth: existing?.panelLayout?.sidebarWidth ?? 280 },
-    contentView,
     fileTreeCollapseState: existing?.fileTreeCollapseState ?? {},
     selectedNodeId: existing?.selectedNodeId ?? null,
     recentFiles: buildRecentFiles(editor.historyStack, existing?.recentFiles ?? []),
@@ -155,22 +147,13 @@ export function registerQuitHandler(): () => void {
  */
 export function subscribeVaultPersist(): () => void {
   let prevNotePath = useEditorStore.getState().activeNotePath
-  let prevContentView = useViewStore.getState().contentView
 
-  const unsubs = [
-    useEditorStore.subscribe((state) => {
-      if (state.activeNotePath !== prevNotePath) {
-        prevNotePath = state.activeNotePath
-        schedulePersist()
-      }
-    }),
-    useViewStore.subscribe((state) => {
-      if (state.contentView !== prevContentView) {
-        prevContentView = state.contentView
-        schedulePersist()
-      }
-    })
-  ]
+  const unsub = useEditorStore.subscribe((state) => {
+    if (state.activeNotePath !== prevNotePath) {
+      prevNotePath = state.activeNotePath
+      schedulePersist()
+    }
+  })
 
-  return () => unsubs.forEach((unsub) => unsub())
+  return unsub
 }

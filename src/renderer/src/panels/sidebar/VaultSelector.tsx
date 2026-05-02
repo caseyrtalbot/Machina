@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { colors } from '../../design/tokens'
 import { useVaultHealthStore } from '../../store/vault-health-store'
-import { useTabStore } from '../../store/tab-store'
+import { useThreadStore } from '../../store/thread-store'
 
 interface ContextMenuState {
   readonly x: number
@@ -26,8 +26,6 @@ function HealthDot() {
   const status = useVaultHealthStore((s) => s.status)
   const runs = useVaultHealthStore((s) => s.runs)
   const issues = useVaultHealthStore((s) => s.issues)
-  const openTab = useTabStore((s) => s.openTab)
-
   let fill: string
   let title: string
   switch (status) {
@@ -48,7 +46,7 @@ function HealthDot() {
 
   const handleClick = () => {
     if (status !== 'green') {
-      openTab({ id: 'health', type: 'health', label: 'Health', closeable: true })
+      useThreadStore.getState().addDockTab({ kind: 'health' })
     }
   }
 

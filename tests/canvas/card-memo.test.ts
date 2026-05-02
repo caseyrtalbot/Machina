@@ -66,8 +66,11 @@ vi.mock('@renderer/store/vault-store', () => ({
 vi.mock('@renderer/store/editor-store', () => ({
   useEditorStore: vi.fn(() => vi.fn())
 }))
-vi.mock('@renderer/store/view-store', () => ({
-  useViewStore: vi.fn(() => vi.fn())
+vi.mock('@renderer/store/thread-store', () => ({
+  useThreadStore: Object.assign(
+    vi.fn(() => vi.fn()),
+    { getState: vi.fn(() => ({ addDockTab: vi.fn() })) }
+  )
 }))
 vi.mock('@renderer/hooks/useClaudeContext', () => ({
   useClaudeContext: vi.fn()

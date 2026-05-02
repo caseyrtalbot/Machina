@@ -1,6 +1,5 @@
 import { useEditorStore } from '../store/editor-store'
-import { useTabStore } from '../store/tab-store'
-import { useViewStore } from '../store/view-store'
+import { useThreadStore } from '../store/thread-store'
 import { useVaultStore } from '../store/vault-store'
 import { parseArtifact } from '../engine/parser'
 import { buildGraph } from '../engine/graph-builder'
@@ -87,8 +86,7 @@ function upsertSystemFile(
 
 export function openArtifactInEditor(path: string, title?: string): void {
   useEditorStore.getState().openTab(path, title)
-  useViewStore.getState().setContentView('editor')
-  useTabStore.getState().activateTab('editor')
+  useThreadStore.getState().addDockTab({ kind: 'editor', path })
 }
 
 export async function syncSystemArtifactFromDisk(path: string): Promise<SyncArtifactResult> {

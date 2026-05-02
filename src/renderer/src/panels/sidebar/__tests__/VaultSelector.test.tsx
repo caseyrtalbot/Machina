@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Mutable mock state
 // ---------------------------------------------------------------------------
 
-const mockOpenTab = vi.fn()
+const mockAddDockTab = vi.fn()
 
 const mockHealthState = {
   status: 'green' as 'green' | 'degraded' | 'unknown',
@@ -29,24 +29,20 @@ vi.mock('../../../store/vault-health-store', () => ({
   )
 }))
 
-vi.mock('../../../store/tab-store', () => ({
-  useTabStore: Object.assign(
+vi.mock('../../../store/thread-store', () => ({
+  useThreadStore: Object.assign(
     vi.fn((selector) =>
       selector({
-        tabs: [],
-        activeTabId: 'editor',
-        openTab: mockOpenTab,
-        activateTab: vi.fn(),
-        closeTab: vi.fn(),
-        reorderTab: vi.fn()
+        addDockTab: mockAddDockTab,
+        removeDockTab: vi.fn(),
+        reorderDockTab: vi.fn()
       })
     ),
     {
       getState: vi.fn(() => ({
-        tabs: [],
-        activeTabId: 'editor',
-        openTab: mockOpenTab,
-        activateTab: vi.fn()
+        addDockTab: mockAddDockTab,
+        removeDockTab: vi.fn(),
+        reorderDockTab: vi.fn()
       }))
     }
   )
@@ -88,7 +84,7 @@ beforeEach(() => {
   mockHealthState.issues = []
   mockHealthState.lastDerivedAt = null
   mockHealthState.lastInfraAt = null
-  mockOpenTab.mockClear()
+  mockAddDockTab.mockClear()
 })
 
 describe('VaultSelector health dot', () => {
@@ -131,7 +127,7 @@ describe('VaultSelector health dot', () => {
     expect(dot).toBeNull()
   })
 
-  it('clicking degraded dot opens health tab', async () => {
+  it('clicking degraded dot opens a health dock tab', async () => {
     mockHealthState.status = 'degraded'
     mockHealthState.issues = [
       { checkId: 'parse-errors', severity: 'hard', title: 'Parse error', detail: 'Bad YAML' }
@@ -143,12 +139,7 @@ describe('VaultSelector health dot', () => {
     const dot = screen.getByTestId('health-dot')
     fireEvent.click(dot)
 
-    expect(mockOpenTab).toHaveBeenCalledWith({
-      id: 'health',
-      type: 'health',
-      label: 'Health',
-      closeable: true
-    })
+    expect(mockAddDockTab).toHaveBeenCalledWith({ kind: 'health' })
   })
 
   it('clicking green dot is a no-op', async () => {
@@ -160,6 +151,6 @@ describe('VaultSelector health dot', () => {
     const dot = screen.getByTestId('health-dot')
     fireEvent.click(dot)
 
-    expect(mockOpenTab).not.toHaveBeenCalled()
+    expect(mockAddDockTab).not.toHaveBeenCalled()
   })
 })

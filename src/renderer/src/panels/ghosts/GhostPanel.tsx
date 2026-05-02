@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useId } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useUiStore } from '../../store/ui-store'
-import { useTabStore, TAB_DEFINITIONS } from '../../store/tab-store'
+import { useThreadStore } from '../../store/thread-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
@@ -292,13 +292,7 @@ function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
   }, [ghost, artifacts, emerge, isEmerging])
 
   const handleShowGraph = useCallback(() => {
-    const def = TAB_DEFINITIONS.graph
-    useTabStore.getState().openTab({
-      id: 'graph',
-      type: 'graph',
-      label: def.label,
-      closeable: true
-    })
+    useThreadStore.getState().addDockTab({ kind: 'graph' })
     useGraphViewStore.getState().setSelectedNode(ghost.id)
   }, [ghost.id])
 

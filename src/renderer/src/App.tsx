@@ -10,7 +10,6 @@ import { useSidebarSelectionStore } from './store/sidebar-selection-store'
 import { AgentShell } from './panels/agent-shell/AgentShell'
 import { useVaultStore } from './store/vault-store'
 import { useEditorStore, flushPendingSave } from './store/editor-store'
-import { useViewStore, subscribeViewSync } from './store/view-store'
 import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
@@ -171,14 +170,8 @@ export default function App() {
       await window.api.vault.init(path)
       await loadVault(path)
       const state = useVaultStore.getState().state
-      if (state) {
-        if (state.contentView) {
-          const view = state.contentView as string
-          if (view === 'editor' || view === 'canvas') {
-            useViewStore.getState().setContentView(view)
-          }
-        }
-        if (state.lastOpenNote) useEditorStore.getState().setActiveNote(state.lastOpenNote)
+      if (state?.lastOpenNote) {
+        useEditorStore.getState().setActiveNote(state.lastOpenNote)
       }
       rehydrateUiState()
       rehydrateUiStore()
@@ -234,10 +227,6 @@ export default function App() {
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [])
-
-  useEffect(() => {
-    return subscribeViewSync()
   }, [])
 
   useEffect(() => {
