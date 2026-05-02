@@ -24,6 +24,16 @@ export function decideApproval(toolUseId: string, accept: boolean, rejectReason?
   resolver({ accept, rejectReason })
 }
 
+// Resolve any pending approval as rejected and drop it from the map. Call this
+// when a run aborts or errors out so the awaiting tool returns instead of
+// leaking a zombie entry forever.
+export function clearApproval(toolUseId: string, reason = 'run aborted'): void {
+  const resolver = approvals.get(toolUseId)
+  if (!resolver) return
+  approvals.delete(toolUseId)
+  resolver({ accept: false, rejectReason: reason })
+}
+
 function awaitApproval(toolUseId: string): Promise<ApprovalDecision> {
   return new Promise((resolve) => {
     approvals.set(toolUseId, resolve)

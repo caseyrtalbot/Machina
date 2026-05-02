@@ -3,7 +3,11 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { callTool, decideApproval } from '../../../src/main/services/machina-native-tools'
+import {
+  callTool,
+  clearApproval,
+  decideApproval
+} from '../../../src/main/services/machina-native-tools'
 
 describe('machina-native-tools read_note', () => {
   it('reads a vault note', async () => {
@@ -264,6 +268,67 @@ describe('machina-native-tools canvasId validation', () => {
         { vaultPath: v, autoAccept: false }
       )
       expect(res.ok).toBe(true)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('machina-native-tools clearApproval (run-abort cleanup)', () => {
+  it('resolves a pending write_note approval as rejected when clearApproval fires', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const pending = callTool(
+        'write_note',
+        { path: 'cleared.md', content: 'never reaches disk' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          toolUseId: 'toolu_clear_test',
+          emitPending: () => {}
+        }
+      )
+      // Simulate the agent's run-abort path: drop the pending approval.
+      setTimeout(() => clearApproval('toolu_clear_test', 'run aborted'), 10)
+      const res = await pending
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('IO_TRANSIENT')
+        expect(res.error.message).toBe('rejected by user')
+        expect(res.error.hint).toBe('run aborted')
+      }
+      // File must not have been written.
+      expect(existsSync(path.join(v, 'cleared.md'))).toBe(false)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('clearApproval is a no-op when no pending approval exists for the id', () => {
+    // Should not throw; the only behavior we can observe is "did not throw".
+    expect(() => clearApproval('toolu_does_not_exist', 'whatever')).not.toThrow()
+  })
+
+  it('decideApproval after clearApproval is a no-op (pending was already resolved)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const pending = callTool(
+        'write_note',
+        { path: 'twice.md', content: 'noop' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          toolUseId: 'toolu_double_resolve',
+          emitPending: () => {}
+        }
+      )
+      setTimeout(() => clearApproval('toolu_double_resolve'), 5)
+      // Late accept arrives after clear; should not write the file or
+      // throw, because the approval entry is already gone.
+      setTimeout(() => decideApproval('toolu_double_resolve', true), 30)
+      const res = await pending
+      expect(res.ok).toBe(false)
+      expect(existsSync(path.join(v, 'twice.md'))).toBe(false)
     } finally {
       rmSync(v, { recursive: true, force: true })
     }

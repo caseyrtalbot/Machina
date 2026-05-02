@@ -3,7 +3,7 @@ import { resolveAnthropicKey } from './anthropic-key'
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { NATIVE_TOOLS_V0 } from '@shared/machina-native-tools'
-import { callTool } from './machina-native-tools'
+import { callTool, clearApproval } from './machina-native-tools'
 import type { AgentNativeEventBody } from '@shared/ipc-channels'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 
@@ -153,6 +153,10 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
     { role: 'user' as const, content: opts.userMessage }
   ]
 
+  // Track every toolUseId we hand to callTool so we can drop any pending
+  // approval entry if this run aborts or errors out before the user decides.
+  const emittedToolUseIds = new Set<string>()
+
   void (async () => {
     try {
       for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
@@ -205,6 +209,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
           // can render the diff card *before* callTool blocks on the user.
           // Pause the SDK timeout while we wait on the human.
           clearTimeout(timeout)
+          emittedToolUseIds.add(tu.id)
           const res = await callTool(tu.name, input, {
             vaultPath: opts.vaultPath,
             autoAccept: opts.autoAccept ?? false,
@@ -212,6 +217,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
             emitPending: (toolUseId, preview) =>
               emit(runId, opts.threadId, { kind: 'tool_pending_approval', toolUseId, ...preview })
           })
+          emittedToolUseIds.delete(tu.id)
           // Restart the timeout for the next SDK iteration.
           resetTimeout()
 
@@ -238,6 +244,11 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
     } finally {
       clearTimeout(timeout)
       inflight.delete(runId)
+      // Drop any approval the user never resolved before we exited.
+      for (const id of emittedToolUseIds) {
+        clearApproval(id, abort.signal.aborted ? 'run aborted' : 'run ended')
+      }
+      emittedToolUseIds.clear()
     }
   })()
 
