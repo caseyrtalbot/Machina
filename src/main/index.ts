@@ -119,6 +119,8 @@ function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: initialWindowState.width,
     height: initialWindowState.height,
+    minWidth: 1200,
+    minHeight: 700,
     ...(typeof initialWindowState.x === 'number' ? { x: initialWindowState.x } : {}),
     ...(typeof initialWindowState.y === 'number' ? { y: initialWindowState.y } : {}),
     show: false,

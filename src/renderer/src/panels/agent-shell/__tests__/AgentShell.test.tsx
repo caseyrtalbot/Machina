@@ -61,6 +61,17 @@ describe('AgentShell welcome tooltip', () => {
     expect(screen.queryByTestId('agent-shell-welcome-tooltip')).toBeNull()
   })
 
+  it('renders a window drag region above the three-pane layout', () => {
+    render(<AgentShell />)
+    const strip = screen.getByTestId('window-drag-region')
+    expect(strip).toBeTruthy()
+    // happy-dom strips unknown CSS props (WebkitAppRegion), so we can only
+    // assert the strip is mounted at the top of the shell. Real drag behavior
+    // requires Electron and is verified by visual check.
+    const shell = screen.getByTestId('agent-shell')
+    expect(shell.firstChild).toBe(strip)
+  })
+
   it('dismissing flips welcomed and writes config', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const writeConfig = (window as any).api.thread.writeConfig

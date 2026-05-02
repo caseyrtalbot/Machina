@@ -55,13 +55,38 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
   useAgentShellKeybindings(keybindingOpts)
 
   return (
-    <div data-testid="agent-shell" style={{ display: 'flex', height: '100%', width: '100%' }}>
-      <ThreadSidebar onOpenSettings={onOpenSettings} />
-      <ThreadPanel />
-      <SurfaceDock />
+    <div
+      data-testid="agent-shell"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}
+    >
+      <WindowDragRegion />
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        <ThreadSidebar onOpenSettings={onOpenSettings} />
+        <ThreadPanel />
+        <SurfaceDock />
+      </div>
       <CommandPalette open={paletteOpen} onClose={closePalette} />
       <WelcomeTooltip vaultPath={vaultPath} />
     </div>
+  )
+}
+
+function WindowDragRegion() {
+  // Reserve a 28px band across the top of the shell so the OS can drag the
+  // window. Sits above the three-pane layout (no overlap), which keeps
+  // interactive elements pointer-clickable without per-button no-drag wiring.
+  // 28px also clears the traffic lights at trafficLightPosition { x: 12, y: 12 }.
+  return (
+    <div
+      data-testid="window-drag-region"
+      aria-hidden
+      style={{
+        height: 28,
+        flexShrink: 0,
+        // @ts-expect-error -- Electron-only CSS property
+        WebkitAppRegion: 'drag'
+      }}
+    />
   )
 }
 
