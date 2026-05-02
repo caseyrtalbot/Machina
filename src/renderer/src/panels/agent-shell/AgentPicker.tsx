@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { agentTag } from './agent-tag'
 import { colors, borderRadius } from '../../design/tokens'
@@ -11,8 +12,41 @@ export function AgentPicker({
   readonly onPick: (a: AgentIdentity) => void
   readonly onCancel: () => void
 }) {
+  const [active, setActive] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setActive((a) => (a + 1) % AGENTS.length)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setActive((a) => (a - 1 + AGENTS.length) % AGENTS.length)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        onPick(AGENTS[active])
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+    function onMouseDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    document.addEventListener('mousedown', onMouseDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('mousedown', onMouseDown)
+    }
+  }, [active, onPick, onCancel])
+
   return (
     <div
+      ref={ref}
       role="menu"
       style={{
         position: 'absolute',
@@ -24,16 +58,27 @@ export function AgentPicker({
         borderRadius: borderRadius.container
       }}
     >
-      {AGENTS.map((a) => (
-        <div
-          key={a}
-          role="menuitem"
-          onClick={() => onPick(a)}
-          style={{ padding: '4px 8px', cursor: 'pointer' }}
-        >
-          /{agentTag(a)}
-        </div>
-      ))}
+      {AGENTS.map((a, i) => {
+        const isActive = i === active
+        return (
+          <div
+            key={a}
+            role="menuitem"
+            aria-selected={isActive}
+            onMouseEnter={() => setActive(i)}
+            onClick={() => onPick(a)}
+            style={{
+              padding: '4px 8px',
+              cursor: 'pointer',
+              borderRadius: borderRadius.inline,
+              background: isActive ? colors.bg.base : 'transparent',
+              color: colors.text.primary
+            }}
+          >
+            /{agentTag(a)}
+          </div>
+        )
+      })}
       <div
         role="menuitem"
         onClick={onCancel}
