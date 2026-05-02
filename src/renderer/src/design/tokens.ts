@@ -184,6 +184,22 @@ export const transitions = {
 
 export const borderRadius = { container: 6, inline: 4, tool: 8, card: 0, round: '50%' } as const
 
+/**
+ * Z-index scale. Higher numbers paint on top.
+ *
+ * Layering principle: surface chrome (canvas HUD, sidebar tags) sits low, dock
+ * and window chrome sits mid, popovers and menus sit high regardless of which
+ * surface they originate from, modals above popovers, tooltips above modals.
+ */
+export const zIndex = {
+  surfaceHud: 30,
+  surfacePopover: 50,
+  dockChrome: 40,
+  dockPopover: 100,
+  modal: 200,
+  tooltip: 1000
+} as const
+
 export const EDGE_KIND_COLORS: Record<string, string> = {
   connection: '#667383', // oklch(0.55 0.03 255) neutral slate
   cluster: '#3dca8d', // oklch(0.75 0.15 160) green

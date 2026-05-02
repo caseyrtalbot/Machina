@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { DOCK_TAB_KINDS, type DockTab, type DockTabKind } from '@shared/dock-types'
-import { colors } from '../../design/tokens'
+import { colors, zIndex } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 
 const EMPTY_TABS: readonly DockTab[] = []
@@ -26,6 +26,26 @@ export function DockTabBar({
   const [adderOpen, setAdderOpen] = useState(false)
   const [menu, setMenu] = useState<TabMenuTarget | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [hoveredAdderItem, setHoveredAdderItem] = useState<DockTabKind | null>(null)
+  const adderRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!adderOpen) return
+    function onMouseDown(e: MouseEvent) {
+      if (adderRef.current && !adderRef.current.contains(e.target as Node)) {
+        setAdderOpen(false)
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAdderOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [adderOpen])
 
   function newTab(kind: DockTabKind) {
     setAdderOpen(false)
@@ -132,10 +152,15 @@ export function DockTabBar({
           </button>
         )
       })}
-      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch' }}>
+      <div
+        ref={adderRef}
+        style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch' }}
+      >
         <button
           aria-label="Add tab"
           title="Add tab"
+          aria-haspopup="menu"
+          aria-expanded={adderOpen}
           onClick={() => setAdderOpen((v) => !v)}
           style={{
             display: 'inline-flex',
@@ -155,30 +180,39 @@ export function DockTabBar({
         </button>
         {adderOpen && (
           <div
+            role="menu"
+            className="sidebar-popover"
             style={{
               position: 'absolute',
-              top: TAB_BAR_HEIGHT,
+              top: TAB_BAR_HEIGHT + 4,
               right: 0,
-              background: colors.bg.elevated,
-              border: `1px solid ${colors.border.default}`,
-              minWidth: 120,
-              zIndex: 10
+              minWidth: 140,
+              padding: 4,
+              zIndex: zIndex.dockPopover
             }}
           >
-            {DOCK_TAB_KINDS.map((k) => (
-              <div
-                key={k}
-                onClick={() => newTab(k)}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  color: colors.text.secondary,
-                  cursor: 'pointer'
-                }}
-              >
-                {k}
-              </div>
-            ))}
+            {DOCK_TAB_KINDS.map((k) => {
+              const isHovered = hoveredAdderItem === k
+              return (
+                <div
+                  key={k}
+                  role="menuitem"
+                  onClick={() => newTab(k)}
+                  onMouseEnter={() => setHoveredAdderItem(k)}
+                  onMouseLeave={() => setHoveredAdderItem((cur) => (cur === k ? null : cur))}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    color: isHovered ? colors.text.primary : colors.text.secondary,
+                    background: isHovered ? 'rgba(255,255,255,0.07)' : 'transparent',
+                    borderRadius: 6,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {k}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

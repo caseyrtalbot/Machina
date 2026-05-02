@@ -5,7 +5,7 @@ import { useSettingsStore } from '../../store/settings-store'
 import { createCanvasNode } from '@shared/canvas-types'
 import { generateClaudeMd } from '../../engine/claude-md-template'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
-import { colors } from '../../design/tokens'
+import { colors, zIndex } from '../../design/tokens'
 import { useClaudeStatus } from '../../hooks/use-claude-status'
 
 interface CanvasToolbarProps {
@@ -338,7 +338,7 @@ export function CanvasToolbar({
               left: '100%',
               marginLeft: 6,
               minWidth: 170,
-              zIndex: 50
+              zIndex: zIndex.surfacePopover
             }}
           >
             <button
@@ -465,7 +465,7 @@ export function CanvasToolbar({
               left: '100%',
               marginLeft: 6,
               minWidth: 180,
-              zIndex: 50
+              zIndex: zIndex.surfacePopover
             }}
           >
             <div className="flex flex-col gap-1">
@@ -603,7 +603,7 @@ export function CanvasToolbar({
               left: '100%',
               marginLeft: 6,
               minWidth: 150,
-              zIndex: 50
+              zIndex: zIndex.surfacePopover
             }}
           >
             <button
