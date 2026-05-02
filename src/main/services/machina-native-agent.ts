@@ -18,6 +18,7 @@ interface RunOptions {
   readonly systemPrompt: string
   readonly userMessage: string
   readonly historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
+  readonly autoAccept?: boolean
 }
 
 const inflight = new Map<string, AbortController>()
@@ -59,6 +60,13 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
         : undefined
     return { id, kind: 'list_vault', args: globs ? { globs } : {} }
   }
+  if (
+    name === 'write_note' &&
+    typeof input.path === 'string' &&
+    typeof input.content === 'string'
+  ) {
+    return { id, kind: 'write_note', args: { path: input.path, content: input.content } }
+  }
   if (name === 'search_vault' && typeof input.query === 'string') {
     const rawPaths = input.paths
     const paths =
@@ -82,7 +90,11 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
   const runId = newRunId()
   const abort = new AbortController()
   inflight.set(runId, abort)
-  const timeout = setTimeout(() => abort.abort(), DEFAULT_TIMEOUT_MS)
+  let timeout: NodeJS.Timeout = setTimeout(() => abort.abort(), DEFAULT_TIMEOUT_MS)
+  function resetTimeout(): void {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => abort.abort(), DEFAULT_TIMEOUT_MS)
+  }
 
   let messages: Anthropic.MessageParam[] = [
     ...opts.historyMessages.map((m) => ({ role: m.role, content: m.content }) as const),
@@ -92,6 +104,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
   void (async () => {
     try {
       for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+        resetTimeout()
         const stream = client.messages.stream(
           {
             model: opts.model,
@@ -134,11 +147,22 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
         const toolResults: Anthropic.ToolResultBlockParam[] = []
         for (const tu of toolUses) {
           const input = (tu.input ?? {}) as Record<string, unknown>
+          const call = asToolCall(tu.name, tu.id, input)
+
+          // Approval-gated tools: emit pending immediately so the renderer
+          // can render the diff card *before* callTool blocks on the user.
+          // Pause the SDK timeout while we wait on the human.
+          clearTimeout(timeout)
           const res = await callTool(tu.name, input, {
             vaultPath: opts.vaultPath,
-            autoAccept: false
+            autoAccept: opts.autoAccept ?? false,
+            toolUseId: tu.id,
+            emitPending: (toolUseId, preview) =>
+              emit(runId, opts.threadId, { kind: 'tool_pending_approval', toolUseId, ...preview })
           })
-          const call = asToolCall(tu.name, tu.id, input)
+          // Restart the timeout for the next SDK iteration.
+          resetTimeout()
+
           if (call) {
             const result: ToolResult = res.ok
               ? { id: tu.id, ok: true, output: res.output }

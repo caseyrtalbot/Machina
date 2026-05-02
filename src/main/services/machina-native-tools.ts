@@ -3,14 +3,37 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { glob } from 'glob'
 import type { ToolErrorCode } from '@shared/thread-types'
+import type { AgentNativeApprovalPreview } from '@shared/ipc-channels'
 
 const SEARCH_HIT_LIMIT = 200
 const SEARCH_PER_FILE_LIMIT = 20
 const SEARCH_SNIPPET_LEN = 200
 
+interface ApprovalDecision {
+  readonly accept: boolean
+  readonly rejectReason?: string
+}
+
+const approvals = new Map<string, (decision: ApprovalDecision) => void>()
+
+export function decideApproval(toolUseId: string, accept: boolean, rejectReason?: string): void {
+  const resolver = approvals.get(toolUseId)
+  if (!resolver) return
+  approvals.delete(toolUseId)
+  resolver({ accept, rejectReason })
+}
+
+function awaitApproval(toolUseId: string): Promise<ApprovalDecision> {
+  return new Promise((resolve) => {
+    approvals.set(toolUseId, resolve)
+  })
+}
+
 export interface ToolContext {
   readonly vaultPath: string
   readonly autoAccept: boolean
+  readonly toolUseId?: string
+  readonly emitPending?: (toolUseId: string, preview: AgentNativeApprovalPreview) => void
 }
 
 export type NativeToolResult =
@@ -188,6 +211,60 @@ async function searchWithJsFallback(
   return { ok: true, output: { hits } }
 }
 
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function writeNote(
+  rel: string,
+  content: string,
+  ctx: ToolContext
+): Promise<NativeToolResult> {
+  const abs = safeJoin(ctx.vaultPath, rel)
+  if (!abs) {
+    return {
+      ok: false,
+      error: { code: 'PATH_OUT_OF_VAULT', message: `path escapes vault: ${rel}` }
+    }
+  }
+  const created = !(await pathExists(abs))
+
+  if (!ctx.autoAccept && ctx.toolUseId && ctx.emitPending) {
+    ctx.emitPending(ctx.toolUseId, {
+      approvalKind: 'write_note',
+      preview: { path: rel, content, created }
+    })
+    const decision = await awaitApproval(ctx.toolUseId)
+    if (!decision.accept) {
+      return {
+        ok: false,
+        error: {
+          code: 'IO_TRANSIENT',
+          message: 'rejected by user',
+          hint: decision.rejectReason
+        }
+      }
+    }
+  }
+
+  try {
+    await fs.mkdir(path.dirname(abs), { recursive: true })
+    await fs.writeFile(abs, content, 'utf8')
+    return {
+      ok: true,
+      output: { created, path: rel, bytes: Buffer.byteLength(content, 'utf8') }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: { code: 'IO_FATAL', message } }
+  }
+}
+
 async function searchVault(
   query: string,
   paths: readonly string[] | undefined,
@@ -237,6 +314,17 @@ export async function callTool(
           ? (rawPaths as string[])
           : undefined
       return searchVault(query, paths, ctx)
+    }
+    case 'write_note': {
+      const p = typeof input.path === 'string' ? input.path : null
+      const content = typeof input.content === 'string' ? input.content : null
+      if (!p) {
+        return { ok: false, error: { code: 'IO_FATAL', message: 'write_note: missing path' } }
+      }
+      if (content == null) {
+        return { ok: false, error: { code: 'IO_FATAL', message: 'write_note: missing content' } }
+      }
+      return writeNote(p, content, ctx)
     }
     default:
       return { ok: false, error: { code: 'IO_FATAL', message: `unknown tool: ${name}` } }

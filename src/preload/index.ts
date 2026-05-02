@@ -162,8 +162,11 @@ const api = {
       systemPrompt: string
       userMessage: string
       historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
+      autoAccept?: boolean
     }) => typedInvoke('agent-native:run', req),
-    abort: (runId: string) => typedInvoke('agent-native:abort', { runId })
+    abort: (runId: string) => typedInvoke('agent-native:abort', { runId }),
+    toolDecision: (req: { toolUseId: string; accept: boolean; rejectReason?: string }) =>
+      typedInvoke('agent-native:tool-decision', req)
   },
   thread: {
     list: (vaultPath: string) => typedInvoke('thread:list', { vaultPath }),

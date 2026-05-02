@@ -267,11 +267,26 @@ export interface IpcChannels {
       systemPrompt: string
       userMessage: string
       historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
+      autoAccept?: boolean
     }
     response: { runId: string }
   }
   'agent-native:abort': { request: { runId: string }; response: void }
+  'agent-native:tool-decision': {
+    request: { toolUseId: string; accept: boolean; rejectReason?: string }
+    response: void
+  }
 }
+
+export type AgentNativeApprovalPreview =
+  | {
+      approvalKind: 'write_note'
+      preview: { path: string; content: string; created: boolean }
+    }
+  | {
+      approvalKind: 'edit_note'
+      preview: { path: string; find: string; replace: string }
+    }
 
 export type AgentNativeEventBody =
   | { kind: 'text'; text: string }
@@ -282,6 +297,8 @@ export type AgentNativeEventBody =
       call: import('./thread-types').ToolCall
       result: import('./thread-types').ToolResult
     }
+  | ({ kind: 'tool_pending_approval'; toolUseId: string } & AgentNativeApprovalPreview)
+  | { kind: 'tool_decision_resolved'; toolUseId: string; accepted: boolean }
 
 export interface IpcEvents {
   'terminal:data': { sessionId: SessionId; data: string }

@@ -63,8 +63,29 @@ export const SEARCH_VAULT_TOOL: NativeToolSpec = {
   }
 }
 
+export const WRITE_NOTE_TOOL: NativeToolSpec = {
+  name: 'write_note',
+  description:
+    'Create or overwrite a vault note. The user is shown a diff and must accept before the file is written, unless the thread is in auto-accept mode. Returns whether the note was newly created and the byte count written.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'Path relative to vault root (e.g. "ideas/spark.md").'
+      },
+      content: {
+        type: 'string',
+        description: 'Full file contents. Existing files are overwritten in their entirety.'
+      }
+    },
+    required: ['path', 'content']
+  }
+}
+
 export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
   READ_NOTE_TOOL,
   LIST_VAULT_TOOL,
-  SEARCH_VAULT_TOOL
+  SEARCH_VAULT_TOOL,
+  WRITE_NOTE_TOOL
 ]

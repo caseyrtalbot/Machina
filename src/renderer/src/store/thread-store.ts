@@ -28,6 +28,7 @@ interface ThreadState {
 
   appendUserMessage: (text: string) => Promise<void>
   appendAssistantStreamChunk: (threadId: string, chunk: string) => void
+  startPendingToolCall: (threadId: string, call: ToolCall) => void
   appendPendingToolCall: (threadId: string, call: ToolCall, result: ToolResult) => void
   finalizeAssistantMessage: (threadId: string) => Promise<void>
 
@@ -181,13 +182,31 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       }
     })),
 
-  appendPendingToolCall: (threadId, call, result) =>
+  startPendingToolCall: (threadId, call) =>
     set((s) => {
       const list = s.pendingToolCallsByThreadId[threadId] ?? []
+      // Avoid duplicates if a pending event for the same id arrives twice.
+      if (list.some((e) => e.call.id === call.id)) return s
       return {
         pendingToolCallsByThreadId: {
           ...s.pendingToolCallsByThreadId,
-          [threadId]: [...list, { call, result }]
+          [threadId]: [...list, { call }]
+        }
+      }
+    }),
+
+  appendPendingToolCall: (threadId, call, result) =>
+    set((s) => {
+      const list = s.pendingToolCallsByThreadId[threadId] ?? []
+      const existingIdx = list.findIndex((e) => e.call.id === call.id)
+      const next =
+        existingIdx >= 0
+          ? list.map((e, i) => (i === existingIdx ? { call, result } : e))
+          : [...list, { call, result }]
+      return {
+        pendingToolCallsByThreadId: {
+          ...s.pendingToolCallsByThreadId,
+          [threadId]: next
         }
       }
     }),

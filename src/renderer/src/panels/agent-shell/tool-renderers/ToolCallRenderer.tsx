@@ -4,6 +4,7 @@ import { ListVaultCard } from './ListVaultCard'
 import { ReadNoteCard } from './ReadNoteCard'
 import { SearchVaultCard } from './SearchVaultCard'
 import { ToolErrorCard } from './ToolErrorCard'
+import { WriteNoteCard } from './WriteNoteCard'
 
 export function ToolCallRenderer({
   call,
@@ -12,6 +13,11 @@ export function ToolCallRenderer({
   readonly call: ToolCall
   readonly result?: ToolResult
 }) {
+  // write_note / edit_note own their own rejected-state UI (the diff card
+  // shows "you rejected this write" instead of a generic error chip).
+  if (call.kind === 'write_note') {
+    return <WriteNoteCard call={call} result={result} />
+  }
   if (result && !result.ok) {
     return <ToolErrorCard call={call} error={result.error} />
   }

@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
+import type { ToolCall } from '@shared/thread-types'
 import { useThreadStore } from '../store/thread-store'
 
 export function useThreadStreaming(): void {
   const append = useThreadStore((s) => s.appendAssistantStreamChunk)
+  const startToolCall = useThreadStore((s) => s.startPendingToolCall)
   const appendToolCall = useThreadStore((s) => s.appendPendingToolCall)
   const finalize = useThreadStore((s) => s.finalizeAssistantMessage)
 
@@ -10,6 +12,9 @@ export function useThreadStreaming(): void {
     const off = window.api.on.agentNativeEvent((evt) => {
       if (evt.kind === 'text') {
         append(evt.threadId, evt.text)
+      } else if (evt.kind === 'tool_pending_approval') {
+        const call = pendingPreviewToCall(evt.toolUseId, evt)
+        if (call) startToolCall(evt.threadId, call)
       } else if (evt.kind === 'tool_call_persisted') {
         appendToolCall(evt.threadId, evt.call, evt.result)
       } else if (evt.kind === 'message_end') {
@@ -20,5 +25,28 @@ export function useThreadStreaming(): void {
       }
     })
     return off
-  }, [append, appendToolCall, finalize])
+  }, [append, startToolCall, appendToolCall, finalize])
+}
+
+function pendingPreviewToCall(
+  id: string,
+  evt:
+    | { approvalKind: 'write_note'; preview: { path: string; content: string } }
+    | { approvalKind: 'edit_note'; preview: { path: string; find: string; replace: string } }
+): ToolCall | null {
+  if (evt.approvalKind === 'write_note') {
+    return {
+      id,
+      kind: 'write_note',
+      args: { path: evt.preview.path, content: evt.preview.content }
+    }
+  }
+  if (evt.approvalKind === 'edit_note') {
+    return {
+      id,
+      kind: 'edit_note',
+      args: { path: evt.preview.path, find: evt.preview.find, replace: evt.preview.replace }
+    }
+  }
+  return null
 }

@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { callTool } from '../../../src/main/services/machina-native-tools'
+import { callTool, decideApproval } from '../../../src/main/services/machina-native-tools'
 
 describe('machina-native-tools read_note', () => {
   it('reads a vault note', async () => {
@@ -192,6 +192,154 @@ describe('machina-native-tools search_vault', () => {
         const hits = (res.output as { hits: unknown[] }).hits
         expect(hits).toEqual([])
       }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('machina-native-tools write_note', () => {
+  it('writes a new file with autoAccept', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'write_note',
+        { path: 'new.md', content: 'hello world\n' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { created: boolean; path: string; bytes: number }
+        expect(out.created).toBe(true)
+        expect(out.path).toBe('new.md')
+        expect(out.bytes).toBe(12)
+      }
+      expect(readFileSync(path.join(v, 'new.md'), 'utf8')).toBe('hello world\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('overwrites an existing file with autoAccept (created=false)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'existing.md'), 'old\n')
+      const res = await callTool(
+        'write_note',
+        { path: 'existing.md', content: 'new\n' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        expect((res.output as { created: boolean }).created).toBe(false)
+      }
+      expect(readFileSync(path.join(v, 'existing.md'), 'utf8')).toBe('new\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('creates parent directories', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'write_note',
+        { path: 'deep/nested/note.md', content: 'x' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(true)
+      expect(readFileSync(path.join(v, 'deep/nested/note.md'), 'utf8')).toBe('x')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects path traversal', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'write_note',
+        { path: '../escape.md', content: 'x' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('blocks on emitPending and resolves on decideApproval(accept=true)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      let pendingId: string | null = null
+      let pendingPath: string | null = null
+      const promise = callTool(
+        'write_note',
+        { path: 'gated.md', content: 'gated\n' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          toolUseId: 'toolu_test_1',
+          emitPending: (id, preview) => {
+            pendingId = id
+            if (preview.approvalKind === 'write_note') pendingPath = preview.preview.path
+          }
+        }
+      )
+
+      // Yield so the impl can register the awaiter and emit the pending event.
+      await new Promise((r) => setTimeout(r, 20))
+      expect(pendingId).toBe('toolu_test_1')
+      expect(pendingPath).toBe('gated.md')
+      // File should not exist yet — write happens after acceptance.
+      expect(existsSync(path.join(v, 'gated.md'))).toBe(false)
+
+      decideApproval('toolu_test_1', true)
+      const res = await promise
+      expect(res.ok).toBe(true)
+      expect(readFileSync(path.join(v, 'gated.md'), 'utf8')).toBe('gated\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns rejection error on decideApproval(accept=false)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const promise = callTool(
+        'write_note',
+        { path: 'rejected.md', content: 'x' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          toolUseId: 'toolu_test_2',
+          emitPending: () => {}
+        }
+      )
+      await new Promise((r) => setTimeout(r, 20))
+      decideApproval('toolu_test_2', false, 'do not want')
+
+      const res = await promise
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('IO_TRANSIENT')
+        expect(res.error.message).toBe('rejected by user')
+        expect(res.error.hint).toBe('do not want')
+      }
+      expect(existsSync(path.join(v, 'rejected.md'))).toBe(false)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects missing path / missing content', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const r1 = await callTool('write_note', { content: 'x' }, { vaultPath: v, autoAccept: true })
+      expect(r1.ok).toBe(false)
+      const r2 = await callTool('write_note', { path: 'a.md' }, { vaultPath: v, autoAccept: true })
+      expect(r2.ok).toBe(false)
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
