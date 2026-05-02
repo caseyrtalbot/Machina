@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Thread, ThreadMessage, ToolCall } from '@shared/thread-types'
+import type { Thread, ThreadMessage, ToolCall, ToolResult } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 
@@ -13,6 +13,7 @@ interface ThreadState {
   archivedThreads: Thread[]
   streamingByThreadId: Record<string, string>
   pendingApprovalsByThreadId: Record<string, ToolCall[]>
+  pendingToolCallsByThreadId: Record<string, Array<{ call: ToolCall; result?: ToolResult }>>
   dockTabsByThreadId: Record<string, DockTab[]>
 
   setVaultPath: (p: string) => void
@@ -25,6 +26,7 @@ interface ThreadState {
 
   appendUserMessage: (text: string) => Promise<void>
   appendAssistantStreamChunk: (threadId: string, chunk: string) => void
+  appendPendingToolCall: (threadId: string, call: ToolCall, result: ToolResult) => void
   finalizeAssistantMessage: (threadId: string) => Promise<void>
 
   addDockTab: (tab: DockTab) => void
@@ -39,6 +41,7 @@ const initial = {
   archivedThreads: [] as Thread[],
   streamingByThreadId: {} as Record<string, string>,
   pendingApprovalsByThreadId: {} as Record<string, ToolCall[]>,
+  pendingToolCallsByThreadId: {} as Record<string, Array<{ call: ToolCall; result?: ToolResult }>>,
   dockTabsByThreadId: {} as Record<string, DockTab[]>
 }
 
@@ -155,21 +158,41 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       }
     })),
 
+  appendPendingToolCall: (threadId, call, result) =>
+    set((s) => {
+      const list = s.pendingToolCallsByThreadId[threadId] ?? []
+      return {
+        pendingToolCallsByThreadId: {
+          ...s.pendingToolCallsByThreadId,
+          [threadId]: [...list, { call, result }]
+        }
+      }
+    }),
+
   finalizeAssistantMessage: async (threadId) => {
     const v = get().vaultPath
     const buf = get().streamingByThreadId[threadId] ?? ''
+    const pendingTools = get().pendingToolCallsByThreadId[threadId] ?? []
     if (!v) return
     set((s) => {
       const t = s.threadsById[threadId]
       if (!t) return s
       const now = new Date().toISOString()
-      const msg: ThreadMessage = { role: 'assistant', body: buf, sentAt: now }
+      const msg: ThreadMessage = {
+        role: 'assistant',
+        body: buf,
+        sentAt: now,
+        ...(pendingTools.length > 0 ? { toolCalls: pendingTools.slice() } : {})
+      }
       const next: Thread = { ...t, messages: [...t.messages, msg], lastMessage: now }
       const stream = { ...s.streamingByThreadId }
       delete stream[threadId]
+      const tools = { ...s.pendingToolCallsByThreadId }
+      delete tools[threadId]
       return {
         threadsById: { ...s.threadsById, [threadId]: next },
-        streamingByThreadId: stream
+        streamingByThreadId: stream,
+        pendingToolCallsByThreadId: tools
       }
     })
     const t = get().threadsById[threadId]

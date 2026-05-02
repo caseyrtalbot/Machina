@@ -290,6 +290,11 @@ export type AgentNativeEventBody =
   | { kind: 'text'; text: string }
   | { kind: 'message_end' }
   | { kind: 'error'; code: import('./thread-types').ToolErrorCode; message: string }
+  | {
+      kind: 'tool_call_persisted'
+      call: import('./thread-types').ToolCall
+      result: import('./thread-types').ToolResult
+    }
 
 export interface IpcEvents {
   'terminal:data': { sessionId: SessionId; data: string }
