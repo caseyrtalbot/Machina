@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { colors, borderRadius } from '../../design/tokens'
+import { useThreadStore } from '../../store/thread-store'
 import { buildIndex, buildPaletteItems, searchPalette, type PaletteItem } from './palette-sources'
 
 const KIND_LABEL: Record<PaletteItem['kind'], string> = {
@@ -21,6 +22,7 @@ export function CommandPalette({
   const [prevOpen, setPrevOpen] = useState(open)
   const [prevQ, setPrevQ] = useState(q)
   const inputRef = useRef<HTMLInputElement>(null)
+  const createThread = useThreadStore((s) => s.createThread)
 
   if (open !== prevOpen) {
     setPrevOpen(open)
@@ -43,6 +45,9 @@ export function CommandPalette({
 
   if (!open) return null
 
+  const trimmedQuery = q.trim()
+  const canCreateThread = results.length === 0 && trimmedQuery.length > 0
+
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -53,7 +58,13 @@ export function CommandPalette({
     } else if (e.key === 'Enter') {
       e.preventDefault()
       const it = results[active]
-      if (it) void it.run()
+      if (it) {
+        void it.run()
+      } else if (canCreateThread) {
+        const title = trimmedQuery
+        onClose()
+        void createThread('machina-native', 'claude-sonnet-4-6', title)
+      }
     }
   }
 
@@ -115,7 +126,9 @@ export function CommandPalette({
         >
           {results.length === 0 && (
             <li style={{ padding: 8, fontSize: 12, color: colors.text.muted }}>
-              {q.trim() ? 'No matches.' : 'Start typing to search.'}
+              {canCreateThread
+                ? `No matches. Press Enter to create a new thread named "${trimmedQuery}".`
+                : 'Start typing to search.'}
             </li>
           )}
           {results.map((it, i) => {
