@@ -28,11 +28,6 @@ import { subscribeCanvasAutosave } from './store/canvas-autosave'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { Artifact } from '@shared/types'
 
-// Helpers parked in `legacy-shell-parking.tsx` (ContentArea, KeepAliveSlot, the
-// LazyXxx panel imports, openArtifactInEditorOnDemand, and
-// placeSystemArtifactOnWorkbench) will be rewired into the agent shell
-// surfaces in Task 7.3.
-
 function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
