@@ -1794,6 +1794,144 @@ body {
   border-radius: 4px;
 }
 
+/*
+ * Thread prose: typography scope for ThreadMessage body content rendered by
+ * react-markdown. Mirrors the editor's proportional rhythm so a thread reads
+ * like a typeset note that contains a conversation. Lives in CSS so heading
+ * and list selectors apply to the standard markdown HTML react-markdown emits.
+ */
+.thread-prose {
+  font-family: var(--font-body);
+  font-size: var(--env-card-body-font-size, 15px);
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  letter-spacing: 0.005em;
+  word-spacing: 0.02em;
+}
+
+.thread-prose > :first-child {
+  margin-top: 0;
+}
+
+.thread-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.thread-prose p {
+  margin: 0 0 0.85em;
+}
+
+.thread-prose h1,
+.thread-prose h2,
+.thread-prose h3,
+.thread-prose h4 {
+  font-family: var(--font-display, var(--font-body));
+  color: var(--color-text-primary);
+  margin: 1.4em 0 0.35em;
+  line-height: 1.25;
+}
+
+.thread-prose h1 {
+  font-size: 1.6em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.thread-prose h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.thread-prose h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+
+.thread-prose ul,
+.thread-prose ol {
+  padding-left: 1.25em;
+  margin: 0 0 0.85em;
+}
+
+.thread-prose li {
+  margin-bottom: 0.2em;
+}
+
+.thread-prose li > p {
+  margin: 0;
+}
+
+.thread-prose blockquote {
+  border-left: 2px solid var(--color-border-default);
+  padding-left: 14px;
+  margin: 0 0 0.85em;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.thread-prose code {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.thread-prose pre {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.85em;
+  padding: 0.75em 1em;
+  border-radius: 4px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  overflow-x: auto;
+  margin: 0 0 0.85em;
+}
+
+.thread-prose pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.thread-prose a {
+  color: var(--color-accent-default);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.thread-prose a:hover {
+  filter: brightness(1.15);
+}
+
+.thread-prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-border-default);
+  margin: 1.4em 0;
+}
+
+.thread-prose table {
+  border-collapse: collapse;
+  margin: 0 0 0.85em;
+  font-size: 0.95em;
+}
+
+.thread-prose th,
+.thread-prose td {
+  border: 1px solid var(--color-border-default);
+  padding: 0.4em 0.65em;
+  text-align: left;
+}
+
+.thread-prose th {
+  background: var(--color-bg-elevated);
+  font-weight: 600;
+}
+
 .canvas-card {
   transition:
     transform 180ms ease-out,

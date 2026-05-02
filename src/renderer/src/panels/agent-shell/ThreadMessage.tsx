@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ThreadMessage as TM } from '@shared/thread-types'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { colors } from '../../design/tokens'
+import { colors, typography } from '../../design/tokens'
 
 interface Props {
   readonly message: TM
@@ -18,21 +18,24 @@ export function ThreadMessage({ message, streamingBody }: Props) {
   return (
     <article
       data-role={message.role}
-      style={{ padding: 16, borderBottom: `1px solid ${colors.border.subtle}` }}
+      style={{
+        padding: '20px 24px',
+        borderBottom: `1px solid ${colors.border.subtle}`
+      }}
     >
-      <h3
+      <div
         style={{
-          fontSize: 11,
+          fontFamily: typography.fontFamily.body,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-          margin: 0,
-          marginBottom: 4
+          marginBottom: 10
         }}
       >
         {heading}
-      </h3>
-      <div className="prose">
+      </div>
+      <div className="thread-prose">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
       </div>
       {message.role === 'assistant' &&
