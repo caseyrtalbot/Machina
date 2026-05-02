@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { Thread, ThreadMessage, ToolCall, ToolResult } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
+import { TE_DIR } from '@shared/constants'
 
 const MACHINA_NATIVE_SYSTEM_PROMPT =
   'You are Machina, a thoughtful assistant for the user’s vault. Keep replies concise and grounded.'
@@ -66,6 +67,16 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   selectThread: async (id) => {
     const prev = get().activeThreadId
     if (prev && prev !== id) await flushDockState(prev)
+    const v = get().vaultPath
+    const tabs = get().dockTabsByThreadId[id]
+    if (v && tabs && tabs.length > 0) {
+      const { valid, dropped } = await validateTabs(v, tabs)
+      if (dropped > 0) {
+        set((s) => ({ dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: valid } }))
+        // TODO: replace with toast infra once it exists.
+        console.warn(`[thread-store] dropped ${dropped} dock tab(s) with missing resources`)
+      }
+    }
     set({ activeThreadId: id })
   },
 
@@ -109,8 +120,17 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     set((s) => {
       const next = { ...s.threadsById }
       delete next[id]
+      const stream = { ...s.streamingByThreadId }
+      delete stream[id]
+      const tools = { ...s.pendingToolCallsByThreadId }
+      delete tools[id]
+      const dock = { ...s.dockTabsByThreadId }
+      delete dock[id]
       return {
         threadsById: next,
+        streamingByThreadId: stream,
+        pendingToolCallsByThreadId: tools,
+        dockTabsByThreadId: dock,
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
     })
@@ -231,6 +251,27 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     })
   }
 }))
+
+async function validateTabs(
+  vault: string,
+  tabs: readonly DockTab[]
+): Promise<{ valid: DockTab[]; dropped: number }> {
+  const valid: DockTab[] = []
+  let dropped = 0
+  for (const t of tabs) {
+    let ok = true
+    if (t.kind === 'editor' && t.path !== '') {
+      ok = await window.api.fs.fileExists(t.path)
+    } else if (t.kind === 'canvas' && t.id !== 'default') {
+      // Per-id canvas files are not yet implemented; only the global "default" is real.
+      ok = await window.api.fs.fileExists(`${vault}/${TE_DIR}/canvas/${t.id}.json`)
+    }
+    // terminal and the static kinds (graph, ghosts, health) are always valid in v1
+    if (ok) valid.push(t)
+    else dropped++
+  }
+  return { valid, dropped }
+}
 
 async function flushDockState(id: string): Promise<void> {
   const s = useThreadStore.getState()
