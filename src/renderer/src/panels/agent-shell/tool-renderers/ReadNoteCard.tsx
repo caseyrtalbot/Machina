@@ -1,5 +1,7 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors, borderRadius } from '../../../design/tokens'
+import { useThreadStore } from '../../../store/thread-store'
+import { useVaultStore } from '../../../store/vault-store'
 
 type ReadNoteCall = Extract<ToolCall, { kind: 'read_note' }>
 
@@ -14,10 +16,19 @@ export function ReadNoteCard({
     result && result.ok && typeof result.output === 'object' && result.output !== null
       ? ((result.output as { lines?: string }).lines ?? '')
       : ''
+
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault()
+    const vault = useVaultStore.getState().vaultPath
+    if (!vault) return
+    const fullPath = call.args.path.startsWith('/') ? call.args.path : `${vault}/${call.args.path}`
+    useThreadStore.getState().addDockTab({ kind: 'editor', path: fullPath })
+  }
+
   return (
     <a
       href="#"
-      onClick={(e) => e.preventDefault()}
+      onClick={handleClick}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -29,7 +40,8 @@ export function ReadNoteCard({
         fontSize: 12,
         color: colors.text.primary,
         textDecoration: 'none',
-        marginTop: 8
+        marginTop: 8,
+        cursor: 'pointer'
       }}
     >
       <span style={{ opacity: 0.6 }}>📄</span>
