@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
+import { useClaudeStatusStore } from '../store/claude-status-store'
 import { colors } from '../design/tokens'
 import { BASE_COLORS } from '../design/themes'
 import { FontPicker } from './FontPicker'
@@ -175,6 +176,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       setKeyDraft('')
       setKeyError(null)
       setHasKey(true)
+      useClaudeStatusStore.getState().setNativeKeyConfigured(true)
     } catch (err) {
       setKeyError(err instanceof Error ? err.message : String(err))
     }
@@ -183,6 +185,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   const clearKey = async (): Promise<void> => {
     await window.api.agentNative.clearKey()
     setHasKey(false)
+    useClaudeStatusStore.getState().setNativeKeyConfigured(false)
   }
 
   return (

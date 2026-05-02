@@ -3,9 +3,6 @@ import { Terminal, UserCircle, CheckCircle, Copy, ArrowSquareOut } from '@phosph
 import { useClaudeStatus } from '../hooks/use-claude-status'
 import { useClaudeStatusStore } from '../store/claude-status-store'
 import { colors } from '../design/tokens'
-import { useCanvasStore } from '../store/canvas-store'
-import { useVaultStore } from '../store/vault-store'
-import { createCanvasNode } from '@shared/canvas-types'
 
 const RECHECK_INTERVAL_MS = 5_000
 const AUTO_DISMISS_MS = 2_000
@@ -89,20 +86,6 @@ function InstallStep() {
 }
 
 function AuthStep() {
-  const handleOpenTerminal = useCallback(() => {
-    const vaultPath = useVaultStore.getState().vaultPath
-    if (!vaultPath) return
-
-    const vp = useCanvasStore.getState().viewport
-    const node = createCanvasNode(
-      'terminal',
-      { x: -vp.x + 200, y: -vp.y + 100 },
-      { metadata: { initialCommand: 'claude auth login' } }
-    )
-    useCanvasStore.getState().addNode(node)
-    useClaudeStatusStore.getState().dismissOnboarding()
-  }, [])
-
   return (
     <div className="flex flex-col items-center text-center">
       <UserCircle size={24} weight="regular" style={{ color: colors.text.muted }} />
@@ -113,24 +96,6 @@ function AuthStep() {
         Run this command in your terminal to authenticate:
       </p>
       <CodeSnippet code="claude auth login" />
-      <button
-        onClick={handleOpenTerminal}
-        className="mt-3 flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors"
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.06)',
-          border: `1px solid ${colors.border.subtle}`,
-          color: colors.text.primary
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'
-        }}
-      >
-        <Terminal size={12} />
-        Open Terminal
-      </button>
       <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: colors.text.muted }}>
         <StatusDot color={colors.text.muted} pulse />
         Waiting for authentication…
