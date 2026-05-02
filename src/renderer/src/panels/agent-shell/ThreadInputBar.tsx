@@ -56,7 +56,7 @@ export function ThreadInputBar() {
         padding: 12,
         display: 'flex',
         alignItems: 'flex-end',
-        gap: 10
+        gap: 8
       }}
     >
       {pickerOpen && <AgentPicker onPick={pickAgent} onCancel={() => setPickerOpen(false)} />}
@@ -66,7 +66,7 @@ export function ThreadInputBar() {
         rows={1}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Ask anything…"
+        placeholder="Ask anything…   Cmd+K · /"
         style={{
           flex: 1,
           resize: 'none',
@@ -82,78 +82,40 @@ export function ThreadInputBar() {
           lineHeight: 1.5
         }}
       />
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          flexShrink: 0,
-          paddingBottom: 2
-        }}
-      >
-        {!inFlight && <HintChip label="⌘K" title="Open command palette" />}
-        {!inFlight && <HintChip label="/" title="Switch agent" />}
-        {inFlight && activeId && (
-          <button
-            type="button"
-            data-testid="thread-input-stop"
-            aria-label="Stop"
-            title="Stop the in-flight agent run"
-            onClick={() => void cancelActive(activeId)}
+      {inFlight && activeId && (
+        <button
+          type="button"
+          data-testid="thread-input-stop"
+          aria-label="Stop"
+          title="Stop the in-flight agent run"
+          onClick={() => void cancelActive(activeId)}
+          style={{
+            flexShrink: 0,
+            padding: '4px 12px',
+            background: 'transparent',
+            border: `1px solid ${colors.border.default}`,
+            borderRadius: borderRadius.inline,
+            color: colors.text.secondary,
+            cursor: 'pointer',
+            fontSize: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <span
+            aria-hidden
             style={{
-              padding: '4px 10px',
-              background: 'transparent',
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: borderRadius.inline,
-              color: colors.text.secondary,
-              cursor: 'pointer',
-              fontSize: 12,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              background: colors.claude.error,
+              borderRadius: 1
             }}
-          >
-            <span
-              aria-hidden
-              style={{
-                display: 'inline-block',
-                width: 8,
-                height: 8,
-                background: colors.claude.error,
-                borderRadius: 1
-              }}
-            />
-            Stop
-          </button>
-        )}
-      </div>
+          />
+          Stop
+        </button>
+      )}
     </div>
-  )
-}
-
-function HintChip({ label, title }: { readonly label: string; readonly title: string }) {
-  return (
-    <span
-      title={title}
-      aria-hidden
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: 18,
-        height: 18,
-        padding: '0 5px',
-        borderRadius: borderRadius.inline,
-        border: `1px solid ${colors.border.subtle}`,
-        background: 'transparent',
-        color: colors.text.muted,
-        fontFamily: typography.fontFamily.body,
-        fontSize: 11,
-        lineHeight: 1,
-        userSelect: 'none'
-      }}
-    >
-      {label}
-    </span>
   )
 }
