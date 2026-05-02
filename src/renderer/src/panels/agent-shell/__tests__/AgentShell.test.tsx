@@ -1,0 +1,66 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { useThreadStore } from '../../../store/thread-store'
+import { useVaultStore } from '../../../store/vault-store'
+import { AgentShell } from '../AgentShell'
+import type { VaultMachinaConfig } from '@shared/thread-storage-types'
+
+const baseConfig: VaultMachinaConfig = {
+  defaultAgent: 'machina-native',
+  defaultModel: 'claude-sonnet-4-6',
+  welcomed: false,
+  customKeybindings: {}
+}
+
+beforeEach(() => {
+  useThreadStore.setState(useThreadStore.getInitialState())
+  useVaultStore.setState({ vaultPath: '/v' })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(window as any).api = {
+    thread: {
+      list: vi.fn().mockResolvedValue([]),
+      listArchived: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue(undefined),
+      create: vi.fn(),
+      archive: vi.fn().mockResolvedValue(undefined),
+      unarchive: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+      readConfig: vi.fn().mockResolvedValue(baseConfig),
+      writeConfig: vi.fn().mockResolvedValue(undefined)
+    },
+    on: {
+      agentNativeEvent: vi.fn().mockReturnValue(() => {})
+    }
+  }
+})
+
+describe('AgentShell welcome tooltip', () => {
+  it('renders the welcome tooltip on first launch when welcomed=false', async () => {
+    render(<AgentShell />)
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-shell-welcome-tooltip')).toBeTruthy()
+    })
+  })
+
+  it('does not render the tooltip when welcomed=true', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.readConfig.mockResolvedValue({ ...baseConfig, welcomed: true })
+    render(<AgentShell />)
+    // Wait a tick for the effect to run, then assert it stays hidden.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(screen.queryByTestId('agent-shell-welcome-tooltip')).toBeNull()
+  })
+
+  it('dismissing flips welcomed and writes config', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const writeConfig = (window as any).api.thread.writeConfig
+    render(<AgentShell />)
+    const tooltip = await screen.findByTestId('agent-shell-welcome-tooltip')
+    fireEvent.click(screen.getByText('got it'))
+    expect(screen.queryByTestId('agent-shell-welcome-tooltip')).toBeNull()
+    await waitFor(() => {
+      expect(writeConfig).toHaveBeenCalledWith('/v', { ...baseConfig, welcomed: true })
+    })
+    expect(tooltip).toBeTruthy()
+  })
+})

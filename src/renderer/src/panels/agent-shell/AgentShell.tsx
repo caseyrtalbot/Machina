@@ -7,6 +7,7 @@ import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
 import { useAgentShellKeybindings } from './keybindings'
+import { colors } from '../../design/tokens'
 
 export interface AgentShellProps {
   readonly onOpenSettings?: () => void
@@ -42,6 +43,75 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
       <ThreadPanel />
       <SurfaceDock />
       <CommandPalette open={paletteOpen} onClose={closePalette} />
+      <WelcomeTooltip vaultPath={vaultPath} />
+    </div>
+  )
+}
+
+function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
+  const [show, setShow] = useState(false)
+
+  useEffect(() => {
+    if (!vaultPath) return
+    let cancelled = false
+    void window.api.thread.readConfig(vaultPath).then((cfg) => {
+      if (!cancelled && cfg.welcomed === false) setShow(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [vaultPath])
+
+  const dismiss = useCallback(() => {
+    setShow(false)
+    if (!vaultPath) return
+    void window.api.thread.readConfig(vaultPath).then((cfg) => {
+      void window.api.thread.writeConfig(vaultPath, { ...cfg, welcomed: true })
+    })
+  }, [vaultPath])
+
+  if (!show) return null
+
+  return (
+    <div
+      data-testid="agent-shell-welcome-tooltip"
+      role="dialog"
+      aria-label="welcome"
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        right: 24,
+        maxWidth: 320,
+        padding: '14px 16px',
+        background: colors.bg.elevated,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: 8,
+        color: colors.text.primary,
+        fontSize: 13,
+        lineHeight: 1.5,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        zIndex: 1000
+      }}
+    >
+      <div style={{ marginBottom: 10 }}>
+        this is your agent shell. type to chat, hit <code>/</code> to switch agent,{' '}
+        <code>Cmd-K</code> for the palette.
+      </div>
+      <button
+        type="button"
+        onClick={dismiss}
+        style={{
+          background: 'transparent',
+          border: `1px solid ${colors.border.subtle}`,
+          color: colors.text.secondary,
+          padding: '4px 10px',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer'
+        }}
+      >
+        got it
+      </button>
     </div>
   )
 }
