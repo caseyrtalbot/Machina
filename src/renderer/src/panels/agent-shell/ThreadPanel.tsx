@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
@@ -6,6 +6,8 @@ import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { agentPillStyle } from './agent-color'
 import { agentTag } from './agent-tag'
 import { colors, borderRadius, typography } from '../../design/tokens'
+
+const AT_BOTTOM_THRESHOLD_PX = 40
 
 export function ThreadPanel() {
   const activeId = useThreadStore((s) => s.activeThreadId)
@@ -18,13 +20,26 @@ export function ThreadPanel() {
   )
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
 
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < AT_BOTTOM_THRESHOLD_PX
     if (atBottom) el.scrollTop = el.scrollHeight
   }, [t?.messages.length, streaming, pendingTools?.length])
+
+  function handleScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    setIsAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < AT_BOTTOM_THRESHOLD_PX)
+  }
+
+  function scrollToBottom() {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }
 
   if (!t) {
     return (
@@ -86,25 +101,89 @@ export function ThreadPanel() {
           <AgentBadge agent={t.agent} />
         </div>
       </header>
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
-        {t.messages.map((m, i) => {
-          const isLastAssistant = i === t.messages.length - 1 && m.role === 'assistant'
-          return (
-            <ThreadMessage
-              key={i}
-              message={m}
-              streamingBody={isLastAssistant ? (streaming ?? undefined) : undefined}
-            />
-          )
-        })}
-        <InflightAssistant
-          messages={t.messages}
-          streaming={streaming}
-          pendingTools={pendingTools}
-        />
+      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+        <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto' }}>
+          {t.messages.length === 0 && !streaming && !pendingTools?.length ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: colors.text.muted,
+                fontFamily: typography.fontFamily.body,
+                fontSize: 13
+              }}
+            >
+              Ask anything about your vault.
+            </div>
+          ) : (
+            <>
+              {t.messages.map((m, i) => {
+                const isLastAssistant = i === t.messages.length - 1 && m.role === 'assistant'
+                return (
+                  <ThreadMessage
+                    key={i}
+                    message={m}
+                    streamingBody={isLastAssistant ? (streaming ?? undefined) : undefined}
+                  />
+                )
+              })}
+              <InflightAssistant
+                messages={t.messages}
+                streaming={streaming}
+                pendingTools={pendingTools}
+              />
+            </>
+          )}
+        </div>
+        {!isAtBottom && <ScrollToBottomButton onClick={scrollToBottom} />}
       </div>
       <ThreadInputBar />
     </section>
+  )
+}
+
+function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="scroll to bottom"
+      title="Scroll to bottom"
+      style={{
+        position: 'absolute',
+        bottom: 16,
+        right: 20,
+        width: 28,
+        height: 28,
+        borderRadius: '50%',
+        background: colors.bg.elevated,
+        border: `1px solid ${colors.border.default}`,
+        color: colors.text.secondary,
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 0,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        transition: 'color 120ms ease-out, border-color 120ms ease-out'
+      }}
+    >
+      <svg
+        width={12}
+        height={12}
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M3 5l3 3 3-3" />
+      </svg>
+    </button>
   )
 }
 
