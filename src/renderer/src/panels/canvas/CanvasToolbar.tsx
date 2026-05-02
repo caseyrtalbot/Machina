@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useSettingsStore } from '../../store/settings-store'
@@ -7,11 +7,6 @@ import { generateClaudeMd } from '../../engine/claude-md-template'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { colors } from '../../design/tokens'
 import { useClaudeStatus } from '../../hooks/use-claude-status'
-import { ActionMenu } from './ActionMenu'
-import type { ActionDefinition } from '@shared/action-types'
-import type { AgentActionName } from '@shared/agent-action-types'
-import type { AgentPhase } from '../../hooks/use-agent-orchestrator'
-import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -22,12 +17,7 @@ interface CanvasToolbarProps {
   readonly onOpenImport: () => void
   readonly onOrganize: () => void
   readonly organizePhase: string
-  readonly onAgentAction: (action: AgentActionName, anchor?: { x: number; y: number }) => void
-  readonly onStopAgent: () => void
-  readonly agentPhase: AgentPhase
-  readonly activeAction: AgentActionName | null
   readonly onClear: () => void
-  readonly onActionSelect: (actionId: string) => void
 }
 
 function Tip({
@@ -112,12 +102,7 @@ export function CanvasToolbar({
   onOpenImport,
   onOrganize,
   organizePhase,
-  onAgentAction,
-  onStopAgent,
-  agentPhase,
-  activeAction,
-  onClear,
-  onActionSelect
+  onClear
 }: CanvasToolbarProps): React.ReactElement {
   const viewport = useCanvasStore((s) => s.viewport)
   const setViewport = useCanvasStore((s) => s.setViewport)
@@ -130,53 +115,19 @@ export function CanvasToolbar({
   const gridDotVisibility = useSettingsStore((s) => s.env.gridDotVisibility)
   const cardBlur = useSettingsStore((s) => s.env.cardBlur)
   const setEnv = useSettingsStore((s) => s.setEnv)
-  const artifacts = useVaultStore((s) => s.artifacts)
-  const graph = useVaultStore((s) => s.graph)
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
-  const [agentFlyoutOpen, setAgentFlyoutOpen] = useState(false)
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
-  const [loadedActions, setLoadedActions] = useState<ActionDefinition[]>([])
   const claudeStatus = useClaudeStatus()
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
-  const agentFlyoutRef = useRef<HTMLDivElement>(null)
   const zoomMenuRef = useRef<HTMLDivElement>(null)
 
-  const sidebarSelectedPaths = useSidebarSelectionStore((s) => s.selectedPaths)
-  const sidebarSelectedCount = sidebarSelectedPaths.size
-  const rawFileCount = useVaultStore((s) => s.rawFileCount)
-  const scopeLabel =
-    sidebarSelectedCount > 0
-      ? `${sidebarSelectedCount} file${sidebarSelectedCount !== 1 ? 's' : ''} selected`
-      : `Entire vault (${rawFileCount} notes)`
-
-  const thinkBusy = agentPhase !== 'idle'
-  const isComputing = agentPhase === 'computing'
-  const isCompileRunning = isComputing && activeAction === 'compile'
-  const isCompileBusy = isComputing && activeAction !== 'compile'
-
-  const unprocessedSourceCount = useMemo(() => {
-    if (!graph) return 0
-    const sourceArtifactIds = new Set<string>()
-    for (const artifact of artifacts) {
-      if (artifact.origin === 'source') sourceArtifactIds.add(artifact.id)
-    }
-    const compiledSourceIds = new Set<string>()
-    for (const edge of graph.edges) {
-      if (edge.kind === 'derived_from' && sourceArtifactIds.has(edge.target)) {
-        compiledSourceIds.add(edge.target)
-      }
-    }
-    return sourceArtifactIds.size - compiledSourceIds.size
-  }, [artifacts, graph])
-
   const hasSelection = selectedNodeIds.size > 0
-  const compileEnabled = unprocessedSourceCount > 0 || hasSelection
-  const clearEnabled = hasNodes && !isComputing
+  const clearEnabled = hasNodes
 
   useEffect(() => {
-    if (!tileMenuOpen && !envMenuOpen && !agentFlyoutOpen && !zoomMenuOpen) return
+    if (!tileMenuOpen && !envMenuOpen && !zoomMenuOpen) return
 
     const handlePointerDown = (event: MouseEvent) => {
       if (tileMenuRef.current && !tileMenuRef.current.contains(event.target as Node)) {
@@ -184,9 +135,6 @@ export function CanvasToolbar({
       }
       if (envMenuRef.current && !envMenuRef.current.contains(event.target as Node)) {
         setEnvMenuOpen(false)
-      }
-      if (agentFlyoutRef.current && !agentFlyoutRef.current.contains(event.target as Node)) {
-        setAgentFlyoutOpen(false)
       }
       if (zoomMenuRef.current && !zoomMenuRef.current.contains(event.target as Node)) {
         setZoomMenuOpen(false)
@@ -197,7 +145,6 @@ export function CanvasToolbar({
       if (event.key === 'Escape') {
         setTileMenuOpen(false)
         setEnvMenuOpen(false)
-        setAgentFlyoutOpen(false)
         setZoomMenuOpen(false)
       }
     }
@@ -208,7 +155,7 @@ export function CanvasToolbar({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [tileMenuOpen, envMenuOpen, agentFlyoutOpen, zoomMenuOpen])
+  }, [tileMenuOpen, envMenuOpen, zoomMenuOpen])
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -720,175 +667,6 @@ export function CanvasToolbar({
           </svg>
         </button>
         <Tip label={organizePhase === 'processing' ? 'Organizing\u2026' : 'Organize'} />
-      </div>
-
-      <div className="canvas-toolrail__divider" />
-
-      {/* THINK: have the agent do something */}
-      <div className="canvas-toolbtn-wrap">
-        <button
-          onClick={() => {
-            if (hasNodes && !thinkBusy) onAgentAction('challenge')
-          }}
-          className="canvas-toolbtn"
-          disabled={thinkBusy || !hasNodes}
-          data-testid="canvas-think"
-          aria-label={
-            thinkBusy
-              ? 'Thinking…'
-              : !hasNodes
-                ? 'Think — add cards first'
-                : 'Think — challenge for insights'
-          }
-          style={{
-            color: thinkBusy || !hasNodes ? colors.text.muted : colors.semantic.tension,
-            cursor: thinkBusy ? 'wait' : undefined,
-            opacity: !hasNodes ? 0.4 : 1
-          }}
-        >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            {/* Sparkle: 4-point star — challenge surfaces insights/tensions */}
-            <path d="M8 2 L9.5 6.5 L14 8 L9.5 9.5 L8 14 L6.5 9.5 L2 8 L6.5 6.5 Z" />
-          </svg>
-        </button>
-        <Tip
-          label={
-            thinkBusy
-              ? 'Thinking\u2026'
-              : !hasNodes
-                ? 'Think \u2014 add cards first'
-                : 'Think \u2014 challenge for insights'
-          }
-        />
-      </div>
-      <div className="canvas-toolbtn-wrap" style={{ position: 'relative' }}>
-        <button
-          onClick={() => {
-            if (isCompileRunning) {
-              onStopAgent()
-            } else if (!isCompileBusy && compileEnabled) {
-              onAgentAction('compile')
-            }
-          }}
-          className="canvas-toolbtn"
-          disabled={(!compileEnabled && !isCompileRunning) || isCompileBusy}
-          data-testid="canvas-compile"
-          aria-label={
-            isCompileRunning
-              ? 'Stop compile'
-              : unprocessedSourceCount > 0
-                ? `Compile — ${unprocessedSourceCount} unprocessed source${unprocessedSourceCount === 1 ? '' : 's'}`
-                : 'Compile — process sources'
-          }
-          style={{
-            color: isCompileRunning
-              ? '#f87171'
-              : compileEnabled
-                ? colors.text.secondary
-                : colors.text.muted,
-            cursor: isCompileBusy ? 'not-allowed' : undefined,
-            opacity: (!compileEnabled && !isCompileRunning) || isCompileBusy ? 0.4 : 1
-          }}
-        >
-          {isCompileRunning ? (
-            <svg width={14} height={14} viewBox="0 0 14 14" fill="currentColor">
-              <rect x="3.5" y="3.5" width="7" height="7" rx="1" />
-            </svg>
-          ) : (
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* Arrow into base: sources converging into structure */}
-              <path d="M7 2 L7 9" />
-              <path d="M4 6 L7 9 L10 6" />
-              <path d="M3 12 L11 12" />
-            </svg>
-          )}
-        </button>
-        {unprocessedSourceCount > 0 && !isCompileRunning && (
-          <span
-            className="absolute rounded-full"
-            style={{
-              top: 2,
-              right: 2,
-              width: 6,
-              height: 6,
-              backgroundColor: colors.accent.default
-            }}
-          />
-        )}
-        <Tip
-          label={
-            isCompileRunning
-              ? 'Stop compile'
-              : unprocessedSourceCount > 0
-                ? `Compile \u2014 ${unprocessedSourceCount} unprocessed source${unprocessedSourceCount === 1 ? '' : 's'}`
-                : 'Compile \u2014 process sources'
-          }
-        />
-      </div>
-      <div ref={agentFlyoutRef} style={{ position: 'relative' }}>
-        <div className="canvas-toolbtn-wrap">
-          <button
-            onClick={async () => {
-              if (agentFlyoutOpen) {
-                setAgentFlyoutOpen(false)
-                return
-              }
-              const listed = await window.api.actions.list()
-              setLoadedActions(listed as ActionDefinition[])
-              setAgentFlyoutOpen(true)
-            }}
-            className="canvas-toolbtn"
-            data-testid="canvas-actions"
-            aria-label="Actions"
-            aria-haspopup="menu"
-            aria-expanded={agentFlyoutOpen}
-          >
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="8" cy="8" r="6" />
-              <path d="M8 5v6M5 8h6" />
-            </svg>
-          </button>
-          <Tip label="Actions" />
-        </div>
-        {agentFlyoutOpen && (
-          <ActionMenu
-            actions={loadedActions}
-            selectedCount={sidebarSelectedCount}
-            scopeLabel={scopeLabel}
-            onSelect={(id) => {
-              setAgentFlyoutOpen(false)
-              onActionSelect(id)
-            }}
-            onClose={() => setAgentFlyoutOpen(false)}
-          />
-        )}
       </div>
 
       <div className="canvas-toolrail__divider" />

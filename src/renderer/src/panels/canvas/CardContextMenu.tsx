@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { colors } from '../../design/tokens'
-import { AGENT_ACTIONS, type AgentActionName } from '@shared/agent-action-types'
 
 interface CardContextMenuProps {
   readonly x: number
@@ -10,10 +9,6 @@ interface CardContextMenuProps {
   readonly onRunClaude?: () => void
   readonly onCopyPath: () => void
   readonly onClose: () => void
-  readonly selectedCount: number
-  readonly onAgentAction?: (action: AgentActionName) => void
-  readonly onAskPrompt?: (placeholder?: string) => void
-  readonly agentBusy?: boolean
   readonly onQuickSaveText?: () => void
   readonly onSaveTextAs?: () => void
 }
@@ -57,10 +52,6 @@ export function CardContextMenu({
   onRunClaude,
   onCopyPath,
   onClose,
-  selectedCount,
-  onAgentAction,
-  onAskPrompt,
-  agentBusy,
   onQuickSaveText,
   onSaveTextAs
 }: CardContextMenuProps) {
@@ -160,44 +151,6 @@ export function CardContextMenu({
           onClose()
         }}
       />
-      {onAgentAction && (
-        <>
-          <div
-            style={{
-              height: 1,
-              backgroundColor: colors.border.subtle,
-              margin: '4px 8px'
-            }}
-          />
-          <div
-            className="px-3 py-1 text-[10px]"
-            style={{ color: colors.text.secondary, opacity: 0.5 }}
-          >
-            Agent
-          </div>
-          {AGENT_ACTIONS.filter(
-            (a) => a.requiresSelection === 0 || selectedCount >= a.requiresSelection
-          ).map((action) => (
-            <MenuItem
-              key={action.id}
-              label={action.label}
-              onClick={() => {
-                if (action.id === 'ask' && onAskPrompt) {
-                  const hint =
-                    selectedCount === 1
-                      ? 'Ask about this card...'
-                      : `Ask about ${selectedCount} selected cards...`
-                  onAskPrompt(hint)
-                } else {
-                  onAgentAction?.(action.id as AgentActionName)
-                }
-                onClose()
-              }}
-              disabled={agentBusy}
-            />
-          ))}
-        </>
-      )}
     </div>
   )
 }

@@ -1,7 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Mock stores that CanvasToolbar reads from
 vi.mock('../../../store/canvas-store', () => ({
   useCanvasStore: vi.fn((selector) => {
     const state = {
@@ -21,33 +20,11 @@ vi.mock('../../../store/canvas-store', () => ({
 vi.mock('../../../store/vault-store', () => ({
   useVaultStore: Object.assign(
     vi.fn((selector) => {
-      const state = {
-        vaultPath: '/test',
-        rawFileCount: 42,
-        artifacts: [],
-        graph: null
-      }
+      const state = { vaultPath: '/test', rawFileCount: 42 }
       return selector(state)
     }),
     {
-      getState: vi.fn(() => ({
-        vaultPath: '/test',
-        rawFileCount: 42,
-        artifacts: [],
-        graph: null
-      }))
-    }
-  )
-}))
-
-vi.mock('../../../store/sidebar-selection-store', () => ({
-  useSidebarSelectionStore: Object.assign(
-    vi.fn((selector) => {
-      const state = { selectedPaths: new Set<string>() }
-      return selector(state)
-    }),
-    {
-      getState: vi.fn(() => ({ selectedPaths: new Set<string>() }))
+      getState: vi.fn(() => ({ vaultPath: '/test', rawFileCount: 42 }))
     }
   )
 }))
@@ -87,37 +64,13 @@ vi.mock('../../../hooks/use-claude-status', () => ({
   useClaudeStatus: vi.fn(() => ({ installed: true, authenticated: true }))
 }))
 
-const mockActionsList = vi.fn().mockResolvedValue([
-  { id: 'emerge', name: 'Emerge', description: 'Surface connections', scope: 'any' },
-  { id: 'librarian', name: 'Librarian', description: 'Audit vault', scope: 'vault' }
-])
-
 vi.stubGlobal('window', {
   ...globalThis.window,
   api: {
-    fs: { fileExists: vi.fn(), writeFile: vi.fn() },
-    actions: { list: mockActionsList }
+    fs: { fileExists: vi.fn(), writeFile: vi.fn() }
   }
 })
 
-vi.mock('../ActionMenu', () => ({
-  ActionMenu: ({
-    scopeLabel,
-    onSelect
-  }: {
-    scopeLabel: string
-    onSelect: (id: string) => void
-  }) => (
-    <div data-testid="action-menu">
-      <span data-testid="scope-label">{scopeLabel}</span>
-      <button data-testid="action-emerge" onClick={() => onSelect('emerge')}>
-        Emerge
-      </button>
-    </div>
-  )
-}))
-
-// Lazy import after mocks
 import { CanvasToolbar } from '../CanvasToolbar'
 
 const baseProps = {
@@ -129,88 +82,8 @@ const baseProps = {
   onOpenImport: vi.fn(),
   onOrganize: vi.fn(),
   organizePhase: 'idle',
-  onAgentAction: vi.fn(),
-  onStopAgent: vi.fn(),
-  agentPhase: 'idle' as const,
-  activeAction: null,
-  onClear: vi.fn(),
-  onActionSelect: vi.fn()
+  onClear: vi.fn()
 }
-
-describe('CanvasToolbar actions button', () => {
-  afterEach(() => {
-    cleanup()
-    vi.clearAllMocks()
-  })
-
-  it('renders a button with data-testid="canvas-actions"', () => {
-    render(<CanvasToolbar {...baseProps} />)
-    const btn = screen.getByTestId('canvas-actions')
-    expect(btn).toBeTruthy()
-  })
-
-  it('does not render librarian or curator buttons', () => {
-    render(<CanvasToolbar {...baseProps} />)
-    expect(screen.queryByTestId('canvas-librarian')).toBeNull()
-    expect(screen.queryByTestId('canvas-curator')).toBeNull()
-  })
-
-  it('opens ActionMenu after clicking the actions button', async () => {
-    render(<CanvasToolbar {...baseProps} />)
-    expect(screen.queryByTestId('action-menu')).toBeNull()
-
-    fireEvent.click(screen.getByTestId('canvas-actions'))
-
-    // Wait for the async actions.list call to resolve
-    await vi.waitFor(() => {
-      expect(screen.getByTestId('action-menu')).toBeTruthy()
-    })
-  })
-
-  it('shows vault scope label when no files selected', async () => {
-    render(<CanvasToolbar {...baseProps} />)
-    fireEvent.click(screen.getByTestId('canvas-actions'))
-
-    await vi.waitFor(() => {
-      expect(screen.getByTestId('scope-label').textContent).toBe('Entire vault (42 notes)')
-    })
-  })
-
-  it('calls actions.list IPC when opening flyout', async () => {
-    render(<CanvasToolbar {...baseProps} />)
-    fireEvent.click(screen.getByTestId('canvas-actions'))
-
-    await vi.waitFor(() => {
-      expect(mockActionsList).toHaveBeenCalled()
-    })
-  })
-
-  it('calls onActionSelect when an action is chosen', async () => {
-    const onActionSelect = vi.fn()
-    render(<CanvasToolbar {...baseProps} onActionSelect={onActionSelect} />)
-    fireEvent.click(screen.getByTestId('canvas-actions'))
-
-    await vi.waitFor(() => {
-      expect(screen.getByTestId('action-emerge')).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByTestId('action-emerge'))
-    expect(onActionSelect).toHaveBeenCalledWith('emerge')
-  })
-
-  it('closes the flyout when toggled again', async () => {
-    render(<CanvasToolbar {...baseProps} />)
-    const btn = screen.getByTestId('canvas-actions')
-
-    fireEvent.click(btn)
-    await vi.waitFor(() => {
-      expect(screen.getByTestId('action-menu')).toBeTruthy()
-    })
-
-    fireEvent.click(btn)
-    expect(screen.queryByTestId('action-menu')).toBeNull()
-  })
-})
 
 describe('CanvasToolbar clear button', () => {
   afterEach(() => {
@@ -228,19 +101,5 @@ describe('CanvasToolbar clear button', () => {
     render(<CanvasToolbar {...baseProps} onClear={onClear} />)
     fireEvent.click(screen.getByTestId('canvas-clear'))
     expect(onClear).toHaveBeenCalledOnce()
-  })
-
-  it('does not call onClear when agent is computing', () => {
-    const onClear = vi.fn()
-    render(
-      <CanvasToolbar
-        {...baseProps}
-        onClear={onClear}
-        agentPhase="computing"
-        activeAction="compile"
-      />
-    )
-    fireEvent.click(screen.getByTestId('canvas-clear'))
-    expect(onClear).not.toHaveBeenCalled()
   })
 })

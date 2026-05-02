@@ -13,7 +13,6 @@ import { registerMcpIpc } from './ipc/mcp'
 import { registerAgentIpc, setAgentServices, stopAgentServices } from './ipc/agents'
 import { registerActionsIpc, setActionsVaultRoot } from './ipc/actions'
 import { registerCanvasIpc } from './ipc/canvas'
-import { registerAgentActionIpc } from './ipc/agent-actions'
 import { registerArtifactIpc } from './ipc/artifact'
 import { registerGhostEmergeIpc } from './ipc/ghost-emerge'
 import { registerHealthIpc, setHealthMonitor, emitHealthReport } from './ipc/health'
@@ -281,7 +280,6 @@ app.whenReady().then(() => {
   registerAgentIpc() // Register once at startup, services update via setAgentServices
   registerActionsIpc()
   registerCanvasIpc()
-  registerAgentActionIpc()
   registerArtifactIpc()
   registerGhostEmergeIpc()
   registerHealthIpc()

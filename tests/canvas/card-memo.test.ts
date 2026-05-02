@@ -110,7 +110,6 @@ describe('card memo wrappers', () => {
     { name: 'PdfCard', path: '@renderer/panels/canvas/PdfCard' },
     { name: 'TerminalCard', path: '@renderer/panels/canvas/TerminalCard' },
     { name: 'FileViewCard', path: '@renderer/panels/canvas/FileViewCard' },
-    { name: 'AgentSessionCard', path: '@renderer/panels/canvas/AgentSessionCard' },
     { name: 'ProjectFolderCard', path: '@renderer/panels/canvas/ProjectFolderCard' },
     { name: 'WorkbenchFileCard', path: '@renderer/panels/workbench/WorkbenchFileCard' },
     { name: 'SystemArtifactCard', path: '@renderer/panels/workbench/SystemArtifactCard' }

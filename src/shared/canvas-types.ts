@@ -12,7 +12,6 @@ export type CanvasNodeType =
   | 'project-file'
   | 'system-artifact'
   | 'file-view'
-  | 'agent-session'
   | 'project-folder'
   | 'terminal-block'
 export type CanvasSide = 'top' | 'right' | 'bottom' | 'left'
@@ -127,7 +126,6 @@ const MIN_SIZES: Record<CanvasNodeType, { width: number; height: number }> = {
   'project-file': { width: 200, height: 60 },
   'system-artifact': { width: 240, height: 120 },
   'file-view': { width: 300, height: 200 },
-  'agent-session': { width: 260, height: 160 },
   'project-folder': { width: 200, height: 60 },
   'terminal-block': { width: 320, height: 140 }
 }
@@ -143,7 +141,6 @@ const DEFAULT_SIZES: Record<CanvasNodeType, { width: number; height: number }> =
   'project-file': { width: 240, height: 80 },
   'system-artifact': { width: 300, height: 180 },
   'file-view': { width: 480, height: 320 },
-  'agent-session': { width: 320, height: 240 },
   'project-folder': { width: 260, height: 80 },
   'terminal-block': { width: 420, height: 200 }
 }
@@ -175,7 +172,6 @@ export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
   'project-file': { label: 'File', icon: '\u25A0', category: 'tools' },
   'system-artifact': { label: 'Artifact', icon: '\u25C6', category: 'tools' },
   'file-view': { label: 'File View', icon: '\u25B7', category: 'tools' },
-  'agent-session': { label: 'Agent Session', icon: '\u25C9', category: 'tools' },
   'project-folder': { label: 'Folder', icon: '\u{1F4C1}', category: 'tools' },
   'terminal-block': { label: 'Block', icon: '$', category: 'tools' }
 }
@@ -207,8 +203,6 @@ export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown
       }
     case 'file-view':
       return { language: 'plaintext', previousLineCount: 0, modified: false }
-    case 'agent-session':
-      return { sessionId: '', status: 'idle', filesTouched: [], startedAt: 0, lastActivity: 0 }
     case 'project-folder':
       return { relativePath: '', rootPath: '', childCount: 0, collapsed: false }
     case 'terminal-block':

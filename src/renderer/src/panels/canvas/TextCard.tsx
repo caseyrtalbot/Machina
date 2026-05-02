@@ -4,11 +4,8 @@ import { useEditorStore } from '../../store/editor-store'
 import { CardShell } from './CardShell'
 import { RichTextCardEditor } from './RichTextCardEditor'
 import { SavedToBadge } from './SavedToBadge'
-import { ClusterCaptureButton } from './ClusterCaptureButton'
 import { useSaveTextCard } from './useSaveTextCard'
 import { hashContent } from './text-card-save'
-import { useCommandStack } from './command-stack-context'
-import { captureClusterFromRoot } from './cluster-capture-handler'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface TextCardProps {
@@ -23,29 +20,6 @@ function TextCardImpl({ node }: TextCardProps) {
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
   const removeNode = useCanvasStore((s) => s.removeNode)
   const openInEditor = useEditorStore((s) => s.setActiveNote)
-  const commandStack = useCommandStack()
-  const edges = useCanvasStore((s) => s.edges)
-  const allNodes = useCanvasStore((s) => s.nodes)
-
-  const clusterId = typeof node.metadata.cluster_id === 'string' ? node.metadata.cluster_id : null
-  const clusterHasMembers = useMemo(() => {
-    if (!clusterId) return false
-    return edges.some(
-      (e) =>
-        (e.fromNode === node.id && allNodes.some((n) => n.id === e.toNode)) ||
-        (e.toNode === node.id && allNodes.some((n) => n.id === e.fromNode))
-    )
-  }, [clusterId, edges, allNodes, node.id])
-
-  const handleCaptureCluster = useCallback(async () => {
-    if (!commandStack) return
-    setErrorMsg(null)
-    const r = await captureClusterFromRoot(node.id, allNodes, edges, commandStack)
-    if (!r.ok) {
-      setErrorMsg(r.reason)
-      window.setTimeout(() => setErrorMsg(null), 4000)
-    }
-  }, [commandStack, node.id, allNodes, edges])
 
   const { saveQuick } = useSaveTextCard()
 
@@ -95,11 +69,6 @@ function TextCardImpl({ node }: TextCardProps) {
 
   const headerActions = (
     <div className="flex items-center gap-1">
-      <ClusterCaptureButton
-        clusterId={clusterId}
-        hasMembers={clusterHasMembers}
-        onCapture={handleCaptureCluster}
-      />
       <button
         type="button"
         onClick={handleHeaderSaveClick}

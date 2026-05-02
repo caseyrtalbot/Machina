@@ -42,7 +42,6 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   'project-file': ['text'],
   'system-artifact': ['markdown', 'text'],
   'file-view': ['text'],
-  'agent-session': [],
   'project-folder': [],
   'terminal-block': []
 } as const

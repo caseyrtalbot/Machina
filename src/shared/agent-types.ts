@@ -21,18 +21,6 @@ export class PathGuardError extends Error {
   }
 }
 
-/** Session status for an agent visibility card. */
-export type AgentSessionStatus = 'active' | 'idle' | 'completed'
-
-/** Data backing an agent session card on the canvas. */
-export interface AgentSessionCardData {
-  readonly sessionId: string
-  readonly status: AgentSessionStatus
-  readonly filesTouched: readonly string[]
-  readonly startedAt: number
-  readonly lastActivity: number
-}
-
 // ---------------------------------------------------------------------------
 // Sidecar monitoring types
 // ---------------------------------------------------------------------------

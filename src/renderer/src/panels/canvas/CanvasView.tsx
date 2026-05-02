@@ -22,7 +22,6 @@ import { CommandStackProvider } from './command-stack-context'
 import { saveCanvas } from './canvas-io'
 import { TE_DIR } from '@shared/constants'
 import { CanvasToolbar } from './CanvasToolbar'
-import { CanvasPromptInput } from './CanvasPromptInput'
 import { CanvasMinimap } from './CanvasMinimap'
 import { ZoomIndicator } from './ZoomIndicator'
 import { EdgeDots } from './EdgeDots'
@@ -49,14 +48,6 @@ import { SectionOverlay } from './SectionOverlay'
 import { OntologyPreview } from './OntologyPreview'
 import { useOntologyOrchestrator } from './ontology-orchestrator'
 import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
-import { useAgentOrchestrator } from '../../hooks/use-agent-orchestrator'
-import { buildScopeContext } from '@shared/action-types'
-import { generateClaudeMd } from '../../engine/claude-md-template'
-import { buildActionLaunchScript, shellQuote } from './action-launcher'
-import { AgentPreview } from './AgentPreview'
-import { AgentThoughtCard } from './AgentThoughtCard'
-import { computeGhostNodes } from './agent-ghost-layer'
-import type { AgentActionName } from '@shared/agent-action-types'
 import { applyFolderMapPlan } from './folder-map-apply'
 import { augmentFolderMapWithVaultSemantics } from './folder-map-semantic'
 import {
@@ -64,7 +55,6 @@ import {
   filterCanvasAdditions,
   type CanvasMutationPlan
 } from '@shared/canvas-mutation-types'
-import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 
 const folderMapProgressStyle: React.CSSProperties = {
   position: 'absolute',
@@ -78,12 +68,6 @@ const folderMapProgressStyle: React.CSSProperties = {
   fontSize: '13px',
   color: 'var(--color-text-secondary)',
   zIndex: 10
-}
-
-function agentActionDisplayName(action: string | null): string | null {
-  if (!action) return null
-  if (action === 'challenge') return 'Think'
-  return action.charAt(0).toUpperCase() + action.slice(1)
 }
 
 export function CanvasView(): React.ReactElement {
@@ -107,10 +91,7 @@ export function CanvasView(): React.ReactElement {
   const [folderMapProgress, setFolderMapProgress] = useState<FolderMapProgress | null>(null)
   const [previewPlan, setPreviewPlan] = useState<CanvasMutationPlan | null>(null)
   const ontology = useOntologyOrchestrator(commandStack)
-  const agent = useAgentOrchestrator(commandStack, containerSize)
   useAgentPlanListener()
-  const [showPromptInput, setShowPromptInput] = useState(false)
-  const [promptPlaceholder, setPromptPlaceholder] = useState<string | undefined>()
   const rawFileCount = useVaultStore((s) => s.rawFileCount)
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -462,18 +443,6 @@ export function CanvasView(): React.ReactElement {
         }
       }
 
-      if (e.key === '/') {
-        if (useCanvasStore.getState().focusedTerminalId) return
-        if (document.activeElement?.tagName === 'TEXTAREA') return
-        if (document.activeElement?.tagName === 'INPUT') return
-        if ((document.activeElement as HTMLElement)?.isContentEditable) return
-        if (document.activeElement?.closest('.cm-editor')) return
-
-        e.preventDefault()
-        setShowPromptInput(true)
-        setPromptPlaceholder(undefined)
-      }
-
       // Escape clears focus lock first, then keyboard focus
       if (e.key === 'Escape') {
         const { lockedCardId } = useCanvasStore.getState()
@@ -575,27 +544,6 @@ export function CanvasView(): React.ReactElement {
     return () => clearTimeout(timer)
   }, [activeTabId, filePath, isDirty, toCanvasFile, markSaved])
 
-  // Agent palette: listen for agent-action-trigger events from command palette
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const action = (e as CustomEvent<{ action: AgentActionName }>).detail.action
-      agent.trigger(action)
-    }
-    window.addEventListener('agent-action-trigger', handler)
-    return () => window.removeEventListener('agent-action-trigger', handler)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- agent.trigger is a stable useCallback
-  }, [agent.trigger])
-
-  // Agent prompt: listen for agent-prompt-open events from command palette
-  useEffect(() => {
-    const handler = () => {
-      setShowPromptInput(true)
-      setPromptPlaceholder(undefined)
-    }
-    window.addEventListener('agent-prompt-open', handler)
-    return () => window.removeEventListener('agent-prompt-open', handler)
-  }, [])
-
   // Folder-map: trigger analysis when a folder path is set.
   // We capture the path, clear pendingFolderMap immediately, and run the orchestrator.
   // Cancel only runs on unmount via a separate effect, NOT on dependency changes,
@@ -673,76 +621,6 @@ export function CanvasView(): React.ReactElement {
     setPreviewPlan(null)
   }, [])
 
-  const handleAction = useCallback(async (actionId: string) => {
-    const vp = useVaultStore.getState().vaultPath
-    if (!vp) return
-
-    // 1. Read skill.md + action body via IPC
-    const [skillContent, actionResult] = await Promise.all([
-      window.api.fs.readFile(`${vp}/${TE_DIR}/skill.md`).catch(() => ''),
-      window.api.actions.read(actionId)
-    ])
-
-    if ('error' in actionResult) {
-      console.error('Action read failed:', actionResult.error)
-      return
-    }
-
-    // 2. Build scope context from sidebar selection
-    const selectedPaths = useSidebarSelectionStore.getState().selectedPaths
-    const scopeContext = buildScopeContext(selectedPaths, vp)
-
-    // 3. Assemble prompt
-    const assembledPrompt = [skillContent, actionResult.body, scopeContext]
-      .filter(Boolean)
-      .join('\n\n---\n\n')
-
-    // 4. Ensure CLAUDE.md exists (same as Claude Live card)
-    const claudeMdPath = `${vp}/CLAUDE.md`
-    const exists = await window.api.fs.fileExists(claudeMdPath)
-    if (!exists) {
-      const vaultName = vp.split('/').pop() ?? 'Vault'
-      await window.api.fs.writeFile(claudeMdPath, generateClaudeMd(vaultName))
-    }
-
-    // 5. Write prompt + launcher script to files for a clean terminal experience
-    const promptId = Date.now().toString(36)
-    const promptPath = `${vp}/${TE_DIR}/action-prompt-${promptId}.txt`
-    const scriptPath = `${vp}/${TE_DIR}/action-launch-${promptId}.sh`
-    await window.api.fs.writeFile(promptPath, assembledPrompt)
-
-    // Build a scope summary for the header line
-    const scopeFiles = [...selectedPaths].map((p) =>
-      p.startsWith(vp) ? p.slice(vp.length + 1) : p
-    )
-    const scopeSummary =
-      scopeFiles.length > 0 ? scopeFiles.map((f) => f.split('/').pop()).join(', ') : 'entire vault'
-
-    const script = buildActionLaunchScript({
-      actionName: actionResult.definition.name,
-      scopeSummary,
-      promptPath,
-      scriptPath
-    })
-    await window.api.fs.writeFile(scriptPath, script)
-
-    // 6. Spawn terminal card that runs the launcher script
-    const viewport = useCanvasStore.getState().viewport
-    const node = createCanvasNode(
-      'terminal',
-      { x: -viewport.x + 200, y: -viewport.y + 100 },
-      {
-        metadata: {
-          initialCommand: `bash ${shellQuote(scriptPath)}`,
-          initialCwd: vp,
-          actionId,
-          actionName: actionResult.definition.name
-        }
-      }
-    )
-    useCanvasStore.getState().addNode(node)
-  }, [])
-
   const ontologyGroups = ontology.pendingSnapshot
     ? Object.values(ontology.pendingSnapshot.groupsById)
     : []
@@ -769,10 +647,6 @@ export function CanvasView(): React.ReactElement {
             onOpenImport={() => setImportOpen(true)}
             onOrganize={ontology.startOrganize}
             organizePhase={ontology.phase}
-            onAgentAction={(action, anchor) => agent.trigger(action, undefined, anchor)}
-            onStopAgent={agent.cancel}
-            agentPhase={agent.phase}
-            activeAction={agent.activeAction}
             onClear={() => {
               useCanvasStore.setState({
                 nodes: [],
@@ -787,19 +661,7 @@ export function CanvasView(): React.ReactElement {
                 isDirty: true
               })
             }}
-            onActionSelect={handleAction}
           />
-          {showPromptInput && agent.phase === 'idle' && (
-            <CanvasPromptInput
-              selectedCount={selectedNodeIds.size}
-              placeholder={promptPlaceholder}
-              onSubmit={(text) => {
-                setShowPromptInput(false)
-                agent.trigger('ask', text)
-              }}
-              onCancel={() => setShowPromptInput(false)}
-            />
-          )}
           <CanvasSurface
             onContextMenu={handleContextMenu}
             onBackgroundClick={handleBackgroundClick}
@@ -821,32 +683,6 @@ export function CanvasView(): React.ReactElement {
               )
             })}
             {previewPlan && <FolderMapPreviewGhosts plan={previewPlan} />}
-            {agent.phase === 'preview' && agent.pendingPlan && (
-              <>
-                {computeGhostNodes(agent.pendingPlan, nodes).map((ghost) => (
-                  <div
-                    key={`ghost-${ghost.id}`}
-                    style={{
-                      position: 'absolute',
-                      left: ghost.position.x,
-                      top: ghost.position.y,
-                      width: ghost.size.width,
-                      height: ghost.size.height,
-                      backgroundColor: 'rgba(76, 175, 80, 0.08)',
-                      border: '1px dashed rgba(76, 175, 80, 0.3)',
-                      borderRadius: 8,
-                      padding: 12,
-                      pointerEvents: 'none',
-                      overflow: 'hidden',
-                      fontSize: 12,
-                      color: 'rgba(255, 255, 255, 0.4)'
-                    }}
-                  >
-                    {ghost.isMoved ? '\u21A6 moved' : ghost.content.slice(0, 120)}
-                  </div>
-                ))}
-              </>
-            )}
           </CanvasSurface>
 
           <SectionOverlay viewport={viewport} />
@@ -859,27 +695,6 @@ export function CanvasView(): React.ReactElement {
               cardCount={ontologyCardCount}
               onApply={ontology.applyResult}
               onCancel={ontology.cancel}
-            />
-          )}
-
-          {(agent.phase === 'preview' || agent.phase === 'error') && (
-            <AgentPreview
-              phase={agent.phase}
-              actionName={agentActionDisplayName(agent.activeAction)}
-              plan={agent.pendingPlan}
-              errorMessage={agent.errorMessage}
-              errorTag={agent.errorTag}
-              onApply={agent.apply}
-              onCancel={agent.cancel}
-            />
-          )}
-          {agent.phase === 'computing' && agent.anchor && agent.startedAt != null && (
-            <AgentThoughtCard
-              streamState={agent.streamState}
-              actionName={agent.activeAction}
-              anchor={agent.anchor}
-              startedAt={agent.startedAt}
-              onCancel={agent.cancel}
             />
           )}
 
@@ -944,17 +759,6 @@ export function CanvasView(): React.ReactElement {
                 <CardContextMenu
                   x={cardContextMenu.x}
                   y={cardContextMenu.y}
-                  selectedCount={selectedNodeIds.size}
-                  onAgentAction={(action) => {
-                    setCardContextMenu(null)
-                    agent.trigger(action)
-                  }}
-                  agentBusy={agent.phase !== 'idle'}
-                  onAskPrompt={(placeholder) => {
-                    setShowPromptInput(true)
-                    setPromptPlaceholder(placeholder)
-                    setCardContextMenu(null)
-                  }}
                   onShowConnections={() => {
                     const { newNodes, newEdges } = computeShowConnections(
                       menuNode,

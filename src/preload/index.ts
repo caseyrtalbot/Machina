@@ -12,11 +12,6 @@ import type {
 
 import type { AgentSidecarState, AgentSpawnRequest } from '../shared/agent-types'
 import type { Block } from '../shared/engine/block-model'
-import type {
-  AgentActionRequest,
-  AgentActionResponse,
-  AgentStreamEvent
-} from '../shared/agent-action-types'
 import type { CanvasMutationPlan } from '../shared/canvas-mutation-types'
 import type { ClaudeStatus } from '../shared/claude-status-types'
 import type { AgentArtifactDraft, MaterializeResult } from '../shared/agent-artifact-types'
@@ -132,11 +127,6 @@ const api = {
     list: () => typedInvoke('actions:list'),
     read: (id: string) => typedInvoke('actions:read', { id })
   },
-  agentAction: {
-    compute: (request: AgentActionRequest): Promise<AgentActionResponse> =>
-      typedInvoke('agent-action:compute', request),
-    cancel: (): Promise<void> => typedInvoke('agent-action:cancel')
-  },
   canvas: {
     getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
     applyPlan: (canvasPath: string, expectedMtime: string, plan: CanvasMutationPlan) =>
@@ -218,8 +208,6 @@ const api = {
       typedOn('agent:states-changed', callback),
     canvasAgentPlanAccepted: (callback: (data: { plan: CanvasMutationPlan }) => void) =>
       typedOn('canvas:agent-plan-accepted', callback),
-    agentActionStream: (callback: (data: AgentStreamEvent) => void) =>
-      typedOn('agent-action:stream', callback),
     appWillQuit: (callback: (data: Record<string, never>) => void) =>
       typedOn('app:will-quit', callback),
     claudeStatusChanged: (callback: (data: ClaudeStatus) => void) =>

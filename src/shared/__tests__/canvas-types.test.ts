@@ -18,7 +18,6 @@ const ALL_TYPES: CanvasNodeType[] = [
   'project-file',
   'system-artifact',
   'file-view',
-  'agent-session',
   'project-folder',
   'terminal-block'
 ]
@@ -59,17 +58,6 @@ describe('canvas-types registration completeness', () => {
       fileRefCount: 0,
       connections: [],
       tensionRefs: []
-    })
-  })
-
-  it('agent-session default metadata has expected shape', () => {
-    const meta = getDefaultMetadata('agent-session')
-    expect(meta).toMatchObject({
-      sessionId: '',
-      status: 'idle',
-      filesTouched: [],
-      startedAt: 0,
-      lastActivity: 0
     })
   })
 
