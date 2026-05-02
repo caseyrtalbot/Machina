@@ -3,6 +3,7 @@ import { typedHandle, typedHandleWithEvent } from '../typed-ipc'
 import { register, unregister, getWebContents } from '../services/session-router'
 import { BlockWatcher } from '../services/block-watcher'
 import { CLIAgentSessionListener } from '../services/cli-agent-session-listener'
+import { CliAgentThreadBridge } from '../services/cli-agent-thread-bridge'
 import { getMainWindow } from '../window-registry'
 import type { SessionId } from '@shared/types'
 
@@ -21,6 +22,10 @@ const cliAgentListener = new CLIAgentSessionListener({
   onContext: (status) => sendToMainWindow('cli-agent:context-updated', status)
 })
 
+const cliAgentThreadBridge = new CliAgentThreadBridge({
+  onMessage: (event) => sendToMainWindow('thread:cli-message', event)
+})
+
 const blockWatcher = new BlockWatcher({
   onUpdate: ({ sessionId, block }) => {
     // block:update is consumed by the renderer's block-store + BlockCard,
@@ -29,8 +34,15 @@ const blockWatcher = new BlockWatcher({
     // Same snapshot feeds the CLI agent session listener so tool-call /
     // status changes emit on cli-agent:* channels.
     cliAgentListener.observe(sessionId, block)
+    // And the thread bridge, which emits one ThreadMessage per completed
+    // block on sessions that have been bound to a thread (Task 8.2).
+    cliAgentThreadBridge.observe(sessionId, block)
   }
 })
+
+export function getCliAgentThreadBridge(): CliAgentThreadBridge {
+  return cliAgentThreadBridge
+}
 
 const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/
 
@@ -53,6 +65,7 @@ export function registerShellIpc(): void {
     (sessionId, code) => {
       blockWatcher.closeSession(sessionId)
       cliAgentListener.closeSession(sessionId)
+      cliAgentThreadBridge.closeSession(sessionId)
       const wc = getWebContents(sessionId)
       if (wc) wc.send('terminal:exit', { sessionId, code })
       unregister(sessionId)

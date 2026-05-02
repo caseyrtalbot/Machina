@@ -38,7 +38,8 @@ beforeEach(() => {
       writeConfig: vi.fn().mockResolvedValue(undefined)
     },
     on: {
-      agentNativeEvent: vi.fn().mockReturnValue(() => {})
+      agentNativeEvent: vi.fn().mockReturnValue(() => {}),
+      threadCliMessage: vi.fn().mockReturnValue(() => {})
     }
   }
 })

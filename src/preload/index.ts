@@ -222,6 +222,8 @@ const api = {
       typedOn('cli-agent:session-status-changed', callback),
     cliAgentContextUpdated: (callback: (data: CLIAgentSessionStatus) => void) =>
       typedOn('cli-agent:context-updated', callback),
+    threadCliMessage: (callback: (data: IpcEventData<'thread:cli-message'>) => void) =>
+      typedOn('thread:cli-message', callback),
     agentNativeEvent: (callback: (data: IpcEventData<'agent-native:event'>) => void) =>
       typedOn('agent-native:event', callback)
   },

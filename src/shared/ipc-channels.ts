@@ -344,6 +344,11 @@ export interface IpcEvents {
   // without a status transition. See cli-agent-session-listener.ts.
   'cli-agent:session-status-changed': CLIAgentSessionStatus
   'cli-agent:context-updated': CLIAgentSessionStatus
+
+  // Per-completed-block message addressed to a CLI agent thread. Emitted by
+  // CliAgentThreadBridge when a session bound to a thread finishes a block;
+  // the renderer mirrors `message` into `threadId`'s message list.
+  'thread:cli-message': { threadId: string; message: import('./thread-types').ThreadMessage }
 }
 
 export type IpcChannel = keyof IpcChannels

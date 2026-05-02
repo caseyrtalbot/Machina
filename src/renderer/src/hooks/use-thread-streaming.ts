@@ -7,6 +7,7 @@ export function useThreadStreaming(): void {
   const startToolCall = useThreadStore((s) => s.startPendingToolCall)
   const appendToolCall = useThreadStore((s) => s.appendPendingToolCall)
   const finalize = useThreadStore((s) => s.finalizeAssistantMessage)
+  const appendCliMessage = useThreadStore((s) => s.appendCliMessage)
 
   useEffect(() => {
     const off = window.api.on.agentNativeEvent((evt) => {
@@ -34,6 +35,13 @@ export function useThreadStreaming(): void {
     })
     return off
   }, [append, startToolCall, appendToolCall, finalize])
+
+  useEffect(() => {
+    const off = window.api.on.threadCliMessage((evt) => {
+      void appendCliMessage(evt.threadId, evt.message)
+    })
+    return off
+  }, [appendCliMessage])
 }
 
 function pendingPreviewToCall(
