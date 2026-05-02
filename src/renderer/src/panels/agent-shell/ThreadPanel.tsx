@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
-import { colors } from '../../design/tokens'
+import { colors, borderRadius } from '../../design/tokens'
 
 export function ThreadPanel() {
   const activeId = useThreadStore((s) => s.activeThreadId)
@@ -10,6 +10,7 @@ export function ThreadPanel() {
   const streaming = useThreadStore((s) =>
     activeId ? (s.streamingByThreadId[activeId] ?? null) : null
   )
+  const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -49,11 +50,36 @@ export function ThreadPanel() {
           padding: 12,
           borderBottom: `1px solid ${colors.border.default}`,
           display: 'flex',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12
         }}
       >
         <span>{t.title}</span>
-        <span style={{ fontSize: 11, color: colors.text.muted }}>{t.agent}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {t.agent === 'machina-native' && (
+            <button
+              onClick={() => void toggleAutoAccept(t.id)}
+              title={
+                t.autoAcceptSession
+                  ? 'Auto-accept on: writes apply without approval'
+                  : 'Auto-accept off: writes require approval'
+              }
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                borderRadius: borderRadius.inline,
+                border: `1px solid ${colors.border.default}`,
+                background: t.autoAcceptSession ? colors.bg.elevated : 'transparent',
+                color: t.autoAcceptSession ? colors.text.primary : colors.text.muted,
+                cursor: 'pointer'
+              }}
+            >
+              Auto-accept: {t.autoAcceptSession ? 'on' : 'off'}
+            </button>
+          )}
+          <span style={{ fontSize: 11, color: colors.text.muted }}>{t.agent}</span>
+        </div>
       </header>
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
         {t.messages.map((m, i) => {

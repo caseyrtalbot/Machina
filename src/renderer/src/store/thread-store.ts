@@ -31,6 +31,7 @@ interface ThreadState {
   startPendingToolCall: (threadId: string, call: ToolCall) => void
   appendPendingToolCall: (threadId: string, call: ToolCall, result: ToolResult) => void
   finalizeAssistantMessage: (threadId: string) => Promise<void>
+  toggleAutoAccept: (threadId: string) => Promise<void>
 
   addDockTab: (tab: DockTab) => void
   removeDockTab: (index: number) => void
@@ -170,7 +171,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       model: t.model,
       systemPrompt: MACHINA_NATIVE_SYSTEM_PROMPT,
       userMessage: text,
-      historyMessages: history
+      historyMessages: history,
+      autoAccept: t.autoAcceptSession ?? false
     })
   },
 
@@ -236,6 +238,19 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         streamingByThreadId: stream,
         pendingToolCallsByThreadId: tools
       }
+    })
+    const t = get().threadsById[threadId]
+    if (t) await window.api.thread.save(v, t)
+  },
+
+  toggleAutoAccept: async (threadId) => {
+    const v = get().vaultPath
+    if (!v) return
+    set((s) => {
+      const t = s.threadsById[threadId]
+      if (!t) return s
+      const next: Thread = { ...t, autoAcceptSession: !(t.autoAcceptSession ?? false) }
+      return { threadsById: { ...s.threadsById, [threadId]: next } }
     })
     const t = get().threadsById[threadId]
     if (t) await window.api.thread.save(v, t)

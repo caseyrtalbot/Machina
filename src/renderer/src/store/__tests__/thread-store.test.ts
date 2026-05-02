@@ -71,4 +71,17 @@ describe('thread-store', () => {
     useThreadStore.getState().removeDockTab(0)
     expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
   })
+
+  it('toggleAutoAccept flips the per-thread autoAcceptSession flag and persists', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: { a: sampleThread('a') }
+    })
+    await useThreadStore.getState().toggleAutoAccept('a')
+    expect(useThreadStore.getState().threadsById['a'].autoAcceptSession).toBe(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalled()
+    await useThreadStore.getState().toggleAutoAccept('a')
+    expect(useThreadStore.getState().threadsById['a'].autoAcceptSession).toBe(false)
+  })
 })
