@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 import { glob } from 'glob'
 import type { ToolErrorCode } from '@shared/thread-types'
 import type { AgentNativeApprovalPreview } from '@shared/ipc-channels'
+import { createCanvasNode } from '@shared/canvas-types'
 
 const SEARCH_HIT_LIMIT = 200
 const SEARCH_PER_FILE_LIMIT = 20
@@ -415,10 +416,6 @@ async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToo
   }
 }
 
-function newCardId(): string {
-  return `card_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-}
-
 async function pinToCanvas(
   canvasId: string,
   card: PinCardInput,
@@ -435,21 +432,18 @@ async function pinToCanvas(
     }
     return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
   }
-  const cardId = newCardId()
-  const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes] : []
-  nodes.push({
-    id: cardId,
-    type: 'note',
-    title: card.title,
-    content: card.content ?? '',
-    x: card.position?.x ?? 0,
-    y: card.position?.y ?? 0,
-    refs: card.refs ?? []
-  })
+  const body = card.content ?? ''
+  const text = body ? `${card.title}\n\n${body}` : card.title
+  const node = createCanvasNode(
+    'text',
+    { x: card.position?.x ?? 0, y: card.position?.y ?? 0 },
+    { content: text, metadata: { refs: card.refs ?? [] } }
+  )
+  const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes, node] : [node]
   const next: CanvasFileShape = { ...canvas, nodes }
   try {
     await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
-    return { ok: true, output: { cardId, canvasId } }
+    return { ok: true, output: { cardId: node.id, canvasId } }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, error: { code: 'IO_FATAL', message } }

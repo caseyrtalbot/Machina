@@ -743,17 +743,29 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       expect(res.ok).toBe(true)
       if (res.ok) {
         const out = res.output as { cardId: string; canvasId: string }
-        expect(out.cardId).toMatch(/^card_/)
+        expect(out.cardId).toMatch(/^cn_/)
         expect(out.canvasId).toBe('main')
       }
       const after = JSON.parse(
         readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
-      ) as { nodes: Array<{ title: string; x: number; y: number; refs: string[] }> }
+      ) as {
+        nodes: Array<{
+          id: string
+          type: string
+          position: { x: number; y: number }
+          size: { width: number; height: number }
+          content: string
+          metadata: { refs: string[] }
+        }>
+      }
       expect(after.nodes.length).toBe(1)
-      expect(after.nodes[0].title).toBe('Spark idea')
-      expect(after.nodes[0].x).toBe(100)
-      expect(after.nodes[0].y).toBe(200)
-      expect(after.nodes[0].refs).toEqual(['notes/idea.md'])
+      const node = after.nodes[0]
+      expect(node.type).toBe('text')
+      expect(node.position).toEqual({ x: 100, y: 200 })
+      expect(node.size.width).toBeGreaterThan(0)
+      expect(node.size.height).toBeGreaterThan(0)
+      expect(node.content).toBe('Spark idea\n\nbody')
+      expect(node.metadata.refs).toEqual(['notes/idea.md'])
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
