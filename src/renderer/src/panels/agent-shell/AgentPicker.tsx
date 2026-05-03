@@ -49,15 +49,10 @@ export function AgentPicker({
       ref={ref}
       role="menu"
       style={{
-        position: 'absolute',
-        bottom: 64,
-        left: 24,
         background: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,
         padding: 4,
-        borderRadius: borderRadius.tool,
-        minWidth: 160,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.4)'
+        borderRadius: borderRadius.tool
       }}
     >
       {AGENTS.map((a, i) => {

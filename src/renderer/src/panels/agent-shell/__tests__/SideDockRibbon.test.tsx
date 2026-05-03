@@ -54,7 +54,6 @@ describe('SideDockRibbon', () => {
     expect(screen.getByTestId('side-dock-ribbon').style.width).toBe('35px')
     expect(screen.getByLabelText('Collapse surface dock')).toBeTruthy()
     expect(screen.getByLabelText('Open command palette')).toBeTruthy()
-    expect(screen.getByLabelText('New thread')).toBeTruthy()
     expect(screen.getByLabelText('Open canvas')).toBeTruthy()
     expect(screen.getByLabelText('Open graph')).toBeTruthy()
     expect(screen.getByLabelText('Open ghosts')).toBeTruthy()
@@ -101,16 +100,5 @@ describe('SideDockRibbon', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((window as any).api.agentNative.abort).toHaveBeenCalledWith('run-1')
     })
-  })
-
-  it('opens the existing agent picker for new threads', () => {
-    render(<SideDockRibbon onOpenPalette={() => {}} />)
-
-    fireEvent.click(screen.getByLabelText('New thread'))
-
-    expect(screen.getByText('/native')).toBeTruthy()
-    expect(screen.getByText('/claude')).toBeTruthy()
-    expect(screen.getByText('/codex')).toBeTruthy()
-    expect(screen.getByText('/gemini')).toBeTruthy()
   })
 })

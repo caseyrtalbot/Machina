@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import {
   Activity,
-  MessageSquarePlus,
   Network,
   PanelRightClose,
   PanelRightOpen,
@@ -16,10 +15,8 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { DockTab } from '@shared/dock-types'
-import type { AgentIdentity } from '@shared/agent-identity'
 import { borderRadius, colors } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
-import { AgentPicker } from './AgentPicker'
 
 export interface SideDockRibbonProps {
   readonly onOpenPalette: () => void
@@ -39,21 +36,14 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
   const dockCollapsed = useThreadStore((s) => s.dockCollapsed)
   const toggleDock = useThreadStore((s) => s.toggleDock)
   const openOrFocusDockTab = useThreadStore((s) => s.openOrFocusDockTab)
-  const createThread = useThreadStore((s) => s.createThread)
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const cancelActive = useThreadStore((s) => s.cancelActive)
   const inFlight = useThreadStore((s) =>
     s.activeThreadId ? Boolean(s.inFlightByThreadId[s.activeThreadId]) : false
   )
-  const [agentPickerOpen, setAgentPickerOpen] = useState(false)
 
   function openSurface(tab: DockTab) {
     openOrFocusDockTab(tab)
-  }
-
-  async function pickAgent(agent: AgentIdentity) {
-    setAgentPickerOpen(false)
-    await createThread(agent, 'claude-sonnet-4-6')
   }
 
   const canToggleAutoAccept = activeThread?.agent === 'machina-native'
@@ -90,11 +80,6 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
           pressed={!dockCollapsed}
         />
         <RibbonAction label="Open command palette" icon={Search} onClick={onOpenPalette} />
-        <RibbonAction
-          label="New thread"
-          icon={MessageSquarePlus}
-          onClick={() => setAgentPickerOpen(true)}
-        />
       </RibbonGroup>
 
       <RibbonDivider />
@@ -147,10 +132,6 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
 
       {onOpenSettings && (
         <RibbonAction label="Open settings" icon={Settings} onClick={onOpenSettings} />
-      )}
-
-      {agentPickerOpen && (
-        <AgentPicker onPick={pickAgent} onCancel={() => setAgentPickerOpen(false)} />
       )}
     </nav>
   )

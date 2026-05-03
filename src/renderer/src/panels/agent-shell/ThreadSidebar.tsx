@@ -5,6 +5,7 @@ import { agentTag } from './agent-tag'
 import { agentPillStyle } from './agent-color'
 import { colors, borderRadius, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
+import { AgentPicker } from './AgentPicker'
 import type { AgentIdentity } from '@shared/agent-identity'
 
 export interface ThreadSidebarProps {
@@ -138,7 +139,7 @@ export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProp
       </ul>
       <footer style={{ padding: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
         {pickerOpen ? (
-          <NewThreadPicker
+          <AgentPicker
             onPick={(a) => {
               setPickerOpen(false)
               void createThread(a, 'claude-sonnet-4-6')
@@ -391,62 +392,5 @@ function RenameInput({
         minWidth: 0
       }}
     />
-  )
-}
-
-function NewThreadPicker({
-  onPick,
-  onCancel
-}: {
-  readonly onPick: (a: AgentIdentity) => void
-  readonly onCancel: () => void
-}) {
-  const AGENTS: readonly AgentIdentity[] = [
-    'machina-native',
-    'cli-claude',
-    'cli-codex',
-    'cli-gemini'
-  ]
-  return (
-    <div role="menu" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {AGENTS.map((a) => (
-        <button
-          key={a}
-          onClick={() => onPick(a)}
-          style={{
-            textAlign: 'left',
-            padding: '6px 8px',
-            background: 'transparent',
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: borderRadius.inline,
-            color: colors.text.secondary,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform,
-            cursor: 'pointer'
-          }}
-        >
-          {agentTag(a)}
-        </button>
-      ))}
-      <button
-        onClick={onCancel}
-        style={{
-          textAlign: 'left',
-          padding: '6px 8px',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted,
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer'
-        }}
-      >
-        Cancel
-      </button>
-    </div>
   )
 }

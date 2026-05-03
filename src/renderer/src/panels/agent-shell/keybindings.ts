@@ -51,6 +51,9 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
       } else if (key === 'k') {
         e.preventDefault()
         opts.openPalette()
+      } else if (key === 'n') {
+        e.preventDefault()
+        void useThreadStore.getState().createThread('machina-native', 'claude-sonnet-4-6')
       } else if (key === 'w') {
         e.preventDefault()
         const state = useThreadStore.getState()
