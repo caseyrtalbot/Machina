@@ -217,6 +217,27 @@ describe('machina-native-tools search_vault', () => {
       rmSync(v, { recursive: true, force: true })
     }
   })
+
+  it('returns aborted when the AbortSignal fires before the call', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'needle is here\n')
+      const ac = new AbortController()
+      ac.abort()
+      const res = await callTool(
+        'search_vault',
+        { query: 'needle' },
+        { vaultPath: v, autoAccept: false, signal: ac.signal }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) {
+        expect(res.error.code).toBe('IO_TRANSIENT')
+        expect(res.error.message).toContain('aborted')
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('machina-native-tools canvasId validation', () => {
@@ -669,6 +690,8 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
     const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
     try {
       seedCanvas(v, 'main', {
+        version: 1,
+        viewport: { x: 10, y: 20, zoom: 1.5 },
         nodes: [{ id: 'card_1', type: 'note', title: 'A' }],
         edges: [{ id: 'e1', from: 'card_1', to: 'card_2' }]
       })
@@ -679,7 +702,16 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       )
       expect(res.ok).toBe(true)
       if (res.ok) {
-        const out = res.output as { cards: unknown[]; edges: unknown[] }
+        const out = res.output as {
+          canvasId: string
+          version?: number
+          viewport: unknown
+          cards: unknown[]
+          edges: unknown[]
+        }
+        expect(out.canvasId).toBe('main')
+        expect(out.version).toBe(1)
+        expect(out.viewport).toEqual({ x: 10, y: 20, zoom: 1.5 })
         expect(out.cards.length).toBe(1)
         expect(out.edges.length).toBe(1)
       }
@@ -805,6 +837,36 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       )
       expect(res.ok).toBe(false)
       if (!res.ok) expect(res.error.code).toBe('CANVAS_NOT_FOUND')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('serializes concurrent pin_to_canvas writes (no clobber)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', { nodes: [], edges: [] })
+      const N = 8
+      const calls = Array.from({ length: N }, (_, i) =>
+        callTool(
+          'pin_to_canvas',
+          {
+            canvasId: 'main',
+            card: { title: `card-${i}`, position: { x: i * 10, y: i * 10 } }
+          },
+          { vaultPath: v, autoAccept: false }
+        )
+      )
+      const results = await Promise.all(calls)
+      for (const res of results) expect(res.ok).toBe(true)
+      const after = JSON.parse(
+        readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
+      ) as { nodes: Array<{ id: string; content: string }> }
+      expect(after.nodes).toHaveLength(N)
+      const ids = new Set(after.nodes.map((n) => n.id))
+      expect(ids.size).toBe(N)
+      const titles = after.nodes.map((n) => n.content).sort()
+      expect(titles).toEqual(Array.from({ length: N }, (_, i) => `card-${i}`).sort())
     } finally {
       rmSync(v, { recursive: true, force: true })
     }

@@ -235,7 +235,8 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
               else if (action.action === 'close')
                 dockTabs = dockTabs.filter((_, i) => i !== action.index)
               emitDockAction(opts.threadId, action)
-            }
+            },
+            signal: abort.signal
           })
           emittedToolUseIds.delete(tu.id)
           // Restart the timeout for the next SDK iteration.

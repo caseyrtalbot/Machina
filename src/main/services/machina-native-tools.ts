@@ -11,6 +11,7 @@ import { TE_DIR } from '@shared/constants'
 const SEARCH_HIT_LIMIT = 200
 const SEARCH_PER_FILE_LIMIT = 20
 const SEARCH_SNIPPET_LEN = 200
+const SEARCH_TIMEOUT_MS = 15_000
 const CANVAS_ID_RE = /^[a-zA-Z0-9_-]+$/
 
 interface ApprovalDecision {
@@ -53,6 +54,10 @@ export interface ToolContext {
   readonly dockTabsSnapshot?: readonly DockTab[]
   /** Drive the renderer's surface dock from the agent. */
   readonly emitDockAction?: (action: DockAction) => void
+  /** Aborted when the agent run is cancelled. Long-running tools (search_vault,
+   * pin_to_canvas) check or wire this to short-circuit instead of running to
+   * completion after the user has already pressed Stop. */
+  readonly signal?: AbortSignal
 }
 
 export type NativeToolResult =
@@ -120,7 +125,8 @@ function normalizeSearchHitPath(p: string): string {
 function searchWithRipgrep(
   query: string,
   paths: readonly string[],
-  vaultPath: string
+  vaultPath: string,
+  signal?: AbortSignal
 ): Promise<NativeToolResult> {
   return new Promise((resolve) => {
     const args = [
@@ -137,6 +143,49 @@ function searchWithRipgrep(
     let buf = ''
     let resolved = false
     let spawnFailed = false
+
+    function killChild(): void {
+      child.kill('SIGTERM')
+      // Force-kill if SIGTERM doesn't take effect promptly.
+      setTimeout(() => {
+        if (!child.killed) child.kill('SIGKILL')
+      }, 1000).unref()
+    }
+
+    // Per-process timeout: a pathological regex can pin CPU until something
+    // kills the child. The agent loop pauses its own timer during tool calls,
+    // so without this the search has no upper bound at all.
+    const timer = setTimeout(() => {
+      if (resolved) return
+      resolved = true
+      signal?.removeEventListener('abort', onAbort)
+      killChild()
+      resolve({
+        ok: false,
+        error: {
+          code: 'IO_TRANSIENT',
+          message: `search_vault timed out after ${SEARCH_TIMEOUT_MS}ms`,
+          hint: 'narrow the query or scope with paths'
+        }
+      })
+    }, SEARCH_TIMEOUT_MS)
+
+    function onAbort(): void {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timer)
+      killChild()
+      resolve({ ok: false, error: { code: 'IO_TRANSIENT', message: 'aborted by user' } })
+    }
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer)
+        killChild()
+        resolve({ ok: false, error: { code: 'IO_TRANSIENT', message: 'aborted by user' } })
+        return
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
 
     child.stdout.on('data', (d: Buffer) => {
       buf += d.toString('utf8')
@@ -173,6 +222,8 @@ function searchWithRipgrep(
     child.on('error', (err) => {
       if (resolved) return
       resolved = true
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
       spawnFailed = true
       // ENOENT means rg is not installed; signal upstream so we can fall back
       const code = (err as NodeJS.ErrnoException).code === 'ENOENT' ? 'IO_TRANSIENT' : 'IO_FATAL'
@@ -182,6 +233,8 @@ function searchWithRipgrep(
     child.on('close', (code) => {
       if (resolved) return
       resolved = true
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
       // ripgrep returns 1 when no matches, 0 when matches; both are success for us
       if (code !== 0 && code !== 1 && !spawnFailed) {
         resolve({ ok: false, error: { code: 'IO_FATAL', message: `rg exited ${code}` } })
@@ -195,7 +248,8 @@ function searchWithRipgrep(
 async function searchWithJsFallback(
   query: string,
   paths: readonly string[],
-  vaultPath: string
+  vaultPath: string,
+  signal?: AbortSignal
 ): Promise<NativeToolResult> {
   const scopeGlobs =
     paths.length > 0 ? paths.map((p) => `${p.replace(/\/$/, '')}/**/*.md`) : ['**/*.md']
@@ -213,7 +267,21 @@ async function searchWithJsFallback(
   }
   files.sort()
   const hits: SearchHit[] = []
+  const deadline = Date.now() + SEARCH_TIMEOUT_MS
   outer: for (const rel of files) {
+    if (signal?.aborted) {
+      return { ok: false, error: { code: 'IO_TRANSIENT', message: 'aborted by user' } }
+    }
+    if (Date.now() > deadline) {
+      return {
+        ok: false,
+        error: {
+          code: 'IO_TRANSIENT',
+          message: `search_vault timed out after ${SEARCH_TIMEOUT_MS}ms`,
+          hint: 'narrow the query or scope with paths'
+        }
+      }
+    }
     let content: string
     try {
       content = await fs.readFile(path.join(vaultPath, rel), 'utf8')
@@ -392,6 +460,8 @@ async function editNote(
 interface CanvasFileShape {
   nodes?: unknown[]
   edges?: unknown[]
+  viewport?: unknown
+  version?: number
   [k: string]: unknown
 }
 
@@ -415,6 +485,9 @@ async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToo
     return {
       ok: true,
       output: {
+        canvasId,
+        version: typeof parsed.version === 'number' ? parsed.version : undefined,
+        viewport: parsed.viewport ?? null,
         cards: Array.isArray(parsed.nodes) ? parsed.nodes : [],
         edges: Array.isArray(parsed.edges) ? parsed.edges : []
       }
@@ -428,38 +501,58 @@ async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToo
   }
 }
 
+// Per-canvas write queue. Concurrent pin_to_canvas calls would otherwise read
+// the same disk state, mutate independent in-memory copies, and have the
+// later write clobber the earlier one. Chaining writes through one promise
+// per canvas file makes the read-modify-write atomic from the agent side.
+const canvasWriteQueues = new Map<string, Promise<unknown>>()
+
+function enqueueCanvasWrite<T>(file: string, task: () => Promise<T>): Promise<T> {
+  const prev = canvasWriteQueues.get(file) ?? Promise.resolve()
+  const next = prev.then(task, task)
+  canvasWriteQueues.set(
+    file,
+    next.finally(() => {
+      if (canvasWriteQueues.get(file) === next) canvasWriteQueues.delete(file)
+    })
+  )
+  return next
+}
+
 async function pinToCanvas(
   canvasId: string,
   card: PinCardInput,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
   const file = canvasFilePath(ctx.vaultPath, canvasId)
-  let canvas: CanvasFileShape
-  try {
-    canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException
-    if (e.code === 'ENOENT') {
-      return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+  return enqueueCanvasWrite(file, async () => {
+    let canvas: CanvasFileShape
+    try {
+      canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException
+      if (e.code === 'ENOENT') {
+        return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+      }
+      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
     }
-    return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
-  }
-  const body = card.content ?? ''
-  const text = body ? `${card.title}\n\n${body}` : card.title
-  const node = createCanvasNode(
-    'text',
-    { x: card.position?.x ?? 0, y: card.position?.y ?? 0 },
-    { content: text, metadata: { refs: card.refs ?? [] } }
-  )
-  const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes, node] : [node]
-  const next: CanvasFileShape = { ...canvas, nodes }
-  try {
-    await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
-    return { ok: true, output: { cardId: node.id, canvasId, node } }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { ok: false, error: { code: 'IO_FATAL', message } }
-  }
+    const body = card.content ?? ''
+    const text = body ? `${card.title}\n\n${body}` : card.title
+    const node = createCanvasNode(
+      'text',
+      { x: card.position?.x ?? 0, y: card.position?.y ?? 0 },
+      { content: text, metadata: { refs: card.refs ?? [] } }
+    )
+    const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes, node] : [node]
+    const next: CanvasFileShape = { ...canvas, nodes }
+    try {
+      await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      return { ok: true, output: { cardId: node.id, canvasId, node } }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, error: { code: 'IO_FATAL', message } }
+    }
+  })
 }
 
 async function searchVault(
@@ -481,10 +574,11 @@ async function searchVault(
     }
   }
   const scope = paths && paths.length > 0 ? [...paths] : ['.']
-  const rgResult = await searchWithRipgrep(query, scope, ctx.vaultPath)
+  const rgResult = await searchWithRipgrep(query, scope, ctx.vaultPath, ctx.signal)
   if (rgResult.ok) return rgResult
+  if (ctx.signal?.aborted) return rgResult
   if (rgResult.error.hint === 'rg-spawn-failed') {
-    return searchWithJsFallback(query, paths ?? [], ctx.vaultPath)
+    return searchWithJsFallback(query, paths ?? [], ctx.vaultPath, ctx.signal)
   }
   return rgResult
 }

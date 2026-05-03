@@ -111,7 +111,7 @@ export const EDIT_NOTE_TOOL: NativeToolSpec = {
 export const READ_CANVAS_TOOL: NativeToolSpec = {
   name: 'read_canvas',
   description:
-    'Read a canvas by id. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns pinned cards and edges. Errors with CANVAS_NOT_FOUND if the canvas does not exist.',
+    'Read a canvas by id. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the canvas id, version, viewport, pinned cards, and edges. Errors with CANVAS_NOT_FOUND if the canvas does not exist.',
   input_schema: {
     type: 'object',
     properties: {

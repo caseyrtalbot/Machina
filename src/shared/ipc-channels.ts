@@ -324,7 +324,6 @@ export type AgentNativeEventBody =
       result: import('./thread-types').ToolResult
     }
   | ({ kind: 'tool_pending_approval'; toolUseId: string } & AgentNativeApprovalPreview)
-  | { kind: 'tool_decision_resolved'; toolUseId: string; accepted: boolean }
 
 export interface IpcEvents {
   'terminal:data': { sessionId: SessionId; data: string }
