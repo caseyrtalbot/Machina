@@ -1,11 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
-import { agentTag } from './agent-tag'
-import { agentPillStyle } from './agent-color'
 import { colors, borderRadius, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 import { AgentPicker } from './AgentPicker'
+import { AgentBadge } from './agent-badge'
 import type { AgentIdentity } from '@shared/agent-identity'
 
 export interface ThreadSidebarProps {
@@ -211,7 +210,6 @@ function ThreadRow({
     else onContextMenu(e.clientX, e.clientY)
   }
 
-  const pill = agentPillStyle(agent)
   const rowBg = isActive
     ? colors.bg.elevated
     : hovered
@@ -290,23 +288,7 @@ function ThreadRow({
           </button>
         )}
       </div>
-      <span
-        style={{
-          display: 'inline-block',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 9,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          padding: '1px 6px',
-          borderRadius: borderRadius.inline,
-          background: pill.background,
-          border: pill.border,
-          color: pill.color,
-          alignSelf: 'flex-start'
-        }}
-      >
-        {agentTag(agent)}
-      </span>
+      <AgentBadge agent={agent} />
     </li>
   )
 }

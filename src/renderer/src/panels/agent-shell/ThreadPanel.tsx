@@ -3,9 +3,8 @@ import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { agentPillStyle } from './agent-color'
-import { agentTag } from './agent-tag'
 import { colors, borderRadius, typography } from '../../design/tokens'
+import { AgentBadge } from './agent-badge'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
 
@@ -274,28 +273,6 @@ function LiveDot() {
         animation: 'te-pulse 1.4s ease-in-out infinite'
       }}
     />
-  )
-}
-
-function AgentBadge({ agent }: { readonly agent: import('@shared/agent-identity').AgentIdentity }) {
-  const pill = agentPillStyle(agent)
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.metadata.size,
-        letterSpacing: typography.metadata.letterSpacing,
-        textTransform: typography.metadata.textTransform,
-        padding: '3px 8px',
-        borderRadius: borderRadius.inline,
-        background: pill.background,
-        border: pill.border,
-        color: pill.color
-      }}
-    >
-      {agentTag(agent)}
-    </span>
   )
 }
 

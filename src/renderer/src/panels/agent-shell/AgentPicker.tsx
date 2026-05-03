@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentIdentity } from '@shared/agent-identity'
-import { agentTag } from './agent-tag'
 import { borderRadius, colors, typography } from '../../design/tokens'
+import { AgentBadge } from './agent-badge'
 
 const AGENTS: readonly AgentIdentity[] = ['machina-native', 'cli-claude', 'cli-codex', 'cli-gemini']
 
@@ -75,10 +75,12 @@ export function AgentPicker({
               fontFamily: typography.fontFamily.mono,
               fontSize: typography.metadata.size,
               letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform
+              textTransform: typography.metadata.textTransform,
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
-            /{agentTag(a)}
+            <AgentBadge agent={a} compact />
           </div>
         )
       })}
