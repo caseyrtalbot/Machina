@@ -156,7 +156,8 @@ export const spacing = {
   contentPadX: 32,
   contentPadY: 24,
   sidebarWidth: 260,
-  terminalMinWidth: 320
+  terminalMinWidth: 320,
+  dockTabBarHeight: 28
 } as const
 
 export const typography = {
