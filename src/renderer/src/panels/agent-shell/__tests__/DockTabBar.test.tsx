@@ -31,9 +31,7 @@ beforeEach(() => {
 describe('DockTabBar context menu', () => {
   it('right-click on a tab opens close / close-others / close-right', () => {
     render(<DockTabBar activeIndex={0} onActivate={() => {}} />)
-    const firstTab = screen
-      .getAllByRole('button')
-      .find((b) => b.textContent?.startsWith('graph')) as HTMLButtonElement
+    const firstTab = screen.getAllByRole('tab')[0]
     fireEvent.contextMenu(firstTab, { clientX: 50, clientY: 50 })
     expect(screen.getByText('Close tab')).toBeTruthy()
     expect(screen.getByText('Close other tabs')).toBeTruthy()
@@ -42,9 +40,7 @@ describe('DockTabBar context menu', () => {
 
   it('clicking Close other tabs leaves only the targeted tab', () => {
     render(<DockTabBar activeIndex={1} onActivate={() => {}} />)
-    const ghosts = screen
-      .getAllByRole('button')
-      .find((b) => b.textContent?.startsWith('ghosts')) as HTMLButtonElement
+    const ghosts = screen.getAllByRole('tab')[1]
     fireEvent.contextMenu(ghosts, { clientX: 50, clientY: 50 })
     fireEvent.click(screen.getByText('Close other tabs'))
     const remaining = useThreadStore.getState().dockTabsByThreadId['a']
@@ -53,9 +49,7 @@ describe('DockTabBar context menu', () => {
 
   it('clicking Close tabs to the right drops everything past the target', () => {
     render(<DockTabBar activeIndex={0} onActivate={() => {}} />)
-    const graph = screen
-      .getAllByRole('button')
-      .find((b) => b.textContent?.startsWith('graph')) as HTMLButtonElement
+    const graph = screen.getAllByRole('tab')[0]
     fireEvent.contextMenu(graph, { clientX: 50, clientY: 50 })
     fireEvent.click(screen.getByText('Close tabs to the right'))
     const remaining = useThreadStore.getState().dockTabsByThreadId['a']

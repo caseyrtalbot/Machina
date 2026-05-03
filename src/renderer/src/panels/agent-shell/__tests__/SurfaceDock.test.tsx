@@ -36,10 +36,7 @@ beforeEach(() => {
 })
 
 function tabBar() {
-  // The tab bar is the only flex row containing the tab kind buttons + "+"
-  return screen
-    .getAllByRole('button')
-    .filter((b) => /^(editor|graph|health|canvas|terminal|ghosts)/.test(b.textContent ?? ''))
+  return screen.queryAllByRole('tab')
 }
 
 describe('SurfaceDock activeIndex on thread switch', () => {
@@ -64,7 +61,7 @@ describe('SurfaceDock activeIndex on thread switch', () => {
     // and the visible tab is the one from thread b
     const remaining = tabBar()
     expect(remaining).toHaveLength(1)
-    expect(within(remaining[0]).getByText('editor')).toBeTruthy()
+    expect(within(remaining[0]).getByText('B.md')).toBeTruthy()
   })
 
   it('survives a switch back to the multi-tab thread by starting at index 0', () => {

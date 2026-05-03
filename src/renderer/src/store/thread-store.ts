@@ -20,6 +20,8 @@ interface ThreadState {
   /** True while a turn is in flight for the thread (cleared when it settles). */
   inFlightByThreadId: Record<string, boolean>
   dockTabsByThreadId: Record<string, DockTab[]>
+  /** Active dock tab index per thread, restored when re-entering the thread. */
+  dockActiveIndexByThreadId: Record<string, number>
   dockCollapsed: boolean
   /** Pixel width of the thread sidebar (left pane). Persisted in vault config. */
   sidebarWidth: number
@@ -50,9 +52,33 @@ interface ThreadState {
   toggleAutoAccept: (threadId: string) => Promise<void>
 
   addDockTab: (tab: DockTab) => void
+  /** Open the matching tab if one already exists, otherwise add it. Activates either way. */
+  openOrFocusDockTab: (tab: DockTab) => void
   removeDockTab: (index: number) => void
+  removeDockTabs: (indices: readonly number[]) => void
   reorderDockTab: (from: number, to: number) => void
+  setDockActiveIndex: (threadId: string, index: number) => void
   toggleDock: () => void
+}
+
+/**
+ * Identity used by openOrFocusDockTab to decide whether two tabs are "the same."
+ * A null result means "always create a new tab" — used for fresh terminals.
+ */
+function dockTabIdentity(t: DockTab): string | null {
+  switch (t.kind) {
+    case 'editor':
+      return `editor:${t.path}`
+    case 'canvas':
+      return `canvas:${t.id}`
+    case 'terminal':
+      // Each terminal click should spawn a fresh session, even with the same id.
+      return null
+    case 'graph':
+    case 'ghosts':
+    case 'health':
+      return t.kind
+  }
 }
 
 const initial = {
@@ -66,6 +92,7 @@ const initial = {
   runIdByThreadId: {} as Record<string, string>,
   inFlightByThreadId: {} as Record<string, boolean>,
   dockTabsByThreadId: {} as Record<string, DockTab[]>,
+  dockActiveIndexByThreadId: {} as Record<string, number>,
   dockCollapsed: false,
   sidebarWidth: 240,
   dockWidth: 480
@@ -107,7 +134,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const cfg = await window.api.thread.readConfig(v)
     set({
       sidebarWidth: clampPaneWidth(cfg.sidebarWidth ?? 240, SIDEBAR_MIN),
-      dockWidth: clampPaneWidth(cfg.dockWidth ?? 480, DOCK_MIN)
+      dockWidth: clampPaneWidth(cfg.dockWidth ?? 480, DOCK_MIN),
+      dockCollapsed: cfg.dockCollapsed ?? false
     })
   },
 
@@ -122,7 +150,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     await window.api.thread.writeConfig(v, {
       ...cfg,
       sidebarWidth: get().sidebarWidth,
-      dockWidth: get().dockWidth
+      dockWidth: get().dockWidth,
+      dockCollapsed: get().dockCollapsed
     })
   },
 
@@ -210,6 +239,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       delete tools[id]
       const dock = { ...s.dockTabsByThreadId }
       delete dock[id]
+      const dockIndex = { ...s.dockActiveIndexByThreadId }
+      delete dockIndex[id]
       const runs = { ...s.runIdByThreadId }
       delete runs[id]
       const flight = { ...s.inFlightByThreadId }
@@ -219,6 +250,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         streamingByThreadId: stream,
         pendingToolCallsByThreadId: tools,
         dockTabsByThreadId: dock,
+        dockActiveIndexByThreadId: dockIndex,
         runIdByThreadId: runs,
         inFlightByThreadId: flight,
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
@@ -416,13 +448,46 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   addDockTab: (tab) => {
     const id = get().activeThreadId
     if (!id) return
-    set((s) => ({
-      dockCollapsed: false,
-      dockTabsByThreadId: {
-        ...s.dockTabsByThreadId,
-        [id]: [...(s.dockTabsByThreadId[id] ?? []), tab]
+    set((s) => {
+      const next = [...(s.dockTabsByThreadId[id] ?? []), tab]
+      return {
+        dockCollapsed: false,
+        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: next },
+        dockActiveIndexByThreadId: {
+          ...s.dockActiveIndexByThreadId,
+          [id]: next.length - 1
+        }
       }
-    }))
+    })
+  },
+
+  openOrFocusDockTab: (tab) => {
+    const id = get().activeThreadId
+    if (!id) return
+    set((s) => {
+      const tabs = s.dockTabsByThreadId[id] ?? []
+      const identity = dockTabIdentity(tab)
+      const existingIdx =
+        identity === null ? -1 : tabs.findIndex((t) => dockTabIdentity(t) === identity)
+      if (existingIdx >= 0) {
+        return {
+          dockCollapsed: false,
+          dockActiveIndexByThreadId: {
+            ...s.dockActiveIndexByThreadId,
+            [id]: existingIdx
+          }
+        }
+      }
+      const next = [...tabs, tab]
+      return {
+        dockCollapsed: false,
+        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: next },
+        dockActiveIndexByThreadId: {
+          ...s.dockActiveIndexByThreadId,
+          [id]: next.length - 1
+        }
+      }
+    })
   },
 
   removeDockTab: (index) => {
@@ -430,8 +495,48 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     if (!id) return
     set((s) => {
       const tabs = (s.dockTabsByThreadId[id] ?? []).slice()
+      if (index < 0 || index >= tabs.length) return s
       tabs.splice(index, 1)
-      return { dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs } }
+      const prevActive = s.dockActiveIndexByThreadId[id] ?? 0
+      // After splice: same index is now the next-right tab. Shift left if we
+      // removed at-or-before the active tab; clamp to the last tab.
+      const nextActive = Math.max(
+        0,
+        Math.min(prevActive >= index ? prevActive - 1 : prevActive, tabs.length - 1)
+      )
+      return {
+        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs },
+        dockActiveIndexByThreadId: {
+          ...s.dockActiveIndexByThreadId,
+          [id]: nextActive
+        }
+      }
+    })
+  },
+
+  removeDockTabs: (indices) => {
+    if (indices.length === 0) return
+    const id = get().activeThreadId
+    if (!id) return
+    set((s) => {
+      const drop = new Set(indices)
+      const before = s.dockTabsByThreadId[id] ?? []
+      const tabs = before.filter((_, i) => !drop.has(i))
+      const prevActive = s.dockActiveIndexByThreadId[id] ?? 0
+      const nextActive = Math.max(
+        0,
+        Math.min(
+          prevActive - indices.filter((i) => i <= prevActive).length,
+          Math.max(0, tabs.length - 1)
+        )
+      )
+      return {
+        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs },
+        dockActiveIndexByThreadId: {
+          ...s.dockActiveIndexByThreadId,
+          [id]: nextActive
+        }
+      }
     })
   },
 
@@ -446,26 +551,44 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     })
   },
 
-  toggleDock: () => set((s) => ({ dockCollapsed: !s.dockCollapsed }))
+  setDockActiveIndex: (threadId, index) =>
+    set((s) => {
+      if (s.dockActiveIndexByThreadId[threadId] === index) return s
+      return {
+        dockActiveIndexByThreadId: { ...s.dockActiveIndexByThreadId, [threadId]: index }
+      }
+    }),
+
+  toggleDock: () => {
+    set((s) => ({ dockCollapsed: !s.dockCollapsed }))
+    // Fire-and-forget: persist the new collapsed state so it survives restart.
+    void get().persistLayout()
+  }
 }))
 
 async function validateTabs(
   vault: string,
   tabs: readonly DockTab[]
 ): Promise<{ valid: DockTab[]; dropped: number }> {
+  // Run filesystem existence checks in parallel; preserve original tab order.
+  const checks = await Promise.all(
+    tabs.map(async (t) => {
+      if (t.kind === 'editor' && t.path !== '') {
+        return window.api.fs.fileExists(t.path)
+      }
+      if (t.kind === 'canvas' && t.id !== 'default') {
+        // Per-id canvas files are not yet implemented; only the global "default" is real.
+        return window.api.fs.fileExists(`${vault}/${TE_DIR}/canvas/${t.id}.json`)
+      }
+      // terminal and the static kinds (graph, ghosts, health) are always valid in v1
+      return true
+    })
+  )
   const valid: DockTab[] = []
   let dropped = 0
-  for (const t of tabs) {
-    let ok = true
-    if (t.kind === 'editor' && t.path !== '') {
-      ok = await window.api.fs.fileExists(t.path)
-    } else if (t.kind === 'canvas' && t.id !== 'default') {
-      // Per-id canvas files are not yet implemented; only the global "default" is real.
-      ok = await window.api.fs.fileExists(`${vault}/${TE_DIR}/canvas/${t.id}.json`)
-    }
-    // terminal and the static kinds (graph, ghosts, health) are always valid in v1
-    if (ok) valid.push(t)
-    else dropped++
+  for (let i = 0; i < tabs.length; i += 1) {
+    if (checks[i]) valid.push(tabs[i])
+    else dropped += 1
   }
   return { valid, dropped }
 }
