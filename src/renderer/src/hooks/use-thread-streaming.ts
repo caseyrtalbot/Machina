@@ -9,6 +9,8 @@ export function useThreadStreaming(): void {
   const appendToolCall = useThreadStore((s) => s.appendPendingToolCall)
   const finalize = useThreadStore((s) => s.finalizeAssistantMessage)
   const appendCliMessage = useThreadStore((s) => s.appendCliMessage)
+  const addDockTab = useThreadStore((s) => s.addDockTab)
+  const removeDockTab = useThreadStore((s) => s.removeDockTab)
 
   useEffect(() => {
     const off = window.api.on.agentNativeEvent((evt) => {
@@ -47,6 +49,16 @@ export function useThreadStreaming(): void {
     })
     return off
   }, [appendCliMessage])
+
+  useEffect(() => {
+    const off = window.api.on.agentNativeDockAction((evt) => {
+      const active = useThreadStore.getState().activeThreadId
+      if (active !== evt.threadId) return
+      if (evt.action === 'open') addDockTab(evt.tab)
+      else if (evt.action === 'close') removeDockTab(evt.index)
+    })
+    return off
+  }, [addDockTab, removeDockTab])
 }
 
 function pendingPreviewToCall(

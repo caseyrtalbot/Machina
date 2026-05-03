@@ -270,6 +270,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
           ? [{ role: m.role, content: m.body } as const]
           : []
       )
+    const dockTabsSnapshot = get().dockTabsByThreadId[id] ?? []
     const { runId } = await window.api.agentNative.run({
       vaultPath: v,
       threadId: id,
@@ -277,7 +278,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       systemPrompt: MACHINA_NATIVE_SYSTEM_PROMPT,
       userMessage: text,
       historyMessages: history,
-      autoAccept: t.autoAcceptSession ?? false
+      autoAccept: t.autoAcceptSession ?? false,
+      dockTabsSnapshot
     })
     set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
   },

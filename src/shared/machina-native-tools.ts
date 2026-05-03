@@ -151,6 +151,53 @@ export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
   }
 }
 
+export const OPEN_DOCK_TAB_TOOL: NativeToolSpec = {
+  name: 'open_dock_tab',
+  description:
+    'Open a surface dock tab in the current thread. Expands the dock if it was collapsed. Tab kinds: canvas, editor, terminal, graph, ghosts, health. canvas/editor/terminal accept an optional id, path, or sessionId; the others take no payload. Returns the new tab index.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      kind: {
+        type: 'string',
+        enum: ['canvas', 'editor', 'terminal', 'graph', 'ghosts', 'health'],
+        description: 'Dock tab kind to open.'
+      },
+      canvasId: {
+        type: 'string',
+        description: 'Canvas id when kind="canvas". Defaults to "default".'
+      },
+      path: {
+        type: 'string',
+        description: 'Vault-relative path when kind="editor". Defaults to "".'
+      },
+      sessionId: {
+        type: 'string',
+        description: 'Terminal session id when kind="terminal". Defaults to "".'
+      }
+    },
+    required: ['kind']
+  }
+}
+
+export const CLOSE_DOCK_TAB_TOOL: NativeToolSpec = {
+  name: 'close_dock_tab',
+  description:
+    'Close a surface dock tab in the current thread by index, or by kind (closes the first tab of that kind). Returns the closed index, or null if no matching tab existed.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      index: { type: 'number', description: 'Zero-based tab index to close.' },
+      kind: {
+        type: 'string',
+        enum: ['canvas', 'editor', 'terminal', 'graph', 'ghosts', 'health'],
+        description: 'Close the first tab matching this kind.'
+      }
+    },
+    required: []
+  }
+}
+
 export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
   READ_NOTE_TOOL,
   LIST_VAULT_TOOL,
@@ -158,5 +205,7 @@ export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
   WRITE_NOTE_TOOL,
   EDIT_NOTE_TOOL,
   READ_CANVAS_TOOL,
-  PIN_TO_CANVAS_TOOL
+  PIN_TO_CANVAS_TOOL,
+  OPEN_DOCK_TAB_TOOL,
+  CLOSE_DOCK_TAB_TOOL
 ]

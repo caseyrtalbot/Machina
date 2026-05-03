@@ -15,6 +15,9 @@ import type { CLIAgentInstallation } from './cli-agents'
 import type { CLIAgentSessionStatus } from './cli-agent-session-types'
 import type { InfraHealth } from './engine/vault-health'
 import type { Block } from './engine/block-model'
+import type { DockTab } from './dock-types'
+
+export type DockAction = { action: 'open'; tab: DockTab } | { action: 'close'; index: number }
 
 export interface IpcChannels {
   // --- Filesystem ---
@@ -268,6 +271,9 @@ export interface IpcChannels {
       userMessage: string
       historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
       autoAccept?: boolean
+      /** Snapshot of the active dock tabs at run start. Lets close_dock_tab
+       * resolve a kind to an index without an extra round-trip. */
+      dockTabsSnapshot?: ReadonlyArray<DockTab>
     }
     response: { runId: string }
   }
@@ -357,6 +363,11 @@ export interface IpcEvents {
 
   // Machina Native streaming events (main -> renderer)
   'agent-native:event': { runId: string; threadId: string } & AgentNativeEventBody
+
+  // Agent-driven dock manipulation (main -> renderer). Fired when the agent
+  // calls open_dock_tab / close_dock_tab so the renderer can apply the change
+  // to the live thread store.
+  'agent-native:dock-action': { threadId: string } & DockAction
 
   // CLI agent session listener (main -> renderer). status-changed fires only
   // when the session transitions between in-progress / success / blocked;

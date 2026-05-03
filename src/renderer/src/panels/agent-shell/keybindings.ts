@@ -7,17 +7,45 @@ export interface AgentShellKeybindingOptions {
   readonly closePalette: () => void
 }
 
+const PALETTE_DIALOG_SELECTOR = '[role="dialog"][aria-label="command palette"]'
+
+function isEditableTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false
+  const tag = el.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return true
+  if (el.isContentEditable) return true
+  return false
+}
+
+function isInsidePalette(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false
+  return Boolean(el.closest(PALETTE_DIALOG_SELECTOR))
+}
+
 export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): void {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const cmd = e.metaKey || e.ctrlKey
+      const editable = isEditableTarget(e.target)
+      const inPalette = isInsidePalette(e.target)
+
+      // Escape closes the palette globally, but inside other editable surfaces
+      // (message composer, side inputs) we leave Escape alone so the user can
+      // clear suggestion popups or exit IME without trampling local UI.
       if (e.key === 'Escape') {
-        opts.closePalette()
+        if (inPalette || !editable) opts.closePalette()
         return
       }
+
+      const cmd = e.metaKey || e.ctrlKey
       if (!cmd) return
+
+      // Suppress global cmd-shortcuts from inside text inputs so typing Cmd-W
+      // in the message composer doesn't quietly close a dock tab. The palette
+      // input is editable but its shortcuts are intentionally global.
+      if (editable && !inPalette) return
+
       const key = e.key.toLowerCase()
-      if (key === '/') {
+      if (key === '/' || (key === 'd' && e.shiftKey)) {
         e.preventDefault()
         opts.toggleDock()
       } else if (key === 'k') {
@@ -25,12 +53,14 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
         opts.openPalette()
       } else if (key === 'w') {
         e.preventDefault()
-        // TODO Phase 6+: close the focused dock tab; for now drop the active tab.
-        const tabs =
-          useThreadStore.getState().dockTabsByThreadId[
-            useThreadStore.getState().activeThreadId ?? ''
-          ] ?? []
-        if (tabs.length > 0) useThreadStore.getState().removeDockTab(tabs.length - 1)
+        const state = useThreadStore.getState()
+        const tid = state.activeThreadId
+        if (!tid) return
+        const tabs = state.dockTabsByThreadId[tid] ?? []
+        if (tabs.length === 0) return
+        const stored = state.dockActiveIndexByThreadId[tid] ?? 0
+        const target = Math.min(Math.max(0, stored), tabs.length - 1)
+        state.removeDockTab(target)
       } else if (/^[1-9]$/.test(e.key)) {
         e.preventDefault()
         const n = Number(e.key)

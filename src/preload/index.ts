@@ -21,6 +21,7 @@ import type { Thread } from '../shared/thread-types'
 import type { AgentIdentity } from '../shared/agent-identity'
 import type { VaultMachinaConfig } from '../shared/thread-storage-types'
 import type { IpcEventData } from '../shared/ipc-channels'
+import type { DockTab } from '../shared/dock-types'
 
 const api = {
   window: {
@@ -163,6 +164,7 @@ const api = {
       userMessage: string
       historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
       autoAccept?: boolean
+      dockTabsSnapshot?: ReadonlyArray<DockTab>
     }) => typedInvoke('agent-native:run', req),
     abort: (runId: string) => typedInvoke('agent-native:abort', { runId }),
     toolDecision: (req: { toolUseId: string; accept: boolean; rejectReason?: string }) =>
@@ -233,7 +235,9 @@ const api = {
     threadCliMessage: (callback: (data: IpcEventData<'thread:cli-message'>) => void) =>
       typedOn('thread:cli-message', callback),
     agentNativeEvent: (callback: (data: IpcEventData<'agent-native:event'>) => void) =>
-      typedOn('agent-native:event', callback)
+      typedOn('agent-native:event', callback),
+    agentNativeDockAction: (callback: (data: IpcEventData<'agent-native:dock-action'>) => void) =>
+      typedOn('agent-native:dock-action', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path })

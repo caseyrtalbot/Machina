@@ -4,7 +4,8 @@ import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { NATIVE_TOOLS_V0 } from '@shared/machina-native-tools'
 import { callTool, clearApproval } from './machina-native-tools'
-import type { AgentNativeEventBody } from '@shared/ipc-channels'
+import type { AgentNativeEventBody, DockAction } from '@shared/ipc-channels'
+import type { DockTab } from '@shared/dock-types'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 
 const DEFAULT_TIMEOUT_MS = 60_000
@@ -19,6 +20,7 @@ interface RunOptions {
   readonly userMessage: string
   readonly historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
   readonly autoAccept?: boolean
+  readonly dockTabsSnapshot?: ReadonlyArray<DockTab>
 }
 
 const inflight = new Map<string, AbortController>()
@@ -27,6 +29,12 @@ function emit(runId: string, threadId: string, body: AgentNativeEventBody): void
   const window = getMainWindow()
   if (!window) return
   typedSend(window, 'agent-native:event', { runId, threadId, ...body })
+}
+
+function emitDockAction(threadId: string, action: DockAction): void {
+  const window = getMainWindow()
+  if (!window) return
+  typedSend(window, 'agent-native:dock-action', { threadId, ...action })
 }
 
 function newRunId(): string {
@@ -157,6 +165,11 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
   // approval entry if this run aborts or errors out before the user decides.
   const emittedToolUseIds = new Set<string>()
 
+  // Mutable mirror of the renderer's dock tabs. Updated when the agent calls
+  // open_dock_tab / close_dock_tab so subsequent calls in the same run can
+  // resolve a kind to the right index without an extra round-trip.
+  let dockTabs: DockTab[] = opts.dockTabsSnapshot ? [...opts.dockTabsSnapshot] : []
+
   void (async () => {
     try {
       for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
@@ -215,7 +228,14 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
             autoAccept: opts.autoAccept ?? false,
             toolUseId: tu.id,
             emitPending: (toolUseId, preview) =>
-              emit(runId, opts.threadId, { kind: 'tool_pending_approval', toolUseId, ...preview })
+              emit(runId, opts.threadId, { kind: 'tool_pending_approval', toolUseId, ...preview }),
+            dockTabsSnapshot: dockTabs,
+            emitDockAction: (action) => {
+              if (action.action === 'open') dockTabs = [...dockTabs, action.tab]
+              else if (action.action === 'close')
+                dockTabs = dockTabs.filter((_, i) => i !== action.index)
+              emitDockAction(opts.threadId, action)
+            }
           })
           emittedToolUseIds.delete(tu.id)
           // Restart the timeout for the next SDK iteration.
