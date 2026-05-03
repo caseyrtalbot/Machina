@@ -128,6 +128,14 @@ function searchWithRipgrep(
   vaultPath: string,
   signal?: AbortSignal
 ): Promise<NativeToolResult> {
+  // Short-circuit before spawning so we don't leak an rg child process whose
+  // error/close events would land on a Promise that's already resolved.
+  if (signal?.aborted) {
+    return Promise.resolve({
+      ok: false,
+      error: { code: 'IO_TRANSIENT', message: 'aborted by user' }
+    })
+  }
   return new Promise((resolve) => {
     const args = [
       '--json',
@@ -177,15 +185,7 @@ function searchWithRipgrep(
       killChild()
       resolve({ ok: false, error: { code: 'IO_TRANSIENT', message: 'aborted by user' } })
     }
-    if (signal) {
-      if (signal.aborted) {
-        clearTimeout(timer)
-        killChild()
-        resolve({ ok: false, error: { code: 'IO_TRANSIENT', message: 'aborted by user' } })
-        return
-      }
-      signal.addEventListener('abort', onAbort, { once: true })
-    }
+    signal?.addEventListener('abort', onAbort, { once: true })
 
     child.stdout.on('data', (d: Buffer) => {
       buf += d.toString('utf8')

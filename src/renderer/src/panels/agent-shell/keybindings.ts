@@ -37,6 +37,19 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
       }
 
       const cmd = e.metaKey || e.ctrlKey
+
+      // Cmd+. cancels the active agent run from anywhere, including text
+      // inputs. Mirrors the macOS convention (Terminal, browsers) where
+      // Cmd+. is "stop". A 60-second vault search is exactly the case
+      // where the user must be able to bail out without the mouse.
+      if (cmd && e.key === '.') {
+        e.preventDefault()
+        const state = useThreadStore.getState()
+        const tid = state.activeThreadId
+        if (tid && state.inFlightByThreadId[tid]) void state.cancelActive(tid)
+        return
+      }
+
       if (!cmd) return
 
       // Suppress global cmd-shortcuts from inside text inputs so typing Cmd-W
