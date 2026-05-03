@@ -11,6 +11,9 @@ import { ResizeHandle } from './ResizeHandle'
 import { useAgentShellKeybindings } from './keybindings'
 import { borderRadius, colors, typography } from '../../design/tokens'
 
+const WINDOW_HEADER_HEIGHT = 39
+const WINDOW_CONTROLS_CONTAINER_WIDTH = 148
+
 export interface AgentShellProps {
   readonly onOpenSettings?: () => void
 }
@@ -96,24 +99,22 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
 }
 
 function WindowDragRegion() {
-  // Reserve a 28px band across the top of the shell so the OS can drag the
-  // window. Sits above the three-pane layout (no overlap), which keeps
-  // interactive elements pointer-clickable without per-button no-drag wiring.
-  // 28px also clears the traffic lights at trafficLightPosition { x: 12, y: 12 }.
+  // Reserve an Obsidian-sized 148x39 titlebar control zone across the left of
+  // the shell and keep the rest of the header draggable. The strip sits above
+  // the three-pane layout, so interactive elements stay pointer-clickable
+  // without per-button no-drag wiring.
   //
-  // The drag region is inset 8px from the left and right and 2px from the top
-  // so macOS keeps ownership of the corner / edge resize hit zones. Without
-  // these gutters, the drag region wins over OS resize at the corners and the
-  // top portion of the side edges, which makes the window feel un-resizable.
+  // The drag region is inset 8px from the left and right so macOS keeps
+  // ownership of the corner resize hit zones. Without these gutters, the drag
+  // region wins over OS resize at the corners.
   return (
     <div
       data-testid="window-drag-region"
       aria-hidden
       style={{
         display: 'flex',
-        height: 28,
+        height: WINDOW_HEADER_HEIGHT,
         flexShrink: 0,
-        paddingTop: 2,
         paddingLeft: 8,
         paddingRight: 8,
         boxSizing: 'border-box',
@@ -122,8 +123,19 @@ function WindowDragRegion() {
       }}
     >
       <div
+        data-testid="window-controls-container"
+        style={{
+          width: WINDOW_CONTROLS_CONTAINER_WIDTH,
+          height: WINDOW_HEADER_HEIGHT,
+          flexShrink: 0,
+          // @ts-expect-error -- Electron-only CSS property
+          WebkitAppRegion: 'drag'
+        }}
+      />
+      <div
         style={{
           flex: 1,
+          minWidth: 0,
           // @ts-expect-error -- Electron-only CSS property
           WebkitAppRegion: 'drag'
         }}

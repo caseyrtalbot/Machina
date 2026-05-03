@@ -72,6 +72,16 @@ describe('AgentShell welcome tooltip', () => {
     expect(shell.firstChild).toBe(strip)
   })
 
+  it('sizes the native controls container to the app header standard', () => {
+    useVaultStore.setState({ vaultPath: null })
+    render(<AgentShell />)
+    const strip = screen.getByTestId('window-drag-region')
+    const controls = screen.getByTestId('window-controls-container')
+    expect(strip.style.height).toBe('39px')
+    expect(controls.style.width).toBe('148px')
+    expect(controls.style.height).toBe('39px')
+  })
+
   it('dismissing flips welcomed and writes config', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const writeConfig = (window as any).api.thread.writeConfig
