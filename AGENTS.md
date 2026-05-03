@@ -109,7 +109,7 @@ before-quit → preventDefault → typedSend('app:will-quit')
 ### Key Subsystems
 
 - **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (6 edge types with provenance) → ghost-index.ts. search-engine.ts: MiniSearch (title x10, tags x5, body x1). All runs in vault-worker.ts Web Worker.
-- **Canvas** (`panels/canvas/`): Pixi.js 8 infinite pan-zoom. 12 card types: `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `agent-session`, `project-folder`. Click-to-focus, click-again-to-interact.
+- **Canvas** (`panels/canvas/`): Pixi.js 8 infinite pan-zoom. 12 card types: `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `project-folder`, `terminal-block`. Click-to-focus, click-again-to-interact.
 - **Ontology** (`engine/ontology-*`): Tag-first grouping with link-analysis fallback, computed in ontology-worker.ts. `GroupProvenance` tracks source (user tags, links, AI).
 - **Agents**: PTY sessions via agent-spawner.ts. session-tailer.ts emits `SessionMilestone` events. IPC: `window.api.agent`.
 - **System Artifacts**: Structured markdown in `.machina/artifacts/{sessions,patterns,tensions}/`. Schemas in `system-artifacts.ts`.

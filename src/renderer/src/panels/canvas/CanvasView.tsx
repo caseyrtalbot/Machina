@@ -19,8 +19,6 @@ import { EdgeLayer } from './EdgeLayer'
 import { ConnectionDragOverlay } from './ConnectionDragOverlay'
 import { CommandStack } from './canvas-commands'
 import { CommandStackProvider } from './command-stack-context'
-import { saveCanvas } from './canvas-io'
-import { TE_DIR } from '@shared/constants'
 import { CanvasToolbar } from './CanvasToolbar'
 import { CanvasMinimap } from './CanvasMinimap'
 import { ZoomIndicator } from './ZoomIndicator'
@@ -47,6 +45,9 @@ import { SectionOverlay } from './SectionOverlay'
 import { OntologyPreview } from './OntologyPreview'
 import { useOntologyOrchestrator } from './ontology-orchestrator'
 import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
+import { useCanvasCardAddedListener } from '../../hooks/use-canvas-card-added-listener'
+import { DEFAULT_CANVAS_ID, useCanvasFileLifecycle } from './use-canvas-file-lifecycle'
+import { useCanvasKeyboardShortcuts } from './use-canvas-keyboard-shortcuts'
 import { applyFolderMapPlan } from './folder-map-apply'
 import { augmentFolderMapWithVaultSemantics } from './folder-map-semantic'
 import {
@@ -69,7 +70,11 @@ const folderMapProgressStyle: React.CSSProperties = {
   zIndex: 10
 }
 
-export function CanvasView(): React.ReactElement {
+export function CanvasView({
+  canvasId = DEFAULT_CANVAS_ID
+}: {
+  readonly canvasId?: string
+} = {}): React.ReactElement {
   const nodes = useCanvasStore((s) => s.nodes)
   const pendingFolderMap = useCanvasStore((s) => s.pendingFolderMap)
   const viewport = useCanvasStore((s) => s.viewport)
@@ -77,20 +82,22 @@ export function CanvasView(): React.ReactElement {
   const addNode = useCanvasStore((s) => s.addNode)
   const setViewport = useCanvasStore((s) => s.setViewport)
   const filePath = useCanvasStore((s) => s.filePath)
-  const isDirty = useCanvasStore((s) => s.isDirty)
-  const toCanvasFile = useCanvasStore((s) => s.toCanvasFile)
-  const markSaved = useCanvasStore((s) => s.markSaved)
   const addNodesAndEdges = useCanvasStore((s) => s.addNodesAndEdges)
   const cardContextMenu = useCanvasStore((s) => s.cardContextMenu)
   const setCardContextMenu = useCanvasStore((s) => s.setCardContextMenu)
   const splitFilePath = useCanvasStore((s) => s.splitFilePath)
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
   const commandStack = useRef(new CommandStack())
+  const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
+  const [importOpen, setImportOpen] = useState(false)
   const [folderMapProgress, setFolderMapProgress] = useState<FolderMapProgress | null>(null)
   const [previewPlan, setPreviewPlan] = useState<CanvasMutationPlan | null>(null)
   const ontology = useOntologyOrchestrator(commandStack)
   useAgentPlanListener()
+  useCanvasCardAddedListener(canvasId)
+  useCanvasFileLifecycle(canvasId)
+  useCanvasKeyboardShortcuts({ commandStack, containerRef, setImportOpen })
   const rawFileCount = useVaultStore((s) => s.rawFileCount)
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -126,57 +133,8 @@ export function CanvasView(): React.ReactElement {
   )
   const fileToId = useVaultStore((s) => s.fileToId)
   const artifactPathById = useVaultStore((s) => s.artifactPathById)
-  const loadCanvas = useCanvasStore((s) => s.loadCanvas)
-
-  // Load existing default canvas from .machina/ if one exists.
-  // The default canvas is a system file — never pollutes the vault root.
-  const didLoadCanvas = useRef(false)
-  useEffect(() => {
-    if (didLoadCanvas.current || filePath || !vaultPath) return
-    didLoadCanvas.current = true
-
-    void (async () => {
-      const defaultPath = `${vaultPath}/${TE_DIR}/canvas.json`
-      try {
-        const exists = await window.api.fs.fileExists(defaultPath)
-        if (exists) {
-          const raw = await window.api.fs.readFile(defaultPath)
-          const { deserializeCanvas } = await import('./canvas-io')
-          loadCanvas(defaultPath, deserializeCanvas(raw))
-        }
-        // If no file exists, canvas works in-memory until first content mutation
-      } catch {
-        // Non-fatal: canvas works without persistence
-      }
-    })()
-  }, [filePath, vaultPath, loadCanvas])
-
-  // Lazily create the canvas file on first content mutation (node or edge added).
-  // Viewport-only changes do not create the file.
-  const didEnsureFile = useRef(false)
-  const edges = useCanvasStore((s) => s.edges)
-  const hasContent = nodes.length > 0 || edges.length > 0
-  useEffect(() => {
-    if (didEnsureFile.current || filePath || !vaultPath || !hasContent) return
-    didEnsureFile.current = true
-
-    void (async () => {
-      const defaultPath = `${vaultPath}/${TE_DIR}/canvas.json`
-      try {
-        const { createCanvasFile } = await import('@shared/canvas-types')
-        const data = createCanvasFile()
-        await window.api.fs.writeFile(defaultPath, JSON.stringify(data, null, 2))
-        loadCanvas(defaultPath, { ...data, ...toCanvasFile() })
-      } catch {
-        // Non-fatal
-      }
-    })()
-  }, [filePath, vaultPath, hasContent, loadCanvas, toCanvasFile])
 
   // Track container size for viewport culling
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [importOpen, setImportOpen] = useState(false)
-
   // Track which filePath has already been auto-centered so we don't fight user panning
   const centeredForFileRef = useRef<string | null>(null)
 
@@ -392,127 +350,6 @@ export function CanvasView(): React.ReactElement {
     [addNodeWithUndo, nodes]
   )
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Focus Frames: Cmd+1-5 jump, Cmd+Shift+1-5 save
-      if (e.metaKey && e.key >= '1' && e.key <= '5') {
-        e.preventDefault()
-        if (e.shiftKey) {
-          useCanvasStore.getState().saveFocusFrame(e.key)
-        } else {
-          useCanvasStore.getState().jumpToFocusFrame(e.key)
-        }
-        return
-      }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const { selectedEdgeId, removeEdge, selectedNodeIds, removeNode, focusedTerminalId } =
-          useCanvasStore.getState()
-        // Don't delete while editing text or terminal is focused
-        if (focusedTerminalId) return
-        if (document.activeElement?.tagName === 'TEXTAREA') return
-        if (document.activeElement?.tagName === 'INPUT') return
-        if ((document.activeElement as HTMLElement)?.isContentEditable) return
-        if (document.activeElement?.closest('.cm-editor')) return
-
-        if (selectedEdgeId) {
-          removeEdge(selectedEdgeId)
-        }
-        if (selectedNodeIds.size > 0) {
-          for (const id of selectedNodeIds) {
-            removeNode(id)
-          }
-        }
-      }
-
-      // J/K spatial card cycling
-      if (e.key === 'j' || e.key === 'k') {
-        // Guard: don't fire in terminals, text inputs, or rich editors
-        if (useCanvasStore.getState().focusedTerminalId) return
-        if (document.activeElement?.tagName === 'TEXTAREA') return
-        if (document.activeElement?.tagName === 'INPUT') return
-        if ((document.activeElement as HTMLElement)?.isContentEditable) return
-
-        e.preventDefault()
-        if (e.key === 'j') {
-          useCanvasStore.getState().focusNextCard()
-        } else {
-          useCanvasStore.getState().focusPrevCard()
-        }
-      }
-
-      // Escape clears focus lock first, then keyboard focus
-      if (e.key === 'Escape') {
-        const { lockedCardId } = useCanvasStore.getState()
-        if (lockedCardId) {
-          useCanvasStore.getState().unlockCard()
-        } else {
-          useCanvasStore.getState().setFocusedCard(null)
-        }
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!e.metaKey) return
-      if (e.key === 'z' && !e.shiftKey) {
-        e.preventDefault()
-        void commandStack.current.undo()
-      } else if (e.key === 'z' && e.shiftKey) {
-        e.preventDefault()
-        void commandStack.current.redo()
-      } else if (e.key === 'g') {
-        if (
-          !containerRef.current?.contains(document.activeElement) &&
-          document.activeElement !== document.body
-        )
-          return
-        e.preventDefault()
-        setImportOpen(true)
-      } else if (e.key === 'e' && e.shiftKey) {
-        // CMD+Shift+E: toggle split editor
-        e.preventDefault()
-        const { splitFilePath: sp } = useCanvasStore.getState()
-        if (sp) {
-          useCanvasStore.getState().closeSplit()
-        } else {
-          // Open split with the focused card's file if available
-          const focusedId = useCanvasStore.getState().focusedCardId
-          const focusedNode = focusedId
-            ? useCanvasStore.getState().nodes.find((n) => n.id === focusedId)
-            : null
-          if (focusedNode?.content) {
-            useCanvasStore.getState().openSplit(focusedNode.content)
-          }
-        }
-      } else if (e.key === 'l' || e.key === 'L') {
-        e.preventDefault()
-        const vp = useCanvasStore.getState().viewport
-        const w = containerRef.current?.clientWidth ?? 1920
-        const h = containerRef.current?.clientHeight ?? 1080
-        const centerX = (-vp.x + w / 2) / vp.zoom
-        const centerY = (-vp.y + h / 2) / vp.zoom
-        if (e.shiftKey) {
-          // CMD+Shift+L: semantic organize by topic
-          const { artifacts, graph, fileToId } = useVaultStore.getState()
-          const fileToIdMap = new Map(Object.entries(fileToId))
-          const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
-          useCanvasStore
-            .getState()
-            .applySemanticLayout({ x: centerX, y: centerY }, fileToIdMap, artMap, graph.edges)
-        } else {
-          // CMD+L: grid-2x2 tile layout
-          useCanvasStore.getState().applyTileLayout('grid-2x2', { x: centerX, y: centerY })
-        }
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
   // Register centerOnNode bridge so external callers (e.g. command palette) can
   // focus a specific card by ID with smooth viewport centering.
   useEffect(() => {
@@ -531,17 +368,6 @@ export function CanvasView(): React.ReactElement {
     })
     return () => useCanvasStore.getState().setCenterOnNode(null)
   }, [containerSize])
-
-  // Auto-save debounce. CanvasView only mounts inside an active dock tab via
-  // DockTabContent, so we no longer need to gate on the legacy active-tab id.
-  useEffect(() => {
-    if (!filePath || !isDirty) return
-    const timer = setTimeout(async () => {
-      await saveCanvas(filePath, toCanvasFile())
-      markSaved()
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [filePath, isDirty, toCanvasFile, markSaved])
 
   // Folder-map: trigger analysis when a folder path is set.
   // We capture the path, clear pendingFolderMap immediately, and run the orchestrator.

@@ -67,7 +67,8 @@ describe('canvas:apply-plan IPC handler', () => {
           type: 'text',
           position: { x: 0, y: 0 },
           size: { width: 200, height: 100 },
-          text: 'Test node'
+          content: 'Test node',
+          metadata: {}
         }
       }
     ],
@@ -179,6 +180,50 @@ describe('canvas:apply-plan IPC handler', () => {
     )
 
     expect(result).toHaveProperty('error', 'validation-failed')
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('does not dispatch malformed add-node payloads with non-numeric geometry', async () => {
+    const mockSend = vi.fn()
+    const mockWindow = {
+      isDestroyed: () => false,
+      webContents: { send: mockSend }
+    }
+    mockGetMainWindow.mockReturnValue(mockWindow)
+
+    registerCanvasIpc()
+
+    const malformedPlan = {
+      ...testPlan,
+      ops: [
+        {
+          type: 'add-node',
+          node: {
+            id: 'node-bad',
+            type: 'text',
+            position: {},
+            size: {},
+            content: 'Broken node',
+            metadata: {}
+          }
+        }
+      ]
+    } as unknown as CanvasMutationPlan
+
+    const handler = getHandler('canvas:apply-plan')
+    const result = await handler(
+      {},
+      {
+        canvasPath: '/test/canvas.canvas',
+        expectedMtime: testMtime,
+        plan: malformedPlan
+      }
+    )
+
+    expect(result).toEqual({
+      error: 'validation-failed',
+      message: 'add-node: node.position.x must be a finite number'
+    })
     expect(mockSend).not.toHaveBeenCalled()
   })
 

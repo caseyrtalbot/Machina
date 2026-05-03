@@ -47,7 +47,7 @@ export function DockTabContent({ tab }: { readonly tab: DockTab }) {
 function renderTab(tab: DockTab) {
   switch (tab.kind) {
     case 'canvas':
-      return <LazyCanvasView />
+      return <LazyCanvasView canvasId={tab.id} />
     case 'editor':
       return <LazyEditorAdapter initialPath={tab.path} />
     case 'terminal':

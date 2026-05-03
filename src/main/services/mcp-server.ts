@@ -17,7 +17,8 @@ import type { VaultQueryFacade } from './vault-query-facade'
 import type { HitlGate } from './hitl-gate'
 import type { WriteRateLimiter } from './hitl-gate'
 import type { CanvasFile } from '@shared/canvas-types'
-import type { CanvasMutationOp, CanvasMutationPlan } from '@shared/canvas-mutation-types'
+import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
+import { validateCanvasMutationOps } from '@shared/canvas-mutation-validation'
 import { DEFAULT_PROJECT_MAP_OPTIONS, isBinaryPath } from '@shared/engine/project-map-types'
 import { buildProjectMapSnapshot, type FileInput } from '@shared/engine/project-map-analyzers'
 
@@ -59,40 +60,6 @@ function wrapSpotlighting(toolName: string, path: string, content: string): stri
     `  ${SPOTLIGHT_BOUNDARY}`,
     `</tool_result>`
   ].join('\n')
-}
-
-function validateCanvasOp(
-  op: CanvasMutationOp,
-  existingNodeIds: Set<string>,
-  addedNodeIds: Set<string>
-): string | null {
-  switch (op.type) {
-    case 'add-node':
-      if (!op.node.type || !op.node.position || !op.node.size)
-        return 'add-node: missing required fields'
-      if (existingNodeIds.has(op.node.id)) return `add-node: nodeId ${op.node.id} already exists`
-      if (addedNodeIds.has(op.node.id)) return `add-node: nodeId ${op.node.id} duplicated in plan`
-      addedNodeIds.add(op.node.id)
-      return null
-    case 'add-edge':
-      if (!existingNodeIds.has(op.edge.fromNode) && !addedNodeIds.has(op.edge.fromNode))
-        return `add-edge: fromNode ${op.edge.fromNode} not found`
-      if (!existingNodeIds.has(op.edge.toNode) && !addedNodeIds.has(op.edge.toNode))
-        return `add-edge: toNode ${op.edge.toNode} not found`
-      return null
-    case 'move-node':
-    case 'resize-node':
-    case 'update-metadata':
-      if (!existingNodeIds.has(op.nodeId)) return `${op.type}: nodeId ${op.nodeId} not found`
-      return null
-    case 'remove-node':
-      if (!existingNodeIds.has(op.nodeId)) return `remove-node: nodeId ${op.nodeId} not found`
-      return null
-    case 'remove-edge':
-      return null
-    default:
-      return 'unknown op type'
-  }
 }
 
 export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts): McpServer {
@@ -388,17 +355,16 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
 
         // Validate all ops
         const raw = await readFile(canvasPath, 'utf-8')
-        const file: CanvasFile = JSON.parse(raw)
-        const existingNodeIds = new Set(file.nodes.map((n) => n.id))
-        const addedNodeIds = new Set<string>()
-
-        for (const op of plan.ops as unknown as readonly CanvasMutationOp[]) {
-          const error = validateCanvasOp(op, existingNodeIds, addedNodeIds)
-          if (error) {
-            return {
-              content: [{ type: 'text' as const, text: `Validation failed: ${error}` }],
-              isError: true
-            }
+        const file = JSON.parse(raw) as Partial<CanvasFile>
+        const existingNodes = Array.isArray(file.nodes) ? file.nodes : []
+        const error = validateCanvasMutationOps(
+          plan.ops as unknown as CanvasMutationPlan['ops'],
+          existingNodes
+        )
+        if (error) {
+          return {
+            content: [{ type: 'text' as const, text: `Validation failed: ${error}` }],
+            isError: true
           }
         }
 

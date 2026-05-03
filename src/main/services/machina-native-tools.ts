@@ -5,6 +5,7 @@ import { glob } from 'glob'
 import type { ToolErrorCode } from '@shared/thread-types'
 import type { AgentNativeApprovalPreview } from '@shared/ipc-channels'
 import { createCanvasNode } from '@shared/canvas-types'
+import { TE_DIR } from '@shared/constants'
 
 const SEARCH_HIT_LIMIT = 200
 const SEARCH_PER_FILE_LIMIT = 20
@@ -106,6 +107,10 @@ interface SearchHit {
   readonly snippet: string
 }
 
+function normalizeSearchHitPath(p: string): string {
+  return p.replace(/^\.[/\\]/, '')
+}
+
 function searchWithRipgrep(
   query: string,
   paths: readonly string[],
@@ -149,7 +154,7 @@ function searchWithRipgrep(
           const text = ev.data.lines?.text ?? ''
           if (typeof p !== 'string' || typeof ln !== 'number') continue
           hits.push({
-            path: p,
+            path: normalizeSearchHitPath(p),
             line: ln,
             snippet: text.replace(/\n+$/, '').slice(0, SEARCH_SNIPPET_LEN)
           })
@@ -392,7 +397,8 @@ interface PinCardInput {
 }
 
 function canvasFilePath(vault: string, canvasId: string): string {
-  return path.join(vault, '.machina', 'canvas', `${canvasId}.json`)
+  if (canvasId === 'default') return path.join(vault, TE_DIR, 'canvas.json')
+  return path.join(vault, TE_DIR, 'canvas', `${canvasId}.json`)
 }
 
 async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToolResult> {
@@ -443,7 +449,7 @@ async function pinToCanvas(
   const next: CanvasFileShape = { ...canvas, nodes }
   try {
     await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
-    return { ok: true, output: { cardId: node.id, canvasId } }
+    return { ok: true, output: { cardId: node.id, canvasId, node } }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, error: { code: 'IO_FATAL', message } }

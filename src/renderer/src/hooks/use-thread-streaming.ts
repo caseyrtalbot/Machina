@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { CanvasNode } from '@shared/canvas-types'
 import type { ToolCall } from '@shared/thread-types'
 import { useThreadStore } from '../store/thread-store'
 
@@ -19,10 +20,14 @@ export function useThreadStreaming(): void {
       } else if (evt.kind === 'tool_call_persisted') {
         appendToolCall(evt.threadId, evt.call, evt.result)
         if (evt.call.kind === 'pin_to_canvas' && evt.result.ok) {
-          const out = evt.result.output as { cardId?: string } | null
+          const out = evt.result.output as { cardId?: string; node?: CanvasNode } | null
           window.dispatchEvent(
             new CustomEvent('machina:canvas:card-added', {
-              detail: { canvasId: evt.call.args.canvasId, cardId: out?.cardId ?? '' }
+              detail: {
+                canvasId: evt.call.args.canvasId,
+                cardId: out?.cardId ?? '',
+                node: out?.node
+              }
             })
           )
         }

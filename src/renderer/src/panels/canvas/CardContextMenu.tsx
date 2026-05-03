@@ -6,7 +6,6 @@ interface CardContextMenuProps {
   readonly y: number
   readonly onShowConnections: () => void
   readonly onOpenInEditor?: () => void
-  readonly onRunClaude?: () => void
   readonly onCopyPath: () => void
   readonly onClose: () => void
   readonly onQuickSaveText?: () => void
@@ -49,7 +48,6 @@ export function CardContextMenu({
   y,
   onShowConnections,
   onOpenInEditor,
-  onRunClaude,
   onCopyPath,
   onClose,
   onQuickSaveText,
@@ -124,15 +122,6 @@ export function CardContextMenu({
           label="Open in Editor"
           onClick={() => {
             onOpenInEditor()
-            onClose()
-          }}
-        />
-      )}
-      {onRunClaude && (
-        <MenuItem
-          label="Run Claude on this note"
-          onClick={() => {
-            onRunClaude()
             onClose()
           }}
         />

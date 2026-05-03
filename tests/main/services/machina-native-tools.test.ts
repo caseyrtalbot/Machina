@@ -742,9 +742,10 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       )
       expect(res.ok).toBe(true)
       if (res.ok) {
-        const out = res.output as { cardId: string; canvasId: string }
+        const out = res.output as { cardId: string; canvasId: string; node: { id: string } }
         expect(out.cardId).toMatch(/^cn_/)
         expect(out.canvasId).toBe('main')
+        expect(out.node.id).toBe(out.cardId)
       }
       const after = JSON.parse(
         readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
@@ -766,6 +767,29 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       expect(node.size.height).toBeGreaterThan(0)
       expect(node.content).toBe('Spark idea\n\nbody')
       expect(node.metadata.refs).toEqual(['notes/idea.md'])
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('maps canvasId default to the visible canvas file', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      mkdirSync(path.join(v, '.machina'), { recursive: true })
+      writeFileSync(path.join(v, '.machina', 'canvas.json'), JSON.stringify({ nodes: [] }))
+      const res = await callTool(
+        'pin_to_canvas',
+        { canvasId: 'default', card: { title: 'Visible pin' } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+
+      const after = JSON.parse(readFileSync(path.join(v, '.machina', 'canvas.json'), 'utf8')) as {
+        nodes: Array<{ content: string }>
+      }
+      expect(after.nodes).toHaveLength(1)
+      expect(after.nodes[0].content).toBe('Visible pin')
+      expect(existsSync(path.join(v, '.machina', 'canvas', 'default.json'))).toBe(false)
     } finally {
       rmSync(v, { recursive: true, force: true })
     }

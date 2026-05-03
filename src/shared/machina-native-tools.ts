@@ -111,7 +111,7 @@ export const EDIT_NOTE_TOOL: NativeToolSpec = {
 export const READ_CANVAS_TOOL: NativeToolSpec = {
   name: 'read_canvas',
   description:
-    'Read a canvas by id from .machina/canvas/<id>.json. Returns the cards and edges currently pinned to it. Errors with CANVAS_NOT_FOUND if the canvas does not exist.',
+    'Read a canvas by id. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns pinned cards and edges. Errors with CANVAS_NOT_FOUND if the canvas does not exist.',
   input_schema: {
     type: 'object',
     properties: {
@@ -124,7 +124,7 @@ export const READ_CANVAS_TOOL: NativeToolSpec = {
 export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
   name: 'pin_to_canvas',
   description:
-    'Pin a card to a canvas at .machina/canvas/<id>.json. Returns the new card id. Not subject to the approval gate; pinning is reversible.',
+    'Pin a card to a canvas. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the new card id. Not subject to the approval gate; pinning is reversible.',
   input_schema: {
     type: 'object',
     properties: {

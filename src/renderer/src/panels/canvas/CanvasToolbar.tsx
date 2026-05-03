@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useSettingsStore } from '../../store/settings-store'
-import { createCanvasNode } from '@shared/canvas-types'
-import { generateClaudeMd } from '../../engine/claude-md-template'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { colors, zIndex } from '../../design/tokens'
-import { useClaudeStatus } from '../../hooks/use-claude-status'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -118,7 +115,6 @@ export function CanvasToolbar({
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
-  const claudeStatus = useClaudeStatus()
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
   const zoomMenuRef = useRef<HTMLDivElement>(null)
@@ -238,74 +234,6 @@ export function CanvasToolbar({
         </button>
         <Tip label="Import notes" shortcut="⌘G" />
       </div>
-      <div className="canvas-toolbtn-wrap" style={{ position: 'relative' }}>
-        <button
-          onClick={async () => {
-            if (!claudeStatus.installed) return
-            const vaultPath = useVaultStore.getState().vaultPath
-            if (!vaultPath) return
-
-            const claudeMdPath = `${vaultPath}/CLAUDE.md`
-            const exists = await window.api.fs.fileExists(claudeMdPath)
-            if (!exists) {
-              const vaultName = vaultPath.split('/').pop() ?? 'Vault'
-              await window.api.fs.writeFile(claudeMdPath, generateClaudeMd(vaultName))
-            }
-
-            const vp = useCanvasStore.getState().viewport
-            const node = createCanvasNode(
-              'terminal',
-              { x: -vp.x + 200, y: -vp.y + 100 },
-              { metadata: { initialCommand: 'claude' } }
-            )
-            useCanvasStore.getState().addNode(node)
-          }}
-          className={`canvas-toolbtn ${claudeStatus.installed ? 'canvas-toolbtn--accent' : ''}`}
-          disabled={!claudeStatus.installed}
-          aria-label={
-            !claudeStatus.installed
-              ? 'Claude Code not installed'
-              : !claudeStatus.authenticated
-                ? 'Start Claude (not signed in)'
-                : 'Start Claude'
-          }
-          style={!claudeStatus.installed ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
-        >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
-          </svg>
-        </button>
-        {claudeStatus.installed && !claudeStatus.authenticated && (
-          <span
-            className="absolute rounded-full"
-            style={{
-              top: 2,
-              right: 2,
-              width: 6,
-              height: 6,
-              backgroundColor: colors.claude.warning
-            }}
-          />
-        )}
-        <Tip
-          label={
-            !claudeStatus.installed
-              ? 'Claude Code not installed'
-              : !claudeStatus.authenticated
-                ? 'Start Claude (not signed in)'
-                : 'Start Claude'
-          }
-        />
-      </div>
-
       <div className="canvas-toolrail__divider" />
 
       {/* VIEW: how am I seeing it */}
