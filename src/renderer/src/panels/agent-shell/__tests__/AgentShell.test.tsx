@@ -39,7 +39,8 @@ beforeEach(() => {
     },
     on: {
       agentNativeEvent: vi.fn().mockReturnValue(() => {}),
-      threadCliMessage: vi.fn().mockReturnValue(() => {})
+      threadCliMessage: vi.fn().mockReturnValue(() => {}),
+      agentNativeDockAction: vi.fn().mockReturnValue(() => {})
     }
   }
 })

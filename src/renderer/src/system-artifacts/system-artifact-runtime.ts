@@ -86,7 +86,7 @@ function upsertSystemFile(
 
 export function openArtifactInEditor(path: string, title?: string): void {
   useEditorStore.getState().openTab(path, title)
-  useThreadStore.getState().addDockTab({ kind: 'editor', path })
+  useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path })
 }
 
 export async function syncSystemArtifactFromDisk(path: string): Promise<SyncArtifactResult> {

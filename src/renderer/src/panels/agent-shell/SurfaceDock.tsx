@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { DockTabBar } from './DockTabBar'
 import { DockTabContent } from './DockTabContent'
@@ -12,6 +12,20 @@ const EMPTY_KIND_LIST = (() => {
 })()
 
 const EMPTY_TABS: readonly DockTab[] = []
+
+// Module-scoped identity for DockTab objects. WeakMap lets entries be garbage
+// collected when the tab object is dropped from the store, so this never grows.
+// Lives outside the component so render-time access is not a ref read.
+const tabIdMap = new WeakMap<DockTab, string>()
+let tabIdCounter = 0
+function tabIdentity(tab: DockTab): string {
+  const cached = tabIdMap.get(tab)
+  if (cached) return cached
+  tabIdCounter += 1
+  const id = `t${tabIdCounter}`
+  tabIdMap.set(tab, id)
+  return id
+}
 
 export interface SurfaceDockProps {
   readonly width?: number
@@ -46,37 +60,27 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
   )
   const safeIndex = storedActiveIndex < tabs.length ? storedActiveIndex : 0
   const active = tabs[safeIndex]
-  // Assign each tab object a stable identity so React keys survive reorders
-  // and we can keep previously-activated tabs mounted across switches.
-  const idMapRef = useRef<WeakMap<DockTab, string>>(new WeakMap())
-  const idCounterRef = useRef(0)
-  const tabId = (tab: DockTab): string => {
-    const map = idMapRef.current
-    let id = map.get(tab)
-    if (!id) {
-      idCounterRef.current += 1
-      id = `t${idCounterRef.current}`
-      map.set(tab, id)
-    }
-    return id
-  }
   // Track which tab ids have been activated so previously-loaded tabs stay
   // mounted across switches. Tabs not yet visited are skipped to avoid eager
   // loading of every kind. Trimmed to currently-open tabs to free state on close.
+  // Synced during render — React's recommended pattern for state derived from
+  // props, see https://react.dev/reference/react/useState#storing-information-from-previous-renders.
   const [mountedIds, setMountedIds] = useState<readonly string[]>(() =>
-    active ? [tabId(active)] : []
+    active ? [tabIdentity(active)] : []
   )
-  useEffect(() => {
-    const openIds = new Set(tabs.map(tabId))
-    const activeId = active ? tabId(active) : null
-    setMountedIds((prev) => {
-      const next = prev.filter((k) => openIds.has(k))
-      if (activeId && !next.includes(activeId)) next.push(activeId)
-      return next.length === prev.length && next.every((k, i) => k === prev[i]) ? prev : next
-    })
-    // tabId is stable per-tab object; safe to omit
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs, active])
+  const [syncSnapshot, setSyncSnapshot] = useState<{
+    readonly tabs: readonly DockTab[]
+    readonly active: DockTab | undefined
+  }>({ tabs, active })
+  if (syncSnapshot.tabs !== tabs || syncSnapshot.active !== active) {
+    setSyncSnapshot({ tabs, active })
+    const openIds = new Set(tabs.map(tabIdentity))
+    const activeId = active ? tabIdentity(active) : null
+    const next = mountedIds.filter((k) => openIds.has(k))
+    if (activeId && !next.includes(activeId)) next.push(activeId)
+    const changed = next.length !== mountedIds.length || !next.every((k, i) => k === mountedIds[i])
+    if (changed) setMountedIds(next)
+  }
 
   if (collapsed) return <aside data-testid="dock-collapsed" style={{ width: 0 }} />
   return (
@@ -93,7 +97,7 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
         {active ? (
           tabs.map((tab) => {
-            const key = tabId(tab)
+            const key = tabIdentity(tab)
             if (!mountedIds.includes(key)) return null
             const isActive = tab === active
             return (

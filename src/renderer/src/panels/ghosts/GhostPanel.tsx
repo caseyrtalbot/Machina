@@ -292,7 +292,7 @@ function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
   }, [ghost, artifacts, emerge, isEmerging])
 
   const handleShowGraph = useCallback(() => {
-    useThreadStore.getState().addDockTab({ kind: 'graph' })
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'graph' })
     useGraphViewStore.getState().setSelectedNode(ghost.id)
   }, [ghost.id])
 

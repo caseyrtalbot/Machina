@@ -52,7 +52,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: f.path,
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().addDockTab({ kind: 'editor', path: f.path })
+        useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: f.path })
       }
     })
   }
@@ -71,7 +71,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: 'dock surface',
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().addDockTab(s.tab)
+        useThreadStore.getState().openOrFocusDockTab(s.tab)
       }
     })
   }

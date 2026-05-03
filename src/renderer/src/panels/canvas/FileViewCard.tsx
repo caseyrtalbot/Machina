@@ -250,7 +250,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   // Double-click: open in editor
   const handleDoubleClick = useCallback(() => {
     useEditorStore.getState().openTab(filePath, filename)
-    useThreadStore.getState().addDockTab({ kind: 'editor', path: filePath })
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: filePath })
   }, [filePath, filename])
 
   const openInEditor = useCallback(() => {

@@ -35,7 +35,7 @@ export function ListVaultCard({
   function openInEditor(rel: string) {
     const vault = useVaultStore.getState().vaultPath
     if (!vault) return
-    useThreadStore.getState().addDockTab({ kind: 'editor', path: `${vault}/${rel}` })
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: `${vault}/${rel}` })
   }
 
   return (

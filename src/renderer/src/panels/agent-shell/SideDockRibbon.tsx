@@ -38,7 +38,7 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
   )
   const dockCollapsed = useThreadStore((s) => s.dockCollapsed)
   const toggleDock = useThreadStore((s) => s.toggleDock)
-  const addDockTab = useThreadStore((s) => s.addDockTab)
+  const openOrFocusDockTab = useThreadStore((s) => s.openOrFocusDockTab)
   const createThread = useThreadStore((s) => s.createThread)
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const cancelActive = useThreadStore((s) => s.cancelActive)
@@ -48,7 +48,7 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
   const [agentPickerOpen, setAgentPickerOpen] = useState(false)
 
   function openSurface(tab: DockTab) {
-    addDockTab(tab)
+    openOrFocusDockTab(tab)
   }
 
   async function pickAgent(agent: AgentIdentity) {

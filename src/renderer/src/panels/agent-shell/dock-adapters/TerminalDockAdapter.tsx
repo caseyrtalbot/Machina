@@ -30,10 +30,14 @@ export function TerminalDockAdapter({ sessionId }: { readonly sessionId: string 
   const webviewRef = useRef<Electron.WebviewTag | null>(null)
   const [failure, setFailure] = useState<LoadFailure | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
-
-  useEffect(() => {
+  // Reset stale failure during render when the webview navigates to a fresh
+  // URL or the user clicks reload. React's recommended pattern for prop-derived
+  // resets, avoiding the cascading-render warning of setState-in-effect.
+  const [resetKey, setResetKey] = useState({ src: webviewSrc, reloadKey })
+  if (resetKey.src !== webviewSrc || resetKey.reloadKey !== reloadKey) {
+    setResetKey({ src: webviewSrc, reloadKey })
     setFailure(null)
-  }, [webviewSrc, reloadKey])
+  }
 
   useEffect(() => {
     const el = webviewRef.current

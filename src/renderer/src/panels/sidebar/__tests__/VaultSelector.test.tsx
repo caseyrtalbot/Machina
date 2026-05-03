@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Mutable mock state
 // ---------------------------------------------------------------------------
 
-const mockAddDockTab = vi.fn()
+const mockOpenOrFocusDockTab = vi.fn()
 
 const mockHealthState = {
   status: 'green' as 'green' | 'degraded' | 'unknown',
@@ -33,14 +33,14 @@ vi.mock('../../../store/thread-store', () => ({
   useThreadStore: Object.assign(
     vi.fn((selector) =>
       selector({
-        addDockTab: mockAddDockTab,
+        openOrFocusDockTab: mockOpenOrFocusDockTab,
         removeDockTab: vi.fn(),
         reorderDockTab: vi.fn()
       })
     ),
     {
       getState: vi.fn(() => ({
-        addDockTab: mockAddDockTab,
+        openOrFocusDockTab: mockOpenOrFocusDockTab,
         removeDockTab: vi.fn(),
         reorderDockTab: vi.fn()
       }))
@@ -100,7 +100,7 @@ beforeEach(() => {
   mockHealthState.issues = []
   mockHealthState.lastDerivedAt = null
   mockHealthState.lastInfraAt = null
-  mockAddDockTab.mockClear()
+  mockOpenOrFocusDockTab.mockClear()
 })
 
 describe('VaultSelector health dot', () => {
@@ -155,7 +155,7 @@ describe('VaultSelector health dot', () => {
     const dot = screen.getByTestId('health-dot')
     fireEvent.click(dot)
 
-    expect(mockAddDockTab).toHaveBeenCalledWith({ kind: 'health' })
+    expect(mockOpenOrFocusDockTab).toHaveBeenCalledWith({ kind: 'health' })
   })
 
   it('clicking green dot is a no-op', async () => {
@@ -167,6 +167,6 @@ describe('VaultSelector health dot', () => {
     const dot = screen.getByTestId('health-dot')
     fireEvent.click(dot)
 
-    expect(mockAddDockTab).not.toHaveBeenCalled()
+    expect(mockOpenOrFocusDockTab).not.toHaveBeenCalled()
   })
 })

@@ -202,7 +202,7 @@ function IssueRow({ issue }: { readonly issue: HealthIssue }) {
   const handleFileClick = useCallback(() => {
     if (!issue.filePath) return
     useEditorStore.getState().setActiveNote(issue.filePath)
-    useThreadStore.getState().addDockTab({ kind: 'editor', path: issue.filePath })
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: issue.filePath })
   }, [issue.filePath])
 
   const fileName = issue.filePath?.split('/').pop() ?? null

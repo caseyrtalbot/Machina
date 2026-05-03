@@ -31,7 +31,7 @@ export function ReadNoteCard({
     const vault = useVaultStore.getState().vaultPath
     if (!vault) return
     const fullPath = call.args.path.startsWith('/') ? call.args.path : `${vault}/${call.args.path}`
-    useThreadStore.getState().addDockTab({ kind: 'editor', path: fullPath })
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: fullPath })
   }
 
   return (

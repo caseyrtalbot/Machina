@@ -9,6 +9,8 @@ export interface VaultMachinaConfig {
   sidebarWidth?: number
   /** Pixel width of the surface dock. Optional for back-compat. */
   dockWidth?: number
+  /** Whether the surface dock starts collapsed. Persisted across restart. */
+  dockCollapsed?: boolean
 }
 
 export const DEFAULT_VAULT_MACHINA_CONFIG: VaultMachinaConfig = {

@@ -46,7 +46,7 @@ function HealthDot() {
 
   const handleClick = () => {
     if (status !== 'green') {
-      useThreadStore.getState().addDockTab({ kind: 'health' })
+      useThreadStore.getState().openOrFocusDockTab({ kind: 'health' })
     }
   }
 

@@ -109,14 +109,14 @@ export function GraphDetailDrawer() {
   const handleOpenInEditor = () => {
     if (!artifact || !filePath) return
     useEditorStore.getState().setActiveNote(filePath)
-    useThreadStore.getState().addDockTab({ kind: 'editor', path: filePath })
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: filePath })
   }
 
   const handleNavigateBacklink = (id: string) => {
     const path = artifactPathById[id]
     if (path) {
       useEditorStore.getState().setActiveNote(path)
-      useThreadStore.getState().addDockTab({ kind: 'editor', path })
+      useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path })
     }
   }
 

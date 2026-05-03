@@ -54,12 +54,12 @@ vi.mock('../../../store/thread-store', () => ({
   useThreadStore: Object.assign(
     vi.fn((selector) =>
       selector({
-        addDockTab: vi.fn()
+        openOrFocusDockTab: vi.fn()
       })
     ),
     {
       getState: vi.fn(() => ({
-        addDockTab: vi.fn()
+        openOrFocusDockTab: vi.fn()
       }))
     }
   )
@@ -245,14 +245,14 @@ describe('HealthPanel', () => {
     expect(screen.getByText('Stale worker index')).toBeDefined()
   })
 
-  it('clicking file link calls setActiveNote and adds an editor dock tab', async () => {
+  it('clicking file link calls setActiveNote and opens an editor dock tab', async () => {
     const now = Date.now()
-    const mockAddDockTab = vi.fn()
+    const mockOpenOrFocus = vi.fn()
     const mockSetActiveNote = vi.fn()
 
     const { useThreadStore } = await import('../../../store/thread-store')
     ;(useThreadStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-      addDockTab: mockAddDockTab
+      openOrFocusDockTab: mockOpenOrFocus
     })
 
     const { useEditorStore } = await import('../../../store/editor-store')
@@ -282,7 +282,7 @@ describe('HealthPanel', () => {
     fireEvent.click(fileLink)
 
     expect(mockSetActiveNote).toHaveBeenCalledWith('/vault/broken.md')
-    expect(mockAddDockTab).toHaveBeenCalledWith({ kind: 'editor', path: '/vault/broken.md' })
+    expect(mockOpenOrFocus).toHaveBeenCalledWith({ kind: 'editor', path: '/vault/broken.md' })
   })
 
   it('refresh button disables for 500ms after click', async () => {
