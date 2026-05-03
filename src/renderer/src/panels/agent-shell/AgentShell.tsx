@@ -6,6 +6,7 @@ import { ThreadSidebar } from './ThreadSidebar'
 import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
+import { SideDockRibbon } from './SideDockRibbon'
 import { ResizeHandle } from './ResizeHandle'
 import { useAgentShellKeybindings } from './keybindings'
 import { borderRadius, colors, typography } from '../../design/tokens'
@@ -77,6 +78,7 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
           onCommit={() => void persistLayout()}
         />
         <ThreadPanel />
+        <SideDockRibbon onOpenPalette={openPalette} onOpenSettings={onOpenSettings} />
         {!dockCollapsed && (
           <ResizeHandle
             side="dock"

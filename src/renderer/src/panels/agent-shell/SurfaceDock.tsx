@@ -16,12 +16,17 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
   const tabs = useThreadStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
   const collapsed = useThreadStore((s) => s.dockCollapsed)
   const [activeIndex, setActiveIndex] = useState(0)
-  // Reset active tab on thread switch using the render-time prev-state pattern
-  // required by the react-hooks/set-state-in-effect lint rule.
-  const [prevId, setPrevId] = useState(id)
-  if (id !== prevId) {
-    setPrevId(id)
+  // Keep tab activation in render-time state transitions so command-palette and
+  // ribbon-opened tabs become visible without a follow-up click.
+  const [prevDockSnapshot, setPrevDockSnapshot] = useState({ id, length: tabs.length })
+  if (id !== prevDockSnapshot.id) {
+    setPrevDockSnapshot({ id, length: tabs.length })
     setActiveIndex(0)
+  } else if (tabs.length > prevDockSnapshot.length) {
+    setPrevDockSnapshot({ id, length: tabs.length })
+    setActiveIndex(tabs.length - 1)
+  } else if (tabs.length !== prevDockSnapshot.length) {
+    setPrevDockSnapshot({ id, length: tabs.length })
   }
   if (collapsed) return <aside data-testid="dock-collapsed" style={{ width: 0 }} />
   const safeIndex = activeIndex < tabs.length ? activeIndex : 0

@@ -71,6 +71,7 @@
     "electron-store": "^11.0.2",
     "gray-matter": "^4.0.3",
     "ignore": "^7.0.5",
+    "lucide-react": "^1.14.0",
     "markdown-it": "^14.1.1",
     "mermaid": "^11.13.0",
     "minisearch": "^7.2.0",

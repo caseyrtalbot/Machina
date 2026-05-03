@@ -415,6 +415,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const id = get().activeThreadId
     if (!id) return
     set((s) => ({
+      dockCollapsed: false,
       dockTabsByThreadId: {
         ...s.dockTabsByThreadId,
         [id]: [...(s.dockTabsByThreadId[id] ?? []), tab]
