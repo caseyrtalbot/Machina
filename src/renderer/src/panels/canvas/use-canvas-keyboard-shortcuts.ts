@@ -1,7 +1,8 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import type { CommandStack } from './canvas-commands'
+import { createNoteAtCursor } from './create-note-at-cursor'
 
 interface CanvasKeyboardShortcutOptions {
   readonly commandStack: { readonly current: CommandStack }
@@ -28,11 +29,46 @@ function viewportCenter(containerRef: RefObject<HTMLElement | null>): { x: numbe
   }
 }
 
+function noteAnchorPosition(
+  containerRef: RefObject<HTMLElement | null>,
+  lastMouseClient: { x: number; y: number } | null
+): { x: number; y: number } {
+  const el = containerRef.current
+  if (!el || !lastMouseClient) return viewportCenter(containerRef)
+  const rect = el.getBoundingClientRect()
+  if (
+    lastMouseClient.x < rect.left ||
+    lastMouseClient.x > rect.right ||
+    lastMouseClient.y < rect.top ||
+    lastMouseClient.y > rect.bottom
+  ) {
+    return viewportCenter(containerRef)
+  }
+  const vp = useCanvasStore.getState().viewport
+  return {
+    x: (lastMouseClient.x - rect.left - vp.x) / vp.zoom,
+    y: (lastMouseClient.y - rect.top - vp.y) / vp.zoom
+  }
+}
+
 export function useCanvasKeyboardShortcuts({
   commandStack,
   containerRef,
   setImportOpen
 }: CanvasKeyboardShortcutOptions): void {
+  // Track last mouse position over the canvas container so `n` anchors the new
+  // note to where the cursor actually is, not the viewport center.
+  const lastMouseClientRef = useRef<{ x: number; y: number } | null>(null)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const handler = (e: MouseEvent) => {
+      lastMouseClientRef.current = { x: e.clientX, y: e.clientY }
+    }
+    el.addEventListener('mousemove', handler)
+    return () => el.removeEventListener('mousemove', handler)
+  }, [containerRef])
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey && e.key >= '1' && e.key <= '5') {
@@ -67,6 +103,13 @@ export function useCanvasKeyboardShortcuts({
         }
       }
 
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isEditingSurfaceActive()) return
+        e.preventDefault()
+        const position = noteAnchorPosition(containerRef, lastMouseClientRef.current)
+        void createNoteAtCursor(position)
+      }
+
       if (e.key === 'Escape') {
         const { lockedCardId } = useCanvasStore.getState()
         if (lockedCardId) {
@@ -78,7 +121,7 @@ export function useCanvasKeyboardShortcuts({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [containerRef])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
