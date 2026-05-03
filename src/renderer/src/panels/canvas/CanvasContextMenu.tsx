@@ -1,4 +1,19 @@
 import { useEffect, useRef } from 'react'
+import {
+  Code2,
+  FileBox,
+  FileText,
+  Folder,
+  Hash,
+  Image as ImageIcon,
+  Network,
+  StickyNote,
+  Terminal,
+  TerminalSquare,
+  Type,
+  Zap,
+  type LucideIcon
+} from 'lucide-react'
 import { colors } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNodeType, type CanvasNode } from '@shared/canvas-types'
 
@@ -13,12 +28,34 @@ interface CanvasContextMenuProps {
   readonly onClose: () => void
 }
 
-// Group card types by category for the menu
 const MENU_SECTIONS: { label: string; category: 'content' | 'media' | 'tools' }[] = [
   { label: 'Content', category: 'content' },
   { label: 'Media', category: 'media' },
   { label: 'Tools', category: 'tools' }
 ]
+
+const TYPE_ICON: Record<CanvasNodeType, LucideIcon> = {
+  text: Type,
+  code: Code2,
+  markdown: Hash,
+  note: StickyNote,
+  image: ImageIcon,
+  terminal: Terminal,
+  pdf: FileText,
+  'project-file': FileBox,
+  'system-artifact': Network,
+  'file-view': FileText,
+  'project-folder': Folder,
+  'terminal-block': TerminalSquare
+}
+
+// Single source of truth for canvas-menu shortcuts. Anything listed here must
+// also be wired in use-canvas-keyboard-shortcuts.ts so the hint isn't a lie.
+const TYPE_SHORTCUT: Partial<Record<CanvasNodeType, string>> = {
+  note: 'N'
+}
+
+const ICON_PX = 14
 
 export function CanvasContextMenu({
   x,
@@ -43,7 +80,7 @@ export function CanvasContextMenu({
     accept: string,
     type: CanvasNodeType,
     buildMeta: (path: string, name: string) => Record<string, unknown>
-  ) => {
+  ): void => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = accept
@@ -58,6 +95,45 @@ export function CanvasContextMenu({
     input.click()
   }
 
+  const renderRow = (
+    Icon: LucideIcon,
+    label: string,
+    shortcut: string | undefined,
+    onClick: () => void,
+    key: string
+  ): React.ReactElement => (
+    <button
+      key={key}
+      onClick={onClick}
+      className="w-full text-left px-3 py-1 text-xs grid items-center gap-2 transition-colors"
+      style={{
+        color: colors.text.primary,
+        gridTemplateColumns: `${ICON_PX + 4}px 1fr auto`
+      }}
+      onMouseEnter={(e) => {
+        ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
+      }}
+      onMouseLeave={(e) => {
+        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+      }}
+    >
+      <Icon size={ICON_PX} strokeWidth={1.75} style={{ color: colors.text.secondary }} />
+      <span>{label}</span>
+      <span
+        className="font-mono"
+        style={{
+          color: colors.text.muted,
+          fontSize: 10,
+          letterSpacing: 0.3,
+          minWidth: 16,
+          textAlign: 'right'
+        }}
+      >
+        {shortcut ?? ''}
+      </span>
+    </button>
+  )
+
   return (
     <div
       ref={ref}
@@ -69,7 +145,7 @@ export function CanvasContextMenu({
         backgroundColor: colors.bg.elevated,
         borderColor: colors.border.default,
         borderRadius: 8,
-        minWidth: 180,
+        minWidth: 220,
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)'
@@ -90,49 +166,27 @@ export function CanvasContextMenu({
             <div className="px-3 py-0.5 text-xs font-medium" style={{ color: colors.text.muted }}>
               {section.label}
             </div>
-            {types.map(([type, info]) => (
-              <button
-                key={type}
-                onClick={() => {
-                  if (type === 'image') {
-                    handleFilePickerAdd('image/*', 'image', (path, name) => ({
-                      src: path,
-                      alt: name
-                    }))
-                  } else if (type === 'pdf') {
-                    handleFilePickerAdd('.pdf,application/pdf', 'pdf', (path) => ({
-                      src: path,
-                      pageCount: 0,
-                      currentPage: 1
-                    }))
-                  } else {
-                    onAddCard(type)
-                  }
-                }}
-                className="w-full text-left px-3 py-1 text-xs flex items-center gap-1.5 transition-colors"
-                style={{ color: colors.text.primary }}
-                onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
-                }}
-              >
-                <span
-                  className="inline-flex items-center justify-center text-xs font-mono"
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 4,
-                    backgroundColor: colors.bg.surface,
-                    color: colors.text.secondary
-                  }}
-                >
-                  {info.icon}
-                </span>
-                {info.label}
-              </button>
-            ))}
+            {types.map(([type, info]) => {
+              const Icon = TYPE_ICON[type]
+              const shortcut = TYPE_SHORTCUT[type]
+              const handle = (): void => {
+                if (type === 'image') {
+                  handleFilePickerAdd('image/*', 'image', (path, name) => ({
+                    src: path,
+                    alt: name
+                  }))
+                } else if (type === 'pdf') {
+                  handleFilePickerAdd('.pdf,application/pdf', 'pdf', (path) => ({
+                    src: path,
+                    pageCount: 0,
+                    currentPage: 1
+                  }))
+                } else {
+                  onAddCard(type)
+                }
+              }
+              return renderRow(Icon, info.label, shortcut, handle, type)
+            })}
           </div>
         )
       })}
@@ -145,34 +199,16 @@ export function CanvasContextMenu({
               margin: '4px 8px'
             }}
           />
-          <button
-            onClick={() => {
+          {renderRow(
+            Zap,
+            'Spawn Claude Session',
+            undefined,
+            () => {
               onSpawnAgent()
               onClose()
-            }}
-            className="w-full text-left px-3 py-1 text-xs flex items-center gap-1.5 transition-colors"
-            style={{ color: colors.text.primary }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
-            }}
-          >
-            <span
-              className="inline-flex items-center justify-center text-xs font-mono"
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 4,
-                backgroundColor: colors.bg.surface,
-                color: colors.text.secondary
-              }}
-            >
-              {'⚡'}
-            </span>
-            Spawn Claude Session
-          </button>
+            },
+            'spawn-agent'
+          )}
         </>
       )}
     </div>
