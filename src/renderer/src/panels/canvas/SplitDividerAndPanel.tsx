@@ -15,7 +15,7 @@ export function SplitDividerAndPanel({ filePath }: { readonly filePath: string }
     const onMove = (e: MouseEvent) => {
       if (!dragging.current) return
       const fromRight = window.innerWidth - e.clientX
-      setWidth(Math.max(250, Math.min(fromRight, window.innerWidth - 500)))
+      setWidth(Math.max(200, Math.min(fromRight, window.innerWidth - 240)))
     }
 
     const onUp = () => {

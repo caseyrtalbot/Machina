@@ -98,11 +98,11 @@ const initial = {
   dockWidth: 480
 }
 
-/** Sidebar pixel bounds. Min lets two columns of metadata + pill fit. */
-const SIDEBAR_MIN = 200
-/** Dock pixel bounds. Min lets the tab strip + a useful panel render. */
-const DOCK_MIN = 280
-const PANE_MAX_RATIO = 0.7
+/** Sidebar pixel bounds. Min lets a single mono label + pill ellipsize cleanly. */
+const SIDEBAR_MIN = 160
+/** Dock pixel bounds. Min lets the tab strip + a narrow surface render. */
+const DOCK_MIN = 240
+const PANE_MAX_RATIO = 0.85
 
 function clampPaneWidth(w: number, min: number): number {
   const innerWidth = typeof window === 'undefined' ? 1920 : window.innerWidth

@@ -45,7 +45,7 @@ export function ThreadPanel() {
       <section
         style={{
           flex: 1,
-          minWidth: 480,
+          minWidth: 320,
           padding: 24,
           color: colors.text.muted,
           background: colors.bg.base
@@ -62,7 +62,7 @@ export function ThreadPanel() {
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
-        minWidth: 480,
+        minWidth: 320,
         height: '100%',
         background: colors.bg.base
       }}
