@@ -124,7 +124,7 @@ export const READ_CANVAS_TOOL: NativeToolSpec = {
 export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
   name: 'pin_to_canvas',
   description:
-    'Pin a card to a canvas. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the new card id. Not subject to the approval gate; pinning is reversible.',
+    'Pin a card to a canvas. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the new card id. Not subject to the approval gate; pinning is reversible via unpin_from_canvas.',
   input_schema: {
     type: 'object',
     properties: {
@@ -148,6 +148,56 @@ export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
       }
     },
     required: ['canvasId', 'card']
+  }
+}
+
+export const UNPIN_FROM_CANVAS_TOOL: NativeToolSpec = {
+  name: 'unpin_from_canvas',
+  description:
+    'Remove a previously-pinned card from a canvas by card id. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the removed card id. Errors with CANVAS_NOT_FOUND if the canvas is missing or CARD_NOT_FOUND if no card with that id exists. Not subject to the approval gate.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      canvasId: { type: 'string', description: 'Canvas id (basename without extension).' },
+      cardId: {
+        type: 'string',
+        description: 'Card id returned by pin_to_canvas (e.g. "cn_…").'
+      }
+    },
+    required: ['canvasId', 'cardId']
+  }
+}
+
+export const LIST_CANVASES_TOOL: NativeToolSpec = {
+  name: 'list_canvases',
+  description:
+    'List all canvases in the vault by id. Always includes "default" if the visible main canvas exists, plus any canvases stored under the app canvas directory. Returns an array of { canvasId, cardCount }.',
+  input_schema: {
+    type: 'object',
+    properties: {},
+    required: []
+  }
+}
+
+export const FOCUS_CANVAS_TOOL: NativeToolSpec = {
+  name: 'focus_canvas',
+  description:
+    'Set the persisted viewport of a canvas so it pans/zooms to the given coordinates the next time it is opened. Use canvasId "default" for the visible main canvas. Note: when the canvas is currently open in the dock, the renderer owns viewport state until the canvas is reopened — agents pinning a card and immediately calling focus_canvas should rely on the user re-opening the canvas to see the new viewport. Returns the applied viewport.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      canvasId: { type: 'string', description: 'Canvas id (basename without extension).' },
+      viewport: {
+        type: 'object',
+        properties: {
+          x: { type: 'number' },
+          y: { type: 'number' },
+          zoom: { type: 'number' }
+        },
+        required: ['x', 'y', 'zoom']
+      }
+    },
+    required: ['canvasId', 'viewport']
   }
 }
 
@@ -206,6 +256,9 @@ export const NATIVE_TOOLS: readonly NativeToolSpec[] = [
   EDIT_NOTE_TOOL,
   READ_CANVAS_TOOL,
   PIN_TO_CANVAS_TOOL,
+  UNPIN_FROM_CANVAS_TOOL,
+  LIST_CANVASES_TOOL,
+  FOCUS_CANVAS_TOOL,
   OPEN_DOCK_TAB_TOOL,
   CLOSE_DOCK_TAB_TOOL
 ]

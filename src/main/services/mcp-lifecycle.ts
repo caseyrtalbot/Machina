@@ -52,10 +52,10 @@ export class McpLifecycle implements McpStatusProvider {
     const gate = new TimeoutHitlGate(new ElectronHitlGate())
     const rateLimiter = new WriteRateLimiter()
 
-    const dispatchCanvasPlan = (plan: CanvasMutationPlan): void => {
+    const dispatchCanvasPlan = (plan: CanvasMutationPlan, canvasPath: string): void => {
       const window = getMainWindow()
       if (window) {
-        typedSend(window, 'canvas:agent-plan-accepted', { plan })
+        typedSend(window, 'canvas:agent-plan-accepted', { plan, canvasPath })
       }
     }
 

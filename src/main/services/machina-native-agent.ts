@@ -103,6 +103,33 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
     return { id, kind: 'read_canvas', args: { canvasId: input.canvasId } }
   }
   if (
+    name === 'unpin_from_canvas' &&
+    typeof input.canvasId === 'string' &&
+    typeof input.cardId === 'string'
+  ) {
+    return {
+      id,
+      kind: 'unpin_from_canvas',
+      args: { canvasId: input.canvasId, cardId: input.cardId }
+    }
+  }
+  if (name === 'list_canvases') {
+    return { id, kind: 'list_canvases', args: {} }
+  }
+  if (name === 'focus_canvas' && typeof input.canvasId === 'string') {
+    const rawVp = input.viewport
+    if (rawVp && typeof rawVp === 'object') {
+      const vp = rawVp as Record<string, unknown>
+      if (typeof vp.x === 'number' && typeof vp.y === 'number' && typeof vp.zoom === 'number') {
+        return {
+          id,
+          kind: 'focus_canvas',
+          args: { canvasId: input.canvasId, viewport: { x: vp.x, y: vp.y, zoom: vp.zoom } }
+        }
+      }
+    }
+  }
+  if (
     name === 'pin_to_canvas' &&
     typeof input.canvasId === 'string' &&
     input.card &&
@@ -235,6 +262,10 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
               else if (action.action === 'close')
                 dockTabs = dockTabs.filter((_, i) => i !== action.index)
               emitDockAction(opts.threadId, action)
+            },
+            dispatchCanvasPlan: (plan, canvasPath) => {
+              const window = getMainWindow()
+              if (window) typedSend(window, 'canvas:agent-plan-accepted', { plan, canvasPath })
             },
             signal: abort.signal
           })

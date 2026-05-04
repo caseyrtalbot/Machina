@@ -130,8 +130,12 @@ describe('canvas:apply-plan IPC handler', () => {
       }
     )
 
-    // Verify typedSend dispatched the plan event
-    expect(mockSend).toHaveBeenCalledWith('canvas:agent-plan-accepted', { plan: testPlan })
+    // Verify typedSend dispatched the plan event with the canvasPath so the
+    // renderer can gate apply on the currently loaded canvas.
+    expect(mockSend).toHaveBeenCalledWith('canvas:agent-plan-accepted', {
+      plan: testPlan,
+      canvasPath: '/test/canvas.canvas'
+    })
   })
 
   it('does not throw when no main window is available', async () => {

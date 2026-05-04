@@ -52,6 +52,13 @@ export type ToolCall =
   | { id: string; kind: 'list_vault'; args: { globs?: string[] } }
   | { id: string; kind: 'search_vault'; args: { query: string; paths?: string[] } }
   | { id: string; kind: 'pin_to_canvas'; args: PinToCanvasArgs }
+  | { id: string; kind: 'unpin_from_canvas'; args: { canvasId: string; cardId: string } }
+  | { id: string; kind: 'list_canvases'; args: Record<string, never> }
+  | {
+      id: string
+      kind: 'focus_canvas'
+      args: { canvasId: string; viewport: { x: number; y: number; zoom: number } }
+    }
   | { id: string; kind: 'read_canvas'; args: { canvasId: string } }
   | { id: string; kind: 'cli_command'; args: { command: string; cwd: string } }
   | { id: string; kind: `cli_${string}_${string}`; args: Record<string, unknown> }
@@ -75,5 +82,6 @@ export type ToolErrorCode =
   | 'EDIT_FIND_NOT_UNIQUE'
   | 'EDIT_FIND_NOT_FOUND'
   | 'CANVAS_NOT_FOUND'
+  | 'CARD_NOT_FOUND'
   | 'IO_TRANSIENT'
   | 'IO_FATAL'

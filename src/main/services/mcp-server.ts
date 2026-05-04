@@ -25,7 +25,7 @@ import { buildProjectMapSnapshot, type FileInput } from '@shared/engine/project-
 export interface McpServerOpts {
   readonly gate?: HitlGate
   readonly rateLimiter?: WriteRateLimiter
-  readonly dispatchCanvasPlan?: (plan: CanvasMutationPlan) => void
+  readonly dispatchCanvasPlan?: (plan: CanvasMutationPlan, canvasPath: string) => void
 }
 
 /**
@@ -388,7 +388,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         rateLimiter?.record()
 
         // Ops validated by validateCanvasOp loop above; cast is safe post-validation
-        opts?.dispatchCanvasPlan?.(plan as unknown as CanvasMutationPlan)
+        opts?.dispatchCanvasPlan?.(plan as unknown as CanvasMutationPlan, canvasPath)
 
         return {
           content: [

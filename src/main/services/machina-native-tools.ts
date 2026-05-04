@@ -6,7 +6,9 @@ import type { ToolErrorCode } from '@shared/thread-types'
 import type { AgentNativeApprovalPreview, DockAction } from '@shared/ipc-channels'
 import type { DockTab, DockTabKind } from '@shared/dock-types'
 import { createCanvasNode } from '@shared/canvas-types'
+import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import { TE_DIR } from '@shared/constants'
+import { enqueueCanvasWrite } from './canvas-write-queue'
 
 const SEARCH_HIT_LIMIT = 200
 const SEARCH_PER_FILE_LIMIT = 20
@@ -54,6 +56,13 @@ export interface ToolContext {
   readonly dockTabsSnapshot?: readonly DockTab[]
   /** Drive the renderer's surface dock from the agent. */
   readonly emitDockAction?: (action: DockAction) => void
+  /** Push canvas mutations to the renderer's in-memory store after an
+   * agent tool writes the canvas file directly. Without this bridge,
+   * the renderer's debounced autosave would later overwrite the disk
+   * with stale in-memory state, silently dropping the agent's write.
+   * The renderer applies the plan only when canvasPath matches the
+   * currently loaded canvas. */
+  readonly dispatchCanvasPlan?: (plan: CanvasMutationPlan, canvasPath: string) => void
   /** Aborted when the agent run is cancelled. Long-running tools (search_vault,
    * pin_to_canvas) check or wire this to short-circuit instead of running to
    * completion after the user has already pressed Stop. */
@@ -516,6 +525,27 @@ function canvasFilePath(vault: string, canvasId: string): string {
   return path.join(vault, TE_DIR, 'canvas', `${canvasId}.json`)
 }
 
+function buildAgentPlan(
+  ops: CanvasMutationPlan['ops'],
+  summary: CanvasMutationPlan['summary']
+): CanvasMutationPlan {
+  return {
+    id: `plan_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    operationId: `agent_${Date.now().toString(36)}`,
+    source: 'agent',
+    ops,
+    summary
+  }
+}
+
+const EMPTY_PLAN_SUMMARY: CanvasMutationPlan['summary'] = {
+  addedNodes: 0,
+  addedEdges: 0,
+  movedNodes: 0,
+  skippedFiles: 0,
+  unresolvedRefs: 0
+}
+
 async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToolResult> {
   const file = canvasFilePath(ctx.vaultPath, canvasId)
   try {
@@ -538,24 +568,6 @@ async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToo
     }
     return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
   }
-}
-
-// Per-canvas write queue. Concurrent pin_to_canvas calls would otherwise read
-// the same disk state, mutate independent in-memory copies, and have the
-// later write clobber the earlier one. Chaining writes through one promise
-// per canvas file makes the read-modify-write atomic from the agent side.
-const canvasWriteQueues = new Map<string, Promise<unknown>>()
-
-function enqueueCanvasWrite<T>(file: string, task: () => Promise<T>): Promise<T> {
-  const prev = canvasWriteQueues.get(file) ?? Promise.resolve()
-  const next = prev.then(task, task)
-  canvasWriteQueues.set(
-    file,
-    next.finally(() => {
-      if (canvasWriteQueues.get(file) === next) canvasWriteQueues.delete(file)
-    })
-  )
-  return next
 }
 
 async function pinToCanvas(
@@ -586,7 +598,141 @@ async function pinToCanvas(
     const next: CanvasFileShape = { ...canvas, nodes }
     try {
       await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      ctx.dispatchCanvasPlan?.(
+        buildAgentPlan([{ type: 'add-node', node }], { ...EMPTY_PLAN_SUMMARY, addedNodes: 1 }),
+        file
+      )
       return { ok: true, output: { cardId: node.id, canvasId, node } }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, error: { code: 'IO_FATAL', message } }
+    }
+  })
+}
+
+async function unpinFromCanvas(
+  canvasId: string,
+  cardId: string,
+  ctx: ToolContext
+): Promise<NativeToolResult> {
+  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  return enqueueCanvasWrite(file, async () => {
+    let canvas: CanvasFileShape
+    try {
+      canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException
+      if (e.code === 'ENOENT') {
+        return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+      }
+      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+    }
+    const nodes = Array.isArray(canvas.nodes) ? canvas.nodes : []
+    const idx = nodes.findIndex(
+      (n): n is { id: string } =>
+        n != null &&
+        typeof n === 'object' &&
+        typeof (n as { id?: unknown }).id === 'string' &&
+        (n as { id: string }).id === cardId
+    )
+    if (idx === -1) {
+      return { ok: false, error: { code: 'CARD_NOT_FOUND', message: cardId } }
+    }
+    const nextNodes = [...nodes.slice(0, idx), ...nodes.slice(idx + 1)]
+    // Drop edges that reference the removed card so the file stays consistent.
+    const edges = Array.isArray(canvas.edges) ? canvas.edges : []
+    const nextEdges = edges.filter((e) => {
+      if (!e || typeof e !== 'object') return true
+      const rec = e as Record<string, unknown>
+      return rec.from !== cardId && rec.to !== cardId
+    })
+    const next: CanvasFileShape = { ...canvas, nodes: nextNodes, edges: nextEdges }
+    try {
+      await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      // remove-node in applyPlanOps cascades to drop matching edges, so we
+      // do not need to enumerate removed edges in the plan ops.
+      ctx.dispatchCanvasPlan?.(
+        buildAgentPlan([{ type: 'remove-node', nodeId: cardId }], EMPTY_PLAN_SUMMARY),
+        file
+      )
+      return { ok: true, output: { cardId, canvasId } }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, error: { code: 'IO_FATAL', message } }
+    }
+  })
+}
+
+async function listCanvases(ctx: ToolContext): Promise<NativeToolResult> {
+  interface CanvasEntry {
+    canvasId: string
+    cardCount: number
+  }
+  const entries: CanvasEntry[] = []
+
+  async function countNodes(file: string): Promise<number | null> {
+    try {
+      const raw = await fs.readFile(file, 'utf8')
+      const parsed = JSON.parse(raw) as CanvasFileShape
+      return Array.isArray(parsed.nodes) ? parsed.nodes.length : 0
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException
+      if (e.code === 'ENOENT') return null
+      // Treat unreadable canvases as 0 cards rather than failing the whole list.
+      return 0
+    }
+  }
+
+  const defaultFile = path.join(ctx.vaultPath, TE_DIR, 'canvas.json')
+  const defaultCount = await countNodes(defaultFile)
+  if (defaultCount !== null) {
+    entries.push({ canvasId: 'default', cardCount: defaultCount })
+  }
+
+  const dir = path.join(ctx.vaultPath, TE_DIR, 'canvas')
+  let names: string[] = []
+  try {
+    names = await fs.readdir(dir)
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException
+    if (e.code !== 'ENOENT') {
+      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+    }
+  }
+  const ids = names
+    .filter((n) => n.endsWith('.json'))
+    .map((n) => n.slice(0, -'.json'.length))
+    .filter((id) => CANVAS_ID_RE.test(id))
+    .sort()
+  for (const id of ids) {
+    const file = path.join(dir, `${id}.json`)
+    const count = await countNodes(file)
+    if (count !== null) entries.push({ canvasId: id, cardCount: count })
+  }
+  return { ok: true, output: { canvases: entries } }
+}
+
+async function focusCanvas(
+  canvasId: string,
+  viewport: { x: number; y: number; zoom: number },
+  ctx: ToolContext
+): Promise<NativeToolResult> {
+  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  return enqueueCanvasWrite(file, async () => {
+    let canvas: CanvasFileShape
+    try {
+      canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException
+      if (e.code === 'ENOENT') {
+        return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+      }
+      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+    }
+    const next: CanvasFileShape = { ...canvas, viewport }
+    try {
+      await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      return { ok: true, output: { canvasId, viewport } }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       return { ok: false, error: { code: 'IO_FATAL', message } }
@@ -738,6 +884,71 @@ export async function callTool(
           ? (rawRefs as string[])
           : undefined
       return pinToCanvas(id, { title, content, position, refs }, ctx)
+    }
+    case 'unpin_from_canvas': {
+      const id = typeof input.canvasId === 'string' ? input.canvasId : null
+      const cardId = typeof input.cardId === 'string' ? input.cardId : null
+      if (!id) {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'unpin_from_canvas: missing canvasId' }
+        }
+      }
+      if (!CANVAS_ID_RE.test(id)) {
+        return {
+          ok: false,
+          error: { code: 'PATH_OUT_OF_VAULT', message: `invalid canvasId: ${id}` }
+        }
+      }
+      if (!cardId) {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'unpin_from_canvas: missing cardId' }
+        }
+      }
+      return unpinFromCanvas(id, cardId, ctx)
+    }
+    case 'list_canvases':
+      return listCanvases(ctx)
+    case 'focus_canvas': {
+      const id = typeof input.canvasId === 'string' ? input.canvasId : null
+      if (!id) {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'focus_canvas: missing canvasId' }
+        }
+      }
+      if (!CANVAS_ID_RE.test(id)) {
+        return {
+          ok: false,
+          error: { code: 'PATH_OUT_OF_VAULT', message: `invalid canvasId: ${id}` }
+        }
+      }
+      const rawVp = input.viewport
+      if (!rawVp || typeof rawVp !== 'object') {
+        return {
+          ok: false,
+          error: { code: 'IO_FATAL', message: 'focus_canvas: missing viewport' }
+        }
+      }
+      const vp = rawVp as Record<string, unknown>
+      if (
+        typeof vp.x !== 'number' ||
+        typeof vp.y !== 'number' ||
+        typeof vp.zoom !== 'number' ||
+        !Number.isFinite(vp.x) ||
+        !Number.isFinite(vp.y) ||
+        !Number.isFinite(vp.zoom)
+      ) {
+        return {
+          ok: false,
+          error: {
+            code: 'IO_FATAL',
+            message: 'focus_canvas: viewport.{x,y,zoom} must all be finite numbers'
+          }
+        }
+      }
+      return focusCanvas(id, { x: vp.x, y: vp.y, zoom: vp.zoom }, ctx)
     }
     case 'open_dock_tab':
       return openDockTab(input, ctx)

@@ -56,7 +56,7 @@ export function useCanvasFileLifecycle(canvasId: string): void {
             ? `${vaultPath}/${TE_DIR}`
             : `${vaultPath}/${TE_DIR}/canvas`
         await window.api.fs.mkdir(dirPath)
-        await window.api.fs.writeFile(defaultPath, JSON.stringify(data, null, 2))
+        await window.api.canvas.save(defaultPath, JSON.stringify(data, null, 2))
         loadCanvas(defaultPath, { ...data, ...toCanvasFile() })
       } catch {
         // Non-fatal.

@@ -4,7 +4,8 @@ import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import type { CanvasMutationPlan } from '../../src/shared/canvas-mutation-types'
 
 // Capture the IPC callback so we can simulate events
-let capturedCallback: ((data: { plan: CanvasMutationPlan }) => void) | null = null
+let capturedCallback: ((data: { plan: CanvasMutationPlan; canvasPath: string }) => void) | null =
+  null
 const mockUnsubscribe = vi.fn(() => {
   capturedCallback = null
 })
@@ -70,12 +71,20 @@ describe('useAgentPlanListener', () => {
     expect(capturedCallback).toBeTypeOf('function')
   })
 
-  it('calls applyAgentPlan on the store when event fires', () => {
+  it('calls applyAgentPlan on the store when event fires for the loaded canvas', () => {
+    const canvasPath = '/test/canvas.canvas'
+    useCanvasStore.getState().loadCanvas(canvasPath, {
+      version: 1,
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      focusFrames: {}
+    })
     const spy = vi.spyOn(useCanvasStore.getState(), 'applyAgentPlan')
     renderHook(() => useAgentPlanListener())
 
     const plan = makePlan('test1')
-    capturedCallback!({ plan })
+    capturedCallback!({ plan, canvasPath })
 
     // applyAgentPlan is on the store instance, but getState() returns a new ref
     // after set() calls, so check the store state instead
@@ -84,6 +93,23 @@ describe('useAgentPlanListener', () => {
     expect(nodes[0].id).toBe('n_test1')
     expect(nodes[0].content).toBe('agent-added')
     spy.mockRestore()
+  })
+
+  it('skips apply when canvasPath does not match the loaded canvas', () => {
+    useCanvasStore.getState().loadCanvas('/test/canvas-a.canvas', {
+      version: 1,
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      focusFrames: {}
+    })
+    renderHook(() => useAgentPlanListener())
+
+    capturedCallback!({ plan: makePlan('test2'), canvasPath: '/test/canvas-b.canvas' })
+
+    // Plan targeted a different canvas; the loaded canvas should not be mutated
+    // in memory (otherwise we'd silently corrupt the wrong canvas).
+    expect(useCanvasStore.getState().nodes).toHaveLength(0)
   })
 
   it('unsubscribes on unmount', () => {

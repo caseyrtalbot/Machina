@@ -206,6 +206,15 @@ export interface IpcChannels {
     request: { vaultPath: string }
     response: { canvasIds: readonly string[] }
   }
+  // Renderer-driven canvas write. Routes through the same per-file
+  // mutex as agent-side tools (pin_to_canvas etc.) so the renderer's
+  // debounced autosave cannot interleave with an in-flight agent
+  // read-modify-write. Without this shared serialization, either side
+  // can silently clobber the other's changes.
+  'canvas:save': {
+    request: { canvasPath: string; content: string }
+    response: void
+  }
 
   // --- Artifact ---
   'artifact:materialize': {
@@ -351,8 +360,11 @@ export interface IpcEvents {
   // Agent observation events (main -> renderer)
   'agent:states-changed': { states: readonly AgentSidecarState[] }
 
-  // Canvas agent plan dispatch (main -> renderer)
-  'canvas:agent-plan-accepted': { plan: CanvasMutationPlan }
+  // Canvas agent plan dispatch (main -> renderer).
+  // canvasPath identifies which canvas file the plan applies to so the
+  // renderer can ignore plans for canvases it doesn't currently have
+  // loaded (otherwise blind apply mutates the wrong canvas in memory).
+  'canvas:agent-plan-accepted': { plan: CanvasMutationPlan; canvasPath: string }
 
   // Claude status events (main -> renderer)
   'claude:status-changed': ClaudeStatus

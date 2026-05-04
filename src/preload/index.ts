@@ -132,6 +132,8 @@ const api = {
     getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
     applyPlan: (canvasPath: string, expectedMtime: string, plan: CanvasMutationPlan) =>
       typedInvoke('canvas:apply-plan', { canvasPath, expectedMtime, plan }),
+    save: (canvasPath: string, content: string) =>
+      typedInvoke('canvas:save', { canvasPath, content }),
     list: (vaultPath: string) => typedInvoke('canvas:list', { vaultPath })
   },
   artifact: {
@@ -220,8 +222,9 @@ const api = {
     docSaved: (callback: (data: { path: string }) => void) => typedOn('doc:saved', callback),
     agentStatesChanged: (callback: (data: { states: readonly AgentSidecarState[] }) => void) =>
       typedOn('agent:states-changed', callback),
-    canvasAgentPlanAccepted: (callback: (data: { plan: CanvasMutationPlan }) => void) =>
-      typedOn('canvas:agent-plan-accepted', callback),
+    canvasAgentPlanAccepted: (
+      callback: (data: { plan: CanvasMutationPlan; canvasPath: string }) => void
+    ) => typedOn('canvas:agent-plan-accepted', callback),
     appWillQuit: (callback: (data: Record<string, never>) => void) =>
       typedOn('app:will-quit', callback),
     claudeStatusChanged: (callback: (data: ClaudeStatus) => void) =>

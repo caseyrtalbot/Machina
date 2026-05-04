@@ -1,9 +1,10 @@
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
-import { readFile, readdir, stat } from 'fs/promises'
+import { readFile, readdir, stat, writeFile } from 'fs/promises'
 import { TE_DIR } from '@shared/constants'
 import type { CanvasFile } from '@shared/canvas-types'
 import { validateCanvasMutationOps } from '@shared/canvas-mutation-validation'
+import { enqueueCanvasWrite } from '../services/canvas-write-queue'
 
 const DEFAULT_CANVAS_ID = 'default'
 
@@ -38,10 +39,19 @@ export function registerCanvasIpc(): void {
     // Dispatch validated plan to renderer for store application
     const window = getMainWindow()
     if (window) {
-      typedSend(window, 'canvas:agent-plan-accepted', { plan: args.plan })
+      typedSend(window, 'canvas:agent-plan-accepted', {
+        plan: args.plan,
+        canvasPath: args.canvasPath
+      })
     }
 
     return { accepted: true, mtime: currentMtime }
+  })
+
+  typedHandle('canvas:save', async (args) => {
+    await enqueueCanvasWrite(args.canvasPath, async () => {
+      await writeFile(args.canvasPath, args.content, 'utf-8')
+    })
   })
 
   typedHandle('canvas:list', async (args) => {

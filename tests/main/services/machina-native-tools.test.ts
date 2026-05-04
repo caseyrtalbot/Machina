@@ -964,3 +964,284 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
     }
   })
 })
+
+describe('machina-native-tools unpin_from_canvas', () => {
+  function seedCanvas(vault: string, id: string, content: unknown): void {
+    mkdirSync(path.join(vault, '.machina', 'canvas'), { recursive: true })
+    writeFileSync(
+      path.join(vault, '.machina', 'canvas', `${id}.json`),
+      JSON.stringify(content, null, 2)
+    )
+  }
+
+  it('removes a card by id and drops edges that reference it', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', {
+        nodes: [
+          { id: 'card_a', type: 'text', content: 'A' },
+          { id: 'card_b', type: 'text', content: 'B' }
+        ],
+        edges: [
+          { id: 'e1', from: 'card_a', to: 'card_b' },
+          { id: 'e2', from: 'card_b', to: 'card_b' }
+        ]
+      })
+      const res = await callTool(
+        'unpin_from_canvas',
+        { canvasId: 'main', cardId: 'card_a' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { cardId: string; canvasId: string }
+        expect(out.cardId).toBe('card_a')
+        expect(out.canvasId).toBe('main')
+      }
+      const after = JSON.parse(
+        readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
+      ) as { nodes: Array<{ id: string }>; edges: Array<{ id: string }> }
+      expect(after.nodes.map((n) => n.id)).toEqual(['card_b'])
+      // Edge e1 referenced card_a → dropped. Edge e2 only references card_b → kept.
+      expect(after.edges.map((e) => e.id)).toEqual(['e2'])
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns CARD_NOT_FOUND when the card id does not exist', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', { nodes: [{ id: 'card_a', type: 'text' }], edges: [] })
+      const res = await callTool(
+        'unpin_from_canvas',
+        { canvasId: 'main', cardId: 'card_missing' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('CARD_NOT_FOUND')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns CANVAS_NOT_FOUND when the canvas file is missing', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'unpin_from_canvas',
+        { canvasId: 'ghost', cardId: 'card_a' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('CANVAS_NOT_FOUND')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a traversal canvasId', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'unpin_from_canvas',
+        { canvasId: '../escape', cardId: 'card_a' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('round-trips with pin_to_canvas: pinning then unpinning leaves no card', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', { nodes: [], edges: [] })
+      const pin = await callTool(
+        'pin_to_canvas',
+        { canvasId: 'main', card: { title: 'temp' } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(pin.ok).toBe(true)
+      const cardId = pin.ok ? (pin.output as { cardId: string }).cardId : ''
+      const unpin = await callTool(
+        'unpin_from_canvas',
+        { canvasId: 'main', cardId },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(unpin.ok).toBe(true)
+      const after = JSON.parse(
+        readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
+      ) as { nodes: unknown[] }
+      expect(after.nodes).toEqual([])
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('machina-native-tools list_canvases', () => {
+  it('returns an empty array when no canvas directory or default canvas exists', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool('list_canvases', {}, { vaultPath: v, autoAccept: false })
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { canvases: Array<{ canvasId: string; cardCount: number }> }
+        expect(out.canvases).toEqual([])
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('includes the default canvas when canvas.json exists', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      mkdirSync(path.join(v, '.machina'), { recursive: true })
+      writeFileSync(
+        path.join(v, '.machina', 'canvas.json'),
+        JSON.stringify({ nodes: [{ id: 'a' }, { id: 'b' }] })
+      )
+      const res = await callTool('list_canvases', {}, { vaultPath: v, autoAccept: false })
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { canvases: Array<{ canvasId: string; cardCount: number }> }
+        expect(out.canvases).toEqual([{ canvasId: 'default', cardCount: 2 }])
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('lists named canvases from the canvas directory, sorted, and skips invalid ids', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      mkdirSync(path.join(v, '.machina', 'canvas'), { recursive: true })
+      writeFileSync(
+        path.join(v, '.machina', 'canvas', 'beta.json'),
+        JSON.stringify({ nodes: [{ id: 'x' }] })
+      )
+      writeFileSync(path.join(v, '.machina', 'canvas', 'alpha.json'), JSON.stringify({ nodes: [] }))
+      // Files that don't match the safe canvas id regex should be skipped.
+      writeFileSync(
+        path.join(v, '.machina', 'canvas', 'has spaces.json'),
+        JSON.stringify({ nodes: [] })
+      )
+      // Non-json files in the directory are ignored.
+      writeFileSync(path.join(v, '.machina', 'canvas', 'README.md'), '')
+      const res = await callTool('list_canvases', {}, { vaultPath: v, autoAccept: false })
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { canvases: Array<{ canvasId: string; cardCount: number }> }
+        expect(out.canvases).toEqual([
+          { canvasId: 'alpha', cardCount: 0 },
+          { canvasId: 'beta', cardCount: 1 }
+        ])
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('includes default first, then sorted named canvases', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      mkdirSync(path.join(v, '.machina', 'canvas'), { recursive: true })
+      writeFileSync(path.join(v, '.machina', 'canvas.json'), JSON.stringify({ nodes: [] }))
+      writeFileSync(path.join(v, '.machina', 'canvas', 'zeta.json'), JSON.stringify({ nodes: [] }))
+      writeFileSync(path.join(v, '.machina', 'canvas', 'alpha.json'), JSON.stringify({ nodes: [] }))
+      const res = await callTool('list_canvases', {}, { vaultPath: v, autoAccept: false })
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { canvases: Array<{ canvasId: string }> }
+        expect(out.canvases.map((c) => c.canvasId)).toEqual(['default', 'alpha', 'zeta'])
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('machina-native-tools focus_canvas', () => {
+  function seedCanvas(vault: string, id: string, content: unknown): void {
+    mkdirSync(path.join(vault, '.machina', 'canvas'), { recursive: true })
+    writeFileSync(
+      path.join(vault, '.machina', 'canvas', `${id}.json`),
+      JSON.stringify(content, null, 2)
+    )
+  }
+
+  it('writes the viewport into the canvas file', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', {
+        nodes: [],
+        edges: [],
+        viewport: { x: 0, y: 0, zoom: 1 }
+      })
+      const res = await callTool(
+        'focus_canvas',
+        { canvasId: 'main', viewport: { x: 250, y: -100, zoom: 1.5 } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      const after = JSON.parse(
+        readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
+      ) as { viewport: { x: number; y: number; zoom: number }; nodes: unknown[] }
+      expect(after.viewport).toEqual({ x: 250, y: -100, zoom: 1.5 })
+      // Other fields preserved.
+      expect(after.nodes).toEqual([])
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns CANVAS_NOT_FOUND when the canvas is missing', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'focus_canvas',
+        { canvasId: 'ghost', viewport: { x: 0, y: 0, zoom: 1 } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('CANVAS_NOT_FOUND')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a non-finite zoom', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', { nodes: [], edges: [] })
+      const res = await callTool(
+        'focus_canvas',
+        { canvasId: 'main', viewport: { x: 0, y: 0, zoom: Number.POSITIVE_INFINITY } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('IO_FATAL')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a traversal canvasId', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'focus_canvas',
+        { canvasId: '../escape', viewport: { x: 0, y: 0, zoom: 1 } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})

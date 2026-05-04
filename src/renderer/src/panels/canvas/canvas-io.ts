@@ -54,7 +54,11 @@ export function defaultCanvasFilename(existingNames: readonly string[]): string 
   return `Untitled ${i}.canvas`
 }
 
-/** Save canvas file to disk via IPC. Debounce externally. */
+/** Save canvas file to disk via IPC. Debounce externally.
+ * Routes through the canvas-specific channel so writes serialize against
+ * agent-side mutations (pin_to_canvas, unpin_from_canvas, focus_canvas)
+ * via the shared per-file mutex in main. Plain fs:write-file would bypass
+ * that mutex and race with in-flight agent writes. */
 export async function saveCanvas(path: string, file: CanvasFile): Promise<void> {
-  await window.api.fs.writeFile(path, serializeCanvas(file))
+  await window.api.canvas.save(path, serializeCanvas(file))
 }
