@@ -63,8 +63,6 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
         boxSizing: 'border-box',
         padding: '4px 2px 8px 3px',
         background: colors.bg.rail,
-        borderLeft: `1px solid ${colors.border.subtle}`,
-        borderRight: `1px solid ${colors.border.subtle}`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

@@ -54,7 +54,7 @@ export function ResizeHandle({ side, width, onChange, onCommit }: ResizeHandlePr
       onMouseLeave={() => setHovered(false)}
       style={{
         flexShrink: 0,
-        width: 4,
+        width: 3,
         position: 'relative',
         cursor: 'col-resize',
         background: 'transparent'
@@ -68,7 +68,7 @@ export function ResizeHandle({ side, width, onChange, onCommit }: ResizeHandlePr
           bottom: 0,
           left: 1,
           width: 1,
-          background: showAccent ? colors.accent.muted : colors.border.default,
+          background: showAccent ? colors.accent.muted : colors.border.subtle,
           transition: `background ${transitions.fast}`
         }}
       />
