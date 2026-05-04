@@ -418,16 +418,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
           {/* ── Canvas ── */}
           <SectionHeading>Canvas</SectionHeading>
-          <SettingRow label="Translucency">
-            <SliderInput
-              value={env.canvasTranslucency}
-              min={0}
-              max={100}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('canvasTranslucency', v)}
-            />
-          </SettingRow>
           <SettingRow label="Card Opacity">
             <SliderInput
               value={env.cardOpacity}
@@ -466,19 +456,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
               step={1}
               unit="%"
               onChange={(v) => setEnv('gridDotVisibility', v)}
-            />
-          </SettingRow>
-
-          {/* ── Surfaces ── */}
-          <SectionHeading>Surfaces</SectionHeading>
-          <SettingRow label="Side Rails">
-            <SliderInput
-              value={env.activityBarOpacity}
-              min={0}
-              max={60}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('activityBarOpacity', v)}
             />
           </SettingRow>
 

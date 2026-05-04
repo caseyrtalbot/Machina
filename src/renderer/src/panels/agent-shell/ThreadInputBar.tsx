@@ -77,7 +77,8 @@ export function ThreadInputBar() {
           rows={1}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask anything…   Cmd+K · /"
+          placeholder="ASK ANYTHING…   CMD+K · /"
+          className="thread-input-textarea"
           style={{
             flex: 1,
             resize: 'none',

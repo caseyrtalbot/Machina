@@ -48,7 +48,11 @@ export function ThreadPanel() {
           minWidth: 320,
           padding: 24,
           color: colors.text.muted,
-          background: colors.bg.base
+          background: colors.bg.base,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform
         }}
       >
         No thread selected.
@@ -92,10 +96,11 @@ export function ThreadPanel() {
           {streaming !== null && <LiveDot />}
           <span
             style={{
-              fontFamily: typography.fontFamily.body,
-              fontSize: 14,
-              fontWeight: 500,
-              color: colors.text.primary,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              color: colors.text.muted,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -124,8 +129,10 @@ export function ThreadPanel() {
                 justifyContent: 'center',
                 height: '100%',
                 color: colors.text.muted,
-                fontFamily: typography.fontFamily.body,
-                fontSize: 13
+                fontFamily: typography.fontFamily.mono,
+                fontSize: typography.metadata.size,
+                letterSpacing: typography.metadata.letterSpacing,
+                textTransform: typography.metadata.textTransform
               }}
             >
               Ask anything about your vault.

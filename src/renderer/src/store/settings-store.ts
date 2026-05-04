@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'machina-settings',
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -154,6 +154,16 @@ export const useSettingsStore = create<SettingsStore>()(
           // v8 → v9: introduce accent picker (Console-direction palette).
           if (typeof state.accentId !== 'string') state.accentId = DEFAULT_ACCENT_ID
           if (typeof state.customAccentHex !== 'string') state.customAccentHex = '#ff8c5a'
+        }
+
+        if (version < 10) {
+          // v9 → v10: drop env fields with no live effect under the
+          // pure-black aesthetic (canvas surface and rails both = #000).
+          const existingEnv = state.env as Record<string, unknown> | undefined
+          if (existingEnv) {
+            delete existingEnv.canvasTranslucency
+            delete existingEnv.activityBarOpacity
+          }
         }
 
         // Validate accentId on every load: a removed/typo'd preset id otherwise

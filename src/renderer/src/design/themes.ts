@@ -11,24 +11,20 @@ export const ACCENT_HEX = '#ff8c5a'
 export const CHROME_BG_HEX = '#070a0e'
 
 export interface EnvironmentSettings {
-  readonly canvasTranslucency: number
   readonly cardOpacity: number
   readonly cardHeaderDarkness: number
   readonly cardBlur: number
   readonly gridDotVisibility: number
-  readonly activityBarOpacity: number
   readonly cardTitleFontSize: number
   readonly cardBodyFontSize: number
   readonly sidebarFontSize: number
 }
 
 export const ENV_DEFAULTS: EnvironmentSettings = {
-  canvasTranslucency: 0,
   cardOpacity: 94,
   cardHeaderDarkness: 45,
   cardBlur: 9,
   gridDotVisibility: 20,
-  activityBarOpacity: 40,
   cardTitleFontSize: 13,
   cardBodyFontSize: 16,
   sidebarFontSize: 13
@@ -45,11 +41,11 @@ interface ThemeBaseColors {
   readonly cardBody: BaseRgb
 }
 
-// Black-gray slate base. canvasSurface (#111113) sits ABOVE the card body
-// (#0a0a0c) so canvas cards read as recessed objects, not floating above the
-// surface. Console-direction layering, neutralized hue.
+// Pure-black base. The thread, sidebar, dock, and ribbon all read as the
+// same #000 surface; canvas cards sit slightly lifted (cardBody) so they
+// register as objects against the void.
 export const BASE_COLORS: ThemeBaseColors = {
-  canvasSurface: { r: 17, g: 17, b: 19 },
+  canvasSurface: { r: 0, g: 0, b: 0 },
   cardBody: { r: 10, g: 10, b: 12 }
 }
 

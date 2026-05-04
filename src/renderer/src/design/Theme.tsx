@@ -20,7 +20,6 @@ function resolveAccentHex(accentId: AccentId, customHex: string): string {
 interface EnvContext {
   readonly cardBlur: number
   readonly gridDotVisibility: number
-  readonly activityBarOpacity: number
   readonly cardTitleFontSize: number
   readonly sidebarFontSize: number
 }
@@ -39,7 +38,6 @@ const ThemeContext = createContext<ThemeContextType>({
   env: {
     cardBlur: ENV_DEFAULTS.cardBlur,
     gridDotVisibility: ENV_DEFAULTS.gridDotVisibility,
-    activityBarOpacity: ENV_DEFAULTS.activityBarOpacity,
     cardTitleFontSize: ENV_DEFAULTS.cardTitleFontSize,
     sidebarFontSize: ENV_DEFAULTS.sidebarFontSize
   }
@@ -50,11 +48,8 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   const base = BASE_COLORS
   const structural = STRUCTURAL_COLORS
 
-  const surfaceOpacity = (100 - env.canvasTranslucency) / 100
-  root.style.setProperty(
-    '--canvas-surface-bg',
-    `rgba(${base.canvasSurface.r}, ${base.canvasSurface.g}, ${base.canvasSurface.b}, ${surfaceOpacity})`
-  )
+  const { r, g, b } = base.canvasSurface
+  root.style.setProperty('--canvas-surface-bg', `rgb(${r}, ${g}, ${b})`)
 
   const cardOp = env.cardOpacity / 100
   root.style.setProperty(
@@ -64,27 +59,17 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
 
   root.style.setProperty('--canvas-card-title-bg', `rgba(0, 0, 0, ${env.cardHeaderDarkness / 100})`)
 
-  const { r, g, b } = base.canvasSurface
-  // Sidebar / thread / dock surfaces are SOLID. The center (thread) reads
-  // as the lit focal layer at `--color-bg-base`; side rails (sidebar +
-  // dock + settings) recess by a user-tuned amount via `--color-bg-rail`.
-  // `--color-bg-surface` and `--color-bg-elevated` are subtle hover lifts
-  // for tab strips, pills, and active-row backgrounds.
+  // Pure-black base. Thread, sidebar, dock, and ribbon all share the same
+  // `--color-bg-base`; `--color-bg-surface` / `--color-bg-elevated` are
+  // subtle hover lifts for tab strips, pills, and active-row backgrounds.
   const lift = (amt: number): string => {
     const lc = (c: number): number => Math.min(255, Math.round(c + (255 - c) * amt))
     return `rgb(${lc(r)}, ${lc(g)}, ${lc(b)})`
   }
-  const drop = (amt: number): string => {
-    const dc = (c: number): number => Math.max(0, Math.round(c * (1 - amt)))
-    return `rgb(${dc(r)}, ${dc(g)}, ${dc(b)})`
-  }
-  // activityBarOpacity (0-100) is reinterpreted as the rail recess percent:
-  // 0 leaves rails identical to the thread; 100 drives them to pure black.
-  const railRecess = Math.max(0, Math.min(100, env.activityBarOpacity)) / 100
   root.style.setProperty('--color-bg-base', `rgb(${r}, ${g}, ${b})`)
   root.style.setProperty('--color-bg-surface', lift(0.04))
   root.style.setProperty('--color-bg-elevated', lift(0.1))
-  root.style.setProperty('--color-bg-rail', drop(railRecess))
+  root.style.setProperty('--color-bg-rail', `rgb(${r}, ${g}, ${b})`)
 
   root.style.setProperty('--color-border-default', structural.border.default)
   root.style.setProperty('--border-subtle', structural.border.subtle)
@@ -97,10 +82,6 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   root.style.setProperty('--canvas-card-border', structural.canvas.cardBorder)
   root.style.setProperty('--canvas-text-heading', structural.canvas.textHeading)
   root.style.setProperty('--canvas-blockquote-bar', structural.canvas.blockquoteBar)
-  root.style.setProperty(
-    '--chrome-rail-bg',
-    `rgba(${base.canvasSurface.r}, ${base.canvasSurface.g}, ${base.canvasSurface.b}, ${env.activityBarOpacity / 100})`
-  )
   root.style.setProperty('--env-card-blur', `${env.cardBlur}px`)
   root.style.setProperty('--env-card-title-font-size', `${env.cardTitleFontSize}px`)
   root.style.setProperty('--env-card-body-font-size', `${env.cardBodyFontSize}px`)
@@ -140,7 +121,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       env: {
         cardBlur: env.cardBlur,
         gridDotVisibility: env.gridDotVisibility,
-        activityBarOpacity: env.activityBarOpacity,
         cardTitleFontSize: env.cardTitleFontSize,
         sidebarFontSize: env.sidebarFontSize
       }
