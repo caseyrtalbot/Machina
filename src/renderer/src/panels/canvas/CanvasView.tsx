@@ -31,7 +31,7 @@ import { useViewportCulling } from './use-canvas-culling'
 import { getLodLevel } from './use-canvas-lod'
 import { findOpenPosition } from './canvas-layout'
 import { SplitDividerAndPanel } from './SplitDividerAndPanel'
-import { CanvasWelcomeCard, EmptyCanvasHint } from './CanvasEmptyStates'
+import { CanvasWelcomeCard } from './CanvasEmptyStates'
 import { useSaveTextCard } from './useSaveTextCard'
 import { SaveTextCardDialog } from './SaveTextCardDialog'
 import { slugifyFilename } from './text-card-save'
@@ -98,7 +98,6 @@ export function CanvasView({
   useCanvasCardAddedListener(canvasId)
   useCanvasFileLifecycle(canvasId)
   useCanvasKeyboardShortcuts({ commandStack, containerRef, setImportOpen })
-  const rawFileCount = useVaultStore((s) => s.rawFileCount)
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
@@ -543,7 +542,6 @@ export function CanvasView({
 
           <ConnectionDragOverlay />
           {nodes.length === 0 && !vaultPath && <CanvasWelcomeCard />}
-          {nodes.length === 0 && vaultPath && <EmptyCanvasHint rawFileCount={rawFileCount} />}
           <ZoomIndicator />
           <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
           <ClusterLabels viewport={viewport} />
