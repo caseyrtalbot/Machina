@@ -218,6 +218,82 @@ describe('machina-native-tools search_vault', () => {
     }
   })
 
+  it('matches literally and does not interpret regex metacharacters', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      // Regex `foo.bar` would match `foozbar`. Literal `foo.bar` must not.
+      writeFileSync(path.join(v, 'a.md'), 'foozbar appears here\nfoo.bar appears here\n')
+      const res = await callTool(
+        'search_vault',
+        { query: 'foo.bar' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as {
+          hits: Array<{ line: number }>
+          truncated: boolean
+          engine: string
+        }
+        expect(out.hits.length).toBe(1)
+        expect(out.hits[0].line).toBe(2)
+        expect(out.truncated).toBe(false)
+        expect(['ripgrep', 'fallback']).toContain(out.engine)
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('flags truncated when the global hit cap is reached', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      // SEARCH_PER_FILE_LIMIT is 20 and SEARCH_HIT_LIMIT is 200, so we need
+      // matches across at least 11 files (220 > 200) to force truncation.
+      for (let f = 0; f < 12; f++) {
+        const lines: string[] = []
+        for (let i = 0; i < 20; i++) lines.push(`alpha line ${i}`)
+        writeFileSync(path.join(v, `note-${f}.md`), lines.join('\n') + '\n')
+      }
+      const res = await callTool(
+        'search_vault',
+        { query: 'alpha' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as {
+          hits: Array<unknown>
+          truncated: boolean
+          engine: string
+        }
+        expect(out.hits.length).toBe(200)
+        expect(out.truncated).toBe(true)
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the engine that handled the search', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'engine probe\n')
+      const res = await callTool(
+        'search_vault',
+        { query: 'engine probe' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+      if (res.ok) {
+        const out = res.output as { engine: string }
+        expect(['ripgrep', 'fallback']).toContain(out.engine)
+      }
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
   it('returns aborted when the AbortSignal fires before the call', async () => {
     const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
     try {

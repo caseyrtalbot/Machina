@@ -44,13 +44,13 @@ export const LIST_VAULT_TOOL: NativeToolSpec = {
 export const SEARCH_VAULT_TOOL: NativeToolSpec = {
   name: 'search_vault',
   description:
-    'Search vault notes for a literal or regex string (ripgrep). Returns up to 200 hits with path, line number, and a trimmed snippet. Always ignores ".machina/**".',
+    'Search vault notes for a case-sensitive literal substring. Returns up to 200 hits (path, line, trimmed snippet), a `truncated` flag set when the cap was hit (more matches exist — narrow the query or scope), and an `engine` field ("ripgrep" or "fallback") indicating which backend ran. Regex metacharacters are matched literally. Always ignores ".machina/**".',
   input_schema: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'String to search for. Case-sensitive; ripgrep regex syntax.'
+        description: 'Literal substring to search for. Case-sensitive. Not a regex.'
       },
       paths: {
         type: 'array',

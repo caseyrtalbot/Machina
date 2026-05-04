@@ -31,10 +31,12 @@ export function SearchVaultCard({
   }
   if (!result.ok) return null
 
-  const hits =
+  const output =
     typeof result.output === 'object' && result.output !== null
-      ? ((result.output as { hits?: Hit[] }).hits ?? [])
-      : []
+      ? (result.output as { hits?: Hit[]; truncated?: boolean; engine?: string })
+      : {}
+  const hits = output.hits ?? []
+  const truncated = output.truncated === true
 
   function open(rel: string) {
     const vault = useVaultStore.getState().vaultPath
@@ -58,7 +60,10 @@ export function SearchVaultCard({
       >
         <SearchGlyph />
         <span>
-          {hits.length} {hits.length === 1 ? 'hit' : 'hits'} for &ldquo;{call.args.query}&rdquo;
+          {hits.length}
+          {truncated ? '+' : ''} {hits.length === 1 ? 'hit' : 'hits'} for &ldquo;
+          {call.args.query}&rdquo;
+          {truncated ? ' — capped, narrow the query for more' : ''}
         </span>
       </div>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>

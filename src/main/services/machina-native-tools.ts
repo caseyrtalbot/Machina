@@ -122,6 +122,32 @@ function normalizeSearchHitPath(p: string): string {
   return p.replace(/^\.[/\\]/, '')
 }
 
+function parseRipgrepMatchLine(line: string, hits: SearchHit[]): void {
+  if (!line) return
+  try {
+    const ev = JSON.parse(line) as {
+      type: string
+      data?: {
+        path?: { text?: string }
+        line_number?: number
+        lines?: { text?: string }
+      }
+    }
+    if (ev.type !== 'match' || !ev.data) return
+    const p = ev.data.path?.text
+    const ln = ev.data.line_number
+    const text = ev.data.lines?.text ?? ''
+    if (typeof p !== 'string' || typeof ln !== 'number') return
+    hits.push({
+      path: normalizeSearchHitPath(p),
+      line: ln,
+      snippet: text.replace(/\n+$/, '').slice(0, SEARCH_SNIPPET_LEN)
+    })
+  } catch {
+    // ignore malformed json line
+  }
+}
+
 function searchWithRipgrep(
   query: string,
   paths: readonly string[],
@@ -137,8 +163,12 @@ function searchWithRipgrep(
     })
   }
   return new Promise((resolve) => {
+    // --fixed-strings: query is a literal substring, not a regex. Matches the
+    // JS fallback's String.includes semantics so the engine choice never
+    // changes match results for the same query.
     const args = [
       '--json',
+      '--fixed-strings',
       '--max-count',
       String(SEARCH_PER_FILE_LIMIT),
       '--glob',
@@ -151,6 +181,8 @@ function searchWithRipgrep(
     let buf = ''
     let resolved = false
     let spawnFailed = false
+    let truncated = false
+    let killedForLimit = false
 
     function killChild(): void {
       child.kill('SIGTERM')
@@ -188,34 +220,23 @@ function searchWithRipgrep(
     signal?.addEventListener('abort', onAbort, { once: true })
 
     child.stdout.on('data', (d: Buffer) => {
+      if (killedForLimit) return
       buf += d.toString('utf8')
       const lines = buf.split('\n')
       buf = lines.pop() ?? ''
       for (const line of lines) {
-        if (!line) continue
-        if (hits.length >= SEARCH_HIT_LIMIT) return
-        try {
-          const ev = JSON.parse(line) as {
-            type: string
-            data?: {
-              path?: { text?: string }
-              line_number?: number
-              lines?: { text?: string }
-            }
-          }
-          if (ev.type !== 'match' || !ev.data) continue
-          const p = ev.data.path?.text
-          const ln = ev.data.line_number
-          const text = ev.data.lines?.text ?? ''
-          if (typeof p !== 'string' || typeof ln !== 'number') continue
-          hits.push({
-            path: normalizeSearchHitPath(p),
-            line: ln,
-            snippet: text.replace(/\n+$/, '').slice(0, SEARCH_SNIPPET_LEN)
-          })
-        } catch {
-          // ignore malformed json line
+        if (hits.length >= SEARCH_HIT_LIMIT) {
+          truncated = true
+          killedForLimit = true
+          killChild()
+          return
         }
+        parseRipgrepMatchLine(line, hits)
+      }
+      if (hits.length >= SEARCH_HIT_LIMIT) {
+        truncated = true
+        killedForLimit = true
+        killChild()
       }
     })
 
@@ -235,12 +256,24 @@ function searchWithRipgrep(
       resolved = true
       clearTimeout(timer)
       signal?.removeEventListener('abort', onAbort)
-      // ripgrep returns 1 when no matches, 0 when matches; both are success for us
-      if (code !== 0 && code !== 1 && !spawnFailed) {
+      // Flush any trailing partial line. ripgrep --json normally terminates
+      // every event with \n, but if it ever exits without a trailing newline
+      // (or we read the final chunk mid-line), the last match would otherwise
+      // sit in `buf` and be silently dropped.
+      if (buf.length > 0 && hits.length < SEARCH_HIT_LIMIT) {
+        parseRipgrepMatchLine(buf, hits)
+      }
+      buf = ''
+      if (hits.length >= SEARCH_HIT_LIMIT) truncated = true
+      // ripgrep returns 0 with matches, 1 with no matches; both are success.
+      // When we kill it after hitting the global limit, code is null on macOS
+      // and that is also success — we have the hits we wanted.
+      const cleanExit = code === 0 || code === 1 || (killedForLimit && code === null)
+      if (!cleanExit && !spawnFailed) {
         resolve({ ok: false, error: { code: 'IO_FATAL', message: `rg exited ${code}` } })
         return
       }
-      resolve({ ok: true, output: { hits } })
+      resolve({ ok: true, output: { hits, truncated, engine: 'ripgrep' } })
     })
   })
 }
@@ -267,6 +300,7 @@ async function searchWithJsFallback(
   }
   files.sort()
   const hits: SearchHit[] = []
+  let truncated = false
   const deadline = Date.now() + SEARCH_TIMEOUT_MS
   outer: for (const rel of files) {
     if (signal?.aborted) {
@@ -294,12 +328,15 @@ async function searchWithJsFallback(
       if (lines[i].includes(query)) {
         hits.push({ path: rel, line: i + 1, snippet: lines[i].slice(0, SEARCH_SNIPPET_LEN) })
         perFile++
-        if (hits.length >= SEARCH_HIT_LIMIT) break outer
+        if (hits.length >= SEARCH_HIT_LIMIT) {
+          truncated = true
+          break outer
+        }
         if (perFile >= SEARCH_PER_FILE_LIMIT) break
       }
     }
   }
-  return { ok: true, output: { hits } }
+  return { ok: true, output: { hits, truncated, engine: 'fallback' } }
 }
 
 async function pathExists(p: string): Promise<boolean> {
