@@ -100,7 +100,7 @@ describe('AgentShell welcome tooltip', () => {
     const writeConfig = (window as any).api.thread.writeConfig
     render(<AgentShell />)
     const tooltip = await screen.findByTestId('agent-shell-welcome-tooltip')
-    fireEvent.click(screen.getByText('got it'))
+    fireEvent.click(screen.getByText('Got it'))
     expect(screen.queryByTestId('agent-shell-welcome-tooltip')).toBeNull()
     await waitFor(() => {
       expect(writeConfig).toHaveBeenCalledWith('/v', { ...baseConfig, welcomed: true })

@@ -10,16 +10,17 @@ import { SideDockRibbon } from './SideDockRibbon'
 import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 
 const WINDOW_HEADER_HEIGHT = 39
 const WINDOW_CONTROLS_CONTAINER_WIDTH = 148
 
 export interface AgentShellProps {
   readonly onOpenSettings?: () => void
+  readonly onChangeVault?: () => void
 }
 
-export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
+export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = {}) {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const setVaultPath = useThreadStore((s) => s.setVaultPath)
   const loadThreads = useThreadStore((s) => s.loadThreads)
@@ -74,7 +75,7 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
     >
       <WindowDragRegion />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <ThreadSidebar width={sidebarWidth} />
+        <ThreadSidebar width={sidebarWidth} onChangeVault={onChangeVault} />
         <ResizeHandle
           side="sidebar"
           width={sidebarWidth}
@@ -177,43 +178,88 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
       aria-label="welcome"
       style={{
         position: 'fixed',
-        bottom: 24,
-        right: 24,
-        maxWidth: 320,
-        padding: '14px 16px',
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.tool,
+        bottom: 20,
+        right: 20,
+        maxWidth: 300,
+        padding: '14px 16px 12px',
+        background: floatingPanel.glass.bg,
+        backdropFilter: floatingPanel.glass.blur,
+        WebkitBackdropFilter: floatingPanel.glass.blur,
+        border: `1px solid ${colors.border.subtle}`,
+        borderRadius: floatingPanel.borderRadius,
         color: colors.text.primary,
         fontFamily: typography.fontFamily.body,
-        fontSize: 'var(--text-body)',
-        lineHeight: 1.5,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-        zIndex: 1000
+        fontSize: 13,
+        lineHeight: 1.55,
+        boxShadow: floatingPanel.shadowCompact,
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10
       }}
     >
-      <div style={{ marginBottom: 10 }}>
-        this is your agent shell. type to chat, hit <code>/</code> to switch agent,{' '}
-        <code>Cmd-K</code> for the palette.
-      </div>
-      <button
-        type="button"
-        onClick={dismiss}
+      <div
         style={{
-          background: 'transparent',
-          border: `1px solid ${colors.border.default}`,
-          color: colors.text.secondary,
-          padding: '4px 10px',
-          borderRadius: borderRadius.inline,
           fontFamily: typography.fontFamily.mono,
           fontSize: typography.metadata.size,
           letterSpacing: typography.metadata.letterSpacing,
           textTransform: typography.metadata.textTransform,
-          cursor: 'pointer'
+          color: colors.text.muted
         }}
       >
-        got it
-      </button>
+        Welcome
+      </div>
+      <div style={{ color: colors.text.secondary }}>
+        Type to chat, <WelcomeKbd>/</WelcomeKbd> to switch agent, <WelcomeKbd>⌘K</WelcomeKbd> for
+        the palette.
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+        <button
+          type="button"
+          onClick={dismiss}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: colors.text.muted,
+            padding: '2px 4px',
+            fontFamily: typography.fontFamily.mono,
+            fontSize: typography.metadata.size,
+            letterSpacing: typography.metadata.letterSpacing,
+            textTransform: typography.metadata.textTransform,
+            cursor: 'pointer',
+            transition: `color ${transitions.focusRing}`
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = colors.text.primary)}
+          onMouseLeave={(e) => (e.currentTarget.style.color = colors.text.muted)}
+        >
+          Got it
+        </button>
+      </div>
     </div>
+  )
+}
+
+function WelcomeKbd({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 18,
+        height: 18,
+        padding: '0 5px',
+        margin: '0 2px',
+        verticalAlign: 'baseline',
+        border: `1px solid ${colors.border.subtle}`,
+        borderRadius: borderRadius.inline,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: 10,
+        color: colors.text.primary,
+        background: 'transparent'
+      }}
+    >
+      {children}
+    </span>
   )
 }

@@ -9,6 +9,7 @@ import type { AgentIdentity } from '@shared/agent-identity'
 
 export interface ThreadSidebarProps {
   readonly width?: number
+  readonly onChangeVault?: () => void
 }
 
 interface MenuTarget {
@@ -16,7 +17,7 @@ interface MenuTarget {
   readonly position: ContextMenuPosition
 }
 
-export function ThreadSidebar({ width = 240 }: ThreadSidebarProps = {}) {
+export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps = {}) {
   const threadsById = useThreadStore((s) => s.threadsById)
   const activeId = useThreadStore((s) => s.activeThreadId)
   const selectThread = useThreadStore((s) => s.selectThread)
@@ -63,30 +64,18 @@ export function ThreadSidebar({ width = 240 }: ThreadSidebarProps = {}) {
       <header
         style={{
           height: 44,
-          padding: '0 14px',
           flexShrink: 0,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted,
           display: 'flex',
-          alignItems: 'center',
-          gap: 8,
+          alignItems: 'stretch',
           borderBottom: `1px solid ${colors.border.subtle}`,
           boxSizing: 'border-box'
         }}
       >
-        <span
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            minWidth: 0
-          }}
-        >
-          {vaultName}
-        </span>
+        <VaultSwitcher
+          name={vaultPath ? vaultName : 'Open vault…'}
+          fullPath={vaultPath ?? null}
+          onClick={onChangeVault}
+        />
       </header>
       <ul style={{ flex: 1, overflowY: 'auto', listStyle: 'none', margin: 0, padding: 0 }}>
         {sorted.map((t) => (
@@ -142,6 +131,99 @@ export function ThreadSidebar({ width = 240 }: ThreadSidebarProps = {}) {
         />
       )}
     </aside>
+  )
+}
+
+function VaultSwitcher({
+  name,
+  fullPath,
+  onClick
+}: {
+  readonly name: string
+  readonly fullPath: string | null
+  readonly onClick?: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const disabled = !onClick
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      disabled={disabled}
+      title={fullPath ? `${fullPath}\nClick to switch vault` : 'Open a vault'}
+      aria-label={fullPath ? `Vault: ${name}. Click to switch.` : 'Open a vault'}
+      style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '0 14px',
+        background:
+          hovered && !disabled
+            ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
+            : 'transparent',
+        border: 'none',
+        borderRadius: 0,
+        color: disabled ? colors.text.muted : colors.text.primary,
+        cursor: disabled ? 'default' : 'pointer',
+        textAlign: 'left',
+        minWidth: 0,
+        transition: `background ${transitions.focusRing}`
+      }}
+    >
+      <svg
+        width={11}
+        height={11}
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        style={{ flexShrink: 0, opacity: 0.7 }}
+      >
+        <path d="M2 3.5a1 1 0 0 1 1-1h2.4l1 1.2H9a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5z" />
+      </svg>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 12,
+          letterSpacing: '0.01em',
+          color: 'inherit'
+        }}
+      >
+        {name}
+      </span>
+      {!disabled && (
+        <svg
+          width={9}
+          height={9}
+          viewBox="0 0 12 12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            color: colors.text.muted,
+            opacity: hovered ? 1 : 0.7,
+            transition: `opacity ${transitions.focusRing}`
+          }}
+        >
+          <path d="M3.5 5l2.5 2.5L8.5 5" />
+        </svg>
+      )}
+    </button>
   )
 }
 
