@@ -2,7 +2,7 @@ import { useRef, useCallback, useEffect, useMemo, useState } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useCanvasViewport } from './use-canvas-viewport'
 import { useCanvasSelection } from './use-canvas-selection'
-import { colors, canvasTokens } from '../../design/tokens'
+import { colors, canvasTokens, transitions } from '../../design/tokens'
 import { TE_FILE_MIME, inferCardType } from './file-drop-utils'
 import { useEnv } from '../../design/Theme'
 
@@ -272,7 +272,7 @@ export function CanvasSurface({
           backgroundSize: `${tileSize}px ${tileSize}px`,
           backgroundPosition: bgPos,
           opacity: 0,
-          transition: 'opacity 300ms ease-out'
+          transition: `opacity ${transitions.surface}`
         }}
       />
 

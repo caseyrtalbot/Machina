@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import type { PropertyValue } from './markdown-utils'
 
 // ── Type inference ──
@@ -409,7 +409,7 @@ export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps
           border: 'none',
           cursor: 'pointer',
           padding: '0 2px',
-          transition: 'opacity 120ms'
+          transition: `opacity ${transitions.fast}`
         }}
         className="hover:opacity-100"
         aria-label={`Property type: ${type}. Click to change.`}

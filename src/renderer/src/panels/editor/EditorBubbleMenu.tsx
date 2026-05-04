@@ -1,6 +1,6 @@
 import { BubbleMenu } from '@tiptap/react/menus'
 import type { Editor } from '@tiptap/react'
-import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
+import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 
 interface EditorBubbleMenuProps {
   readonly editor: Editor
@@ -36,7 +36,7 @@ function FormatButton({ active, onClick, title, children }: FormatButtonProps) {
         fontWeight: active ? 600 : 400,
         backgroundColor: active ? 'var(--color-accent-muted)' : 'transparent',
         color: active ? 'var(--color-accent-default)' : colors.text.secondary,
-        transition: 'background-color 100ms ease, color 100ms ease'
+        transition: `background-color ${transitions.focusRing}, color ${transitions.focusRing}`
       }}
       onMouseEnter={(e) => {
         if (!active) {

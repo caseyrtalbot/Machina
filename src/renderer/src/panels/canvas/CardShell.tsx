@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
-import { borderRadius, colors, canvasTokens, typography } from '../../design/tokens'
+import { borderRadius, colors, canvasTokens, transitions, typography } from '../../design/tokens'
 import { useEnv } from '../../design/Theme'
 import {
   startConnectionDrag,
@@ -582,7 +582,7 @@ export function CardShell({
             boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)',
             cursor: 'crosshair',
             zIndex: 10,
-            transition: 'opacity 200ms ease',
+            transition: `opacity ${transitions.slow}`,
             ...(side === 'top' && { top: -4, left: '50%', marginLeft: -4 }),
             ...(side === 'bottom' && { bottom: -4, left: '50%', marginLeft: -4 }),
             ...(side === 'left' && { left: -4, top: '50%', marginTop: -4 }),

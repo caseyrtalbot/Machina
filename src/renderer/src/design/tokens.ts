@@ -30,6 +30,12 @@ export const colors = {
     cluster: '#3dca8d',
     tension: '#ecaa0b'
   },
+  // Single source of truth for the dim layer behind modal-class surfaces
+  // (command palette, quick switcher). Coachmark overlays keep their own
+  // lighter alpha — scrim is for surfaces that block interaction beneath them.
+  scrim: {
+    modal: 'rgba(0, 0, 0, 0.55)'
+  },
   claude: {
     ready: '#4ec983', // ARTIFACT_COLORS.session emerald
     warning: '#dfa11a', // ARTIFACT_COLORS.pattern amber

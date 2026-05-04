@@ -6,7 +6,7 @@ import {
   type DragFileData,
   type DragMoveData
 } from '../canvas/file-drop-utils'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { useSettingsStore } from '../../store/settings-store'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { RenameInput } from './FileContextMenu'
@@ -243,7 +243,7 @@ function Chevron({ isExpanded }: { isExpanded: boolean }) {
       xmlns="http://www.w3.org/2000/svg"
       style={{
         transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-        transition: 'transform 150ms ease-out',
+        transition: `transform ${transitions.default}`,
         flexShrink: 0
       }}
     >

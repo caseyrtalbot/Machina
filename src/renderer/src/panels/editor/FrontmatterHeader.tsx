@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Artifact } from '@shared/types'
-import { borderRadius, colors, getArtifactColor, typography } from '../../design/tokens'
+import {
+  borderRadius,
+  colors,
+  getArtifactColor,
+  transitions,
+  typography
+} from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useVaultStore } from '../../store/vault-store'
 import { serializeFrontmatter, type PropertyValue } from './markdown-utils'
@@ -695,14 +701,14 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
         cursor: onNavigate ? 'pointer' : 'default',
         color: colors.text.secondary,
         paddingRight: onRemove ? '22px' : undefined,
-        transition: 'border-color 120ms, color 120ms'
+        transition: `border-color ${transitions.fast}, color ${transitions.fast}`
       }}
     >
       <span
         onClick={() => onNavigate?.(id)}
         style={{
           display: 'inline-block',
-          transition: 'color 120ms'
+          transition: `color ${transitions.fast}`
         }}
         onMouseEnter={(e) => {
           if (!onNavigate) return
@@ -742,7 +748,7 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
             color: colors.text.muted,
             fontSize: '10px',
             opacity: focused ? 1 : hovered ? 0.7 : 0,
-            transition: 'opacity 120ms'
+            transition: `opacity ${transitions.fast}`
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '1'

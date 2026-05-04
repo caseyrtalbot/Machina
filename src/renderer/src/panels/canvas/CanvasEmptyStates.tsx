@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { colors, typography } from '../../design/tokens'
+import { colors, transitions, typography } from '../../design/tokens'
 
 export function CanvasWelcomeCard() {
   const [isHovered, setIsHovered] = useState(false)
@@ -81,7 +81,7 @@ export function CanvasWelcomeCard() {
             border: 'none',
             borderRadius: 8,
             cursor: 'pointer',
-            transition: 'background-color 150ms ease-out',
+            transition: `background-color ${transitions.default}`,
             lineHeight: 1.5
           }}
         >

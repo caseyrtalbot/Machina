@@ -5,7 +5,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
-import { colors, typography } from '../../design/tokens'
+import { colors, transitions, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { groupByFrequency } from './ghost-sections'
 import type { Artifact } from '@shared/types'
@@ -226,7 +226,7 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
         background: hovered ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
         color: hovered ? '#c0c7d0' : '#5a6070',
         cursor: 'pointer',
-        transition: 'background 100ms ease, color 100ms ease',
+        transition: `background ${transitions.focusRing}, color ${transitions.focusRing}`,
         position: 'relative',
         padding: 0
       }}
@@ -247,7 +247,7 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
           opacity: hovered ? 1 : 0,
-          transition: 'opacity 100ms ease',
+          transition: `opacity ${transitions.focusRing}`,
           backdropFilter: 'blur(8px)',
           zIndex: 50
         }}
@@ -341,7 +341,7 @@ function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          transition: 'color 120ms ease'
+          transition: `color ${transitions.fast}`
         }}
       >
         {ghost.id}
@@ -353,7 +353,7 @@ function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
           display: 'flex',
           gap: 4,
           opacity: hovered ? 1 : 0,
-          transition: 'opacity 100ms ease',
+          transition: `opacity ${transitions.focusRing}`,
           position: 'absolute',
           right: 0,
           background: 'linear-gradient(90deg, transparent, var(--color-bg-base) 12px)',
@@ -390,7 +390,7 @@ function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
           minWidth: 18,
           textAlign: 'right' as const,
           opacity: hovered ? 0 : 1,
-          transition: 'opacity 100ms ease'
+          transition: `opacity ${transitions.focusRing}`
         }}
       >
         {ghost.referenceCount}

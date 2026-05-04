@@ -1,5 +1,5 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors } from '../../../design/tokens'
+import { colors, typography } from '../../../design/tokens'
 import { CliCommandCard } from './CliCommandCard'
 import { EditNoteCard } from './EditNoteCard'
 import { ListVaultCard } from './ListVaultCard'
@@ -7,6 +7,7 @@ import { PinToCanvasCard } from './PinToCanvasCard'
 import { ReadCanvasCard } from './ReadCanvasCard'
 import { ReadNoteCard } from './ReadNoteCard'
 import { SearchVaultCard } from './SearchVaultCard'
+import { ToolCardShell } from './ToolCardShell'
 import { ToolErrorCard } from './ToolErrorCard'
 import { WriteNoteCard } from './WriteNoteCard'
 
@@ -45,9 +46,19 @@ export function ToolCallRenderer({
       return <PinToCanvasCard call={call} result={result} />
     default:
       return (
-        <div style={{ fontSize: 11, color: colors.text.muted, marginTop: 8 }}>
-          tool: {call.kind} {result ? 'ok' : 'pending'}
-        </div>
+        <ToolCardShell variant="pill" inline>
+          <span
+            style={{
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              color: colors.text.muted
+            }}
+          >
+            tool: {call.kind} {result ? 'ok' : 'pending'}
+          </span>
+        </ToolCardShell>
       )
   }
 }

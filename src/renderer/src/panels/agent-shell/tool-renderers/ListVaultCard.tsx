@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors, typography } from '../../../design/tokens'
 import { useThreadStore } from '../../../store/thread-store'
@@ -16,9 +17,11 @@ export function ListVaultCard({
   readonly call: ListVaultCall
   readonly result?: SuccessResult
 }) {
+  const [expanded, setExpanded] = useState(false)
+
   if (!result) {
     return (
-      <ToolCardShell variant="pill" inline style={{ gap: 6, color: colors.text.muted }}>
+      <ToolCardShell variant="pill" inline pending style={{ gap: 6, color: colors.text.muted }}>
         <FolderGlyph />
         <span>listing vault…</span>
       </ToolCardShell>
@@ -40,29 +43,41 @@ export function ListVaultCard({
 
   return (
     <ToolCardShell variant="block" style={{ padding: 0 }}>
-      <details>
-        <summary
-          style={{
-            cursor: 'pointer',
-            color: colors.text.primary,
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
-        >
-          <FolderGlyph />
-          <span>
-            {paths.length} {paths.length === 1 ? 'file' : 'files'}
-          </span>
-          <span style={{ color: colors.text.muted, fontFamily: typography.fontFamily.mono }}>
-            · {globsLabel}
-          </span>
-        </summary>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          width: '100%',
+          padding: '8px 12px',
+          background: 'transparent',
+          border: 'none',
+          color: colors.text.primary,
+          textAlign: 'left',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: 'inherit'
+        }}
+      >
+        <span aria-hidden style={{ opacity: 0.5, width: 10 }}>
+          {expanded ? '▾' : '▸'}
+        </span>
+        <FolderGlyph />
+        <span>
+          {paths.length} {paths.length === 1 ? 'file' : 'files'}
+        </span>
+        <span style={{ color: colors.text.muted, fontFamily: typography.fontFamily.mono }}>
+          · {globsLabel}
+        </span>
+      </button>
+      {expanded && (
         <ul
           style={{
             margin: 0,
-            padding: '6px 12px 10px 24px',
+            padding: '6px 12px 10px 28px',
             listStyle: 'none',
             borderTop: `1px solid ${colors.border.subtle}`
           }}
@@ -71,13 +86,13 @@ export function ListVaultCard({
             <li key={p} style={{ padding: '2px 0' }}>
               <a
                 href="#"
+                className="no-underline hover:underline"
                 onClick={(e) => {
                   e.preventDefault()
                   openInEditor(p)
                 }}
                 style={{
                   color: colors.text.primary,
-                  textDecoration: 'none',
                   fontSize: 12,
                   fontFamily: typography.fontFamily.mono
                 }}
@@ -92,7 +107,7 @@ export function ListVaultCard({
             </li>
           )}
         </ul>
-      </details>
+      )}
     </ToolCardShell>
   )
 }

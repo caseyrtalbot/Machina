@@ -3,7 +3,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { colors, borderRadius, typography } from '../../design/tokens'
+import { colors, borderRadius, transitions, typography } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
@@ -177,7 +177,7 @@ function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
         justifyContent: 'center',
         padding: 0,
         boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-        transition: 'color 120ms ease-out, border-color 120ms ease-out'
+        transition: `color ${transitions.fast}, border-color ${transitions.fast}`
       }}
     >
       <svg
@@ -223,7 +223,7 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
           : 'transparent',
         color: on ? colors.text.primary : colors.text.muted,
         cursor: 'pointer',
-        transition: 'background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out'
+        transition: `background ${transitions.fast}, border-color ${transitions.fast}, color ${transitions.fast}`
       }}
     >
       <span
@@ -231,13 +231,13 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
         style={{
           width: 22,
           height: 12,
-          borderRadius: 999,
+          borderRadius: borderRadius.pill,
           background: on
             ? colors.accent.default
             : 'color-mix(in srgb, var(--color-text-primary) 18%, transparent)',
           position: 'relative',
           flexShrink: 0,
-          transition: 'background 120ms ease-out'
+          transition: `background ${transitions.fast}`
         }}
       >
         <span
@@ -249,7 +249,7 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
             height: 8,
             borderRadius: '50%',
             background: on ? colors.bg.base : colors.text.primary,
-            transition: 'left 120ms ease-out, background 120ms ease-out'
+            transition: `left ${transitions.fast}, background ${transitions.fast}`
           }}
         />
       </span>
@@ -306,7 +306,7 @@ function InflightAssistant({
           letterSpacing: typography.metadata.letterSpacing,
           textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
-          marginBottom: 10
+          marginBottom: 8
         }}
       >
         Machina

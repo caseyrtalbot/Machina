@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
-import { EDGE_KIND_COLORS } from '../../design/tokens'
+import { EDGE_KIND_COLORS, transitions } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 const DOT_SIZE = 8
@@ -124,7 +124,7 @@ export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
               cursor: 'pointer',
               opacity: isHovered ? 1 : 0.7,
               transform: isHovered ? 'scale(1.3)' : 'scale(1)',
-              transition: 'opacity 200ms ease, transform 200ms ease'
+              transition: `opacity ${transitions.slow}, transform ${transitions.slow}`
             }}
             onClick={() => handleClick(dot.targetNodeId)}
             onMouseEnter={() => setHoveredId(dot.targetNodeId)}

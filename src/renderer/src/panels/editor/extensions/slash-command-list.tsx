@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Editor, Range } from '@tiptap/core'
-import { typography, colors } from '../../../design/tokens'
+import { typography, colors, transitions } from '../../../design/tokens'
 
 export interface SlashCommandItem {
   readonly title: string
@@ -91,7 +91,7 @@ export function SlashCommandList({ items, command }: SlashCommandListProps) {
             border: 'none',
             cursor: 'pointer',
             color: colors.text.primary,
-            transition: 'background-color 100ms ease'
+            transition: `background-color ${transitions.focusRing}`
           }}
           onClick={() => command(item)}
           onMouseEnter={() => setSelectedIndex(index)}

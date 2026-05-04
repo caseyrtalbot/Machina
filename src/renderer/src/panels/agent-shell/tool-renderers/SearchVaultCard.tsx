@@ -24,7 +24,7 @@ export function SearchVaultCard({
 }) {
   if (!result) {
     return (
-      <ToolCardShell variant="pill" inline style={{ gap: 6, color: colors.text.muted }}>
+      <ToolCardShell variant="pill" inline pending style={{ gap: 6, color: colors.text.muted }}>
         <SearchGlyph />
         <span>searching for &ldquo;{call.args.query}&rdquo;…</span>
       </ToolCardShell>
@@ -80,6 +80,7 @@ export function SearchVaultCard({
           >
             <a
               href="#"
+              className="no-underline hover:underline"
               onClick={(e) => {
                 e.preventDefault()
                 open(h.path)
@@ -87,8 +88,7 @@ export function SearchVaultCard({
               style={{
                 fontSize: 12,
                 fontFamily: typography.fontFamily.mono,
-                color: colors.text.primary,
-                textDecoration: 'none'
+                color: colors.text.primary
               }}
             >
               {h.path}:{h.line}

@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { AgentPicker } from './AgentPicker'
 import type { AgentIdentity } from '@shared/agent-identity'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 const MIN_INPUT_HEIGHT = 22
 const MAX_INPUT_HEIGHT = 200
@@ -68,7 +68,7 @@ export function ThreadInputBar() {
           background: colors.bg.surface,
           border: `1px solid ${colors.border.default}`,
           borderRadius: borderRadius.inline,
-          transition: 'border-color 120ms ease-out, box-shadow 120ms ease-out'
+          transition: `border-color ${transitions.fast}, box-shadow ${transitions.fast}`
         }}
       >
         <textarea
@@ -124,7 +124,7 @@ export function ThreadInputBar() {
                 width: 8,
                 height: 8,
                 background: colors.claude.error,
-                borderRadius: 1
+                borderRadius: borderRadius.card
               }}
             />
             Stop

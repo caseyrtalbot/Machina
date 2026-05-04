@@ -15,7 +15,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { DockTab } from '@shared/dock-types'
-import { borderRadius, colors } from '../../design/tokens'
+import { borderRadius, colors, transitions } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 
 export interface SideDockRibbonProps {
@@ -213,7 +213,7 @@ function RibbonAction({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    transition: 'background 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out'
+    transition: `background ${transitions.fast}, color ${transitions.fast}, border-color ${transitions.fast}`
   }
 
   return (

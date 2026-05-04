@@ -3,7 +3,13 @@ import { useState, useCallback } from 'react'
 import { rewriteWikilinks } from '@engine/rename-links'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { useVaultStore } from '../../store/vault-store'
-import { borderRadius, colors, getArtifactColor, typography } from '../../design/tokens'
+import {
+  borderRadius,
+  colors,
+  getArtifactColor,
+  transitions,
+  typography
+} from '../../design/tokens'
 import { FileContextMenu } from './FileContextMenu'
 import { FileTree } from './FileTree'
 import { SearchBar } from './SearchBar'
@@ -142,7 +148,7 @@ function ActionBar({
             fill="none"
             style={{
               transform: filesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-              transition: 'transform 150ms ease-out',
+              transition: `transform ${transitions.default}`,
               color: colors.text.muted
             }}
           >

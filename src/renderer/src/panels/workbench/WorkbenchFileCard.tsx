@@ -1,7 +1,7 @@
 import { useCallback, memo } from 'react'
 import { CardShell } from '../canvas/CardShell'
 import { useCanvasStore } from '../../store/canvas-store'
-import { colors, typography } from '../../design/tokens'
+import { colors, transitions, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import './workbench-animations.css'
 
@@ -66,7 +66,7 @@ export function WorkbenchFileCard({ node }: WorkbenchFileCardProps) {
         className="flex items-center gap-2 px-2.5 py-2 h-full workbench-file-card-enter"
         style={{
           boxShadow: isActive ? `0 0 12px 2px ${langColor}44` : undefined,
-          transition: 'box-shadow 300ms ease'
+          transition: `box-shadow ${transitions.surface}`
         }}
       >
         {/* Language icon */}

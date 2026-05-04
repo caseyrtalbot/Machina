@@ -5,7 +5,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { useEditorStore } from '../../store/editor-store'
 import { computeDerivedHealth } from '@shared/engine/vault-health'
 import type { HealthIssue } from '@shared/engine/vault-health'
-import { colors, typography } from '../../design/tokens'
+import { colors, transitions, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ function RefreshButton() {
         color: colors.text.muted,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
-        transition: 'opacity 150ms ease-out'
+        transition: `opacity ${transitions.default}`
       }}
     >
       <svg
@@ -213,7 +213,7 @@ function IssueRow({ issue }: { readonly issue: HealthIssue }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         padding: '8px 0',
-        transition: 'background 100ms ease',
+        transition: `background ${transitions.focusRing}`,
         background: hovered ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
       }}
     >

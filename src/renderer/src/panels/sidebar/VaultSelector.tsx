@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useThreadStore } from '../../store/thread-store'
 
@@ -215,7 +215,7 @@ export function VaultSelector({
               color: colors.text.muted,
               flexShrink: 0,
               transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: '150ms ease-out'
+              transition: transitions.default
             }}
           >
             <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" />

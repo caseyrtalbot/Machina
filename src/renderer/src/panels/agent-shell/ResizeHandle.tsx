@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { colors } from '../../design/tokens'
+import { colors, transitions } from '../../design/tokens'
 
 export type ResizeHandleSide = 'sidebar' | 'dock'
 
@@ -69,7 +69,7 @@ export function ResizeHandle({ side, width, onChange, onCommit }: ResizeHandlePr
           left: 1,
           width: 1,
           background: showAccent ? colors.accent.muted : colors.border.default,
-          transition: 'background 120ms ease-out'
+          transition: `background ${transitions.fast}`
         }}
       />
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { extractHeadings, findActiveHeading, type HeadingEntry } from './outline-utils'
 
 interface OutlinePanelProps {
@@ -136,7 +136,7 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                transition: 'color 100ms ease, background 100ms ease'
+                transition: `color ${transitions.focusRing}, background ${transitions.focusRing}`
               }}
               onMouseEnter={(e) => {
                 if (!isActive) e.currentTarget.style.color = colors.text.primary

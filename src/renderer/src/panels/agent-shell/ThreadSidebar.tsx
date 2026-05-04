@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
-import { colors, borderRadius, typography } from '../../design/tokens'
+import { colors, borderRadius, transitions, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 import { AgentPicker } from './AgentPicker'
 import { AgentBadge } from './agent-badge'
@@ -236,7 +236,7 @@ function ThreadRow({
         flexDirection: 'column',
         gap: 6,
         position: 'relative',
-        transition: 'background 100ms ease-out'
+        transition: `background ${transitions.focusRing}`
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -276,7 +276,7 @@ function ThreadRow({
               color: colors.text.muted,
               cursor: 'pointer',
               opacity: hovered || isActive ? 1 : 0,
-              transition: 'opacity 80ms ease',
+              transition: `opacity ${transitions.micro}`,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -319,7 +319,7 @@ function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
         letterSpacing: typography.metadata.letterSpacing,
         textTransform: typography.metadata.textTransform,
         textAlign: 'left',
-        transition: 'background 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out'
+        transition: `background ${transitions.fast}, color ${transitions.fast}, border-color ${transitions.fast}`
       }}
     >
       <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden style={{ flexShrink: 0 }}>
