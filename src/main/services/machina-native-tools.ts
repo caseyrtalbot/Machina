@@ -515,6 +515,7 @@ interface CanvasFileShape {
 
 interface PinCardInput {
   readonly title: string
+  readonly path?: string
   readonly content?: string
   readonly position?: { x: number; y: number }
   readonly refs?: readonly string[]
@@ -587,13 +588,31 @@ async function pinToCanvas(
       }
       return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
     }
-    const body = card.content ?? ''
-    const text = body ? `${card.title}\n\n${body}` : card.title
-    const node = createCanvasNode(
-      'text',
-      { x: card.position?.x ?? 0, y: card.position?.y ?? 0 },
-      { content: text, metadata: { refs: card.refs ?? [] } }
-    )
+    // Three pin shapes:
+    //   1. path set → pin a `note` card pointing at the vault file. The
+    //      canvas renderer reads the .md off disk and renders the actual
+    //      note with full markdown formatting (this is the canonical way
+    //      to pin existing vault content).
+    //   2. content set → pin a `markdown` card with the agent-authored
+    //      body so headings/bold/lists/wikilinks all render rich.
+    //   3. neither → pin a `markdown` card with just the title.
+    // Older `text` cards rendered as raw plaintext, which surfaced literal
+    // `## heading` and `**bold**` markers when the agent passed markdown.
+    const pos = { x: card.position?.x ?? 0, y: card.position?.y ?? 0 }
+    const refs = card.refs ?? []
+    const node = card.path
+      ? createCanvasNode('note', pos, {
+          content: card.path,
+          metadata: { refs }
+        })
+      : (() => {
+          const body = card.content ?? ''
+          const text = body ? `# ${card.title}\n\n${body}` : `# ${card.title}`
+          return createCanvasNode('markdown', pos, {
+            content: text,
+            metadata: { viewMode: 'rendered', refs }
+          })
+        })()
     const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes, node] : [node]
     const next: CanvasFileShape = { ...canvas, nodes }
     try {
@@ -869,6 +888,7 @@ export async function callTool(
           error: { code: 'IO_FATAL', message: 'pin_to_canvas: card.title is required' }
         }
       }
+      const cardPath = typeof c.path === 'string' ? c.path : undefined
       const content = typeof c.content === 'string' ? c.content : undefined
       const rawPos = c.position
       let position: { x: number; y: number } | undefined
@@ -883,7 +903,7 @@ export async function callTool(
         Array.isArray(rawRefs) && rawRefs.every((r): r is string => typeof r === 'string')
           ? (rawRefs as string[])
           : undefined
-      return pinToCanvas(id, { title, content, position, refs }, ctx)
+      return pinToCanvas(id, { title, path: cardPath, content, position, refs }, ctx)
     }
     case 'unpin_from_canvas': {
       const id = typeof input.canvasId === 'string' ? input.canvasId : null

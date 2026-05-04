@@ -39,6 +39,14 @@ export interface PinToCanvasArgs {
   canvasId: string
   card: {
     title: string
+    /** Relative path of a vault note (.md). When set, the canvas pins a
+     * `note` card that references the file directly so its contents render
+     * with full markdown formatting. Preferred over `content` for any
+     * existing vault note. */
+    path?: string
+    /** Free-form markdown body. Used only when there is no source note to
+     * point at — pins a `markdown` card so the body still renders rich
+     * (headings, bold, lists, links). Ignored when `path` is set. */
     content?: string
     position?: { x: number; y: number }
     refs?: string[]

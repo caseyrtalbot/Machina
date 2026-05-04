@@ -869,12 +869,42 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       }
       expect(after.nodes.length).toBe(1)
       const node = after.nodes[0]
-      expect(node.type).toBe('text')
+      // Free-form pins land as `markdown` cards so the body renders rich.
+      // The title becomes an `# H1` heading because the card has no title
+      // chrome of its own.
+      expect(node.type).toBe('markdown')
       expect(node.position).toEqual({ x: 100, y: 200 })
       expect(node.size.width).toBeGreaterThan(0)
       expect(node.size.height).toBeGreaterThan(0)
-      expect(node.content).toBe('Spark idea\n\nbody')
+      expect(node.content).toBe('# Spark idea\n\nbody')
       expect(node.metadata.refs).toEqual(['notes/idea.md'])
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('pins a vault note by path as a `note` card that renders the file', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      seedCanvas(v, 'main', { nodes: [], edges: [] })
+      const res = await callTool(
+        'pin_to_canvas',
+        {
+          canvasId: 'main',
+          card: { title: 'Asimov', path: 'Books/Isaac Asimov.md', position: { x: 0, y: 0 } }
+        },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(true)
+
+      const after = JSON.parse(
+        readFileSync(path.join(v, '.machina', 'canvas', 'main.json'), 'utf8')
+      ) as { nodes: Array<{ type: string; content: string }> }
+      expect(after.nodes).toHaveLength(1)
+      // path-mode pins reference the file directly; the card content is the
+      // relative path so the canvas renderer reads + renders the actual md.
+      expect(after.nodes[0].type).toBe('note')
+      expect(after.nodes[0].content).toBe('Books/Isaac Asimov.md')
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
@@ -896,7 +926,7 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
         nodes: Array<{ content: string }>
       }
       expect(after.nodes).toHaveLength(1)
-      expect(after.nodes[0].content).toBe('Visible pin')
+      expect(after.nodes[0].content).toBe('# Visible pin')
       expect(existsSync(path.join(v, '.machina', 'canvas', 'default.json'))).toBe(false)
     } finally {
       rmSync(v, { recursive: true, force: true })
@@ -942,7 +972,7 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       const ids = new Set(after.nodes.map((n) => n.id))
       expect(ids.size).toBe(N)
       const titles = after.nodes.map((n) => n.content).sort()
-      expect(titles).toEqual(Array.from({ length: N }, (_, i) => `card-${i}`).sort())
+      expect(titles).toEqual(Array.from({ length: N }, (_, i) => `# card-${i}`).sort())
     } finally {
       rmSync(v, { recursive: true, force: true })
     }

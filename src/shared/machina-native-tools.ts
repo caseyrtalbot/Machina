@@ -124,7 +124,7 @@ export const READ_CANVAS_TOOL: NativeToolSpec = {
 export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
   name: 'pin_to_canvas',
   description:
-    'Pin a card to a canvas. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the new card id. Not subject to the approval gate; pinning is reversible via unpin_from_canvas.',
+    "Pin a card to a canvas. To pin an existing vault note (PREFERRED for any .md file already in the vault), set card.path to the note's relative path — the canvas pins a live note card that renders the file's actual content with full markdown formatting (headings, bold, lists, wikilinks). Do NOT retype or paraphrase the note's contents into card.content; reference it by path. Use card.content only when authoring a free-form synthesis card with no source note; that body is pinned as a markdown card and rendered as rich text. canvasId \"default\" is the visible main canvas. Returns the new card id. Not subject to the approval gate; reversible via unpin_from_canvas.",
   input_schema: {
     type: 'object',
     properties: {
@@ -133,7 +133,16 @@ export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
         type: 'object',
         properties: {
           title: { type: 'string' },
-          content: { type: 'string' },
+          path: {
+            type: 'string',
+            description:
+              'Relative path of an existing vault note (e.g. "Books/Isaac Asimov.md"). When set, pins a note card that renders the file. Always prefer this over content for vault notes.'
+          },
+          content: {
+            type: 'string',
+            description:
+              'Free-form markdown body. Use only when there is no vault note to reference. Pinned as a markdown card and rendered as rich text. Ignored if path is set.'
+          },
           position: {
             type: 'object',
             properties: {

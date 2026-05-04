@@ -137,6 +137,7 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
   ) {
     const c = input.card as Record<string, unknown>
     if (typeof c.title === 'string') {
+      const cardPath = typeof c.path === 'string' ? c.path : undefined
       const content = typeof c.content === 'string' ? c.content : undefined
       const rawPos = c.position
       let position: { x: number; y: number } | undefined
@@ -158,6 +159,7 @@ function asToolCall(name: string, id: string, input: Record<string, unknown>): T
           canvasId: input.canvasId,
           card: {
             title: c.title,
+            ...(cardPath !== undefined ? { path: cardPath } : {}),
             ...(content !== undefined ? { content } : {}),
             ...(position ? { position } : {}),
             ...(refs ? { refs } : {})
