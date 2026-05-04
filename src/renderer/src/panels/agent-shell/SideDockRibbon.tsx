@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import {
   Activity,
+  FileText,
   Network,
   PanelRightClose,
   PanelRightOpen,
@@ -17,6 +18,8 @@ import {
 import type { DockTab } from '@shared/dock-types'
 import { borderRadius, colors, transitions } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
+import { useEditorStore } from '../../store/editor-store'
+import { useVaultStore } from '../../store/vault-store'
 
 export interface SideDockRibbonProps {
   readonly onOpenPalette: () => void
@@ -44,6 +47,28 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
 
   function openSurface(tab: DockTab) {
     openOrFocusDockTab(tab)
+  }
+
+  async function openEditor() {
+    const editorState = useEditorStore.getState()
+    const fallback = editorState.activeNotePath ?? editorState.openTabs[0]?.path ?? null
+    if (fallback) {
+      openOrFocusDockTab({ kind: 'editor', path: fallback })
+      return
+    }
+    // No prior note — create an Untitled scratch note in the vault root and open it.
+    const vaultPath = useVaultStore.getState().vaultPath
+    if (!vaultPath) return
+    const today = new Date().toISOString().slice(0, 10)
+    const title = `Untitled ${today}`
+    const filePath = `${vaultPath}/${title}.md`
+    const exists = await window.api.fs.fileExists(filePath)
+    if (!exists) {
+      const content = `---\ntitle: ${title}\ncreated: ${today}\ntags: []\n---\n\n`
+      await window.api.fs.writeFile(filePath, content)
+    }
+    editorState.openTab(filePath, title)
+    openOrFocusDockTab({ kind: 'editor', path: filePath })
   }
 
   const canToggleAutoAccept = activeThread?.agent === 'machina-native'
@@ -83,6 +108,7 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
       <RibbonDivider />
 
       <RibbonGroup>
+        <RibbonAction label="Open editor" icon={FileText} onClick={() => void openEditor()} />
         <RibbonAction
           label="Open canvas"
           icon={PanelsTopLeft}
