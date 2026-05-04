@@ -14,8 +14,9 @@ export function ReadNoteCard({
   readonly call: ReadNoteCall
   readonly result?: ToolResult
 }) {
+  const settled = result !== undefined
   const lines =
-    result && result.ok && typeof result.output === 'object' && result.output !== null
+    settled && result.ok && typeof result.output === 'object' && result.output !== null
       ? ((result.output as { lines?: string }).lines ?? '')
       : ''
   const { onContextMenu, menu } = useToolCardMenu([
@@ -27,6 +28,7 @@ export function ReadNoteCard({
   ])
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!settled) return
     e.preventDefault()
     const vault = useVaultStore.getState().vaultPath
     if (!vault) return
@@ -40,23 +42,33 @@ export function ReadNoteCard({
         variant="pill"
         inline
         onContextMenu={onContextMenu}
-        style={{ cursor: 'pointer', gap: 6 }}
+        style={{ cursor: settled ? 'pointer' : 'default', gap: 6 }}
       >
         <div
           role="button"
-          tabIndex={0}
+          tabIndex={settled ? 0 : -1}
           onClick={handleClick}
           onKeyDown={(e) => {
+            if (!settled) return
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
               handleClick(e as unknown as React.MouseEvent<HTMLDivElement>)
             }
           }}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            color: settled ? colors.text.primary : colors.text.muted
+          }}
         >
           <FileGlyph />
-          <span style={{ color: colors.text.primary }}>{call.args.path}</span>
-          {lines && <span style={{ color: colors.text.muted }}>· {lines}</span>}
+          <span>{call.args.path}</span>
+          {!settled ? (
+            <span style={{ color: colors.text.muted }}>· reading…</span>
+          ) : (
+            lines && <span style={{ color: colors.text.muted }}>· {lines}</span>
+          )}
         </div>
       </ToolCardShell>
       {menu}
