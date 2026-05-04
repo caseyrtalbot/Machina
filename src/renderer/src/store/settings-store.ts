@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { ENV_DEFAULTS, type EnvironmentSettings } from '../design/themes'
-import { DEFAULT_ACCENT_ID } from '../design/accent-presets'
+import { DEFAULT_ACCENT_ID, isAccentId, type AccentId } from '../design/accent-presets'
 
 interface SettingsState {
   readonly env: EnvironmentSettings
@@ -9,7 +9,7 @@ interface SettingsState {
   readonly bodyFont: string
   readonly monoFont: string
   /** Accent preset id from `accent-presets.ts`, or `'custom'` for a hex pick. */
-  readonly accentId: string
+  readonly accentId: AccentId
   /** Hex used when `accentId === 'custom'`. */
   readonly customAccentHex: string
   readonly defaultEditorMode: 'rich' | 'source'
@@ -32,7 +32,7 @@ interface SettingsActions {
   setDisplayFont: (value: string) => void
   setBodyFont: (value: string) => void
   setMonoFont: (value: string) => void
-  setAccentId: (value: string) => void
+  setAccentId: (value: AccentId) => void
   setCustomAccentHex: (value: string) => void
   setDefaultEditorMode: (value: 'rich' | 'source') => void
   setAutosaveInterval: (value: number) => void
@@ -155,6 +155,10 @@ export const useSettingsStore = create<SettingsStore>()(
           if (typeof state.accentId !== 'string') state.accentId = DEFAULT_ACCENT_ID
           if (typeof state.customAccentHex !== 'string') state.customAccentHex = '#ff8c5a'
         }
+
+        // Validate accentId on every load: a removed/typo'd preset id otherwise
+        // resolves silently to ACCENT_HEX inside Theme.tsx's hex resolver.
+        if (!isAccentId(state.accentId)) state.accentId = DEFAULT_ACCENT_ID
 
         return state as unknown as SettingsState & SettingsActions
       }

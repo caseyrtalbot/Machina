@@ -3,7 +3,7 @@ import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
 import { colors, borderRadius, typography } from '../design/tokens'
-import { ACCENT_PRESETS } from '../design/accent-presets'
+import { ACCENT_PRESETS, type AccentId } from '../design/accent-presets'
 import { FontPicker } from './FontPicker'
 
 interface SettingsModalProps {
@@ -130,9 +130,9 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 interface AccentPreviewRowProps {
-  readonly accentId: string
+  readonly accentId: AccentId
   readonly customHex: string
-  readonly onPick: (id: string) => void
+  readonly onPick: (id: AccentId) => void
 }
 
 function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps) {
@@ -360,7 +360,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                 })),
                 { value: 'custom', label: 'Custom…' }
               ]}
-              onChange={setAccentId}
+              onChange={(v) => setAccentId(v as AccentId)}
             />
           </SettingRow>
           {accentId === 'custom' && (

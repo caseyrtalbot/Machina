@@ -5,14 +5,7 @@
  * Currently used as data only. The settings refactor (Phase 9.6) will wire
  * a picker that calls `applyAccentCssVars(hex)` from `design/Theme.tsx`. */
 
-export interface AccentPreset {
-  readonly id: string
-  readonly hex: string
-  readonly label: string
-  readonly note: string
-}
-
-export const ACCENT_PRESETS: readonly AccentPreset[] = [
+export const ACCENT_PRESETS = [
   {
     id: 'phosphor',
     hex: '#41e0d4',
@@ -28,4 +21,23 @@ export const ACCENT_PRESETS: readonly AccentPreset[] = [
   { id: 'mercury', hex: '#cbd5e1', label: 'Mercury', note: 'Pale silver, ascetic, inkless' }
 ] as const
 
-export const DEFAULT_ACCENT_ID = 'ember'
+export type AccentPresetId = (typeof ACCENT_PRESETS)[number]['id']
+export type AccentId = AccentPresetId | 'custom'
+
+export interface AccentPreset {
+  readonly id: AccentPresetId
+  readonly hex: string
+  readonly label: string
+  readonly note: string
+}
+
+const VALID_ACCENT_IDS: ReadonlySet<string> = new Set<string>([
+  ...ACCENT_PRESETS.map((p) => p.id),
+  'custom'
+])
+
+export function isAccentId(value: unknown): value is AccentId {
+  return typeof value === 'string' && VALID_ACCENT_IDS.has(value)
+}
+
+export const DEFAULT_ACCENT_ID: AccentId = 'ember'

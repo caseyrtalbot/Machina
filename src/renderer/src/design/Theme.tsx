@@ -8,10 +8,10 @@ import {
   type EnvironmentSettings
 } from './themes'
 import { applyAccentCssVars } from './apply-accent'
-import { ACCENT_PRESETS } from './accent-presets'
+import { ACCENT_PRESETS, type AccentId } from './accent-presets'
 import { useSettingsStore } from '../store/settings-store'
 
-function resolveAccentHex(accentId: string, customHex: string): string {
+function resolveAccentHex(accentId: AccentId, customHex: string): string {
   if (accentId === 'custom') return customHex
   const preset = ACCENT_PRESETS.find((p) => p.id === accentId)
   return preset?.hex ?? customHex
