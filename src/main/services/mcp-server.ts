@@ -228,7 +228,20 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         }
       },
       async ({ path, content, expectedMtime }) => {
-        // Check rate limiter before gate
+        // Capture mtime BEFORE the gate so a user edit during the approval wait
+        // is detected as a conflict, even if the agent omitted expectedMtime.
+        // vault.write_file requires the file to already exist; reject otherwise.
+        let preGateMtime: string
+        try {
+          const fileStat = await stat(path)
+          preGateMtime = fileStat.mtime.toISOString()
+        } catch {
+          return {
+            content: [{ type: 'text' as const, text: `File not found: ${path}` }],
+            isError: true
+          }
+        }
+
         const rateExceeded = rateLimiter?.isExceeded() ?? false
 
         const decision = await gate.confirm({
@@ -249,7 +262,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
 
         await facade.writeFile(path, content, {
           agentId: 'mcp-agent',
-          expectedMtime
+          expectedMtime: expectedMtime ?? preGateMtime
         })
 
         rateLimiter?.record()
@@ -270,10 +283,14 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         }
       },
       async ({ path, content }) => {
+        const rateExceeded = rateLimiter?.isExceeded() ?? false
+
         const decision = await gate.confirm({
           tool: 'vault.create_file',
           path,
-          description: `Create new file at ${path}`,
+          description: rateExceeded
+            ? 'Write rate limit exceeded. Confirm to continue.'
+            : `Create new file at ${path}`,
           contentPreview: content.slice(0, 200)
         })
 

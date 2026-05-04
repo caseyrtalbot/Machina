@@ -489,5 +489,101 @@ describe('MCP Server', () => {
       await client.close()
       await server.close()
     })
+
+    it('flags rate limit in vault.create_file gate description', async () => {
+      const gate = new AlwaysApproveGate()
+      const rateLimiter = new WriteRateLimiter()
+      for (let i = 0; i < 10; i++) {
+        rateLimiter.record()
+      }
+
+      const { client, server } = await createConnectedPair(vaultRoot, gate, rateLimiter)
+
+      await client.callTool({
+        name: 'vault.create_file',
+        arguments: {
+          path: join(vaultRoot, 'notes', 'fresh.md'),
+          content: '---\nid: fresh\ntitle: Fresh\ntype: note\n---\n\n# Fresh\n'
+        }
+      })
+
+      expect(gate.calls.length).toBeGreaterThanOrEqual(1)
+      expect(gate.calls[0].description).toContain('rate limit exceeded')
+
+      await client.close()
+      await server.close()
+    })
+  })
+
+  describe('vault.write_file TOCTOU defense', () => {
+    /**
+     * A gate that lets the test mutate the file during the approval wait,
+     * simulating the user editing while the dialog is open.
+     */
+    class MutatingGate implements HitlGate {
+      constructor(private readonly onConfirm: () => Promise<void> | void) {}
+      async confirm(): Promise<HitlDecision> {
+        await this.onConfirm()
+        return { allowed: true, reason: 'auto-approved' }
+      }
+    }
+
+    it('rejects when file is edited during the gate wait, even without expectedMtime', async () => {
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+
+      const gate = new MutatingGate(async () => {
+        // Simulate user editing the file while the gate dialog is open.
+        // Bump mtime past second resolution to defeat any coarse comparison.
+        await new Promise((r) => setTimeout(r, 1100))
+        writeFileSync(
+          filePath,
+          '---\nid: hello\ntitle: User Edit\ntype: note\n---\n\n# User Edit\n'
+        )
+      })
+
+      const { client, server } = await createConnectedPair(vaultRoot, gate)
+
+      const result = await client.callTool({
+        name: 'vault.write_file',
+        arguments: {
+          path: filePath,
+          content: '---\nid: hello\ntitle: Agent Wrote\ntype: note\n---\n\n# Agent Wrote\n'
+        }
+      })
+
+      expect(result.isError).toBe(true)
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text
+      expect(text).toContain('Conflict')
+
+      // User's edit must survive — agent's accept did not silently overwrite.
+      const onDisk = readFileSync(filePath, 'utf-8')
+      expect(onDisk).toContain('# User Edit')
+      expect(onDisk).not.toContain('# Agent Wrote')
+
+      await client.close()
+      await server.close()
+    })
+
+    it('rejects vault.write_file on a non-existent path with a clear error', async () => {
+      const gate = new AlwaysApproveGate()
+      const { client, server } = await createConnectedPair(vaultRoot, gate)
+
+      const result = await client.callTool({
+        name: 'vault.write_file',
+        arguments: {
+          path: join(vaultRoot, 'notes', 'does-not-exist.md'),
+          content: '---\nid: x\ntitle: X\ntype: note\n---\n\n# X\n'
+        }
+      })
+
+      expect(result.isError).toBe(true)
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text
+      expect(text).toContain('File not found')
+      // Gate should not have been consulted for a missing file.
+      expect(gate.calls).toHaveLength(0)
+
+      await client.close()
+      await server.close()
+    })
   })
 })
