@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { colors, getArtifactColor, typography } from '../tokens'
+import { colors, getArtifactColor, typography, zIndex } from '../tokens'
 import { fuzzyMatch } from './CommandPalette'
 
 export interface QuickSwitcherItem {
@@ -181,8 +181,8 @@ function QuickSwitcherInner({
       role="dialog"
       aria-modal="true"
       aria-label="Quick switcher"
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] te-cmdk-backdrop"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      className="fixed inset-0 flex items-start justify-center pt-[20vh] te-cmdk-backdrop"
+      style={{ backgroundColor: colors.scrim.modal, zIndex: zIndex.modal }}
       onClick={onClose}
     >
       <div

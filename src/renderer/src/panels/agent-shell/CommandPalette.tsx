@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { colors, borderRadius, typography } from '../../design/tokens'
+import { colors, borderRadius, typography, zIndex } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { buildIndex, buildPaletteItems, searchPalette, type PaletteItem } from './palette-sources'
 
@@ -102,14 +102,14 @@ export function CommandPalette({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.55)',
+        background: colors.scrim.modal,
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
         paddingTop: '12vh',
-        zIndex: 100
+        zIndex: zIndex.modal
       }}
     >
       <div
