@@ -1257,6 +1257,8 @@ body {
   margin: 0 auto;
   letter-spacing: 0.005em;
   word-spacing: 0.02em;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* Allow text selection within the editor */

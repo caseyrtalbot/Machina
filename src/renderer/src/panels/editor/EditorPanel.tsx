@@ -409,8 +409,8 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
           Source
         </button>
       </div>
-      <div className="flex-1 flex min-h-0">
-        <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 flex min-h-0 min-w-0">
+        <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
           <FrontmatterHeader
             artifact={artifact}
             frontmatter={frontmatterData}
