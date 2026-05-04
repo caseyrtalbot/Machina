@@ -22,7 +22,11 @@ export function PinToCanvasCard({
   const refs = call.args.card.refs ?? []
 
   return (
-    <ToolCardShell variant="block" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <ToolCardShell
+      variant="block"
+      pending={!settled}
+      style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+    >
       <PinGlyph />
       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
         <div

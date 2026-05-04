@@ -184,7 +184,7 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
         borderRadius: borderRadius.tool,
         color: colors.text.primary,
         fontFamily: typography.fontFamily.body,
-        fontSize: 13,
+        fontSize: 'var(--text-body)',
         lineHeight: 1.5,
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
         zIndex: 1000

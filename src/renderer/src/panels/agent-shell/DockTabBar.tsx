@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -6,11 +7,25 @@ import {
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 import { useThreadStore } from '../../store/thread-store'
-import { DOCK_TAB_KINDS, type DockTab, type DockTabKind } from '@shared/dock-types'
-import { borderRadius, colors, spacing, typography, zIndex } from '../../design/tokens'
+import { type DockTab } from '@shared/dock-types'
+import { borderRadius, colors, spacing, transitions, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 
 const EMPTY_TABS: readonly DockTab[] = []
+const TAB_EXIT_DURATION_MS = 140
+
+// Module-scoped stable identity per DockTab object (same pattern as SurfaceDock).
+// WeakMap entries get GC'd when the tab leaves the store, so this never grows.
+const tabIdMap = new WeakMap<DockTab, string>()
+let tabIdCounter = 0
+function tabIdentity(tab: DockTab): string {
+  const cached = tabIdMap.get(tab)
+  if (cached) return cached
+  tabIdCounter += 1
+  const id = `dt${tabIdCounter}`
+  tabIdMap.set(tab, id)
+  return id
+}
 
 interface TabMenuTarget {
   readonly index: number
@@ -52,36 +67,60 @@ export function DockTabBar({
 }) {
   const id = useThreadStore((s) => s.activeThreadId)
   const tabs = useThreadStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
-  const remove = useThreadStore((s) => s.removeDockTab)
-  const removeMany = useThreadStore((s) => s.removeDockTabs)
-  const add = useThreadStore((s) => s.openOrFocusDockTab)
   const reorder = useThreadStore((s) => s.reorderDockTab)
-  const [adderOpen, setAdderOpen] = useState(false)
   const [menu, setMenu] = useState<TabMenuTarget | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const [hoveredAdderItem, setHoveredAdderItem] = useState<DockTabKind | null>(null)
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-  const adderRef = useRef<HTMLDivElement>(null)
+  const [exitingIds, setExitingIds] = useState<ReadonlySet<string>>(() => new Set())
   const tabRefs = useRef<Array<HTMLDivElement | null>>([])
+  const exitTimers = useRef<number[]>([])
 
   useEffect(() => {
-    if (!adderOpen) return
-    function onMouseDown(e: MouseEvent) {
-      if (adderRef.current && !adderRef.current.contains(e.target as Node)) {
-        setAdderOpen(false)
-      }
-    }
-    function onKeyDown(e: globalThis.KeyboardEvent) {
-      if (e.key === 'Escape') setAdderOpen(false)
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    document.addEventListener('keydown', onKeyDown)
     return () => {
-      document.removeEventListener('mousedown', onMouseDown)
-      document.removeEventListener('keydown', onKeyDown)
+      for (const t of exitTimers.current) window.clearTimeout(t)
+      exitTimers.current = []
     }
-  }, [adderOpen])
+  }, [])
+
+  // Animate close: mark target tabs as exiting, then dispatch the actual store
+  // removal once the exit animation has had time to play. Indices are recomputed
+  // at removal time because the store may shift between click and timeout.
+  const animateClose = useCallback(
+    (indices: readonly number[]) => {
+      if (indices.length === 0) return
+      const ids: string[] = []
+      for (const i of indices) {
+        const tab = tabs[i]
+        if (tab) ids.push(tabIdentity(tab))
+      }
+      if (ids.length === 0) return
+      setExitingIds((prev) => {
+        const next = new Set(prev)
+        for (const tabId of ids) next.add(tabId)
+        return next
+      })
+      const timer = window.setTimeout(() => {
+        const cur = useThreadStore.getState()
+        const threadId = cur.activeThreadId
+        const list = threadId ? (cur.dockTabsByThreadId[threadId] ?? []) : []
+        const targetIndices: number[] = []
+        for (let i = 0; i < list.length; i += 1) {
+          if (ids.includes(tabIdentity(list[i]))) targetIndices.push(i)
+        }
+        if (targetIndices.length === 1) cur.removeDockTab(targetIndices[0])
+        else if (targetIndices.length > 1) cur.removeDockTabs(targetIndices)
+        setExitingIds((prev) => {
+          const next = new Set(prev)
+          for (const tabId of ids) next.delete(tabId)
+          return next
+        })
+        exitTimers.current = exitTimers.current.filter((t) => t !== timer)
+      }, TAB_EXIT_DURATION_MS)
+      exitTimers.current.push(timer)
+    },
+    [tabs]
+  )
 
   // Keep the active tab visible when the strip overflows horizontally.
   useLayoutEffect(() => {
@@ -121,46 +160,24 @@ export function DockTabBar({
       onActivate(i)
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
-      remove(i)
+      animateClose([i])
     }
-  }
-
-  function newTab(kind: DockTabKind) {
-    setAdderOpen(false)
-    let tab: DockTab
-    switch (kind) {
-      case 'canvas':
-        tab = { kind: 'canvas', id: 'default' }
-        break
-      case 'editor':
-        tab = { kind: 'editor', path: '' }
-        break
-      case 'terminal':
-        tab = { kind: 'terminal', sessionId: '' }
-        break
-      default:
-        tab = { kind }
-        break
-    }
-    // openOrFocusDockTab handles both add-and-activate and focus-existing,
-    // so we don't manually call onActivate here.
-    add(tab)
   }
 
   function closeTab(index: number) {
-    remove(index)
+    animateClose([index])
   }
 
   function closeOthers(keep: number) {
     const indices: number[] = []
     for (let i = 0; i < tabs.length; i += 1) if (i !== keep) indices.push(i)
-    removeMany(indices)
+    animateClose(indices)
   }
 
   function closeToRight(from: number) {
     const indices: number[] = []
     for (let i = from + 1; i < tabs.length; i += 1) indices.push(i)
-    removeMany(indices)
+    animateClose(indices)
   }
 
   return (
@@ -188,29 +205,35 @@ export function DockTabBar({
         }}
       >
         {tabs.map((t, i) => {
+          const tid = tabIdentity(t)
+          const isExiting = exitingIds.has(tid)
           const isActive = i === activeIndex
           const isHovered = hoveredIndex === i
           const isDragging = draggingIndex === i
           const isDropTarget = dropIndex === i && draggingIndex !== null && draggingIndex !== i
+          const motionClass = isExiting ? 'dock-tab-exiting' : 'dock-tab-enter'
           return (
             <div
-              key={i}
+              key={tid}
               ref={(el) => {
                 tabRefs.current[i] = el
               }}
+              className={motionClass}
               role="tab"
               id={`dock-tab-${i}`}
               aria-selected={isActive}
               aria-controls={`dock-tab-panel-${i}`}
-              tabIndex={isActive ? 0 : -1}
-              draggable
+              tabIndex={isActive && !isExiting ? 0 : -1}
+              aria-hidden={isExiting || undefined}
+              draggable={!isExiting}
               onDragStart={(e) => {
+                if (isExiting) return
                 e.dataTransfer.effectAllowed = 'move'
                 e.dataTransfer.setData('text/plain', String(i))
                 setDraggingIndex(i)
               }}
               onDragOver={(e) => {
-                if (draggingIndex === null || draggingIndex === i) return
+                if (draggingIndex === null || draggingIndex === i || isExiting) return
                 e.preventDefault()
                 e.dataTransfer.dropEffect = 'move'
                 setDropIndex(i)
@@ -224,7 +247,7 @@ export function DockTabBar({
                 const from = fromStr ? Number(fromStr) : draggingIndex
                 setDraggingIndex(null)
                 setDropIndex(null)
-                if (from === null || Number.isNaN(from) || from === i) return
+                if (from === null || Number.isNaN(from) || from === i || isExiting) return
                 reorder(from, i)
                 onActivate(i)
               }}
@@ -232,11 +255,15 @@ export function DockTabBar({
                 setDraggingIndex(null)
                 setDropIndex(null)
               }}
-              onClick={() => onActivate(i)}
+              onClick={() => {
+                if (isExiting) return
+                onActivate(i)
+              }}
               onKeyDown={(e) => onTabKeyDown(e, i)}
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex((cur) => (cur === i ? null : cur))}
               onContextMenu={(e) => {
+                if (isExiting) return
                 e.preventDefault()
                 setMenu({ index: i, position: { x: e.clientX, y: e.clientY } })
               }}
@@ -247,7 +274,11 @@ export function DockTabBar({
                 padding: '0 12px',
                 height: '100%',
                 flexShrink: 0,
-                background: isHovered && !isActive ? colors.tab.bgHover : 'transparent',
+                background: isActive
+                  ? colors.tab.bgActive
+                  : isHovered
+                    ? colors.tab.bgHover
+                    : colors.tab.bg,
                 borderLeft: isDropTarget
                   ? `2px solid ${colors.accent.default}`
                   : '2px solid transparent',
@@ -262,8 +293,7 @@ export function DockTabBar({
                 cursor: 'pointer',
                 outline: 'none',
                 opacity: isDragging ? 0.5 : 1,
-                transition:
-                  'background 100ms ease-out, color 100ms ease-out, opacity 100ms ease-out'
+                transition: `background ${transitions.focusRing}, color ${transitions.focusRing}, opacity ${transitions.focusRing}`
               }}
             >
               <span
@@ -284,7 +314,7 @@ export function DockTabBar({
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation()
-                  remove(i)
+                  animateClose([i])
                 }}
                 style={{
                   display: 'inline-flex',
@@ -301,7 +331,7 @@ export function DockTabBar({
                   color: colors.text.muted,
                   cursor: 'pointer',
                   opacity: isActive || isHovered ? 1 : 0,
-                  transition: 'opacity 100ms ease-out',
+                  transition: `opacity ${transitions.focusRing}`,
                   pointerEvents: isActive || isHovered ? 'auto' : 'none'
                 }}
               >
@@ -310,76 +340,6 @@ export function DockTabBar({
             </div>
           )
         })}
-      </div>
-      <div
-        ref={adderRef}
-        style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch' }}
-      >
-        <button
-          aria-label="Add tab"
-          title="Add tab"
-          aria-haspopup="menu"
-          aria-expanded={adderOpen}
-          onClick={() => setAdderOpen((v) => !v)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: spacing.dockTabBarHeight,
-            height: '100%',
-            flexShrink: 0,
-            background: 'transparent',
-            border: 'none',
-            color: colors.text.muted,
-            fontSize: 14,
-            lineHeight: 1,
-            cursor: 'pointer'
-          }}
-        >
-          +
-        </button>
-        {adderOpen && (
-          <div
-            role="menu"
-            className="sidebar-popover"
-            style={{
-              position: 'absolute',
-              top: spacing.dockTabBarHeight + 4,
-              right: 0,
-              minWidth: 140,
-              padding: 4,
-              zIndex: zIndex.dockPopover
-            }}
-          >
-            {DOCK_TAB_KINDS.map((k) => {
-              const isHovered = hoveredAdderItem === k
-              return (
-                <div
-                  key={k}
-                  role="menuitem"
-                  onClick={() => newTab(k)}
-                  onMouseEnter={() => setHoveredAdderItem(k)}
-                  onMouseLeave={() => setHoveredAdderItem((cur) => (cur === k ? null : cur))}
-                  style={{
-                    padding: '6px 10px',
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: typography.metadata.size,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: isHovered ? colors.text.primary : colors.text.secondary,
-                    background: isHovered
-                      ? 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)'
-                      : 'transparent',
-                    borderRadius: borderRadius.inline,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {k}
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
       {menu && (
         <ContextMenu

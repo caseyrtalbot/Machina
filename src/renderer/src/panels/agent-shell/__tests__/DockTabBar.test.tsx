@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, fireEvent, screen } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, fireEvent, screen, act } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
 import { DockTabBar } from '../DockTabBar'
 import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
+
+// Tab closes are animated with a deferred store dispatch. Tests advance fake
+// timers past the exit animation window before asserting on store state.
+const TAB_EXIT_FLUSH_MS = 200
 
 const tabs: DockTab[] = [{ kind: 'graph' }, { kind: 'ghosts' }, { kind: 'health' }]
 
@@ -19,6 +23,7 @@ const thread = (id: string): Thread => ({
 })
 
 beforeEach(() => {
+  vi.useFakeTimers()
   useThreadStore.setState(useThreadStore.getInitialState())
   useThreadStore.setState({
     vaultPath: '/v',
@@ -26,6 +31,10 @@ beforeEach(() => {
     dockTabsByThreadId: { a: tabs.slice() },
     activeThreadId: 'a'
   })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('DockTabBar context menu', () => {
@@ -43,6 +52,9 @@ describe('DockTabBar context menu', () => {
     const ghosts = screen.getAllByRole('tab')[1]
     fireEvent.contextMenu(ghosts, { clientX: 50, clientY: 50 })
     fireEvent.click(screen.getByText('Close other tabs'))
+    act(() => {
+      vi.advanceTimersByTime(TAB_EXIT_FLUSH_MS)
+    })
     const remaining = useThreadStore.getState().dockTabsByThreadId['a']
     expect(remaining).toEqual([{ kind: 'ghosts' }])
   })
@@ -52,6 +64,9 @@ describe('DockTabBar context menu', () => {
     const graph = screen.getAllByRole('tab')[0]
     fireEvent.contextMenu(graph, { clientX: 50, clientY: 50 })
     fireEvent.click(screen.getByText('Close tabs to the right'))
+    act(() => {
+      vi.advanceTimersByTime(TAB_EXIT_FLUSH_MS)
+    })
     const remaining = useThreadStore.getState().dockTabsByThreadId['a']
     expect(remaining).toEqual([{ kind: 'graph' }])
   })

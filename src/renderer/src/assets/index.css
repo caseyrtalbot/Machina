@@ -1150,6 +1150,9 @@ body {
   .te-card-enter,
   .te-popover-enter,
   .te-cmdk-backdrop,
+  .te-tool-card-pending::after,
+  .dock-tab-enter,
+  .dock-tab-exiting,
   [class*='te-pulse'],
   [class*='te-shimmer'],
   [class*='te-slide'],
@@ -2347,6 +2350,62 @@ body {
 .tile-close-btn:hover {
   color: #e53935 !important;
   opacity: 1 !important;
+}
+
+/* ─── Tool Card Pending Shimmer ─── */
+.te-tool-card-pending {
+  position: relative;
+  overflow: hidden;
+}
+.te-tool-card-pending::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-accent-default) 9%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: te-shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ─── Dock Tab Open / Close Motion ─── */
+@keyframes te-tab-enter {
+  from {
+    opacity: 0;
+    max-width: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    max-width: 240px;
+    transform: translateY(0);
+  }
+}
+@keyframes te-tab-exit {
+  from {
+    opacity: 1;
+    max-width: 240px;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    max-width: 0;
+    transform: translateY(2px);
+  }
+}
+.dock-tab-enter {
+  animation: te-tab-enter 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
+}
+.dock-tab-exiting {
+  animation: te-tab-exit 140ms cubic-bezier(0.4, 0, 1, 1) both;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* ─── Popover / Palette Entrance ─── */

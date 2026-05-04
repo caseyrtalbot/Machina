@@ -25,6 +25,7 @@ export function ReadCanvasCard({
     <ToolCardShell
       variant="pill"
       inline
+      pending={!settled}
       style={{ gap: 6, color: settled ? colors.text.primary : colors.text.muted }}
     >
       <CanvasGlyph />

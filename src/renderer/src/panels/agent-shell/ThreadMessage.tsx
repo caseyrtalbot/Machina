@@ -30,7 +30,7 @@ export function ThreadMessage({ message, streamingBody }: Props) {
           letterSpacing: typography.metadata.letterSpacing,
           textTransform: typography.metadata.textTransform,
           color: colors.text.muted,
-          marginBottom: 10
+          marginBottom: 8
         }}
       >
         {heading}

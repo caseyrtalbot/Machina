@@ -83,6 +83,18 @@ describe('AgentShell welcome tooltip', () => {
     expect(controls.style.height).toBe('39px')
   })
 
+  it('pins 8px corner gutters so macOS keeps the resize hit zones', () => {
+    // The drag region must be inset 8px from the left/right edges. Without
+    // this padding the WebkitAppRegion: drag wins over the OS corner-resize
+    // handles and users can't resize the window from the top corners. This is
+    // load-bearing platform behavior, not visual polish.
+    useVaultStore.setState({ vaultPath: null })
+    render(<AgentShell />)
+    const strip = screen.getByTestId('window-drag-region')
+    expect(strip.style.paddingLeft).toBe('8px')
+    expect(strip.style.paddingRight).toBe('8px')
+  })
+
   it('dismissing flips welcomed and writes config', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const writeConfig = (window as any).api.thread.writeConfig

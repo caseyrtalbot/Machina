@@ -34,6 +34,7 @@ export function CliCommandCard({
   return (
     <ToolCardShell
       variant="block"
+      pending={!result}
       onContextMenu={onContextMenu}
       style={{
         padding: 0,

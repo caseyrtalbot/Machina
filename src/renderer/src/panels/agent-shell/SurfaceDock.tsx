@@ -3,13 +3,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { DockTabBar } from './DockTabBar'
 import { DockTabContent } from './DockTabContent'
 import { colors, typography } from '../../design/tokens'
-import { DOCK_TAB_KINDS, type DockTab } from '@shared/dock-types'
-
-const EMPTY_KIND_LIST = (() => {
-  const kinds = DOCK_TAB_KINDS
-  if (kinds.length <= 1) return kinds.join('')
-  return `${kinds.slice(0, -1).join(', ')}, or ${kinds[kinds.length - 1]}`
-})()
+import { type DockTab } from '@shared/dock-types'
 
 const EMPTY_TABS: readonly DockTab[] = []
 
@@ -113,21 +107,37 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
             )
           })
         ) : (
-          <div
-            data-testid="dock-empty-state"
-            style={{
-              padding: 24,
-              color: colors.text.muted,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 11,
-              letterSpacing: '0.04em',
-              lineHeight: 1.6
-            }}
-          >
-            no surface tabs yet, hit + to open {EMPTY_KIND_LIST}
-          </div>
+          <EmptyDockState />
         )}
       </div>
     </aside>
+  )
+}
+
+function EmptyDockState() {
+  return (
+    <div
+      data-testid="dock-empty-state"
+      style={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24
+      }}
+    >
+      <div
+        style={{
+          color: colors.text.muted,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
+          textAlign: 'center'
+        }}
+      >
+        pick a surface from the dock
+      </div>
+    </div>
   )
 }
