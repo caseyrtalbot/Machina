@@ -39,6 +39,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
   const storeNotePath = useEditorStore((s) => s.activeNotePath)
   const activeNotePath = filePath !== undefined ? filePath : storeNotePath
   const mode = useEditorStore((s) => s.mode)
+  const setMode = useEditorStore((s) => s.setMode)
   const content = useEditorStore((s) => s.content)
   const setContent = useEditorStore((s) => s.setContent)
   const loadContent = useEditorStore((s) => s.loadContent)
@@ -388,6 +389,26 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
           </span>
         </div>
       )}
+      <div className="editor-mode-bar" role="tablist" aria-label="Editor mode">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'rich'}
+          className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
+          onClick={() => setMode('rich')}
+        >
+          Rich
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'source'}
+          className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
+          onClick={() => setMode('source')}
+        >
+          Source
+        </button>
+      </div>
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 overflow-y-auto">
           <FrontmatterHeader

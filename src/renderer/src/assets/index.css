@@ -1102,6 +1102,54 @@ body {
   overflow: hidden;
 }
 
+.editor-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--color-bg-base);
+}
+
+.editor-mode-toggle__btn {
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+.editor-mode-toggle__btn:first-of-type {
+  border-radius: 2px 0 0 2px;
+}
+
+.editor-mode-toggle__btn:last-of-type {
+  border-radius: 0 2px 2px 0;
+  border-left: none;
+}
+
+.editor-mode-toggle__btn:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+
+.editor-mode-toggle__btn--active {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  border-color: var(--color-border-strong);
+}
+
 .canvas-split-editor__header {
   background: linear-gradient(
     180deg,
@@ -1810,31 +1858,12 @@ body {
 }
 
 /*
- * Thread input box: integrated, soft-surface treatment. Resting state sits
- * one elevation step above the panel; focus lifts the surface another step
- * and reveals a 2px accent rail along the left edge — Warp-style "active
- * lane" instead of a perimeter halo. No outer ring, no border-color flip.
+ * Thread input box: integrated, soft-surface treatment. Surface stays put
+ * on focus; only the border swaps to a 1px white outline, matching the
+ * thread-row selection treatment in the sidebar. No bg lift, no rail.
  */
-.thread-input-box::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-  background: var(--color-accent-default);
-  opacity: 0;
-  transition: opacity 150ms ease-out;
-  pointer-events: none;
-}
-
 .thread-input-box:focus-within {
-  background: var(--color-bg-elevated) !important;
-  border-color: var(--color-border-strong) !important;
-}
-
-.thread-input-box:focus-within::before {
-  opacity: 1;
+  border-color: color-mix(in srgb, var(--color-text-primary) 55%, transparent) !important;
 }
 
 .thread-input-textarea::placeholder {
