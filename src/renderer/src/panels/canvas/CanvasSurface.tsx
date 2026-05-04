@@ -242,7 +242,7 @@ export function CanvasSurface({
         backgroundColor: canvasTokens.surface,
         backgroundImage: [
           'linear-gradient(180deg, color-mix(in srgb, var(--color-text-primary) 3%, transparent), transparent 24%)',
-          'linear-gradient(90deg, color-mix(in srgb, var(--color-accent-default) 6%, transparent), transparent 18%, transparent 82%, color-mix(in srgb, var(--color-text-primary) 3%, transparent))',
+          'linear-gradient(90deg, color-mix(in srgb, var(--color-text-primary) 3%, transparent), transparent 18%, transparent 82%, color-mix(in srgb, var(--color-text-primary) 3%, transparent))',
           'radial-gradient(ellipse at 24% 16%, rgba(255,255,255,0.024) 0%, transparent 56%)',
           'radial-gradient(ellipse at 76% 84%, rgba(255,255,255,0.014) 0%, transparent 52%)',
           svgDataUri

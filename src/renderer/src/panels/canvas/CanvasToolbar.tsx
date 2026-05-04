@@ -1,4 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  Import,
+  LayoutDashboard,
+  LayoutGrid,
+  Minus,
+  Plus,
+  Redo2,
+  SlidersHorizontal,
+  Spline,
+  Trash2,
+  Undo2,
+  type LucideIcon
+} from 'lucide-react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useSettingsStore } from '../../store/settings-store'
@@ -17,6 +30,9 @@ interface CanvasToolbarProps {
   readonly onClear: () => void
 }
 
+const ICON_SIZE = 16
+const ICON_STROKE = 1.75
+
 function Tip({
   label,
   shortcut
@@ -30,6 +46,10 @@ function Tip({
       {shortcut && <span className="canvas-tooltip__shortcut">{shortcut}</span>}
     </span>
   )
+}
+
+function ToolIcon({ icon: Icon }: { readonly icon: LucideIcon }): React.ReactElement {
+  return <Icon size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />
 }
 
 /** Compute the canvas-space point at the center of the visible surface. */
@@ -192,19 +212,8 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           data-testid="canvas-add-card"
           aria-label="Add card"
-          style={{ color: colors.text.secondary }}
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <line x1="7" y1="2" x2="7" y2="12" />
-            <line x1="2" y1="7" x2="12" y2="7" />
-          </svg>
+          <ToolIcon icon={Plus} />
         </button>
         <Tip label="Add card" />
       </div>
@@ -214,23 +223,8 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           data-testid="canvas-import"
           aria-label="Import notes"
-          style={{ color: colors.text.secondary }}
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <circle cx="3" cy="3" r="1.5" />
-            <circle cx="11" cy="3" r="1.5" />
-            <circle cx="7" cy="11" r="1.5" />
-            <line x1="4.2" y1="3.8" x2="5.8" y2="9.8" />
-            <line x1="9.8" y1="3.8" x2="8.2" y2="9.8" />
-            <line x1="4.5" y1="3" x2="9.5" y2="3" />
-          </svg>
+          <ToolIcon icon={Import} />
         </button>
         <Tip label="Import notes" shortcut="⌘G" />
       </div>
@@ -239,7 +233,7 @@ export function CanvasToolbar({
       {/* VIEW: how am I seeing it */}
       <div className="canvas-toolbtn-wrap">
         <button onClick={zoomIn} className="canvas-toolbtn" aria-label="Zoom in">
-          +
+          <ToolIcon icon={Plus} />
         </button>
         <Tip label="Zoom in" />
       </div>
@@ -331,7 +325,7 @@ export function CanvasToolbar({
       </div>
       <div className="canvas-toolbtn-wrap">
         <button onClick={zoomOut} className="canvas-toolbtn" aria-label="Zoom out">
-          -
+          <ToolIcon icon={Minus} />
         </button>
         <Tip label="Zoom out" />
       </div>
@@ -342,19 +336,7 @@ export function CanvasToolbar({
           aria-label={showAllEdges ? 'Hide edges' : 'Show edges'}
           aria-pressed={showAllEdges}
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          >
-            <circle cx="4" cy="4" r="2" />
-            <circle cx="12" cy="12" r="2" />
-            <line x1="5.5" y1="5.5" x2="10.5" y2="10.5" />
-          </svg>
+          <ToolIcon icon={Spline} />
         </button>
         <Tip label={showAllEdges ? 'Hide edges' : 'Show edges'} />
       </div>
@@ -368,20 +350,7 @@ export function CanvasToolbar({
             aria-haspopup="menu"
             aria-expanded={envMenuOpen}
           >
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <circle cx="8" cy="8" r="3" />
-              <line x1="8" y1="1" x2="8" y2="4" />
-              <line x1="8" y1="12" x2="8" y2="15" />
-              <line x1="1" y1="8" x2="4" y2="8" />
-              <line x1="12" y1="8" x2="15" y2="8" />
-            </svg>
+            <ToolIcon icon={SlidersHorizontal} />
           </button>
           <Tip label="Environment" />
         </div>
@@ -455,18 +424,7 @@ export function CanvasToolbar({
           data-testid="canvas-undo"
           aria-label="Undo"
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <polyline points="3 7 6 4" />
-            <polyline points="3 7 6 10" />
-            <path d="M6 7h4a2 2 0 0 1 0 4H8" />
-          </svg>
+          <ToolIcon icon={Undo2} />
         </button>
         <Tip label="Undo" shortcut="⌘Z" />
       </div>
@@ -478,18 +436,7 @@ export function CanvasToolbar({
           data-testid="canvas-redo"
           aria-label="Redo"
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <polyline points="11 7 8 4" />
-            <polyline points="11 7 8 10" />
-            <path d="M8 7H4a2 2 0 0 0 0 4h2" />
-          </svg>
+          <ToolIcon icon={Redo2} />
         </button>
         <Tip label="Redo" shortcut="⇧⌘Z" />
       </div>
@@ -507,19 +454,7 @@ export function CanvasToolbar({
             aria-haspopup="menu"
             aria-expanded={tileMenuOpen}
           >
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <rect x="1" y="1" width="5" height="5" rx="0.5" />
-              <rect x="8" y="1" width="5" height="5" rx="0.5" />
-              <rect x="1" y="8" width="5" height="5" rx="0.5" />
-              <rect x="8" y="8" width="5" height="5" rx="0.5" />
-            </svg>
+            <ToolIcon icon={LayoutGrid} />
           </button>
           <Tip label="Tile layout" shortcut="⌘L" />
         </div>
@@ -578,23 +513,9 @@ export function CanvasToolbar({
           aria-label={organizePhase === 'processing' ? 'Organizing…' : 'Organize'}
           style={{ cursor: organizePhase === 'processing' ? 'wait' : undefined }}
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="1" y="1" width="12" height="12" rx="2" />
-            <rect x="3" y="3" width="4" height="3.5" rx="0.8" />
-            <rect x="3" y="8" width="3" height="3" rx="0.8" />
-            <rect x="8" y="5" width="3.5" height="3.5" rx="0.8" />
-          </svg>
+          <ToolIcon icon={LayoutDashboard} />
         </button>
-        <Tip label={organizePhase === 'processing' ? 'Organizing\u2026' : 'Organize'} />
+        <Tip label={organizePhase === 'processing' ? 'Organizing…' : 'Organize'} />
       </div>
 
       <div className="canvas-toolrail__divider" />
@@ -622,10 +543,10 @@ export function CanvasToolbar({
               }
               aria-label={filled ? `Jump to focus frame ${slot}` : `Focus frame ${slot} (empty)`}
               style={{
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 borderRadius: '50%',
-                border: `1.5px solid ${colors.text.muted}`,
+                border: `1.25px solid ${colors.text.muted}`,
                 backgroundColor: filled ? colors.text.muted : 'transparent',
                 cursor: 'pointer',
                 padding: 0
@@ -647,34 +568,14 @@ export function CanvasToolbar({
           disabled={!clearEnabled}
           data-testid="canvas-clear"
           aria-label="Clear canvas"
-          style={{
-            color: colors.text.secondary,
-            opacity: clearEnabled ? 1 : 0.4,
-            cursor: clearEnabled ? 'pointer' : 'not-allowed'
-          }}
           onMouseEnter={(e) => {
-            if (clearEnabled) e.currentTarget.style.color = '#ef4444'
+            if (clearEnabled) e.currentTarget.style.color = colors.claude.error
           }}
           onMouseLeave={(e) => {
-            if (clearEnabled) e.currentTarget.style.color = colors.text.secondary
+            if (clearEnabled) e.currentTarget.style.color = ''
           }}
         >
-          <svg
-            width={14}
-            height={14}
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M2.5 4 L11.5 4" />
-            <path d="M5.5 4 L5.5 2.5 L8.5 2.5 L8.5 4" />
-            <path d="M4 4 L4.5 12 L9.5 12 L10 4" />
-            <path d="M6 6.5 L6 10" />
-            <path d="M8 6.5 L8 10" />
-          </svg>
+          <ToolIcon icon={Trash2} />
         </button>
         <Tip label="Clear canvas" />
       </div>
