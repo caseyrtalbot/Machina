@@ -412,49 +412,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             />
           </SettingRow>
 
-          {/* ── Canvas ── */}
-          <SectionHeading>Canvas</SectionHeading>
-          <SettingRow label="Card Opacity">
-            <SliderInput
-              value={env.cardOpacity}
-              min={50}
-              max={100}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('cardOpacity', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Card Header">
-            <SliderInput
-              value={env.cardHeaderDarkness}
-              min={0}
-              max={60}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('cardHeaderDarkness', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Card Blur">
-            <SliderInput
-              value={env.cardBlur}
-              min={0}
-              max={24}
-              step={1}
-              unit="px"
-              onChange={(v) => setEnv('cardBlur', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Grid Dots">
-            <SliderInput
-              value={env.gridDotVisibility}
-              min={0}
-              max={50}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('gridDotVisibility', v)}
-            />
-          </SettingRow>
-
           {/* ── Editor ── */}
           <SectionHeading>Editor</SectionHeading>
           <SettingRow label="Default Mode">

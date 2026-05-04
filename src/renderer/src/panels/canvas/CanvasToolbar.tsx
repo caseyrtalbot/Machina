@@ -52,6 +52,61 @@ function ToolIcon({ icon: Icon }: { readonly icon: LucideIcon }): React.ReactEle
   return <Icon size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />
 }
 
+interface EnvSliderProps {
+  readonly label: string
+  readonly value: number
+  readonly min: number
+  readonly max: number
+  readonly step: number
+  readonly unit: string
+  readonly onChange: (value: number) => void
+}
+
+function EnvSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit,
+  onChange
+}: EnvSliderProps): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between">
+        <span
+          style={{
+            fontSize: 10,
+            color: colors.text.muted,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase'
+          }}
+        >
+          {label}
+        </span>
+        <span
+          className="tabular-nums"
+          style={{ fontSize: 10, color: colors.text.secondary, fontFamily: 'var(--font-mono)' }}
+        >
+          {value}
+          {unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="graph-slider w-full"
+        style={{ accentColor: 'var(--color-text-primary)' }}
+        aria-label={label}
+      />
+    </div>
+  )
+}
+
 /** Compute the canvas-space point at the center of the visible surface. */
 function getViewportCenter(): { x: number; y: number } {
   const vp = useCanvasStore.getState().viewport
@@ -131,6 +186,8 @@ export function CanvasToolbar({
   const toggleShowAllEdges = useCanvasStore((s) => s.toggleShowAllEdges)
   const gridDotVisibility = useSettingsStore((s) => s.env.gridDotVisibility)
   const cardBlur = useSettingsStore((s) => s.env.cardBlur)
+  const cardOpacity = useSettingsStore((s) => s.env.cardOpacity)
+  const cardHeaderDarkness = useSettingsStore((s) => s.env.cardHeaderDarkness)
   const setEnv = useSettingsStore((s) => s.setEnv)
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
@@ -361,54 +418,46 @@ export function CanvasToolbar({
               top: 0,
               left: '100%',
               marginLeft: 6,
-              minWidth: 180,
+              minWidth: 200,
               zIndex: zIndex.surfacePopover
             }}
           >
-            <div className="flex flex-col gap-1">
-              <span
-                style={{
-                  fontSize: 10,
-                  color: colors.text.muted,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase'
-                }}
-              >
-                Grid dots
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={gridDotVisibility}
-                onChange={(e) => setEnv('gridDotVisibility', Number(e.target.value))}
-                className="graph-slider w-full"
-                style={{ accentColor: 'var(--color-text-primary)' }}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span
-                style={{
-                  fontSize: 10,
-                  color: colors.text.muted,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase'
-                }}
-              >
-                Card blur
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={32}
-                step={2}
-                value={cardBlur}
-                onChange={(e) => setEnv('cardBlur', Number(e.target.value))}
-                className="graph-slider w-full"
-                style={{ accentColor: 'var(--color-text-primary)' }}
-              />
-            </div>
+            <EnvSlider
+              label="Card opacity"
+              value={cardOpacity}
+              min={50}
+              max={100}
+              step={1}
+              unit="%"
+              onChange={(v) => setEnv('cardOpacity', v)}
+            />
+            <EnvSlider
+              label="Card header"
+              value={cardHeaderDarkness}
+              min={0}
+              max={60}
+              step={1}
+              unit="%"
+              onChange={(v) => setEnv('cardHeaderDarkness', v)}
+            />
+            <EnvSlider
+              label="Card blur"
+              value={cardBlur}
+              min={0}
+              max={32}
+              step={1}
+              unit="px"
+              onChange={(v) => setEnv('cardBlur', v)}
+            />
+            <EnvSlider
+              label="Grid dots"
+              value={gridDotVisibility}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              onChange={(v) => setEnv('gridDotVisibility', v)}
+            />
           </div>
         )}
       </div>
