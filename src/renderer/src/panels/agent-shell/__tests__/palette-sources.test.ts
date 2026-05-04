@@ -91,4 +91,26 @@ describe('palette-sources', () => {
     const tabs = useThreadStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/spark.md' })
   })
+
+  it('emits one canvas surface item per discovered canvas id', () => {
+    useVaultStore.setState({ canvasIds: ['default', 'research', 'planning'] })
+    const items = buildPaletteItems({ closePalette: () => {} })
+    const canvasItems = items.filter((i) => i.id.startsWith('surface:canvas:'))
+    expect(canvasItems.map((i) => i.title)).toEqual([
+      'Open canvas',
+      'Open canvas: research',
+      'Open canvas: planning'
+    ])
+  })
+
+  it('opening a non-default canvas surface routes the dock tab to that canvas id', () => {
+    useVaultStore.setState({ canvasIds: ['default', 'research'] })
+    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    const items = buildPaletteItems({ closePalette: () => {} })
+    const research = items.find((i) => i.id === 'surface:canvas:research')
+    expect(research).toBeDefined()
+    research!.run()
+    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'research' })
+  })
 })

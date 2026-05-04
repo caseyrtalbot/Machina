@@ -8,14 +8,15 @@ import type {
 } from '../../shared/thread-types'
 
 export function encodeThread(t: Thread): string {
+  // autoAcceptSession is intentionally omitted — it's a session-only flag.
+  // Persisting it caused dangerous bypass to survive restarts (silent note edits).
   const fm = {
     agent: t.agent,
     model: t.model,
     started: t.started,
     last_message: t.lastMessage,
     title: t.title,
-    dock_state: t.dockState,
-    auto_accept_session: t.autoAcceptSession ?? false
+    dock_state: t.dockState
   }
   const body = t.messages.map(encodeMessage).join('\n')
   return matter.stringify(body, fm)
@@ -53,7 +54,7 @@ export function decodeThread(md: string): Thread {
     lastMessage: data.last_message,
     title: data.title,
     dockState: data.dock_state ?? { tabs: [] },
-    autoAcceptSession: data.auto_accept_session ?? false,
+    autoAcceptSession: false,
     messages
   }
 }

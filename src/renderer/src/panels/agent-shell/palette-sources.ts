@@ -57,13 +57,27 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
     })
   }
 
-  const surfaces: ReadonlyArray<{ kind: DockTab['kind']; title: string; tab: DockTab }> = [
-    { kind: 'canvas', title: 'Open canvas', tab: { kind: 'canvas', id: 'default' } },
+  const canvasIds = vaultStore.canvasIds.length > 0 ? vaultStore.canvasIds : ['default']
+  for (const canvasId of canvasIds) {
+    const title = canvasId === 'default' ? 'Open canvas' : `Open canvas: ${canvasId}`
+    items.push({
+      id: `surface:canvas:${canvasId}`,
+      kind: 'surface',
+      title,
+      subtitle: 'dock surface',
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
+      }
+    })
+  }
+
+  const otherSurfaces: ReadonlyArray<{ kind: DockTab['kind']; title: string; tab: DockTab }> = [
     { kind: 'graph', title: 'Open graph view', tab: { kind: 'graph' } },
     { kind: 'ghosts', title: 'Open ghosts', tab: { kind: 'ghosts' } },
     { kind: 'health', title: 'Open health', tab: { kind: 'health' } }
   ]
-  for (const s of surfaces) {
+  for (const s of otherSurfaces) {
     items.push({
       id: `surface:${s.kind}`,
       kind: 'surface',
@@ -95,7 +109,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       run: () => {
         opts.closePalette()
         const id = useThreadStore.getState().activeThreadId
-        if (id) void useThreadStore.getState().toggleAutoAccept(id)
+        if (id) useThreadStore.getState().toggleAutoAccept(id)
       }
     }
   )

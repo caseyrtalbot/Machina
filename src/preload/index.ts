@@ -131,7 +131,8 @@ const api = {
   canvas: {
     getSnapshot: (canvasPath: string) => typedInvoke('canvas:get-snapshot', { canvasPath }),
     applyPlan: (canvasPath: string, expectedMtime: string, plan: CanvasMutationPlan) =>
-      typedInvoke('canvas:apply-plan', { canvasPath, expectedMtime, plan })
+      typedInvoke('canvas:apply-plan', { canvasPath, expectedMtime, plan }),
+    list: (vaultPath: string) => typedInvoke('canvas:list', { vaultPath })
   },
   artifact: {
     materialize: (draft: AgentArtifactDraft, vaultPath: string): Promise<MaterializeResult> =>

@@ -315,6 +315,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
     if (!block) return
     const projection = buildBlockProjection(node, block)
     addNode(projection)
+    useCanvasStore.getState().markRecentlyPinned(projection.id)
   }, [sessionBlocks, node, addNode])
 
   const handleActivateContentClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {

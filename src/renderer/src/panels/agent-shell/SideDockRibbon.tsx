@@ -121,7 +121,7 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
         <RibbonAction
           label={autoAcceptOn ? 'Disable auto-accept' : 'Enable auto-accept'}
           icon={AutoAcceptIcon}
-          onClick={() => activeId && void toggleAutoAccept(activeId)}
+          onClick={() => activeId && toggleAutoAccept(activeId)}
           disabled={!canToggleAutoAccept || !activeId}
           pressed={autoAcceptOn}
           tone={autoAcceptOn ? 'active' : 'default'}

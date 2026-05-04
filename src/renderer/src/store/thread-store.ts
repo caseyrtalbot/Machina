@@ -49,7 +49,7 @@ interface ThreadState {
   appendCliMessage: (threadId: string, message: ThreadMessage) => Promise<void>
   setRunId: (threadId: string, runId: string | null) => void
   cancelActive: (threadId: string) => Promise<void>
-  toggleAutoAccept: (threadId: string) => Promise<void>
+  toggleAutoAccept: (threadId: string) => void
 
   addDockTab: (tab: DockTab) => void
   /** Open the matching tab if one already exists, otherwise add it. Activates either way. */
@@ -432,17 +432,13 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     })
   },
 
-  toggleAutoAccept: async (threadId) => {
-    const v = get().vaultPath
-    if (!v) return
+  toggleAutoAccept: (threadId) => {
     set((s) => {
       const t = s.threadsById[threadId]
       if (!t) return s
       const next: Thread = { ...t, autoAcceptSession: !(t.autoAcceptSession ?? false) }
       return { threadsById: { ...s.threadsById, [threadId]: next } }
     })
-    const t = get().threadsById[threadId]
-    if (t) await window.api.thread.save(v, t)
   },
 
   addDockTab: (tab) => {

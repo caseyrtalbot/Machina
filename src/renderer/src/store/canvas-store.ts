@@ -39,6 +39,10 @@ interface CanvasStore {
   // Edge visibility: session-only, not persisted
   readonly showAllEdges: boolean
   readonly focusedTerminalId: string | null
+  // Newly pinned nodes get a transient pulse animation; cleared after the
+  // animation completes so the keyframe runs once per pin.
+  readonly recentlyPinnedNodeIds: ReadonlySet<string>
+  markRecentlyPinned: (id: string) => void
   readonly cardContextMenu: {
     readonly x: number
     readonly y: number
@@ -172,6 +176,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   hoveredNodeId: null,
   showAllEdges: false,
   focusedTerminalId: null,
+  recentlyPinnedNodeIds: new Set(),
   cardContextMenu: null,
   splitFilePath: null,
   clusterLabels: [],
@@ -197,6 +202,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       hoveredNodeId: null,
       showAllEdges: false,
       focusedTerminalId: null,
+      recentlyPinnedNodeIds: new Set(),
       cardContextMenu: null,
       ontologySnapshot: data.ontologySnapshot ?? null,
       ontologyLayout: data.ontologyLayout ?? null,
@@ -218,12 +224,30 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       hoveredNodeId: null,
       cardContextMenu: null,
       focusedTerminalId: null,
+      recentlyPinnedNodeIds: new Set(),
       ontologySnapshot: null,
       ontologyLayout: null,
       ontologyIsStale: false
     }),
 
   markSaved: () => set({ isDirty: false }),
+
+  markRecentlyPinned: (id) => {
+    set((s) => {
+      const next = new Set(s.recentlyPinnedNodeIds)
+      next.add(id)
+      return { recentlyPinnedNodeIds: next }
+    })
+    // 1400ms matches the .te-pin-pulse CSS animation duration in index.css.
+    setTimeout(() => {
+      set((s) => {
+        if (!s.recentlyPinnedNodeIds.has(id)) return s
+        const next = new Set(s.recentlyPinnedNodeIds)
+        next.delete(id)
+        return { recentlyPinnedNodeIds: next }
+      })
+    }, 1400)
+  },
 
   addNode: (node) => set((s) => ({ nodes: [...s.nodes, node], isDirty: true })),
 

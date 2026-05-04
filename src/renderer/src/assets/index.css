@@ -123,6 +123,10 @@ h6 {
   100% { box-shadow: 0 0 0 0 rgba(235, 235, 235, 0); }
 }
 
+.te-pin-pulse {
+  animation: te-pin-pulse 1.4s ease-out 1;
+}
+
 /* Scrollbar: hidden until hover, stable gutter to prevent layout shift */
 .scrollbar-hover {
   scrollbar-gutter: stable;

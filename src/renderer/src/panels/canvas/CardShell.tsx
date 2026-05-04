@@ -196,6 +196,7 @@ export function CardShell({
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
   const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
   const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
+  const isPinPulsing = useCanvasStore((s) => s.recentlyPinnedNodeIds.has(node.id))
   const isInteracting = useCanvasStore((s) => s.isInteracting)
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
@@ -293,7 +294,7 @@ export function CardShell({
   return (
     <div
       data-canvas-node
-      className={`absolute flex flex-col canvas-card te-card-enter${isFocused ? ' canvas-card--focused' : ''}${isLocked ? ' canvas-card--locked' : ''}`}
+      className={`absolute flex flex-col canvas-card te-card-enter${isFocused ? ' canvas-card--focused' : ''}${isLocked ? ' canvas-card--locked' : ''}${isPinPulsing ? ' te-pin-pulse' : ''}`}
       style={{
         left: node.position.x,
         top: node.position.y,

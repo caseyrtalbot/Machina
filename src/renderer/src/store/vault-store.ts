@@ -46,8 +46,10 @@ interface VaultStore {
   readonly discoveredTypes: readonly string[]
   readonly activeWorkspace: string | null
   readonly isLoading: boolean
+  readonly canvasIds: readonly string[]
 
   setVaultPath: (path: string) => void
+  refreshCanvasIds: () => Promise<void>
   setConfig: (config: VaultConfig) => void
   setState: (state: VaultState) => void
   setFiles: (files: VaultFile[]) => void
@@ -75,8 +77,23 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   discoveredTypes: [],
   activeWorkspace: null,
   isLoading: false,
+  canvasIds: ['default'],
 
   setVaultPath: (path) => set({ vaultPath: path }),
+
+  refreshCanvasIds: async () => {
+    const vaultPath = get().vaultPath
+    if (!vaultPath) {
+      set({ canvasIds: ['default'] })
+      return
+    }
+    try {
+      const { canvasIds } = await window.api.canvas.list(vaultPath)
+      set({ canvasIds })
+    } catch {
+      set({ canvasIds: ['default'] })
+    }
+  },
   setConfig: (config) => set({ config }),
   setState: (state) => set({ state }),
   setFiles: (files) => set({ files }),
@@ -97,6 +114,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
         toVaultFile({ path: filePath, mtime: '' }, 'system')
       )
       set({ vaultPath, config, state, files, systemFiles, isLoading: false })
+      void get().refreshCanvasIds()
     } catch (err) {
       console.error('Failed to load vault:', err)
       set({ vaultPath, isLoading: false })

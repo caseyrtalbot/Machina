@@ -202,6 +202,10 @@ export interface IpcChannels {
       | { accepted: boolean; mtime: string }
       | { error: 'stale' | 'validation-failed'; message: string }
   }
+  'canvas:list': {
+    request: { vaultPath: string }
+    response: { canvasIds: readonly string[] }
+  }
 
   // --- Artifact ---
   'artifact:materialize': {

@@ -1,8 +1,11 @@
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
-import { readFile, stat } from 'fs/promises'
+import { readFile, readdir, stat } from 'fs/promises'
+import { TE_DIR } from '@shared/constants'
 import type { CanvasFile } from '@shared/canvas-types'
 import { validateCanvasMutationOps } from '@shared/canvas-mutation-validation'
+
+const DEFAULT_CANVAS_ID = 'default'
 
 export function registerCanvasIpc(): void {
   typedHandle('canvas:get-snapshot', async (args) => {
@@ -39,5 +42,23 @@ export function registerCanvasIpc(): void {
     }
 
     return { accepted: true, mtime: currentMtime }
+  })
+
+  typedHandle('canvas:list', async (args) => {
+    const ids = new Set<string>([DEFAULT_CANVAS_ID])
+    const namedDir = `${args.vaultPath}/${TE_DIR}/canvas`
+    try {
+      const entries = await readdir(namedDir)
+      for (const name of entries) {
+        if (!name.endsWith('.json')) continue
+        const id = name.slice(0, -'.json'.length)
+        if (id) ids.add(id)
+      }
+    } catch {
+      // Directory doesn't exist yet — only the default canvas exists. Non-fatal.
+    }
+    // Default first, then named canvases sorted alphabetically.
+    const named = [...ids].filter((id) => id !== DEFAULT_CANVAS_ID).sort()
+    return { canvasIds: [DEFAULT_CANVAS_ID, ...named] }
   })
 }

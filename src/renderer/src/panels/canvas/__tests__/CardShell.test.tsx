@@ -18,6 +18,7 @@ vi.mock('../../../store/canvas-store', () => ({
       selectedNodeIds: new Set<string>(),
       focusedCardId: mockFocusedCardId,
       lockedCardId: mockLockedCardId,
+      recentlyPinnedNodeIds: new Set<string>(),
       setSelection: mockSetSelection,
       toggleSelection: mockToggleSelection,
       setHoveredNode: mockSetHoveredNode,

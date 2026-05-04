@@ -122,16 +122,17 @@ describe('thread-store', () => {
     expect((window as any).api.thread.save).not.toHaveBeenCalled()
   })
 
-  it('toggleAutoAccept flips the per-thread autoAcceptSession flag and persists', async () => {
+  it('toggleAutoAccept flips the per-thread autoAcceptSession flag in memory only (no disk write)', () => {
     useThreadStore.setState({
       vaultPath: '/v',
       threadsById: { a: sampleThread('a') }
     })
-    await useThreadStore.getState().toggleAutoAccept('a')
+    useThreadStore.getState().toggleAutoAccept('a')
     expect(useThreadStore.getState().threadsById['a'].autoAcceptSession).toBe(true)
+    // Session-only flag must NOT persist — it's a one-off bypass that should die on restart.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((window as any).api.thread.save).toHaveBeenCalled()
-    await useThreadStore.getState().toggleAutoAccept('a')
+    expect((window as any).api.thread.save).not.toHaveBeenCalled()
+    useThreadStore.getState().toggleAutoAccept('a')
     expect(useThreadStore.getState().threadsById['a'].autoAcceptSession).toBe(false)
   })
 })
