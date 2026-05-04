@@ -198,7 +198,9 @@ function ThreadRow({
         padding: '8px 12px',
         cursor: isRenaming ? 'text' : 'pointer',
         background: rowBg,
-        boxShadow: isActive ? `inset 0 0 0 2px ${colors.text.primary}` : 'none',
+        boxShadow: isActive
+          ? `inset 0 0 0 1px color-mix(in srgb, ${colors.text.primary} 55%, transparent)`
+          : 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: 6,

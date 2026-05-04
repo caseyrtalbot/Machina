@@ -122,21 +122,7 @@ export function ThreadPanel() {
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto' }}>
           {t.messages.length === 0 && !streaming && !pendingTools?.length ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: typography.metadata.size,
-                letterSpacing: typography.metadata.letterSpacing,
-                textTransform: typography.metadata.textTransform
-              }}
-            >
-              Ask anything about your vault.
-            </div>
+            <EmptyState />
           ) : (
             <>
               {t.messages.map((m, i) => {
@@ -161,6 +147,77 @@ export function ThreadPanel() {
       </div>
       <ThreadInputBar />
     </section>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        height: '100%',
+        padding: '18% 32px 0',
+        gap: 14,
+        boxSizing: 'border-box'
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 18,
+          height: 1,
+          background: colors.accent.line,
+          marginBottom: 2,
+          opacity: 0.9
+        }}
+      />
+      <h2
+        style={{
+          margin: 0,
+          fontFamily: typography.fontFamily.display,
+          fontWeight: 400,
+          fontSize: 22,
+          lineHeight: 1.2,
+          letterSpacing: '-0.01em',
+          color: colors.text.primary
+        }}
+      >
+        Ask anything about your vault.
+      </h2>
+      <p
+        style={{
+          margin: 0,
+          maxWidth: 420,
+          fontFamily: typography.fontFamily.body,
+          fontSize: 13,
+          lineHeight: 1.6,
+          color: colors.text.muted
+        }}
+      >
+        Cite notes, trace ideas across the graph, or ask the agent to draft from what you already
+        wrote.
+      </p>
+      <div
+        style={{
+          marginTop: 6,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
+          color: colors.text.disabled
+        }}
+      >
+        <span>type</span>
+        <span style={{ color: colors.text.muted }}>/</span>
+        <span>to switch agent</span>
+      </div>
+    </div>
   )
 }
 

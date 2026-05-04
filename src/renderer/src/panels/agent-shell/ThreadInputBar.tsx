@@ -18,6 +18,7 @@ export function ThreadInputBar() {
   )
   const [text, setText] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
 
   useLayoutEffect(() => {
@@ -52,8 +53,7 @@ export function ThreadInputBar() {
     <div
       style={{
         position: 'relative',
-        borderTop: `1px solid ${colors.border.subtle}`,
-        padding: 12,
+        padding: '14px 16px 16px',
         background: colors.bg.base
       }}
     >
@@ -61,23 +61,39 @@ export function ThreadInputBar() {
       <div
         className="thread-input-box"
         style={{
+          position: 'relative',
           display: 'flex',
           alignItems: 'flex-end',
-          gap: 8,
-          padding: '10px 12px',
+          gap: 10,
+          padding: '12px 14px 12px 16px',
           background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: borderRadius.inline,
-          transition: `border-color ${transitions.fast}, box-shadow ${transitions.fast}`
+          border: `1px solid ${colors.border.subtle}`,
+          borderRadius: borderRadius.tool,
+          transition: `background ${transitions.fast}, border-color ${transitions.fast}`
         }}
       >
+        <span
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            color: colors.text.muted,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: 13,
+            lineHeight: '22px',
+            userSelect: 'none'
+          }}
+        >
+          ›
+        </span>
         <textarea
           ref={ref}
           value={text}
           rows={1}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="ASK ANYTHING…   CMD+K · /"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="Ask anything about your vault…"
           className="thread-input-textarea"
           style={{
             flex: 1,
@@ -91,10 +107,10 @@ export function ThreadInputBar() {
             padding: 0,
             fontFamily: typography.fontFamily.body,
             fontSize: 14,
-            lineHeight: 1.5
+            lineHeight: 1.55
           }}
         />
-        {inFlight && activeId && (
+        {inFlight && activeId ? (
           <button
             type="button"
             data-testid="thread-input-stop"
@@ -130,8 +146,59 @@ export function ThreadInputBar() {
             />
             Stop
           </button>
+        ) : (
+          <KeyHint visible={!focused && text.length === 0} />
         )}
       </div>
     </div>
+  )
+}
+
+function KeyHint({ visible }: { readonly visible: boolean }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        opacity: visible ? 1 : 0,
+        transition: `opacity ${transitions.fast}`,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: 10,
+        letterSpacing: '0.08em',
+        color: colors.text.disabled,
+        lineHeight: '22px',
+        userSelect: 'none'
+      }}
+    >
+      <Kbd>⌘K</Kbd>
+      <span style={{ color: colors.text.disabled }}>·</span>
+      <Kbd>/</Kbd>
+    </span>
+  )
+}
+
+function Kbd({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 16,
+        height: 16,
+        padding: '0 4px',
+        border: `1px solid ${colors.border.subtle}`,
+        borderRadius: 3,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: 10,
+        color: colors.text.muted,
+        background: 'transparent'
+      }}
+    >
+      {children}
+    </span>
   )
 }
