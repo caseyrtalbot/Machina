@@ -162,8 +162,7 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
               background: p.hex,
               border: `1px solid ${active ? colors.text.primary : colors.border.default}`,
               cursor: 'pointer',
-              boxShadow: active ? `0 0 0 1px ${colors.text.primary}` : 'none',
-              transition: 'box-shadow 120ms ease-out, border-color 120ms ease-out'
+              transition: 'border-color 120ms ease-out'
             }}
           />
         )
@@ -183,7 +182,6 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
             accentId === 'custom'
               ? `1px solid ${colors.text.primary}`
               : `1px dashed ${colors.border.default}`,
-          boxShadow: accentId === 'custom' ? `0 0 0 1px ${colors.text.primary}` : 'none',
           color: colors.text.muted,
           fontFamily: typography.fontFamily.mono,
           fontSize: 11,
@@ -285,9 +283,8 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       <div
         className="settings-shell flex flex-col h-full w-full"
         style={{
-          backgroundColor: colors.bg.elevated,
-          borderLeft: `1px solid ${colors.border.strong}`,
-          boxShadow: isOpen ? '-24px 0 48px rgba(0, 0, 0, 0.6)' : 'none'
+          backgroundColor: colors.bg.base,
+          borderLeft: `1px solid ${colors.border.subtle}`
         }}
       >
         {/* Header */}
@@ -352,30 +349,29 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
           <SectionHeading>Appearance</SectionHeading>
           <SettingRow label="Accent">
             <SelectInput
-              value={accentId}
-              options={[
-                ...ACCENT_PRESETS.map((p) => ({
-                  value: p.id,
-                  label: `${p.label} · ${p.hex}`
-                })),
-                { value: 'custom', label: 'Custom…' }
-              ]}
+              value={accentId === 'custom' ? customAccentHex : accentId}
+              options={ACCENT_PRESETS.map((p) => ({
+                value: p.id,
+                label: `${p.label} · ${p.hex}`
+              }))}
               onChange={(v) => setAccentId(v as AccentId)}
             />
           </SettingRow>
+          <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
           {accentId === 'custom' && (
-            <SettingRow label="Hex">
+            <div style={{ padding: '0 0 14px' }}>
               <input
                 type="text"
                 value={customAccentHex}
                 onChange={(e) => setCustomAccentHex(e.target.value)}
                 spellCheck={false}
-                className="settings-select text-xs rounded"
+                aria-label="Custom accent hex"
+                placeholder="#ffb454"
+                className="settings-input text-xs rounded"
                 style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
               />
-            </SettingRow>
+            </div>
           )}
-          <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
 
           {/* ── Typography ── */}
           <SectionHeading>Typography</SectionHeading>
@@ -383,7 +379,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             <FontPicker value={bodyFont} onChange={handleFontChange} />
           </SettingRow>
           <SettingRow label="Code Font">
-            <FontPicker value={monoFont} onChange={setMonoFont} />
+            <FontPicker value={monoFont} onChange={setMonoFont} categoryFilter="monospace" />
           </SettingRow>
           <SettingRow label="Card Titles">
             <SliderInput
@@ -405,7 +401,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
               onChange={(v) => setEnv('cardBodyFontSize', v)}
             />
           </SettingRow>
-          <SettingRow label="Sidebar">
+          <SettingRow label="File Tree">
             <SliderInput
               value={env.sidebarFontSize}
               min={11}

@@ -12,16 +12,18 @@ import {
 interface FontPickerProps {
   value: string
   onChange: (fontName: string) => void
+  /** Lock the picker to a single font category (hides category tabs). */
+  categoryFilter?: Exclude<FontCategory, 'all'>
 }
 
 /**
  * Searchable, categorized font picker with live preview.
  * Loads fonts on hover for lightweight previewing.
  */
-export function FontPicker({ value, onChange }: FontPickerProps) {
+export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState<FontCategory>('all')
+  const [category, setCategory] = useState<FontCategory>(categoryFilter ?? 'all')
   const [previewFont, setPreviewFont] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -30,11 +32,12 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
   const filteredFonts = useMemo(() => {
     const query = search.toLowerCase()
     return ALL_FONT_OPTIONS.filter((f) => {
+      if (categoryFilter && f.category !== categoryFilter) return false
       if (category !== 'all' && f.category !== category) return false
       if (query && !f.name.toLowerCase().includes(query)) return false
       return true
     })
-  }, [search, category])
+  }, [search, category, categoryFilter])
 
   // Close on click outside
   useEffect(() => {
@@ -61,9 +64,9 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
       // Reset state when picker closes — cascading render is acceptable here
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearch('')
-      setCategory('all')
+      setCategory(categoryFilter ?? 'all')
     }
-  }, [isOpen])
+  }, [isOpen, categoryFilter])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -166,38 +169,40 @@ export function FontPicker({ value, onChange }: FontPickerProps) {
             />
           </div>
 
-          {/* Category filters */}
-          <div
-            className="flex"
-            style={{
-              gap: 4,
-              padding: '6px 8px',
-              borderBottom: `1px solid ${colors.border.subtle}`
-            }}
-          >
-            {FONT_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategory(cat)}
-                className="transition-colors"
-                style={{
-                  padding: '2px 6px',
-                  borderRadius: borderRadius.inline,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: typography.metadata.size,
-                  letterSpacing: typography.metadata.letterSpacing,
-                  textTransform: typography.metadata.textTransform,
-                  backgroundColor: category === cat ? colors.accent.soft : 'transparent',
-                  border: `1px solid ${category === cat ? colors.accent.default : 'transparent'}`,
-                  color: category === cat ? colors.accent.default : colors.text.muted,
-                  cursor: 'pointer'
-                }}
-              >
-                {cat === 'all' ? 'All' : cat}
-              </button>
-            ))}
-          </div>
+          {/* Category filters (hidden when locked to a single category) */}
+          {!categoryFilter && (
+            <div
+              className="flex"
+              style={{
+                gap: 4,
+                padding: '6px 8px',
+                borderBottom: `1px solid ${colors.border.subtle}`
+              }}
+            >
+              {FONT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat)}
+                  className="transition-colors"
+                  style={{
+                    padding: '2px 6px',
+                    borderRadius: borderRadius.inline,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: typography.metadata.size,
+                    letterSpacing: typography.metadata.letterSpacing,
+                    textTransform: typography.metadata.textTransform,
+                    backgroundColor: category === cat ? colors.accent.soft : 'transparent',
+                    border: `1px solid ${category === cat ? colors.accent.default : 'transparent'}`,
+                    color: category === cat ? colors.accent.default : colors.text.muted,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {cat === 'all' ? 'All' : cat}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Font list */}
           <div ref={listRef} className="overflow-y-auto" style={{ maxHeight: 240 }}>
