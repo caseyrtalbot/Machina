@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { agentPillStyle } from './agent-color'
 import { agentTag } from './agent-tag'
-import { borderRadius, typography } from '../../design/tokens'
+import { typography } from '../../design/tokens'
 
 export function AgentBadge({
   agent,
@@ -20,8 +20,7 @@ export function AgentBadge({
         display: 'inline-flex',
         alignItems: 'center',
         gap: compact ? 5 : 6,
-        padding: compact ? '2px 7px 2px 6px' : '3px 8px 3px 7px',
-        borderRadius: borderRadius.inline,
+        padding: 0,
         background: pill.background,
         border: pill.border,
         color: pill.color,

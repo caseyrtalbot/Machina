@@ -70,9 +70,9 @@ export function ToolCardShell({
         alignItems,
         marginTop: 8,
         padding,
-        borderRadius: borderRadius.tool,
-        background: isError ? ERROR_BG : colors.bg.elevated,
-        border: `1px solid ${isError ? ERROR_BORDER : colors.border.subtle}`,
+        borderRadius: isError ? borderRadius.tool : 0,
+        background: isError ? ERROR_BG : 'transparent',
+        border: isError ? `1px solid ${ERROR_BORDER}` : '1px solid transparent',
         fontSize: 12,
         color: colors.text.primary,
         ...style

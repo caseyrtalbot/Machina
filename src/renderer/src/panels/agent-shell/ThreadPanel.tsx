@@ -69,7 +69,10 @@ export function ThreadPanel() {
     >
       <header
         style={{
-          padding: '12px 20px',
+          height: 44,
+          padding: '0 20px',
+          flexShrink: 0,
+          boxSizing: 'border-box',
           borderBottom: `1px solid ${colors.border.subtle}`,
           display: 'flex',
           justifyContent: 'space-between',

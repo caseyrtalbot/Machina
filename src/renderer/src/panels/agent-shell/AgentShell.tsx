@@ -74,7 +74,7 @@ export function AgentShell({ onOpenSettings }: AgentShellProps = {}) {
     >
       <WindowDragRegion />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <ThreadSidebar onOpenSettings={onOpenSettings} width={sidebarWidth} />
+        <ThreadSidebar width={sidebarWidth} />
         <ResizeHandle
           side="sidebar"
           width={sidebarWidth}

@@ -115,16 +115,15 @@ export function CommandPalette({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: colors.bg.elevated,
-          border: `1px solid ${colors.border.strong}`,
+          background: colors.bg.base,
+          border: `1px solid ${colors.text.primary}`,
           borderRadius: borderRadius.tool,
           width: 560,
           maxHeight: '60vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow:
-            '0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)'
+          boxShadow: '0 24px 48px rgba(0,0,0,0.6)'
         }}
       >
         <div

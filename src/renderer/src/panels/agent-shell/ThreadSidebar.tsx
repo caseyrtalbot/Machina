@@ -8,7 +8,6 @@ import { AgentBadge } from './agent-badge'
 import type { AgentIdentity } from '@shared/agent-identity'
 
 export interface ThreadSidebarProps {
-  readonly onOpenSettings?: () => void
   readonly width?: number
 }
 
@@ -17,7 +16,7 @@ interface MenuTarget {
   readonly position: ContextMenuPosition
 }
 
-export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProps = {}) {
+export function ThreadSidebar({ width = 240 }: ThreadSidebarProps = {}) {
   const threadsById = useThreadStore((s) => s.threadsById)
   const activeId = useThreadStore((s) => s.activeThreadId)
   const selectThread = useThreadStore((s) => s.selectThread)
@@ -63,7 +62,9 @@ export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProp
     >
       <header
         style={{
-          padding: '14px 14px 12px',
+          height: 44,
+          padding: '0 14px',
+          flexShrink: 0,
           fontFamily: typography.fontFamily.mono,
           fontSize: typography.metadata.size,
           letterSpacing: typography.metadata.letterSpacing,
@@ -71,9 +72,9 @@ export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProp
           color: colors.text.muted,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
           gap: 8,
-          borderBottom: `1px solid ${colors.border.subtle}`
+          borderBottom: `1px solid ${colors.border.subtle}`,
+          boxSizing: 'border-box'
         }}
       >
         <span
@@ -86,39 +87,6 @@ export function ThreadSidebar({ onOpenSettings, width = 240 }: ThreadSidebarProp
         >
           {vaultName}
         </span>
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            title="Settings"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: 2,
-              cursor: 'pointer',
-              color: colors.text.muted,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="8" cy="8" r="2.2" />
-              <path d="M8 1.5v1.6M8 12.9v1.6M2.6 8H1M15 8h-1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1" />
-            </svg>
-          </button>
-        )}
       </header>
       <ul style={{ flex: 1, overflowY: 'auto', listStyle: 'none', margin: 0, padding: 0 }}>
         {sorted.map((t) => (
@@ -210,9 +178,8 @@ function ThreadRow({
     else onContextMenu(e.clientX, e.clientY)
   }
 
-  const rowBg = isActive
-    ? colors.bg.elevated
-    : hovered
+  const rowBg =
+    hovered && !isActive
       ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
       : 'transparent'
 
@@ -228,10 +195,10 @@ function ThreadRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '8px 12px 8px 10px',
+        padding: '8px 12px',
         cursor: isRenaming ? 'text' : 'pointer',
         background: rowBg,
-        borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
+        boxShadow: isActive ? `inset 0 0 0 2px ${colors.text.primary}` : 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: 6,
