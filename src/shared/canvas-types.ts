@@ -223,9 +223,8 @@ export function getDefaultMetadata(type: CanvasNodeType): Record<string, unknown
 
 // --- Factory helpers ---
 
-let counter = 0
 function uid(): string {
-  return `cn_${Date.now().toString(36)}_${(counter++).toString(36)}`
+  return globalThis.crypto.randomUUID()
 }
 
 export function createCanvasNode(

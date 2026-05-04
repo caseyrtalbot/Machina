@@ -5,6 +5,7 @@ import { useVaultStore } from '../../../store/vault-store'
 import { ToolCardShell } from './ToolCardShell'
 
 type ListVaultCall = Extract<ToolCall, { kind: 'list_vault' }>
+type SuccessResult = Extract<ToolResult, { ok: true }>
 
 const PREVIEW_LIMIT = 50
 
@@ -13,7 +14,7 @@ export function ListVaultCard({
   result
 }: {
   readonly call: ListVaultCall
-  readonly result?: ToolResult
+  readonly result?: SuccessResult
 }) {
   if (!result) {
     return (
@@ -23,7 +24,6 @@ export function ListVaultCard({
       </ToolCardShell>
     )
   }
-  if (!result.ok) return null
 
   const paths =
     typeof result.output === 'object' && result.output !== null

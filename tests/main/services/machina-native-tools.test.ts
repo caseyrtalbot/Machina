@@ -597,7 +597,7 @@ describe('machina-native-tools edit_note', () => {
           diff_stats: { added: number; removed: number }
         }
         expect(out.path).toBe('a.md')
-        expect(out.diff_stats).toEqual({ added: 1, removed: 0 })
+        expect(out.diff_stats).toEqual({ added: 2, removed: 1 })
       }
       expect(readFileSync(path.join(v, 'a.md'), 'utf8')).toBe('one\nTWO\nadded\nthree\n')
     } finally {
@@ -851,7 +851,7 @@ describe('machina-native-tools read_canvas / pin_to_canvas', () => {
       expect(res.ok).toBe(true)
       if (res.ok) {
         const out = res.output as { cardId: string; canvasId: string; node: { id: string } }
-        expect(out.cardId).toMatch(/^cn_/)
+        expect(out.cardId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
         expect(out.canvasId).toBe('main')
         expect(out.node.id).toBe(out.cardId)
       }

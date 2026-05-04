@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { resolveAnthropicKey } from './anthropic-key'
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
-import { NATIVE_TOOLS_V0 } from '@shared/machina-native-tools'
+import { NATIVE_TOOLS } from '@shared/machina-native-tools'
 import { callTool, clearApproval } from './machina-native-tools'
 import type { AgentNativeEventBody, DockAction } from '@shared/ipc-channels'
 import type { DockTab } from '@shared/dock-types'
@@ -185,7 +185,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
                 cache_control: { type: 'ephemeral' }
               }
             ],
-            tools: NATIVE_TOOLS_V0.map((t) => ({
+            tools: NATIVE_TOOLS.map((t) => ({
               name: t.name,
               description: t.description,
               input_schema: {

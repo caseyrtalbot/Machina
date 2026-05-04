@@ -406,9 +406,11 @@ function countOccurrences(haystack: string, needle: string): number {
   return count
 }
 
-function countNewlines(s: string): number {
-  let n = 0
+function countLines(s: string): number {
+  if (s.length === 0) return 0
+  let n = 1
   for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) n++
+  if (s.charCodeAt(s.length - 1) === 10) n--
   return n
 }
 
@@ -485,7 +487,7 @@ async function editNote(
       ok: true,
       output: {
         path: rel,
-        diff_stats: { added: countNewlines(replace), removed: countNewlines(find) }
+        diff_stats: { added: countLines(replace), removed: countLines(find) }
       }
     }
   } catch (err) {

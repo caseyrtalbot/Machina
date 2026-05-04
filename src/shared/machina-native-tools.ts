@@ -198,7 +198,7 @@ export const CLOSE_DOCK_TAB_TOOL: NativeToolSpec = {
   }
 }
 
-export const NATIVE_TOOLS_V0: readonly NativeToolSpec[] = [
+export const NATIVE_TOOLS: readonly NativeToolSpec[] = [
   READ_NOTE_TOOL,
   LIST_VAULT_TOOL,
   SEARCH_VAULT_TOOL,

@@ -5,6 +5,7 @@ import { useVaultStore } from '../../../store/vault-store'
 import { ToolCardShell } from './ToolCardShell'
 
 type SearchVaultCall = Extract<ToolCall, { kind: 'search_vault' }>
+type SuccessResult = Extract<ToolResult, { ok: true }>
 
 interface Hit {
   readonly path: string
@@ -19,7 +20,7 @@ export function SearchVaultCard({
   result
 }: {
   readonly call: SearchVaultCall
-  readonly result?: ToolResult
+  readonly result?: SuccessResult
 }) {
   if (!result) {
     return (
@@ -29,7 +30,6 @@ export function SearchVaultCard({
       </ToolCardShell>
     )
   }
-  if (!result.ok) return null
 
   const output =
     typeof result.output === 'object' && result.output !== null
