@@ -159,21 +159,37 @@ interface CardTypeInfo {
   readonly label: string
   readonly icon: string
   readonly category: 'content' | 'media' | 'tools'
+  /** False for types that require external context (file path, vault link,
+   *  terminal session, folder map). They remain valid in the data model
+   *  because legitimate flows (drag-drop, folder map, block pin) still
+   *  produce them, but the right-click "Add card" menu hides them since
+   *  an empty instance has no usable state. */
+  readonly creatableFromMenu: boolean
 }
 
 export const CARD_TYPE_INFO: Record<CanvasNodeType, CardTypeInfo> = {
-  text: { label: 'Text', icon: 'T', category: 'content' },
-  code: { label: 'Code', icon: '</>', category: 'content' },
-  markdown: { label: 'Markdown', icon: 'M', category: 'content' },
-  note: { label: 'Vault Note', icon: 'N', category: 'content' },
-  image: { label: 'Image', icon: 'I', category: 'media' },
-  terminal: { label: 'Terminal', icon: '>', category: 'tools' },
-  pdf: { label: 'PDF', icon: 'P', category: 'media' },
-  'project-file': { label: 'File', icon: '\u25A0', category: 'tools' },
-  'system-artifact': { label: 'Artifact', icon: '\u25C6', category: 'tools' },
-  'file-view': { label: 'File View', icon: '\u25B7', category: 'tools' },
-  'project-folder': { label: 'Folder', icon: '\u{1F4C1}', category: 'tools' },
-  'terminal-block': { label: 'Block', icon: '$', category: 'tools' }
+  text: { label: 'Text', icon: 'T', category: 'content', creatableFromMenu: true },
+  code: { label: 'Code', icon: '</>', category: 'content', creatableFromMenu: true },
+  markdown: { label: 'Markdown', icon: 'M', category: 'content', creatableFromMenu: true },
+  note: { label: 'Vault Note', icon: 'N', category: 'content', creatableFromMenu: false },
+  image: { label: 'Image', icon: 'I', category: 'media', creatableFromMenu: true },
+  terminal: { label: 'Terminal', icon: '>', category: 'tools', creatableFromMenu: true },
+  pdf: { label: 'PDF', icon: 'P', category: 'media', creatableFromMenu: true },
+  'project-file': { label: 'File', icon: '\u25A0', category: 'tools', creatableFromMenu: false },
+  'system-artifact': {
+    label: 'Artifact',
+    icon: '\u25C6',
+    category: 'tools',
+    creatableFromMenu: false
+  },
+  'file-view': { label: 'File View', icon: '\u25B7', category: 'tools', creatableFromMenu: false },
+  'project-folder': {
+    label: 'Folder',
+    icon: '\u{1F4C1}',
+    category: 'tools',
+    creatableFromMenu: false
+  },
+  'terminal-block': { label: 'Block', icon: '$', category: 'tools', creatableFromMenu: false }
 }
 
 // --- Default metadata per type ---

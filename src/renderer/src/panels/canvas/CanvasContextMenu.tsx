@@ -157,7 +157,7 @@ export function CanvasContextMenu({
             CanvasNodeType,
             (typeof CARD_TYPE_INFO)[CanvasNodeType]
           ][]
-        ).filter(([, info]) => info.category === section.category)
+        ).filter(([, info]) => info.category === section.category && info.creatableFromMenu)
 
         if (types.length === 0) return null
 

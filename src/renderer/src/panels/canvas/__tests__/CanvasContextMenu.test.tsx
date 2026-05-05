@@ -9,8 +9,8 @@ vi.mock('@shared/canvas-types', async () => {
   return {
     ...actual,
     CARD_TYPE_INFO: {
-      text: { label: 'Text', icon: 'T', category: 'content' },
-      note: { label: 'Note', icon: 'N', category: 'content' }
+      text: { label: 'Text', icon: 'T', category: 'content', creatableFromMenu: true },
+      note: { label: 'Note', icon: 'N', category: 'content', creatableFromMenu: false }
     }
   }
 })
@@ -50,6 +50,15 @@ describe('CanvasContextMenu', () => {
     renderMenu()
 
     expect(screen.queryByText('Spawn Claude Session')).toBeNull()
+  })
+
+  it('hides card types that are not creatable from the menu', async () => {
+    const mod = await import('../CanvasContextMenu')
+    CanvasContextMenu = mod.CanvasContextMenu
+    renderMenu()
+
+    expect(screen.getByText('Text')).toBeTruthy()
+    expect(screen.queryByText('Note')).toBeNull()
   })
 
   it('calls onSpawnAgent and onClose when "Spawn Claude Session" is clicked', async () => {
