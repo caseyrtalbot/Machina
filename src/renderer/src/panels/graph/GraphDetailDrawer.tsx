@@ -136,7 +136,7 @@ export function GraphDetailDrawer() {
         WebkitBackdropFilter: floatingPanel.glass.blur,
         borderRadius: floatingPanel.borderRadius,
         boxShadow: floatingPanel.shadowCompact,
-        border: `0.5px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`,
         padding: '16px',
         pointerEvents: isOpen ? 'auto' : 'none'
       }}

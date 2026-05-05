@@ -25,6 +25,322 @@ h6 {
   font-feature-settings: 'tnum';
 }
 
+/* ─── Linear-precision design primitives ─────────────────────────────────
+ * Shared vocabulary used across chrome (titlebar, statusbar) and surfaces
+ * (palette, ghosts, diff review). Mirrors the Console direction tokens.css.
+ * Components style off these so the visual grammar stays one-to-one with
+ * the design package: hairline-square, mono labels, ember accent. */
+
+.te-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.te-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-text-secondary);
+  background: var(--bg-tint-text);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-inline);
+}
+
+.te-hairline {
+  background: var(--line-subtle);
+}
+
+.te-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-default);
+  flex-shrink: 0;
+  animation: te-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes te-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+.te-caret {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  vertical-align: -2px;
+  background: var(--color-accent-default);
+  animation: te-caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes te-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.te-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  background: var(--bg-tint-text);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-inline);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+.te-pill[data-tone='accent'] {
+  color: var(--color-accent-default);
+  border-color: var(--color-accent-line);
+  background: var(--bg-tint-accent);
+}
+.te-pill[data-tone='success'] {
+  color: var(--signal-success);
+  border-color: color-mix(in srgb, var(--signal-success) 40%, transparent);
+  background: color-mix(in srgb, var(--signal-success) 10%, transparent);
+}
+.te-pill[data-tone='warn'] {
+  color: var(--signal-warn);
+  border-color: color-mix(in srgb, var(--signal-warn) 40%, transparent);
+  background: color-mix(in srgb, var(--signal-warn) 10%, transparent);
+}
+.te-pill[data-tone='danger'] {
+  color: var(--signal-danger);
+  border-color: color-mix(in srgb, var(--signal-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--signal-danger) 10%, transparent);
+}
+
+/* ─── App chrome: titlebar breadcrumb + statusbar ───────────────────────
+ * Hairline-square, near-black chrome that frames the workspace. The
+ * breadcrumb sits inside the WindowDragRegion; the statusbar pins the
+ * bottom of the shell. Both use mono 10.5px labels with 0.06–0.12em
+ * tracking, matching the Console direction. */
+
+.te-titlebar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  letter-spacing: 0;
+  user-select: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.te-titlebar-breadcrumb__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-default);
+  flex-shrink: 0;
+}
+.te-titlebar-breadcrumb__vault {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.te-titlebar-breadcrumb__sep {
+  color: var(--color-text-faint);
+  flex-shrink: 0;
+}
+.te-titlebar-breadcrumb__crumb {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.te-titlebar-breadcrumb__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-default);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.te-titlebar-agent {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.te-statusbar {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--color-bg-chrome);
+  border-top: 1px solid var(--line-subtle);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  gap: 16px;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+.te-statusbar__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.te-statusbar__item .te-statusbar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal-success);
+  flex-shrink: 0;
+}
+.te-statusbar__item[data-tone='warn'] .te-statusbar__dot {
+  background: var(--signal-warn);
+}
+.te-statusbar__item[data-tone='danger'] .te-statusbar__dot {
+  background: var(--signal-danger);
+}
+.te-statusbar__item[data-tone='accent'] .te-statusbar__dot {
+  background: var(--color-accent-default);
+}
+.te-statusbar__item[data-tone='muted'] .te-statusbar__dot {
+  background: var(--color-text-disabled);
+}
+.te-statusbar__spacer {
+  flex: 1;
+}
+.te-statusbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  padding: 0 6px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  border-radius: var(--r-inline);
+  transition: background var(--t-fast, 120ms ease), color var(--t-fast, 120ms ease);
+}
+.te-statusbar__btn:hover {
+  background: var(--bg-tint-text);
+  color: var(--color-text-primary);
+}
+
+/* Panel headers — 40px, hairline-bottom, label-left, action-right.
+ * Used by editor / ghosts / inbox / diff-review surfaces; lives here so
+ * each panel doesn't redefine the same chrome from scratch. */
+.te-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 40px;
+  padding: 0 16px;
+  flex-shrink: 0;
+  background: var(--color-bg-base);
+  border-bottom: 1px solid var(--line-subtle);
+}
+.te-panel-header__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.te-panel-header__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Buttons — minimal, hairline, square. Primary is filled with accent and
+ * ember-fg (deep coffee). `data-size="sm"` shaves the height to 22px. */
+.te-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-family: var(--font-sans);
+  font-size: var(--ui-fs-sm, 12px);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-inline);
+  cursor: pointer;
+  transition:
+    color var(--t-fast, 120ms ease),
+    background var(--t-fast, 120ms ease),
+    border-color var(--t-fast, 120ms ease);
+  user-select: none;
+}
+.te-btn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--line-default);
+  background: var(--bg-tint-text);
+}
+.te-btn[data-variant='primary'] {
+  background: var(--color-accent-default);
+  color: var(--color-accent-fg, #1a0f08);
+  border-color: var(--color-accent-default);
+  font-weight: 500;
+}
+.te-btn[data-variant='primary']:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+.te-btn[data-variant='ghost'] {
+  border-color: transparent;
+}
+.te-btn[data-variant='ghost']:hover {
+  border-color: var(--line-subtle);
+}
+.te-btn[data-size='sm'] {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11.5px;
+}
+.te-btn:disabled,
+.te-btn[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* ─── Activity Bar ─── */
 
 .workspace-shell {
@@ -57,7 +373,7 @@ h6 {
   position: relative;
   opacity: var(--base-opacity);
   background-color: var(--base-bg);
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   box-shadow: inset 0 1px 0 transparent;
   overflow: hidden;
 }
@@ -375,7 +691,7 @@ body {
   gap: 8px;
   min-height: 34px;
   padding: 0 10px;
-  border: 0.5px solid rgba(255, 255, 255, 0.20);
+  border: 1px solid rgba(255, 255, 255, 0.20);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
   transition:
@@ -433,7 +749,7 @@ body {
   padding: 3px 8px 3px 6px;
   text-align: left;
   border-radius: 4px;
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   background: transparent;
   transition:
     background-color 150ms ease-out,
@@ -481,7 +797,7 @@ body {
 
 .sidebar-popover {
   background: rgba(6, 6, 10, 0.96);
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(20px) saturate(1.4);
@@ -595,7 +911,7 @@ body {
   justify-content: center;
   width: 26px;
   height: 26px;
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
   color: var(--color-text-secondary);
@@ -720,7 +1036,7 @@ body {
 
 .file-row-hover[data-selected='true'] {
   background: color-mix(in srgb, var(--color-accent-default) 12%, transparent);
-  outline: 0.5px solid color-mix(in srgb, var(--color-accent-default) 24%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--color-accent-default) 24%, transparent);
   outline-offset: -1px;
 }
 
@@ -790,7 +1106,7 @@ body {
 .file-row-hover[data-dragging='true'],
 .tree-directory-row[data-dragging='true'] {
   background: color-mix(in srgb, var(--color-accent-default) 10%, transparent);
-  outline: 0.5px solid color-mix(in srgb, var(--color-accent-default) 50%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--color-accent-default) 50%, transparent);
   outline-offset: -1px;
   opacity: 0.7;
 }
@@ -798,7 +1114,7 @@ body {
 /* Drop target folder — smooth 100ms ease via base .tree-directory-row transition */
 .tree-directory-row[data-drop-target='true'] {
   background: color-mix(in srgb, var(--color-accent-default) 16%, transparent);
-  outline: 0.5px solid color-mix(in srgb, var(--color-accent-default) 48%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--color-accent-default) 48%, transparent);
   outline-offset: -1px;
 }
 .tree-directory-row[data-drop-target='true'] > .truncate {
@@ -858,7 +1174,7 @@ body {
 
 .ProseMirror .te-table-header,
 .ProseMirror .te-table-cell {
-  border: 0.5px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
   padding: 6px 10px;
   vertical-align: top;
   min-width: 60px;
@@ -901,15 +1217,20 @@ body {
  * (:focus-visible), not on mouse click. `:where()` keeps specificity 0 so
  * components can override by supplying their own focus treatment.
  */
+/*
+ * Focus ring — Linear-precision: 1px hairline accent with a 1px offset so
+ * the ring reads as a deliberate inset frame rather than a chunky stroke.
+ * `prefers-reduced-transparency` bumps the ring to 2px for legibility.
+ */
 :where(button, a, input, select, textarea, [role='button'], [role='menuitem'], [role='option'], [tabindex]):focus-visible {
-  outline: 2px solid var(--color-accent-default);
-  outline-offset: 2px;
-  border-radius: var(--radius-inline);
+  outline: 1px solid var(--color-accent-default);
+  outline-offset: 1px;
+  border-radius: var(--r-inline, 2px);
 }
 
 @media (prefers-reduced-transparency: reduce) {
   :where(button, a, input, select, textarea, [role='button'], [role='menuitem'], [role='option'], [tabindex]):focus-visible {
-    outline-width: 3px;
+    outline-width: 2px;
   }
 }
 
@@ -1194,7 +1515,7 @@ body {
   gap: 0;
   flex-shrink: 0;
   padding: 6px 16px;
-  border-bottom: 0.5px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
   background: var(--color-bg-base);
 }
 
@@ -1207,7 +1528,7 @@ body {
   text-transform: uppercase;
   color: var(--color-text-muted);
   background: transparent;
-  border: 0.5px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   cursor: pointer;
   transition:
     background-color 120ms ease-out,
@@ -1596,7 +1917,7 @@ body {
 }
 
 .mermaid-error {
-  border: 0.5px solid #ef4444;
+  border: 1px solid #ef4444;
   border-radius: var(--radius-container);
   padding: 0.75em 1em;
 }
@@ -1681,7 +2002,7 @@ body {
   min-width: 35px;
   padding: 4px 2px 8px 3px;
   box-sizing: border-box;
-  border: 0.5px solid var(--border-subtle);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   background: var(--color-bg-rail);
   overflow: visible;
@@ -1705,7 +2026,7 @@ body {
   height: 26px;
   padding: 4px 6px;
   box-sizing: border-box;
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: 2px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1759,7 +2080,7 @@ body {
   padding: 5px 10px;
   border-radius: 6px;
   background: var(--chrome-panel-elevated);
-  border: 0.5px solid var(--chrome-panel-border);
+  border: 1px solid var(--chrome-panel-border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -2053,7 +2374,7 @@ body {
   padding: 0.75em 1em;
   border-radius: 4px;
   background: var(--color-bg-elevated);
-  border: 0.5px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   overflow-x: auto;
   margin: 0 0 0.85em;
 }
@@ -2077,7 +2398,7 @@ body {
 
 .thread-prose hr {
   border: 0;
-  border-top: 0.5px solid var(--color-border-default);
+  border-top: 1px solid var(--color-border-default);
   margin: 1.4em 0;
 }
 
@@ -2089,7 +2410,7 @@ body {
 
 .thread-prose th,
 .thread-prose td {
-  border: 0.5px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   padding: 0.4em 0.65em;
   text-align: left;
 }
@@ -2145,7 +2466,7 @@ body {
 }
 
 .canvas-card__action-btn {
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   background: transparent;
   transition:
     background-color 150ms ease-out,
@@ -2159,7 +2480,7 @@ body {
 }
 
 .canvas-card__badge {
-  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.05);
   font-family: var(--font-mono);
   letter-spacing: 0.14em;
@@ -2169,7 +2490,7 @@ body {
 .canvas-minimap {
   position: absolute;
   overflow: hidden;
-  border: 0.5px solid var(--chrome-panel-border);
+  border: 1px solid var(--chrome-panel-border);
   border-radius: 4px;
   background: var(--canvas-hud-bg);
   backdrop-filter: blur(16px);
@@ -2193,7 +2514,7 @@ body {
 }
 
 .canvas-zoom-indicator {
-  border: 0.5px solid var(--chrome-panel-border);
+  border: 1px solid var(--chrome-panel-border);
   border-radius: 2px;
   background: var(--canvas-hud-bg);
   backdrop-filter: blur(16px);
@@ -2214,7 +2535,7 @@ body {
 }
 
 .settings-header {
-  border-bottom: 0.5px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .settings-kicker {
@@ -2243,7 +2564,7 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 2px;
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -2294,7 +2615,7 @@ body {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 0.5px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .settings-row + .settings-row {
@@ -2329,7 +2650,7 @@ body {
 .settings-input,
 .settings-select {
   min-height: 26px;
-  border: 0.5px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: 2px;
   background: transparent;
   color: var(--color-text-primary);
@@ -2376,14 +2697,14 @@ body {
   padding: 10px 12px;
   margin: 4px 0 8px;
   border-radius: 4px;
-  border: 0.5px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   background: color-mix(in srgb, var(--color-text-primary) 2%, transparent);
 }
 
 .settings-footer {
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 0.5px solid var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: flex-end;
 }
@@ -2409,13 +2730,13 @@ body {
 }
 
 .settings-button {
-  border: 0.5px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   background: transparent;
   color: var(--color-text-secondary);
 }
 
 .settings-primary-button {
-  border: 0.5px solid var(--color-accent-default);
+  border: 1px solid var(--color-accent-default);
   background: var(--color-accent-default);
   color: var(--color-bg-base);
 }

@@ -44,7 +44,7 @@ function treeGuideColor(emphasis: 'rest' | 'active' = 'rest'): string {
 function indentBorderStyle(depth: number, isActive?: boolean): React.CSSProperties {
   if (depth === 0) return {}
   return {
-    borderLeft: `0.5px solid ${treeGuideColor(isActive ? 'active' : 'rest')}`,
+    borderLeft: `1px solid ${treeGuideColor(isActive ? 'active' : 'rest')}`,
     marginLeft: 8 + (depth - 1) * 16 + 7,
     paddingLeft: 9
   }

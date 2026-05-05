@@ -225,7 +225,7 @@ export function ConnectionDragOverlay() {
             top: drag.cursorY + 10,
             backgroundColor: colors.bg.elevated,
             color: edgeColor,
-            border: `0.5px solid ${edgeColor}`
+            border: `1px solid ${edgeColor}`
           }}
         >
           <span>{kindLabel}</span>

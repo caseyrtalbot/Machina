@@ -71,6 +71,11 @@ vi.mock('../../../design/tokens', () => ({
   typography: {
     fontFamily: { display: 'system-ui', body: 'system-ui', mono: 'monospace' },
     metadata: { size: '10px', letterSpacing: '0.14em', textTransform: 'uppercase' as const }
+  },
+  transitions: {
+    default: '150ms ease-out',
+    fast: '120ms cubic-bezier(0.4,0,0.2,1)',
+    med: '180ms cubic-bezier(0.4,0,0.2,1)'
   }
 }))
 

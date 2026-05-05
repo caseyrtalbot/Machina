@@ -84,7 +84,7 @@ export function BooleanInput({ value, onChange }: BooleanInputProps) {
         // Console: hairline-square toggle. Track stays subtly hinted (2px) so
         // the moving indicator inside reads as a square block, not a pill.
         borderRadius: borderRadius.inline,
-        border: `0.5px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`,
         backgroundColor: value ? `${colors.accent.default}40` : 'var(--color-bg-surface)',
         position: 'relative',
         cursor: 'pointer',
@@ -242,7 +242,7 @@ export function ListInput({ value, onChange }: ListInputProps) {
     letterSpacing: '0.08em',
     borderRadius: borderRadius.inline,
     padding: '2px 8px',
-    border: `0.5px solid ${colors.border.default}`,
+    border: `1px solid ${colors.border.default}`,
     backgroundColor: 'var(--color-bg-surface)',
     color: colors.text.primary,
     lineHeight: 1.4
@@ -423,7 +423,7 @@ export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps
           className="absolute left-0 top-full mt-1 z-40 shadow-lg overflow-hidden"
           style={{
             backgroundColor: colors.bg.elevated,
-            border: `0.5px solid ${colors.border.default}`,
+            border: `1px solid ${colors.border.default}`,
             borderRadius: borderRadius.inline,
             minWidth: 56
           }}

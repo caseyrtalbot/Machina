@@ -94,7 +94,7 @@ function ConvertMenu({
         right: window.innerWidth - anchorRect.right,
         minWidth: 120,
         backgroundColor: colors.bg.elevated,
-        border: `0.5px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`,
         borderRadius: canvasTokens.cardRadius,
         zIndex: 50,
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
@@ -306,8 +306,8 @@ export function CardShell({
         borderRadius: borderRadius.tool,
         border:
           isFocused || isLocked
-            ? '0.5px solid color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border))'
-            : `0.5px solid ${canvasTokens.cardBorder}`,
+            ? '1px solid color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border))'
+            : `1px solid ${canvasTokens.cardBorder}`,
         boxShadow: isLocked
           ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 32%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 18px 36px rgba(0, 0, 0, 0.32)'
           : isFocused
@@ -349,7 +349,7 @@ export function CardShell({
           background: isTerminalCard
             ? 'linear-gradient(180deg, rgba(3, 3, 5, 0.96), rgba(3, 3, 5, 0.9))'
             : `color-mix(in srgb, var(--canvas-card-bg) 70%, var(--color-bg-elevated))`,
-          borderBottom: `0.5px solid ${canvasTokens.cardBorder}`,
+          borderBottom: `1px solid ${canvasTokens.cardBorder}`,
           borderRadius: `${borderRadius.tool - 1}px ${borderRadius.tool - 1}px 0 0`,
           cursor: 'grab'
         }}
@@ -399,7 +399,7 @@ export function CardShell({
               letterSpacing: '0.14em',
               padding: '1px 6px',
               borderRadius: borderRadius.inline,
-              border: '0.5px solid color-mix(in srgb, #818cf8 32%, transparent)',
+              border: '1px solid color-mix(in srgb, #818cf8 32%, transparent)',
               background: 'color-mix(in srgb, #818cf8 10%, transparent)'
             }}
           >

@@ -20,7 +20,7 @@ export function ThreadMessage({ message, streamingBody }: Props) {
       data-role={message.role}
       style={{
         padding: '20px 24px',
-        borderBottom: `0.5px solid ${colors.border.subtle}`
+        borderBottom: `1px solid ${colors.border.subtle}`
       }}
     >
       <div

@@ -119,7 +119,7 @@ export function TerminalDockAdapter({ sessionId }: { readonly sessionId: string 
               marginTop: 8,
               padding: '6px 12px',
               background: 'transparent',
-              border: `0.5px solid ${colors.border.default}`,
+              border: `1px solid ${colors.border.default}`,
               color: colors.text.primary,
               fontFamily: typography.fontFamily.mono,
               fontSize: typography.metadata.size,

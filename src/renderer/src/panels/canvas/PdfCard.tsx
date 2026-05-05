@@ -155,7 +155,7 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
           <div
             className="flex items-center justify-center gap-2 py-1 flex-shrink-0"
             style={{
-              borderBottom: `0.5px solid ${colors.border.subtle}`,
+              borderBottom: `1px solid ${colors.border.subtle}`,
               fontSize: 11,
               color: colors.text.secondary
             }}

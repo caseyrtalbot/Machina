@@ -64,7 +64,7 @@ const folderMapProgressStyle: React.CSSProperties = {
   padding: '8px 16px',
   borderRadius: '8px',
   background: 'var(--color-bg-elevated)',
-  border: '0.5px solid var(--color-border-subtle)',
+  border: '1px solid var(--color-border-subtle)',
   fontSize: '13px',
   color: 'var(--color-text-secondary)',
   zIndex: 10

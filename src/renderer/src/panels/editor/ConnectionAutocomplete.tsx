@@ -102,7 +102,7 @@ export function ConnectionAutocomplete({
       className="absolute left-0 top-full mt-1 z-30 rounded-md shadow-lg overflow-hidden"
       style={{
         backgroundColor: colors.bg.elevated,
-        border: `0.5px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`,
         minWidth: 220
       }}
     >

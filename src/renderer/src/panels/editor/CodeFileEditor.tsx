@@ -86,7 +86,7 @@ export function CodeFileEditor({ filePath }: CodeFileEditorProps) {
     <div className="h-full flex flex-col">
       <div
         className="flex items-center px-4 py-2 text-xs shrink-0"
-        style={{ color: colors.text.muted, borderBottom: `0.5px solid ${colors.border.default}` }}
+        style={{ color: colors.text.muted, borderBottom: `1px solid ${colors.border.default}` }}
       >
         <span style={{ color: colors.text.primary }}>{filename}</span>
       </div>

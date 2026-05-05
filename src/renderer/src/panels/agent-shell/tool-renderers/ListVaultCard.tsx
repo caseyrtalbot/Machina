@@ -79,7 +79,7 @@ export function ListVaultCard({
             margin: 0,
             padding: '6px 12px 10px 28px',
             listStyle: 'none',
-            borderTop: `0.5px solid ${colors.border.subtle}`
+            borderTop: `1px solid ${colors.border.subtle}`
           }}
         >
           {paths.slice(0, PREVIEW_LIMIT).map((p) => (

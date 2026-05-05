@@ -76,7 +76,7 @@ export function CliCommandCard({
           style={{
             margin: 0,
             padding: '10px 12px',
-            borderTop: `0.5px solid ${colors.border.subtle}`,
+            borderTop: `1px solid ${colors.border.subtle}`,
             background: colors.bg.base,
             color: colors.text.secondary,
             whiteSpace: 'pre-wrap',

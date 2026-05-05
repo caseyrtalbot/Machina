@@ -15,7 +15,7 @@ export function ZoomIndicator() {
       style={{
         padding: '3px 10px',
         background: 'color-mix(in srgb, var(--canvas-card-bg) 92%, transparent)',
-        border: `0.5px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`,
         borderRadius: borderRadius.inline,
         color: colors.text.secondary,
         fontFamily: typography.fontFamily.mono,

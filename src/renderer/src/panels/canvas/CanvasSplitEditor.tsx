@@ -96,7 +96,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
           className="flex items-center justify-between px-3 py-1.5 shrink-0"
           style={{
             backgroundColor: 'rgba(234, 179, 8, 0.12)',
-            borderBottom: '0.5px solid rgba(234, 179, 8, 0.3)',
+            borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
             color: '#eab308'
           }}
         >
@@ -134,7 +134,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
         style={
           {
             height: 34,
-            borderBottom: '0.5px solid var(--line-faint)',
+            borderBottom: '1px solid var(--line-faint)',
             backgroundColor: 'rgba(0, 0, 0, 0.15)',
             position: 'relative',
             zIndex: 60,

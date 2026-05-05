@@ -1,26 +1,19 @@
-import { colors } from '../../design/tokens'
-
+/**
+ * Vertical hairline divider between the thread panel and the side dock.
+ *
+ * Renders as a single 1px column on `--line-subtle` (the design's hairline
+ * alpha), with a 1px transparent gutter on either side so neighbouring
+ * panels still have breathing room.
+ */
 export function StaticDivider() {
   return (
     <div
       aria-hidden
       style={{
         flexShrink: 0,
-        width: 3,
-        position: 'relative',
-        background: 'transparent'
+        width: 1,
+        background: 'var(--line-subtle)'
       }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 1,
-          width: 0.5,
-          background: colors.border.subtle
-        }}
-      />
-    </div>
+    />
   )
 }

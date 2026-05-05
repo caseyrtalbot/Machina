@@ -72,7 +72,7 @@ export function ToolCardShell({
         padding,
         borderRadius: isError ? borderRadius.tool : 0,
         background: isError ? ERROR_BG : 'transparent',
-        border: isError ? `0.5px solid ${ERROR_BORDER}` : '0.5px solid transparent',
+        border: isError ? `1px solid ${ERROR_BORDER}` : '1px solid transparent',
         fontSize: 12,
         color: colors.text.primary,
         ...style

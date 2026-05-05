@@ -18,19 +18,8 @@ function PaletteFooterHint({
   readonly keyLabel: string
 }) {
   return (
-    <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-      <span
-        style={{
-          padding: '1px 5px',
-          background: 'transparent',
-          border: `0.5px solid ${colors.border.default}`,
-          borderRadius: borderRadius.inline,
-          fontSize: 10,
-          color: colors.text.muted
-        }}
-      >
-        {keyLabel}
-      </span>
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+      <span className="te-kbd">{keyLabel}</span>
       <span>{label}</span>
     </span>
   )
@@ -115,45 +104,48 @@ export function CommandPalette({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: colors.bg.base,
-          border: `0.5px solid ${colors.text.primary}`,
+          background: 'var(--color-bg-elevated)',
+          border: '1px solid var(--line-default)',
           borderRadius: borderRadius.tool,
-          width: 560,
-          maxHeight: '60vh',
+          width: 640,
+          maxHeight: '70vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.6)'
+          boxShadow:
+            '0 24px 64px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02)'
         }}
       >
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
-            padding: '12px 16px',
-            borderBottom: `0.5px solid ${colors.border.subtle}`
+            gap: 12,
+            padding: '14px 18px',
+            borderBottom: '1px solid var(--line-subtle)'
           }}
         >
-          <span
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke={colors.text.muted}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             aria-hidden
-            style={{
-              color: colors.accent.default,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 14,
-              fontWeight: 600,
-              lineHeight: 1
-            }}
           >
-            ❯
-          </span>
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="M11 11l3.5 3.5" />
+          </svg>
           <input
             ref={inputRef}
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search threads, files, surfaces, actions…"
+            placeholder="Find anything · run a command · jump to a note…"
             style={{
               flex: 1,
               padding: 0,
@@ -161,34 +153,12 @@ export function CommandPalette({
               color: colors.text.primary,
               border: 'none',
               outline: 'none',
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 14,
+              fontFamily: typography.fontFamily.body,
+              fontSize: 15,
               lineHeight: 1.4
             }}
           />
-          <span
-            style={{
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 10,
-              color: colors.text.muted,
-              letterSpacing: '0.05em'
-            }}
-          >
-            {results.length} {results.length === 1 ? 'result' : 'results'}
-          </span>
-          <span
-            style={{
-              padding: '2px 6px',
-              background: 'transparent',
-              border: `0.5px solid ${colors.border.default}`,
-              borderRadius: borderRadius.inline,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 10,
-              color: colors.text.muted
-            }}
-          >
-            esc
-          </span>
+          <span className="te-kbd">esc</span>
         </div>
         <ul
           role="listbox"
@@ -225,14 +195,15 @@ export function CommandPalette({
                 onClick={() => void it.run()}
                 style={{
                   padding: '8px 18px',
-                  background: isActive ? colors.bg.surface : 'transparent',
+                  background: isActive ? 'var(--bg-tint-accent)' : 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
                   position: 'relative',
-                  borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
-                  paddingLeft: isActive ? 16 : 18
+                  borderLeft: `2px solid ${isActive ? 'var(--color-accent-default)' : 'transparent'}`,
+                  paddingLeft: isActive ? 16 : 18,
+                  transition: 'background 80ms linear'
                 }}
               >
                 <span
@@ -290,18 +261,27 @@ export function CommandPalette({
         <div
           style={{
             display: 'flex',
+            alignItems: 'center',
             gap: 14,
-            padding: '8px 18px',
-            borderTop: `0.5px solid ${colors.border.subtle}`,
-            background: colors.bg.base,
+            padding: '8px 14px',
+            borderTop: '1px solid var(--line-subtle)',
+            background: 'var(--color-bg-surface)',
             fontFamily: typography.fontFamily.mono,
-            fontSize: 10,
-            color: colors.text.disabled
+            fontSize: 11,
+            color: colors.text.muted,
+            letterSpacing: '0.04em'
           }}
         >
           <PaletteFooterHint label="navigate" keyLabel="↑↓" />
           <PaletteFooterHint label="open" keyLabel="↵" />
           <PaletteFooterHint label="dismiss" keyLabel="esc" />
+          <span style={{ flex: 1 }} />
+          <span
+            className="te-label"
+            style={{ color: colors.text.disabled, letterSpacing: '0.12em' }}
+          >
+            {results.length} {results.length === 1 ? 'result' : 'results'}
+          </span>
         </div>
       </div>
     </div>

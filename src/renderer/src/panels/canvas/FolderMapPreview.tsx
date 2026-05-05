@@ -127,7 +127,7 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
         padding: '10px 20px',
         borderRadius: '10px',
         background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border-subtle)',
+        border: '1px solid var(--color-border-subtle)',
         backdropFilter: 'blur(12px)',
         fontSize: '13px',
         color: 'var(--color-text-secondary)',
@@ -160,7 +160,7 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
         style={{
           padding: '4px 14px',
           borderRadius: '6px',
-          border: '0.5px solid var(--color-border-subtle)',
+          border: '1px solid var(--color-border-subtle)',
           background: 'transparent',
           color: 'var(--color-text-secondary)',
           fontSize: '13px',

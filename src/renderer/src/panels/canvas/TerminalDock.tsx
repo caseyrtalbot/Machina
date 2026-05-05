@@ -84,7 +84,7 @@ function TerminalPill({
       : hovered
         ? floatingPanel.glass.inputBgFocus
         : floatingPanel.glass.inputBg,
-    border: `0.5px solid ${isError ? 'rgba(239, 68, 68, 0.15)' : colors.border.subtle}`,
+    border: `1px solid ${isError ? 'rgba(239, 68, 68, 0.15)' : colors.border.subtle}`,
     borderRadius: borderRadius.inline,
     cursor: 'pointer',
     transition: `background ${transitions.hover}`,

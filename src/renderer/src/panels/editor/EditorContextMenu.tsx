@@ -46,7 +46,7 @@ export function EditorContextMenu({ x, y, actions, onClose }: EditorContextMenuP
         left: x,
         top: y,
         backgroundColor: colors.bg.elevated,
-        border: `0.5px solid ${colors.border.default}`,
+        border: `1px solid ${colors.border.default}`,
         borderRadius: borderRadius.inline
       }}
     >

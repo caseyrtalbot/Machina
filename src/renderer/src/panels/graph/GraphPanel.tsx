@@ -111,7 +111,7 @@ function GraphEmptyState({
         style={{
           backgroundColor: 'rgba(14, 14, 18, 0.94)',
           backdropFilter: 'blur(18px)',
-          border: '0.5px solid var(--color-border-default)',
+          border: '1px solid var(--color-border-default)',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.35)'
         }}
       >
@@ -146,7 +146,7 @@ function GraphStatusRail({
         style={{
           backgroundColor: 'rgba(10, 10, 14, 0.86)',
           backdropFilter: floatingPanel.glass.blur,
-          border: '0.5px solid var(--line-subtle)',
+          border: '1px solid var(--line-subtle)',
           color: colors.text.secondary
         }}
       >
@@ -159,7 +159,7 @@ function GraphStatusRail({
         style={{
           backgroundColor: 'rgba(10, 10, 14, 0.72)',
           backdropFilter: 'blur(14px)',
-          border: '0.5px solid var(--line-faint)',
+          border: '1px solid var(--line-faint)',
           color: colors.text.muted
         }}
       >
@@ -515,7 +515,7 @@ export function GraphPanel() {
             style={{
               backgroundColor: 'rgba(10, 10, 14, 0.92)',
               backdropFilter: 'blur(10px)',
-              border: '0.5px solid rgba(92, 184, 196, 0.18)',
+              border: '1px solid rgba(92, 184, 196, 0.18)',
               boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)'
             }}
           >
@@ -548,7 +548,7 @@ export function GraphPanel() {
           width: 32,
           height: 32,
           backgroundColor: showSettings ? 'var(--color-accent-default)' : 'rgba(12, 12, 16, 0.86)',
-          border: '0.5px solid var(--line-subtle)',
+          border: '1px solid var(--line-subtle)',
           color: showSettings ? '#141414' : 'var(--color-text-secondary)',
           backdropFilter: 'blur(12px)',
           boxShadow: '0 10px 24px rgba(0, 0, 0, 0.22)'
@@ -587,7 +587,7 @@ export function GraphPanel() {
             style={{
               backgroundColor: 'rgba(12, 12, 16, 0.86)',
               backdropFilter: 'blur(12px)',
-              border: '0.5px solid var(--line-subtle)',
+              border: '1px solid var(--line-subtle)',
               color: 'var(--color-text-secondary)'
             }}
             onMouseEnter={(e) => {
@@ -605,7 +605,7 @@ export function GraphPanel() {
             style={{
               backgroundColor: 'rgba(12, 12, 16, 0.86)',
               backdropFilter: 'blur(12px)',
-              border: '0.5px solid var(--line-subtle)',
+              border: '1px solid var(--line-subtle)',
               color: 'var(--color-text-muted)',
               fontSize: 10,
               minWidth: 44,

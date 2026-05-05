@@ -76,7 +76,7 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
           backdropFilter: floatingPanel.glass.blur,
           // Console-direction: hairline border on a near-square chrome surface.
           // Tool radius (4px) keeps shadow corners clean; full square felt knife-edged.
-          border: `0.5px solid ${colors.border.default}`,
+          border: `1px solid ${colors.border.default}`,
           borderRadius: borderRadius.tool,
           boxShadow: floatingPanel.shadowCompact
         }}

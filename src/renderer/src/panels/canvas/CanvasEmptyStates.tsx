@@ -24,7 +24,7 @@ export function CanvasWelcomeCard() {
           backgroundColor: 'var(--canvas-card-bg)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '0.5px solid var(--canvas-card-border)',
+          border: '1px solid var(--canvas-card-border)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)'
         }}
       >

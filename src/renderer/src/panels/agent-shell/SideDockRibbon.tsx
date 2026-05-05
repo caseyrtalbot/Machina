@@ -175,9 +175,9 @@ function RibbonDivider() {
       aria-hidden
       style={{
         width: 18,
-        height: 0.5,
-        margin: '6px 0',
-        background: colors.border.subtle
+        height: 1,
+        margin: '8px 0',
+        background: 'var(--line-subtle)'
       }}
     />
   )
@@ -211,24 +211,18 @@ function RibbonAction({
           ? colors.text.primary
           : colors.text.secondary
   const background =
-    interactive && (hovered || isActive)
+    interactive && hovered
       ? tone === 'danger'
         ? 'color-mix(in srgb, #ff847d 10%, transparent)'
-        : 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
+        : 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)'
       : 'transparent'
-  const border =
-    interactive && isActive
-      ? colors.accent.line
-      : interactive && hovered
-        ? colors.border.default
-        : 'transparent'
 
   const style: CSSProperties = {
     width: ACTION_WIDTH,
     height: ACTION_HEIGHT,
     padding: '4px 6px',
     boxSizing: 'border-box',
-    border: `0.5px solid ${border}`,
+    border: 'none',
     borderRadius: borderRadius.inline,
     background,
     color,
@@ -237,7 +231,8 @@ function RibbonAction({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    transition: `background ${transitions.fast}, color ${transitions.fast}, border-color ${transitions.fast}`
+    position: 'relative',
+    transition: `background ${transitions.fast}, color ${transitions.fast}`
   }
 
   return (
@@ -247,12 +242,27 @@ function RibbonAction({
       aria-label={label}
       title={label}
       aria-pressed={pressed}
+      data-active={isActive ? 'true' : undefined}
       disabled={disabled}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={style}
     >
+      {isActive ? (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: -3,
+            top: 4,
+            bottom: 4,
+            width: 2,
+            background: colors.accent.default,
+            borderRadius: 1
+          }}
+        />
+      ) : null}
       <Icon size={ICON_SIZE} strokeWidth={1.75} aria-hidden />
     </button>
   )

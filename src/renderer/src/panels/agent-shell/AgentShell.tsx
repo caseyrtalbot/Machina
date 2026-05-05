@@ -13,6 +13,8 @@ import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { TitlebarBreadcrumb } from '../../components/TitlebarBreadcrumb'
+import { Statusbar } from '../../components/Statusbar'
 
 const WINDOW_HEADER_HEIGHT = 39
 const WINDOW_CONTROLS_CONTAINER_WIDTH = 148
@@ -76,6 +78,7 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
       style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}
     >
       <WindowDragRegion
+        centerSlot={<TitlebarBreadcrumb />}
         rightSlot={
           <HeaderFilesPopover onChangeVault={onChangeVault} onOpenSettings={onOpenSettings} />
         }
@@ -101,13 +104,20 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
         )}
         <SurfaceDock width={dockWidth} />
       </div>
+      <Statusbar />
       <CommandPalette open={paletteOpen} onClose={closePalette} />
       <WelcomeTooltip vaultPath={vaultPath} />
     </div>
   )
 }
 
-function WindowDragRegion({ rightSlot }: { readonly rightSlot?: ReactNode }) {
+function WindowDragRegion({
+  centerSlot,
+  rightSlot
+}: {
+  readonly centerSlot?: ReactNode
+  readonly rightSlot?: ReactNode
+}) {
   // Reserve an Obsidian-sized 148x39 titlebar control zone across the left of
   // the shell and keep the rest of the header draggable. The strip sits above
   // the three-pane layout, so interactive elements stay pointer-clickable
@@ -128,7 +138,7 @@ function WindowDragRegion({ rightSlot }: { readonly rightSlot?: ReactNode }) {
         paddingRight: 8,
         boxSizing: 'border-box',
         background: colors.bg.chrome,
-        borderBottom: `0.5px solid ${colors.border.subtle}`
+        borderBottom: `1px solid var(--line-subtle)`
       }}
     >
       <div
@@ -147,17 +157,21 @@ function WindowDragRegion({ rightSlot }: { readonly rightSlot?: ReactNode }) {
           flex: 1,
           minWidth: 0,
           height: WINDOW_HEADER_HEIGHT,
+          display: 'flex',
+          alignItems: 'center',
           // @ts-expect-error -- Electron-only CSS property
           WebkitAppRegion: 'drag'
         }}
-      />
+      >
+        {centerSlot}
+      </div>
       {rightSlot && (
         <div
           data-testid="window-header-right-slot"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 10,
             flexShrink: 0,
             // @ts-expect-error -- Electron-only CSS property
             WebkitAppRegion: 'no-drag'
@@ -208,7 +222,7 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
         background: floatingPanel.glass.bg,
         backdropFilter: floatingPanel.glass.blur,
         WebkitBackdropFilter: floatingPanel.glass.blur,
-        border: `0.5px solid ${colors.border.subtle}`,
+        border: `1px solid ${colors.border.subtle}`,
         borderRadius: floatingPanel.borderRadius,
         color: colors.text.primary,
         fontFamily: typography.fontFamily.body,
@@ -274,7 +288,7 @@ function WelcomeKbd({ children }: { readonly children: React.ReactNode }) {
         padding: '0 5px',
         margin: '0 2px',
         verticalAlign: 'baseline',
-        border: `0.5px solid ${colors.border.subtle}`,
+        border: `1px solid ${colors.border.subtle}`,
         borderRadius: borderRadius.inline,
         fontFamily: typography.fontFamily.mono,
         fontSize: 10,

@@ -18,7 +18,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         // to accent line on focus. Background drops to the canvas surface so the
         // input reads as a single recessed slot, not a raised pill.
         borderRadius: borderRadius.inline,
-        border: `0.5px solid ${focused ? colors.accent.line : colors.border.default}`,
+        border: `1px solid ${focused ? colors.accent.line : colors.border.default}`,
         background: 'transparent',
         minHeight: 28,
         padding: '6px 10px',

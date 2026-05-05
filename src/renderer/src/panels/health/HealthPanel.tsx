@@ -262,7 +262,7 @@ function DegradedState({ issues }: { readonly issues: readonly HealthIssue[] }) 
             as="h3"
             style={{
               padding: '14px 0 6px',
-              borderBottom: '0.5px solid var(--line-faint)',
+              borderBottom: '1px solid var(--line-faint)',
               marginBottom: 2,
               marginTop: 0
             }}

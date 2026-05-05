@@ -160,7 +160,7 @@ export function BacklinksPanel({
     // editor body. Padding 12 / 32 matches the breadcrumb row scale.
     <div
       style={{
-        borderTop: `0.5px solid ${colors.border.subtle}`
+        borderTop: `1px solid ${colors.border.subtle}`
       }}
     >
       {/* Header row */}

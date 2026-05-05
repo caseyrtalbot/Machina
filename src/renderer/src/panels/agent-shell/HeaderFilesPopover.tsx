@@ -77,7 +77,7 @@ export function HeaderFilesPopover({
     padding: 0,
     boxSizing: 'border-box',
     borderRadius: borderRadius.inline,
-    border: `0.5px solid ${
+    border: `1px solid ${
       open ? colors.accent.line : hovered ? colors.border.default : 'transparent'
     }`,
     background: open
@@ -104,7 +104,7 @@ export function HeaderFilesPopover({
     background: floatingPanel.glass.popoverBg,
     backdropFilter: floatingPanel.glass.popoverBlur,
     WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
-    border: `0.5px solid ${colors.border.default}`,
+    border: `1px solid ${colors.border.default}`,
     borderRadius: floatingPanel.borderRadius,
     boxShadow: floatingPanel.shadowCompact,
     overflow: 'hidden',

@@ -105,7 +105,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
           gap: 6,
           backgroundColor: 'transparent',
           color: colors.text.primary,
-          border: `0.5px solid ${colors.border.default}`,
+          border: `1px solid ${colors.border.default}`,
           borderRadius: borderRadius.inline,
           fontFamily: typography.fontFamily.mono,
           fontSize: 12,
@@ -138,7 +138,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
             marginTop: 4,
             width: 280,
             backgroundColor: colors.bg.elevated,
-            border: `0.5px solid ${colors.border.strong}`,
+            border: `1px solid ${colors.border.strong}`,
             borderRadius: borderRadius.tool,
             boxShadow: '0 24px 48px rgba(0,0,0,0.6)'
           }}
@@ -147,7 +147,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
           <div
             style={{
               padding: 8,
-              borderBottom: `0.5px solid ${colors.border.subtle}`
+              borderBottom: `1px solid ${colors.border.subtle}`
             }}
           >
             <input
@@ -161,7 +161,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
                 padding: '4px 8px',
                 backgroundColor: 'transparent',
                 color: colors.text.primary,
-                border: `0.5px solid ${colors.border.default}`,
+                border: `1px solid ${colors.border.default}`,
                 borderRadius: borderRadius.inline,
                 fontFamily: typography.fontFamily.mono,
                 fontSize: 12
@@ -176,7 +176,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
               style={{
                 gap: 4,
                 padding: '6px 8px',
-                borderBottom: `0.5px solid ${colors.border.subtle}`
+                borderBottom: `1px solid ${colors.border.subtle}`
               }}
             >
               {FONT_CATEGORIES.map((cat) => (
@@ -193,7 +193,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
                     letterSpacing: typography.metadata.letterSpacing,
                     textTransform: typography.metadata.textTransform,
                     backgroundColor: category === cat ? colors.accent.soft : 'transparent',
-                    border: `0.5px solid ${category === cat ? colors.accent.default : 'transparent'}`,
+                    border: `1px solid ${category === cat ? colors.accent.default : 'transparent'}`,
                     color: category === cat ? colors.accent.default : colors.text.muted,
                     cursor: 'pointer'
                   }}
@@ -236,7 +236,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
                     className="w-full text-left flex items-center justify-between transition-colors"
                     style={{
                       padding: '6px 12px',
-                      borderBottom: `0.5px solid ${colors.border.subtle}`,
+                      borderBottom: `1px solid ${colors.border.subtle}`,
                       backgroundColor: isSelected
                         ? colors.accent.soft
                         : isHovered
@@ -274,7 +274,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
           <div
             style={{
               padding: '6px 12px',
-              borderTop: `0.5px solid ${colors.border.subtle}`,
+              borderTop: `1px solid ${colors.border.subtle}`,
               color: colors.text.muted,
               fontFamily: typography.fontFamily.mono,
               fontSize: typography.metadata.size,

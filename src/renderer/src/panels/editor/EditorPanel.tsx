@@ -334,7 +334,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
             // Console callout: 2px accent left-bar + accent-soft tint
             borderLeft: `2px solid ${colors.claude.warning}`,
             backgroundColor: 'color-mix(in srgb, #dfa11a 10%, transparent)',
-            borderBottom: `0.5px solid ${colors.border.subtle}`,
+            borderBottom: `1px solid ${colors.border.subtle}`,
             color: colors.claude.warning,
             fontFamily: typography.fontFamily.mono
           }}
@@ -358,7 +358,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
                 borderRadius: borderRadius.inline,
                 backgroundColor: 'transparent',
                 color: colors.claude.warning,
-                border: `0.5px solid ${colors.claude.warning}`,
+                border: `1px solid ${colors.claude.warning}`,
                 cursor: 'pointer',
                 fontFamily: typography.fontFamily.mono,
                 textTransform: 'uppercase',
@@ -376,7 +376,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
                 borderRadius: borderRadius.inline,
                 backgroundColor: 'transparent',
                 color: colors.text.secondary,
-                border: `0.5px solid ${colors.border.default}`,
+                border: `1px solid ${colors.border.default}`,
                 cursor: 'pointer',
                 fontFamily: typography.fontFamily.mono,
                 textTransform: 'uppercase',
@@ -443,7 +443,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
             className="shrink-0 overflow-hidden"
             style={{
               width: 200,
-              borderLeft: `0.5px solid ${colors.border.subtle}`
+              borderLeft: `1px solid ${colors.border.subtle}`
             }}
           >
             <OutlinePanel editor={editor} />

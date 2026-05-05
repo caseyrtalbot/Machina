@@ -159,7 +159,7 @@ export function TagBrowser() {
               letterSpacing: typography.metadata.letterSpacing,
               textTransform: typography.metadata.textTransform,
               padding: '2px 6px',
-              border: `0.5px solid ${colors.border.subtle}`,
+              border: `1px solid ${colors.border.subtle}`,
               borderRadius: borderRadius.inline,
               lineHeight: 1
             }}
@@ -187,7 +187,7 @@ export function TagBrowser() {
                   // palette.
                   style={{
                     background: 'transparent',
-                    border: `0.5px solid ${colors.accent.line}`,
+                    border: `1px solid ${colors.accent.line}`,
                     borderRadius: borderRadius.inline,
                     color: colors.accent.default,
                     fontFamily: typography.fontFamily.mono,
