@@ -131,7 +131,7 @@ export function VaultSelector({
 
   return (
     <div className="relative" ref={menuRef}>
-      <div className="flex items-center">
+      <div className="flex items-center" style={{ minWidth: 0 }}>
         <button
           onClick={toggle}
           onContextMenu={(e) => {
@@ -143,23 +143,20 @@ export function VaultSelector({
           }}
           className="sidebar-vault-button"
           data-open={open ? 'true' : 'false'}
+          title={currentPath ?? undefined}
           style={{
             color: colors.text.primary,
-            // Console: square hairline frame, inline radius. The card itself
-            // stays flat; only the icon box gets accent-tint.
             borderRadius: borderRadius.inline,
-            gap: 10
+            gap: 8
           }}
         >
-          {/* Accent-tinted icon box (28×28) — anchors the vault card with
-              the warm Ember accent without coloring the whole row. */}
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28,
-              height: 28,
+              width: 18,
+              height: 18,
               flexShrink: 0,
               borderRadius: borderRadius.inline,
               background: colors.accent.soft,
@@ -167,8 +164,8 @@ export function VaultSelector({
             }}
           >
             <svg
-              width={14}
-              height={14}
+              width={11}
+              height={11}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -180,36 +177,21 @@ export function VaultSelector({
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
           </span>
-          <span className="sidebar-vault-copy">
-            <span
-              className="sidebar-vault-name truncate"
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                letterSpacing: 0,
-                color: colors.text.primary
-              }}
-            >
-              {currentName}
-            </span>
-            {currentPath && (
-              <span
-                className="sidebar-vault-path truncate"
-                title={currentPath}
-                style={{
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: 10,
-                  letterSpacing: 0,
-                  color: colors.text.muted
-                }}
-              >
-                {currentPath}
-              </span>
-            )}
+          <span
+            className="sidebar-vault-name truncate"
+            style={{
+              fontSize: 12,
+              fontWeight: 500,
+              letterSpacing: 0,
+              color: colors.text.primary,
+              minWidth: 0
+            }}
+          >
+            {currentName}
           </span>
           <svg
-            width={10}
-            height={10}
+            width={9}
+            height={9}
             viewBox="0 0 10 10"
             style={{
               color: colors.text.muted,
@@ -226,12 +208,50 @@ export function VaultSelector({
 
       {open && (
         <div
-          className="sidebar-popover absolute left-0 right-0 flex flex-col py-1 z-50"
+          className="sidebar-popover absolute left-0 flex flex-col py-1 z-50"
           style={{
             top: '100%',
-            marginTop: 6
+            marginTop: 6,
+            minWidth: 280,
+            maxWidth: 'min(420px, calc(100vw - 24px))'
           }}
         >
+          {currentPath && (
+            <>
+              <div className="px-3 pt-2 pb-1 sidebar-kicker">Current</div>
+              <div
+                className="px-3 pb-2"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: colors.text.primary
+                  }}
+                >
+                  {currentName}
+                </span>
+                <span
+                  className="truncate"
+                  title={currentPath}
+                  style={{
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 10,
+                    letterSpacing: 0,
+                    color: colors.text.muted
+                  }}
+                >
+                  {currentPath}
+                </span>
+              </div>
+              <div className="sidebar-popover-divider mx-3 my-1" />
+            </>
+          )}
           {recentVaults.length > 0 && (
             <>
               <div className="px-3 pt-2 pb-1 sidebar-kicker">Recent</div>

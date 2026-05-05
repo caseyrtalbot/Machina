@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useThreadStore } from '../../store/thread-store'
 import { useThreadStreaming } from '../../hooks/use-thread-streaming'
@@ -7,6 +8,7 @@ import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
 import { SideDockRibbon } from './SideDockRibbon'
+import { HeaderFilesPopover } from './HeaderFilesPopover'
 import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
@@ -73,7 +75,11 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
       data-testid="agent-shell"
       style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}
     >
-      <WindowDragRegion />
+      <WindowDragRegion
+        rightSlot={
+          <HeaderFilesPopover onChangeVault={onChangeVault} onOpenSettings={onOpenSettings} />
+        }
+      />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <ThreadSidebar width={sidebarWidth} onChangeVault={onChangeVault} />
         <ResizeHandle
@@ -101,7 +107,7 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   )
 }
 
-function WindowDragRegion() {
+function WindowDragRegion({ rightSlot }: { readonly rightSlot?: ReactNode }) {
   // Reserve an Obsidian-sized 148x39 titlebar control zone across the left of
   // the shell and keep the rest of the header draggable. The strip sits above
   // the three-pane layout, so interactive elements stay pointer-clickable
@@ -113,9 +119,9 @@ function WindowDragRegion() {
   return (
     <div
       data-testid="window-drag-region"
-      aria-hidden
       style={{
         display: 'flex',
+        alignItems: 'center',
         height: WINDOW_HEADER_HEIGHT,
         flexShrink: 0,
         paddingLeft: 8,
@@ -136,13 +142,30 @@ function WindowDragRegion() {
         }}
       />
       <div
+        aria-hidden
         style={{
           flex: 1,
           minWidth: 0,
+          height: WINDOW_HEADER_HEIGHT,
           // @ts-expect-error -- Electron-only CSS property
           WebkitAppRegion: 'drag'
         }}
       />
+      {rightSlot && (
+        <div
+          data-testid="window-header-right-slot"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexShrink: 0,
+            // @ts-expect-error -- Electron-only CSS property
+            WebkitAppRegion: 'no-drag'
+          }}
+        >
+          {rightSlot}
+        </div>
+      )}
     </div>
   )
 }

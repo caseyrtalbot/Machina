@@ -127,70 +127,71 @@ function ActionBar({
 
   return (
     <div className="sidebar-action-bar">
-      <div>
-        {vaultName && onSelectVault && onOpenVaultPicker ? (
-          <VaultSelector
-            currentName={vaultName}
-            currentPath={useVaultStore.getState().vaultPath}
-            history={vaultHistory}
-            onSelectVault={onSelectVault}
-            onOpenPicker={onOpenVaultPicker}
-            onRemoveFromHistory={onRemoveFromHistory}
-          />
-        ) : null}
-      </div>
       <div className="sidebar-section-bar">
-        <button onClick={() => onToggleFiles?.()} className="sidebar-section-toggle">
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 16 16"
-            fill="none"
-            style={{
-              transform: filesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-              transition: `transform ${transitions.default}`,
-              color: colors.text.muted
-            }}
-          >
-            <path
-              d="M6 4L10 8L6 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <div className="sidebar-section-bar-left">
+          {vaultName && onSelectVault && onOpenVaultPicker ? (
+            <VaultSelector
+              currentName={vaultName}
+              currentPath={useVaultStore.getState().vaultPath}
+              history={vaultHistory}
+              onSelectVault={onSelectVault}
+              onOpenPicker={onOpenVaultPicker}
+              onRemoveFromHistory={onRemoveFromHistory}
             />
-          </svg>
-          <span className="sidebar-section-copy">
-            {/* Console section header: muted mono 10px / 0.14em uppercase. */}
-            <span
-              className="sidebar-section-label"
+          ) : null}
+          <span aria-hidden className="sidebar-section-bar-divider" />
+          <button onClick={() => onToggleFiles?.()} className="sidebar-section-toggle">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 16 16"
+              fill="none"
               style={{
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: typography.metadata.size,
-                letterSpacing: typography.metadata.letterSpacing,
-                textTransform: typography.metadata.textTransform,
-                fontWeight: 600
+                transform: filesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+                transition: `transform ${transitions.default}`,
+                color: colors.text.muted
               }}
             >
-              Files
-            </span>
-            {/* Right-aligned count in disabled-text gray, recedes behind the
+              <path
+                d="M6 4L10 8L6 12"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="sidebar-section-copy">
+              {/* Console section header: muted mono 10px / 0.14em uppercase. */}
+              <span
+                className="sidebar-section-label"
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: typography.metadata.size,
+                  letterSpacing: typography.metadata.letterSpacing,
+                  textTransform: typography.metadata.textTransform,
+                  fontWeight: 600
+                }}
+              >
+                Files
+              </span>
+              {/* Right-aligned count in disabled-text gray, recedes behind the
                 section label. */}
-            <span
-              className="sidebar-section-count"
-              style={{
-                color: colors.text.disabled,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: typography.metadata.size,
-                letterSpacing: typography.metadata.letterSpacing,
-                fontVariantNumeric: 'tabular-nums'
-              }}
-            >
-              {fileCount}
+              <span
+                className="sidebar-section-count"
+                style={{
+                  color: colors.text.disabled,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: typography.metadata.size,
+                  letterSpacing: typography.metadata.letterSpacing,
+                  fontVariantNumeric: 'tabular-nums'
+                }}
+              >
+                {fileCount}
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
+        </div>
         <div className="flex items-center gap-0.5">
           <button
             onClick={onNewFile}

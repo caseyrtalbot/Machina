@@ -360,11 +360,11 @@ body {
 }
 
 .sidebar-vault-button {
-  width: 100%;
-  display: flex;
+  max-width: 100%;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 3px 8px 3px 6px;
   text-align: left;
   border-radius: 4px;
   border: 0.5px solid transparent;
@@ -372,6 +372,7 @@ body {
   transition:
     background-color 150ms ease-out,
     border-color 150ms ease-out;
+  min-width: 0;
 }
 
 .sidebar-vault-button:hover,
@@ -465,6 +466,23 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+}
+
+.sidebar-section-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sidebar-section-bar-divider {
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .sidebar-section-toggle {
