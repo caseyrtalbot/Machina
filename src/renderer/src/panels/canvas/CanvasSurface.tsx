@@ -17,9 +17,12 @@ interface GridParams {
   readonly majorRadius: number
 }
 
-// Constant dot brightness — does not vary with zoom
-const MINOR_OPACITY = 0.2
-const MAJOR_OPACITY = 0.32
+// Tuned for a "paper texture" feel against the pure-black void: dots are felt,
+// not seen, and major (every-5th) dots stay proportionally subtle so they hint
+// at structure without reading as a hard graph-paper grid.
+const MINOR_OPACITY = 0.07
+const MAJOR_TO_MINOR_RATIO = 1.7
+const MAJOR_OPACITY_CAP = 0.45
 
 // Target screen-space radius in CSS pixels (what the user sees)
 const TARGET_SCREEN_RADIUS = 0.85
@@ -33,7 +36,7 @@ function computeGridParams(zoom: number, minorOp: number = MINOR_OPACITY): GridP
   const baseR = Math.min(TARGET_SCREEN_RADIUS / zoom, MAX_SVG_RADIUS)
   return {
     minorOpacity: minorOp,
-    majorOpacity: MAJOR_OPACITY,
+    majorOpacity: Math.min(minorOp * MAJOR_TO_MINOR_RATIO, MAJOR_OPACITY_CAP),
     minorRadius: baseR,
     majorRadius: baseR * 1.15
   }

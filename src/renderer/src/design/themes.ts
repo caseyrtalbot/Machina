@@ -24,7 +24,7 @@ export const ENV_DEFAULTS: EnvironmentSettings = {
   cardOpacity: 94,
   cardHeaderDarkness: 45,
   cardBlur: 9,
-  gridDotVisibility: 20,
+  gridDotVisibility: 7,
   cardTitleFontSize: 13,
   cardBodyFontSize: 16,
   sidebarFontSize: 13

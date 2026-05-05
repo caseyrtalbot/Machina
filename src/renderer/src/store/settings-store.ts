@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'machina-settings',
-      version: 10,
+      version: 11,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -163,6 +163,16 @@ export const useSettingsStore = create<SettingsStore>()(
           if (existingEnv) {
             delete existingEnv.canvasTranslucency
             delete existingEnv.activityBarOpacity
+          }
+        }
+
+        if (version < 11) {
+          // v10 → v11: retune canvas dot grid. The old default (20) read as
+          // hard graph-paper noise against #000; reset to the new paper-texture
+          // default so the grid is felt rather than seen.
+          const existingEnv = state.env as Record<string, unknown> | undefined
+          if (existingEnv) {
+            existingEnv.gridDotVisibility = ENV_DEFAULTS.gridDotVisibility
           }
         }
 
