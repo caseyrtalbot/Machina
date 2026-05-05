@@ -170,12 +170,12 @@ describe('FileTree origin color coding', () => {
       />
     )
 
-    // Phosphor icons render as SVGs; find the file icon SVG
+    // Lucide icons render as stroke-only SVGs; find the file icon SVG
     const fileRow = container.querySelector('.file-row-hover')
     const svg = fileRow?.querySelector('svg')
     expect(svg).not.toBeNull()
-    // The Phosphor icon receives color prop which sets fill on the SVG
-    expect(svg?.getAttribute('fill')).toBe(getOriginColor('agent'))
+    // Lucide receives color via the stroke attribute; fill stays "none"
+    expect(svg?.getAttribute('stroke')).toBe(getOriginColor('agent'))
   })
 
   it('renders file icon with source color when origin is source', () => {
@@ -204,7 +204,7 @@ describe('FileTree origin color coding', () => {
     const fileRow = container.querySelector('.file-row-hover')
     const svg = fileRow?.querySelector('svg')
     expect(svg).not.toBeNull()
-    expect(svg?.getAttribute('fill')).toBe(getOriginColor('source'))
+    expect(svg?.getAttribute('stroke')).toBe(getOriginColor('source'))
   })
 
   it('renders file icon with default color when origin is human', () => {
@@ -234,8 +234,8 @@ describe('FileTree origin color coding', () => {
     const svg = fileRow?.querySelector('svg')
     expect(svg).not.toBeNull()
     // Human origin should use default icon color, not an origin override
-    expect(svg?.getAttribute('fill')).not.toBe(getOriginColor('agent'))
-    expect(svg?.getAttribute('fill')).not.toBe(getOriginColor('source'))
+    expect(svg?.getAttribute('stroke')).not.toBe(getOriginColor('agent'))
+    expect(svg?.getAttribute('stroke')).not.toBe(getOriginColor('source'))
   })
 
   it('renders file icon with default color when no origin', () => {
@@ -264,8 +264,8 @@ describe('FileTree origin color coding', () => {
     const svg = fileRow?.querySelector('svg')
     expect(svg).not.toBeNull()
     // Default markdown color, NOT any origin color
-    expect(svg?.getAttribute('fill')).not.toBe(getOriginColor('agent'))
-    expect(svg?.getAttribute('fill')).not.toBe(getOriginColor('source'))
+    expect(svg?.getAttribute('stroke')).not.toBe(getOriginColor('agent'))
+    expect(svg?.getAttribute('stroke')).not.toBe(getOriginColor('source'))
   })
 
   it('renders folder icon with agent color when all children are agent origin', () => {
@@ -302,10 +302,10 @@ describe('FileTree origin color coding', () => {
     // The directory row is the one with the Chevron and FolderIcon
     const dirRow = container.querySelector('.tree-directory-row')
     const svgs = dirRow?.querySelectorAll('svg')
-    // First SVG is the chevron, second is the FolderSimple icon
+    // First SVG is the chevron, second is the lucide Folder icon
     const folderSvg = svgs?.[1]
     expect(folderSvg).not.toBeNull()
-    expect(folderSvg?.getAttribute('fill')).toBe(getOriginColor('agent'))
+    expect(folderSvg?.getAttribute('stroke')).toBe(getOriginColor('agent'))
   })
 
   it('renders folder icon with default color when not all children have same origin', () => {
@@ -354,7 +354,7 @@ describe('FileTree origin color coding', () => {
     const folderSvg = svgs?.[1]
     expect(folderSvg).not.toBeNull()
     // Default gray, NOT any origin color
-    expect(folderSvg?.getAttribute('fill')).not.toBe(getOriginColor('agent'))
-    expect(folderSvg?.getAttribute('fill')).not.toBe(getOriginColor('source'))
+    expect(folderSvg?.getAttribute('stroke')).not.toBe(getOriginColor('agent'))
+    expect(folderSvg?.getAttribute('stroke')).not.toBe(getOriginColor('source'))
   })
 })

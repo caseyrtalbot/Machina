@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { FileText } from '@phosphor-icons/react'
+import { FileText } from 'lucide-react'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useSettingsStore } from '../../store/settings-store'
@@ -292,7 +292,7 @@ export function DailyNoteSection({
                       fontSize: 'var(--env-sidebar-font-size)'
                     }}
                   >
-                    <FileText size={14} color="#56b6c2" weight="duotone" />
+                    <FileText size={14} color={colors.text.muted} strokeWidth={1.5} />
                     <span
                       style={{
                         color: isActive ? colors.text.primary : colors.text.secondary,

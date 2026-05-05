@@ -8,7 +8,8 @@ import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
 import { SideDockRibbon } from './SideDockRibbon'
-import { HeaderFilesPopover } from './HeaderFilesPopover'
+import { HeaderFilesSidePanel, HeaderFilesToggleButton } from './HeaderFilesSidePanel'
+import { persistFilesPanelOpen, readPersistedFilesPanelOpen } from './files-side-panel-storage'
 import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
@@ -66,6 +67,19 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   const openPalette = useCallback(() => setPaletteOpen(true), [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
 
+  const [filesPanelOpen, setFilesPanelOpen] = useState<boolean>(() => readPersistedFilesPanelOpen())
+  const toggleFilesPanel = useCallback(() => {
+    setFilesPanelOpen((prev) => {
+      const next = !prev
+      persistFilesPanelOpen(next)
+      return next
+    })
+  }, [])
+  const closeFilesPanel = useCallback(() => {
+    setFilesPanelOpen(false)
+    persistFilesPanelOpen(false)
+  }, [])
+
   const keybindingOpts = useMemo(
     () => ({ toggleDock, openPalette, closePalette }),
     [toggleDock, openPalette, closePalette]
@@ -79,11 +93,9 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
     >
       <WindowDragRegion
         centerSlot={<TitlebarBreadcrumb />}
-        rightSlot={
-          <HeaderFilesPopover onChangeVault={onChangeVault} onOpenSettings={onOpenSettings} />
-        }
+        rightSlot={<HeaderFilesToggleButton open={filesPanelOpen} onToggle={toggleFilesPanel} />}
       />
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}>
         <ThreadSidebar width={sidebarWidth} onChangeVault={onChangeVault} />
         <ResizeHandle
           side="sidebar"
@@ -103,6 +115,12 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
           />
         )}
         <SurfaceDock width={dockWidth} />
+        <HeaderFilesSidePanel
+          open={filesPanelOpen}
+          onClose={closeFilesPanel}
+          onChangeVault={onChangeVault}
+          onOpenSettings={onOpenSettings}
+        />
       </div>
       <Statusbar />
       <CommandPalette open={paletteOpen} onClose={closePalette} />

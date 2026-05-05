@@ -13,21 +13,16 @@ import { RenameInput } from './FileContextMenu'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode, TreeSortMode } from './buildFileTree'
 import {
-  FileText,
-  FileTs,
-  FileJs,
-  BracketsCurly,
-  FileCss,
-  FileHtml,
-  FilePdf,
-  FileImage,
-  FileSvg,
-  FileCode,
-  GearSix,
-  Graph,
+  Braces,
   File,
-  FolderSimple
-} from '@phosphor-icons/react'
+  FileCode,
+  FileImage,
+  FileText,
+  Folder,
+  Network,
+  Settings,
+  type LucideIcon
+} from 'lucide-react'
 
 /** Indent guide via border-l on the row element.
  *  Simpler than background-image gradients, more native-feeling. */
@@ -152,38 +147,28 @@ type FileIconKind =
   | 'config'
   | 'generic'
 
-const ICON_COLORS: Record<FileIconKind, string> = {
-  markdown: '#56b6c2', // teal — primary content type, cool and recognizable
-  typescript: '#4a90e2', // blue — traditional TS
-  javascript: '#e8cc44', // yellow — traditional JS
-  json: '#8bc46a', // leaf green — data format, clearly distinct from JS yellow
-  yaml: '#d4768c', // dusty rose — config markup, distinct from html orange
-  css: '#b07ae8', // purple — traditional CSS
-  html: '#e87040', // orange — traditional HTML
-  pdf: '#e04848', // red — documents
-  svg: '#e09838', // amber — vector graphics
-  image: '#38d0e8', // cyan — raster images
-  canvas: '#44d4b0', // mint — graph/canvas
-  config: '#7a8a9a', // gray — infrastructure
-  generic: '#7a8a9a' // gray — fallback
-}
+// Single muted icon color across the tree. Lucide is stroke-only, so the
+// previous per-language palette read as harsh and noisy in stroke form.
+// Language is communicated by glyph (FileText / FileCode / Braces / FileImage
+// / Network / Settings) plus the visible extension. Origin overrides
+// (agent / source) still apply via getOriginColor on top of this default.
+const DEFAULT_ICON_COLOR = colors.text.muted
 
-const ICON_COMPONENT: Record<
-  FileIconKind,
-  React.ComponentType<{ size: number; color: string; weight: 'light' | 'regular' | 'duotone' }>
-> = {
+// Lucide is stroke-only and lacks language-specific glyphs. Map TS/JS/CSS/HTML/SVG
+// to FileCode; the visible extension carries the language signal.
+const ICON_COMPONENT: Record<FileIconKind, LucideIcon> = {
   markdown: FileText,
-  typescript: FileTs,
-  javascript: FileJs,
-  json: BracketsCurly,
+  typescript: FileCode,
+  javascript: FileCode,
+  json: Braces,
   yaml: FileCode,
-  css: FileCss,
-  html: FileHtml,
-  pdf: FilePdf,
-  svg: FileSvg,
+  css: FileCode,
+  html: FileCode,
+  pdf: FileText,
+  svg: FileCode,
   image: FileImage,
-  canvas: Graph,
-  config: GearSix,
+  canvas: Network,
+  config: Settings,
   generic: File
 }
 
@@ -223,13 +208,13 @@ function FileIcon({
 }) {
   const kind = getFileIconKind(filename)
   const Icon = ICON_COMPONENT[kind]
-  const color = getOriginColor(origin) ?? ICON_COLORS[kind]
-  return <Icon size={14} color={color} weight="duotone" />
+  const color = getOriginColor(origin) ?? DEFAULT_ICON_COLOR
+  return <Icon size={14} color={color} strokeWidth={1.5} />
 }
 
 function FolderIcon({ originColor }: { readonly originColor?: string }) {
-  const color = originColor ?? '#a1a1aa'
-  return <FolderSimple size={14} color={color} weight="duotone" />
+  const color = originColor ?? DEFAULT_ICON_COLOR
+  return <Folder size={14} color={color} strokeWidth={1.5} />
 }
 
 /** Inline SVG chevron pointing right, rotated via CSS when expanded */
