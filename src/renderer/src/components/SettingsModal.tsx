@@ -129,6 +129,70 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h3 className="settings-section-heading">{children}</h3>
 }
 
+interface SegmentedOption<T extends string> {
+  readonly value: T
+  readonly label: string
+}
+
+interface SegmentedControlProps<T extends string> {
+  readonly value: T
+  readonly options: ReadonlyArray<SegmentedOption<T>>
+  readonly onChange: (value: T) => void
+  readonly ariaLabel: string
+}
+
+/** Hairline-square segmented switch for density / radii / background tint.
+ * Mirrors the design's Tweaks panel chip strip — flat, monospace label,
+ * accent under-line on the active segment. */
+function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel
+}: SegmentedControlProps<T>) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      style={{
+        display: 'inline-flex',
+        border: `1px solid ${colors.border.subtle}`,
+        borderRadius: 'var(--r-inline)',
+        background: 'var(--bg-card)',
+        overflow: 'hidden'
+      }}
+    >
+      {options.map((opt, i) => {
+        const active = opt.value === value
+        return (
+          <button
+            key={opt.value}
+            role="radio"
+            aria-checked={active}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            style={{
+              padding: '4px 10px',
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 11,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: active ? 'var(--color-accent-default)' : colors.text.secondary,
+              background: active ? 'var(--bg-tint-accent)' : 'transparent',
+              border: 'none',
+              borderLeft: i === 0 ? 'none' : `1px solid ${colors.border.subtle}`,
+              cursor: 'pointer',
+              transition: 'color 120ms ease-out, background 120ms ease-out'
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 interface AccentPreviewRowProps {
   readonly accentId: AccentId
   readonly customHex: string
@@ -372,6 +436,51 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
               />
             </div>
           )}
+
+          {/* ── Tweaks ── */}
+          <SectionHeading>Tweaks</SectionHeading>
+          <SettingRow label="Density">
+            <SegmentedControl
+              ariaLabel="Density"
+              value={env.density}
+              options={[
+                { value: 'compact', label: 'Compact' },
+                { value: 'default', label: 'Default' },
+                { value: 'comfy', label: 'Comfy' }
+              ]}
+              onChange={(v) => setEnv('density', v)}
+            />
+          </SettingRow>
+          <SettingRow label="Corners">
+            <SegmentedControl
+              ariaLabel="Corner radii"
+              value={env.radii}
+              options={[
+                { value: 'square', label: 'Square' },
+                { value: 'soft', label: 'Soft' }
+              ]}
+              onChange={(v) => setEnv('radii', v)}
+            />
+          </SettingRow>
+          <SettingRow label="Background">
+            <SegmentedControl
+              ariaLabel="Background tint"
+              value={env.backgroundTint}
+              options={[
+                { value: 'pure', label: 'Pure' },
+                { value: 'near-black', label: 'Near' },
+                { value: 'warm', label: 'Warm' }
+              ]}
+              onChange={(v) => setEnv('backgroundTint', v)}
+            />
+          </SettingRow>
+          <SettingRow label="Canvas Grid">
+            <Toggle
+              value={env.canvasGrid}
+              onChange={(v) => setEnv('canvasGrid', v)}
+              ariaLabel="Show canvas dot grid"
+            />
+          </SettingRow>
 
           {/* ── Typography ── */}
           <SectionHeading>Typography</SectionHeading>

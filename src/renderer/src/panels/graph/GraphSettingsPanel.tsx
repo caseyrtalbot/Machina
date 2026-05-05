@@ -79,7 +79,7 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
           style={{
             width: 14,
             height: 14,
-            backgroundColor: '#fff',
+            backgroundColor: checked ? 'var(--color-accent-fg)' : 'var(--color-text-secondary)',
             left: checked ? 15 : 3
           }}
         />

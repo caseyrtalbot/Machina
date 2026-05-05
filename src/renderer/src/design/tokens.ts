@@ -181,9 +181,19 @@ export const typography = {
   }
 } as const
 
+// Transition curve catalog. The `micro/fast/med/slow` ramp matches the
+// design's `--t-*` cubic-bezier scale (120 / 180 / 280 ms) used for hover,
+// surface, and modal motion. Named legacy aliases (`tooltip`, `focusRing`,
+// `settingsSlide`, `modalFade`, `commandPalette`) preserved for callers
+// that already key off intent rather than duration.
 export const transitions = {
   default: '150ms ease-out',
   hover: '150ms ease-out',
+  micro: '90ms cubic-bezier(0.4, 0, 0.2, 1)',
+  fast: '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+  med: '180ms cubic-bezier(0.4, 0, 0.2, 1)',
+  slow: '280ms cubic-bezier(0.4, 0, 0.2, 1)',
+  surface: '180ms cubic-bezier(0.4, 0, 0.2, 1)',
   tooltip: '100ms ease-in',
   focusRing: '100ms ease-out',
   settingsSlide: '250ms ease-out',
@@ -196,7 +206,14 @@ export const transitions = {
 // don't feel knife-edged. Reach for `card: 0` for canvas cards and modal
 // surfaces; `inline: 2` for pills/chips/tabs; `tool: 4` for tool cards and
 // toolbars; `container: 4` for panel-level containers.
-export const borderRadius = { container: 4, inline: 2, tool: 4, card: 0, round: '50%' } as const
+export const borderRadius = {
+  container: 4,
+  inline: 2,
+  tool: 4,
+  card: 0,
+  pill: 999,
+  round: '50%'
+} as const
 
 /**
  * Z-index scale. Higher numbers paint on top.

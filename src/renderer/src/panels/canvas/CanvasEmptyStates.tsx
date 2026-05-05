@@ -76,7 +76,7 @@ export function CanvasWelcomeCard() {
             fontSize: 13,
             fontWeight: 500,
             fontFamily: typography.fontFamily.body,
-            color: '#fff',
+            color: 'var(--color-accent-fg, #fff)',
             backgroundColor: isHovered ? colors.accent.hover : colors.accent.default,
             border: 'none',
             borderRadius: 8,

@@ -202,7 +202,7 @@ export function OnboardingOverlay() {
           <div
             className="flex justify-center py-2.5 text-xs"
             style={{
-              borderTop: `0.5px solid rgba(255, 255, 255, 0.04)`,
+              borderTop: `0.5px solid var(--line-faint)`,
               color: colors.text.muted
             }}
           >

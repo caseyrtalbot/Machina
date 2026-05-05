@@ -4,7 +4,9 @@
 
 html,
 body {
-  font-family: var(--font-body, system-ui, sans-serif);
+  font-family: var(--font-body, var(--font-sans));
+  font-size: var(--ui-fs);
+  font-feature-settings: 'ss01', 'cv11';
 }
 
 h1,
@@ -13,7 +15,14 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-display, system-ui, sans-serif);
+  font-family: var(--font-display, var(--font-sans));
+}
+
+/* Tabular figures helper for stat counters, status bar, and code-like UI. */
+.tabular,
+[data-tabular] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 
 /* ─── Activity Bar ─── */
@@ -169,8 +178,15 @@ body {
 }
 
 :root {
-  --font-display: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  /* Linear-precision typography stack. Geist is the canonical UI face;
+   * the user can swap to Inter/IBM Plex/etc. via Settings → Typography
+   * (which writes to `--font-body` / `--font-display` / `--font-mono`).
+   * Keep the fallback chain rich so design parity holds even if a font
+   * fails to load. */
+  --font-sans: 'Geist', 'Inter', system-ui, sans-serif;
+  --font-display: 'Geist', 'Inter Tight', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --font-serif: 'Tiempos Headline', 'Source Serif 4', Georgia, serif;
   --window-top-chrome-height: 32px;
   --radius-card: 0;
   --text-page-title: 20px;
@@ -189,23 +205,73 @@ body {
   --transition-settings-slide: 250ms ease-out;
   --transition-modal-fade: 200ms ease-in;
   --transition-command-palette: 150ms ease-out;
-  --color-bg-base: hsl(0, 0%, 3%);
-  --color-bg-surface: hsl(0, 0%, 8%);
-  --color-bg-elevated: hsl(0, 0%, 14%);
-  --color-border-default: rgba(255, 255, 255, 0.20);
-  --color-text-primary: #ebebeb;
-  --color-text-secondary: #9a9a9a;
-  --color-text-muted: #585858;
-  --color-accent-default: #ebebeb;
-  --color-accent-hover: #ffffff;
+  /* ── Surface ramp (Theme.tsx overrides per backgroundTint on mount) ── */
+  --color-bg-base: #000000;
+  --color-bg-surface: #050507;
+  --color-bg-elevated: #0a0a0d;
+  --bg-card: #0a0a0d;
+  --bg-card-hover: #0e0e12;
+  --bg-overlay: rgba(0, 0, 0, 0.72);
+
+  /* ── Hairlines: alpha ramp + back-compat aliases ── */
+  --line-faint: rgba(255, 255, 255, 0.04);
+  --line-subtle: rgba(255, 255, 255, 0.08);
+  --line-default: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.20);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.20);
+
+  /* ── Text ── */
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-text-disabled: #52525b;
+  --color-text-faint: rgba(255, 255, 255, 0.18);
+
+  /* ── Accent (Ember default; resolves to user's accent on mount) ── */
+  --color-accent-default: #ff8c5a;
+  --color-accent-hover: #ffae87;
+  --color-accent-pressed: #f5733d;
+  --color-accent-fg: #1a0f08;
   --color-accent-muted: color-mix(in srgb, var(--color-accent-default) 10%, transparent);
+
+  /* ── Signals ── */
+  --signal-success: #4ec983;
+  --signal-warn: #dfa11a;
+  --signal-danger: #ff847d;
+  --signal-info: #6dafff;
+
+  /* ── Density (Theme.tsx overrides per density on mount) ── */
+  --row-h: 26px;
+  --rail-w: 44px;
+  --sidebar-w: 244px;
+  --titlebar-h: 38px;
+  --statusbar-h: 24px;
+  --pad-panel-x: 16px;
+  --pad-panel-y: 12px;
+  --ui-fs: 13px;
+  --ui-fs-sm: 12px;
+  --label-fs: 10.5px;
+  --label-tracking: 0.12em;
+
+  /* ── Radii (Theme.tsx overrides per radii on mount) ── */
+  --r-card: 0px;
+  --r-inline: 2px;
+  --r-tool: 4px;
+  --r-pill: 999px;
+
+  /* ── Elevation ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55), 0 1px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 1px var(--color-accent-line), 0 0 24px -6px var(--color-accent-default);
 
   /* ── Visual Language ── */
   --panel-gap: 0;
   --panel-radius: 0;
   --panel-padding: 12px 16px;
-  --border-subtle: #ffffff;
-  --color-border-subtle: #ffffff;
   --neon-glow: 0 0 8px color-mix(in srgb, var(--color-accent-default) 15%, transparent);
   --color-accent-focus: color-mix(in srgb, var(--color-accent-default) 30%, transparent);
   --color-accent-subtle: color-mix(in srgb, var(--color-accent-default) 15%, transparent);

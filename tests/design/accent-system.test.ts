@@ -84,8 +84,8 @@ describe('applyAccentCssVars', () => {
     expect(style.getPropertyValue('--color-accent-default')).toBe('#41e0d4')
     expect(style.getPropertyValue('--color-accent-focus')).toBe('rgba(65, 224, 212, 0.3)')
     expect(style.getPropertyValue('--color-accent-subtle')).toBe('rgba(65, 224, 212, 0.15)')
-    expect(style.getPropertyValue('--color-accent-soft')).toBe('rgba(65, 224, 212, 0.14)')
-    expect(style.getPropertyValue('--color-accent-line')).toBe('rgba(65, 224, 212, 0.45)')
+    expect(style.getPropertyValue('--color-accent-soft')).toBe('rgba(65, 224, 212, 0.16)')
+    expect(style.getPropertyValue('--color-accent-line')).toBe('rgba(65, 224, 212, 0.5)')
     expect(style.getPropertyValue('--neon-glow')).toBe('0 0 8px rgba(65, 224, 212, 0.15)')
   })
 

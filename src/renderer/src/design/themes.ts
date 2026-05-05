@@ -5,10 +5,22 @@
  * eventually persist a chosen preset (see `accent-presets.ts`). */
 export const ACCENT_HEX = '#ff8c5a'
 
-/** Cool blue-slate chrome layer (titlebar, status bar, deepest rail).
- * One step darker than the canvas surface so the OS chrome reads as
- * a recessed frame around the surface. */
-export const CHROME_BG_HEX = '#070a0e'
+/** OS-chrome layer (titlebar, status bar, deepest rail). Pulled from
+ * `tokens.css` (#050508) — sits one shade off pure black so the chrome
+ * reads as a recessed frame around the surface. */
+export const CHROME_BG_HEX = '#050508'
+
+/** Density of the row-grid: compact (22px), default (26px), comfy (32px).
+ * Drives `--row-h`, `--ui-fs`, `--ui-fs-sm`, and panel padding. */
+export type Density = 'compact' | 'default' | 'comfy'
+
+/** Card / button / pill corner radii. `square` is the Linear-precision
+ * default (0px / 2px / 4px); `soft` rounds everything off (6px / 4px / 8px). */
+export type Radii = 'square' | 'soft'
+
+/** Background tint variant. `pure` is true #000; `near-black` is a cool
+ * navy-tinted near-black; `warm` is a warm coffee-tinted near-black. */
+export type BackgroundTint = 'pure' | 'near-black' | 'warm'
 
 export interface EnvironmentSettings {
   readonly cardOpacity: number
@@ -18,6 +30,10 @@ export interface EnvironmentSettings {
   readonly cardTitleFontSize: number
   readonly cardBodyFontSize: number
   readonly sidebarFontSize: number
+  readonly density: Density
+  readonly radii: Radii
+  readonly backgroundTint: BackgroundTint
+  readonly canvasGrid: boolean
 }
 
 export const ENV_DEFAULTS: EnvironmentSettings = {
@@ -27,7 +43,11 @@ export const ENV_DEFAULTS: EnvironmentSettings = {
   gridDotVisibility: 7,
   cardTitleFontSize: 13,
   cardBodyFontSize: 16,
-  sidebarFontSize: 13
+  sidebarFontSize: 13,
+  density: 'default',
+  radii: 'square',
+  backgroundTint: 'pure',
+  canvasGrid: true
 }
 
 interface BaseRgb {
@@ -68,26 +88,144 @@ interface StructuralColors {
   }
 }
 
-// Neutral gray-black hairline / text palette. Borders are pure white so panel
-// dividers, header rules, and surface separators read as a continuous 1px
-// hairline grid against the #000 surface. Text returns to a near-white →
-// muted-gray scale that pairs cleanly with the warm Ember accent.
+// Hairline border palette per Linear-precision spec. Three steps of white
+// alpha (faint / subtle / default / strong) so panel dividers feel like a
+// continuous 1px grid that recedes against the pure-black canvas. Text
+// follows the Geist gray ramp (Zinc 100 → Zinc 800) and pairs cleanly with
+// the warm Ember accent.
 export const STRUCTURAL_COLORS: StructuralColors = {
   border: {
-    default: '#ffffff',
-    subtle: '#ffffff',
-    strong: '#ffffff'
+    default: 'rgba(255, 255, 255, 0.12)',
+    subtle: 'rgba(255, 255, 255, 0.08)',
+    strong: 'rgba(255, 255, 255, 0.20)'
   },
   text: {
-    primary: '#ebebeb',
-    secondary: '#9a9a9a',
-    muted: '#585858',
-    disabled: '#3e3e3e'
+    primary: '#f4f4f5',
+    secondary: '#a1a1aa',
+    muted: '#71717a',
+    disabled: '#52525b'
   },
   canvas: {
-    cardBorder: 'rgba(255, 255, 255, 0.16)',
-    textHeading: '#f2f2f2',
-    blockquoteBar: '#555555'
+    cardBorder: 'rgba(255, 255, 255, 0.12)',
+    textHeading: '#f4f4f5',
+    blockquoteBar: 'rgba(255, 255, 255, 0.20)'
+  }
+}
+
+/** Hairline alpha ramp emitted as `--line-faint/subtle/default/strong` so
+ * components can pick the right step by name instead of guessing alphas. */
+export const LINE_ALPHAS = {
+  faint: 'rgba(255, 255, 255, 0.04)',
+  subtle: 'rgba(255, 255, 255, 0.08)',
+  default: 'rgba(255, 255, 255, 0.12)',
+  strong: 'rgba(255, 255, 255, 0.20)'
+} as const
+
+/** Semantic signals — success/warn/danger/info — used by status bar dots,
+ * pill tones, diff lines, and callouts. Kept in one place so callers don't
+ * re-pick hexes per surface. */
+export const SIGNAL_COLORS = {
+  success: '#4ec983',
+  warn: '#dfa11a',
+  danger: '#ff847d',
+  info: '#6dafff'
+} as const
+
+/** Per-artifact dot hues. Mirrors `ARTIFACT_COLORS` in `tokens.ts` so they
+ * stay in sync if either is retuned; emitted as `--hue-*` CSS vars for
+ * consumers that key off CSS rather than the typed map. */
+export const ARTIFACT_HUES = {
+  gene: '#00cca8',
+  constraint: '#ff847d',
+  research: '#ad9cff',
+  output: '#ec86cc',
+  note: '#a3afc1',
+  index: '#00befa',
+  session: '#4ec983',
+  pattern: '#dfa11a',
+  tension: '#fe838f'
+} as const
+
+/** Density → row height + UI font sizes + panel padding. Mirrors the
+ * `[data-density="compact|default|comfy"]` blocks in `tokens.css`. */
+export const DENSITY_VARS: Record<Density, Record<string, string>> = {
+  compact: {
+    '--row-h': '22px',
+    '--ui-fs': '12px',
+    '--ui-fs-sm': '11px',
+    '--pad-panel-x': '12px',
+    '--pad-panel-y': '8px'
+  },
+  default: {
+    '--row-h': '26px',
+    '--ui-fs': '13px',
+    '--ui-fs-sm': '12px',
+    '--pad-panel-x': '16px',
+    '--pad-panel-y': '12px'
+  },
+  comfy: {
+    '--row-h': '32px',
+    '--ui-fs': '14px',
+    '--ui-fs-sm': '13px',
+    '--pad-panel-x': '20px',
+    '--pad-panel-y': '16px'
+  }
+}
+
+/** Radii presets. `square` matches the Linear hairline-square direction;
+ * `soft` is the rounded-corner alternate. */
+export const RADII_VARS: Record<Radii, Record<string, string>> = {
+  square: {
+    '--r-card': '0px',
+    '--r-inline': '2px',
+    '--r-tool': '4px'
+  },
+  soft: {
+    '--r-card': '6px',
+    '--r-inline': '4px',
+    '--r-tool': '8px'
+  }
+}
+
+interface BgVariant {
+  readonly base: string
+  readonly surface: string
+  readonly elevated: string
+  readonly chrome: string
+  readonly rail: string
+  readonly card: string
+  readonly cardHover: string
+}
+
+/** Background tint variants. `pure` is true #000 (the default canvas);
+ * `near-black` adds a cool navy lift; `warm` adds a coffee-brown lift. */
+export const BACKGROUND_VARIANTS: Record<BackgroundTint, BgVariant> = {
+  pure: {
+    base: '#000000',
+    surface: '#050507',
+    elevated: '#0a0a0d',
+    chrome: '#050508',
+    rail: '#030305',
+    card: '#0a0a0d',
+    cardHover: '#0e0e12'
+  },
+  'near-black': {
+    base: '#07080a',
+    surface: '#0a0c0f',
+    elevated: '#11141a',
+    chrome: '#07080a',
+    rail: '#04060a',
+    card: '#11141a',
+    cardHover: '#161a21'
+  },
+  warm: {
+    base: '#0d0c0b',
+    surface: '#131210',
+    elevated: '#1a1816',
+    chrome: '#0d0c0b',
+    rail: '#08070605',
+    card: '#1a1816',
+    cardHover: '#211f1c'
   }
 }
 

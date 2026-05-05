@@ -193,7 +193,7 @@ export function SaveTextCardDialog({
             className="px-3 py-1 text-xs"
             style={{
               backgroundColor: canSave ? colors.accent.default : colors.bg.surface,
-              color: canSave ? '#fff' : colors.text.muted,
+              color: canSave ? 'var(--color-accent-fg)' : colors.text.muted,
               borderRadius: 4,
               opacity: canSave ? 1 : 0.5,
               cursor: canSave ? 'pointer' : 'default'

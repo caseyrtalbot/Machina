@@ -86,7 +86,7 @@ export function CanvasSurface({
   onFileDrop
 }: CanvasSurfaceProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { gridDotVisibility } = useEnv()
+  const { gridDotVisibility, canvasGrid } = useEnv()
   const viewport = useCanvasStore((s) => s.viewport)
   const { onWheel, onPointerDown } = useCanvasViewport(containerRef)
   const { rect, onSelectionStart, wasSelectionDrag } = useCanvasSelection()
@@ -188,8 +188,10 @@ export function CanvasSurface({
     [viewport, onFileDrop]
   )
 
-  // Grid dots scale smoothly with zoom: faint when zoomed out, prominent when zoomed in
-  const dynamicMinorOpacity = gridDotVisibility / 100
+  // Grid dots scale smoothly with zoom: faint when zoomed out, prominent when zoomed in.
+  // Setting the user-facing `Canvas Grid` toggle off zeroes both layers so the canvas
+  // reads as a clean void without rebuilding the SVG pipeline.
+  const dynamicMinorOpacity = canvasGrid ? gridDotVisibility / 100 : 0
   const svgDataUri = useMemo(() => {
     const params = computeGridParams(viewport.zoom, dynamicMinorOpacity)
     const svg = buildGridSvg(params)

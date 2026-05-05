@@ -134,7 +134,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
         style={
           {
             height: 34,
-            borderBottom: '0.5px solid rgba(255, 255, 255, 0.04)',
+            borderBottom: '0.5px solid var(--line-faint)',
             backgroundColor: 'rgba(0, 0, 0, 0.15)',
             position: 'relative',
             zIndex: 60,

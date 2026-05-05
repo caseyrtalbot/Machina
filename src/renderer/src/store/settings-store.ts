@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'machina-settings',
-      version: 11,
+      version: 12,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -173,6 +173,23 @@ export const useSettingsStore = create<SettingsStore>()(
           const existingEnv = state.env as Record<string, unknown> | undefined
           if (existingEnv) {
             existingEnv.gridDotVisibility = ENV_DEFAULTS.gridDotVisibility
+          }
+        }
+
+        if (version < 12) {
+          // v11 → v12: introduce density / radii / backgroundTint / canvasGrid
+          // tweakables wired to the design's Tweaks panel. Backfill defaults
+          // for older stores so the new live-tweakable controls have values.
+          const existingEnv = state.env as Record<string, unknown> | undefined
+          if (existingEnv) {
+            if (typeof existingEnv.density !== 'string') existingEnv.density = ENV_DEFAULTS.density
+            if (typeof existingEnv.radii !== 'string') existingEnv.radii = ENV_DEFAULTS.radii
+            if (typeof existingEnv.backgroundTint !== 'string') {
+              existingEnv.backgroundTint = ENV_DEFAULTS.backgroundTint
+            }
+            if (typeof existingEnv.canvasGrid !== 'boolean') {
+              existingEnv.canvasGrid = ENV_DEFAULTS.canvasGrid
+            }
           }
         }
 
