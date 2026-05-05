@@ -184,6 +184,8 @@ h6 {
   text-transform: uppercase;
 }
 .te-titlebar-agent {
+  margin-left: auto;
+  padding-left: 12px;
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.12em;

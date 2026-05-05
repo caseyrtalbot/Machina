@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useVaultStore } from '../store/vault-store'
 import { useEditorStore } from '../store/editor-store'
 import { useThreadStore } from '../store/thread-store'
+import { formatModelLabel } from '@shared/format-model-label'
 
 export interface StatusbarItem {
   readonly key: string
@@ -27,15 +28,6 @@ function formatNumber(n: number): string {
   if (n < 1000) return String(n)
   if (n < 10_000) return `${(n / 1000).toFixed(1)}k`.replace('.0k', 'k')
   return `${Math.round(n / 1000)}k`
-}
-
-function shortAgent(agent: string): string {
-  // Display "Sonnet 4.6" rather than "claude-sonnet-4-6" / model ids.
-  const cleaned = agent
-    .replace(/^claude-?/i, '')
-    .replace(/-/g, ' ')
-    .trim()
-  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /**
@@ -103,7 +95,7 @@ export function Statusbar() {
   const rightItems: StatusbarItem[] = useMemo(() => {
     const items: StatusbarItem[] = []
     if (activeThread) {
-      const label = shortAgent(activeThread.model ?? 'Agent')
+      const label = formatModelLabel(activeThread.model ?? 'Agent')
       items.push({
         key: 'agent',
         tone: inFlight ? 'accent' : undefined,

@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useVaultStore } from '../store/vault-store'
-import { useEditorStore } from '../store/editor-store'
 import { useThreadStore } from '../store/thread-store'
+import { formatModelLabel } from '@shared/format-model-label'
+import type { DockTab } from '@shared/dock-types'
 
 function basenameNoExt(path: string): string {
   const file = path.split('/').pop() ?? path
@@ -15,51 +16,52 @@ function vaultName(vaultPath: string | null): string {
   return last ?? vaultPath
 }
 
-function shortAgent(model: string): string {
-  return model
-    .replace(/^claude-?/i, '')
-    .replace(/-/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
 /**
  * Titlebar breadcrumb.
  *
  * Renders inside the WindowDragRegion: vault accent dot → vault name → "/"
- * → active note title → optional live indicator → agent label on the right.
- * Mirrors the Console direction titlebar from the design package: 12px
- * sans for the breadcrumb, 10.5px mono uppercase 0.12em for the agent label.
+ * → active surface title → optional live indicator → agent label on the right.
  *
- * The whole strip stays inside the OS drag region so users can grab any
- * empty area to move the window; only future interactive children would
- * need to opt out of `-webkit-app-region: drag`.
+ * The crumb tracks the *active dock surface* for the active thread, not the
+ * editor-store's `activeNotePath`. When the dock holds an editor, the note's
+ * title appears; when the dock is empty or shows a non-editor surface, the
+ * crumb falls back to the active thread's title. This avoids leaving a stale
+ * note title in the chrome after the editor surface is closed.
  */
 export function TitlebarBreadcrumb() {
   const vaultPath = useVaultStore((s) => s.vaultPath)
-  const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const fileToTitle = useVaultStore((s) => s.artifactById)
   const fileToId = useVaultStore((s) => s.fileToId)
   const activeThread = useThreadStore((s) =>
     s.activeThreadId ? (s.threadsById[s.activeThreadId] ?? null) : null
   )
+  const activeDockTab = useThreadStore<DockTab | null>((s) => {
+    const id = s.activeThreadId
+    if (!id) return null
+    const tabs = s.dockTabsByThreadId[id] ?? []
+    if (tabs.length === 0) return null
+    const idx = s.dockActiveIndexByThreadId[id] ?? 0
+    const safeIdx = idx < tabs.length ? idx : 0
+    return tabs[safeIdx] ?? null
+  })
   const inFlight = useThreadStore((s) =>
     s.activeThreadId ? Boolean(s.inFlightByThreadId[s.activeThreadId]) : false
   )
 
   const crumb = useMemo(() => {
-    if (activeThread && !activeNotePath) {
+    if (activeDockTab?.kind === 'editor') {
+      const path = activeDockTab.path
+      const id = fileToId[path]
+      const artifact = id ? fileToTitle[id] : undefined
+      return artifact?.title ?? basenameNoExt(path)
+    }
+    if (activeThread) {
       return activeThread.title || 'Thread'
     }
-    if (activeNotePath) {
-      const id = fileToId[activeNotePath]
-      const artifact = id ? fileToTitle[id] : undefined
-      return artifact?.title ?? basenameNoExt(activeNotePath)
-    }
     return null
-  }, [activeNotePath, fileToId, fileToTitle, activeThread])
+  }, [activeDockTab, activeThread, fileToId, fileToTitle])
 
-  const agentLabel = activeThread?.model ? shortAgent(activeThread.model) : null
+  const agentLabel = activeThread?.model ? formatModelLabel(activeThread.model) : null
 
   return (
     <>
