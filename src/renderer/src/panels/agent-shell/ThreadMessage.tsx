@@ -1,12 +1,34 @@
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ThreadMessage as TM } from '@shared/thread-types'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { colors, typography } from '../../design/tokens'
+import { rehypeEmojiIcons } from '../../markdown/rehype-emoji-icons'
+import { LucideInline } from '../../markdown/LucideInline'
 
 interface Props {
   readonly message: TM
   readonly streamingBody?: string
+}
+
+const markdownComponents: Components = {
+  span(props) {
+    const {
+      node: _node,
+      children,
+      ...rest
+    } = props as unknown as {
+      node?: unknown
+      children?: unknown
+      [key: string]: unknown
+    }
+    const r = rest as Record<string, unknown>
+    const iconName = r['data-lucide-icon'] ?? r['dataLucideIcon']
+    if (typeof iconName === 'string') {
+      return <LucideInline name={iconName} />
+    }
+    return <span {...(rest as object)}>{children as never}</span>
+  }
 }
 
 export function ThreadMessage({ message, streamingBody }: Props) {
@@ -36,7 +58,13 @@ export function ThreadMessage({ message, streamingBody }: Props) {
         {heading}
       </div>
       <div className="thread-prose">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeEmojiIcons]}
+          components={markdownComponents}
+        >
+          {body}
+        </ReactMarkdown>
       </div>
       {message.role === 'assistant' &&
         message.toolCalls?.map((tc, i) => (

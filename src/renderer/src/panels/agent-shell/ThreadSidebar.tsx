@@ -345,34 +345,8 @@ function ThreadRow({
 }
 
 function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
-  const [hovered, setHovered] = useState(false)
   return (
-    <button
-      onClick={onClick}
-      title="New thread"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        width: '100%',
-        padding: '8px 10px',
-        background: hovered
-          ? 'color-mix(in srgb, var(--color-accent-default) 8%, transparent)'
-          : 'transparent',
-        border: `1px solid ${hovered ? colors.accent.line : 'transparent'}`,
-        color: hovered ? colors.accent.default : colors.text.muted,
-        borderRadius: borderRadius.inline,
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.metadata.size,
-        letterSpacing: typography.metadata.letterSpacing,
-        textTransform: typography.metadata.textTransform,
-        textAlign: 'left',
-        transition: `background ${transitions.fast}, color ${transitions.fast}, border-color ${transitions.fast}`
-      }}
-    >
+    <button onClick={onClick} title="New thread" className="te-new-thread-button">
       <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden style={{ flexShrink: 0 }}>
         <path
           d="M5.5 1V10 M1 5.5H10"

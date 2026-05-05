@@ -196,6 +196,79 @@ h6 {
   app-region: drag;
 }
 
+/* ─── New-thread button ─────────────────────────────────────────────────
+ * Sidebar footer trigger. Idle state is a pure ghost; hover lifts with a
+ * neutral 4% wash (so the accent stays in the edge + glow, not the fill),
+ * a hairline accent border, soft outer glow, and a one-shot diagonal
+ * shimmer that sweeps the surface on entry. Reduced-motion users skip
+ * the sweep but keep the static color/glow shift. */
+.te-new-thread-button {
+  position: relative;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 220ms ease-out;
+}
+.te-new-thread-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    color-mix(in srgb, var(--color-text-primary) 10%, transparent) 50%,
+    transparent 65%
+  );
+  transform: translateX(-110%);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.te-new-thread-button > * {
+  position: relative;
+  z-index: 1;
+}
+.te-new-thread-button:hover {
+  background-color: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+  border-color: color-mix(in srgb, var(--color-text-primary) 22%, transparent);
+  color: var(--color-text-primary);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+.te-new-thread-button:hover::before {
+  transform: translateX(110%);
+}
+.te-new-thread-button:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-text-primary) 36%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-text-primary) 16%, transparent);
+}
+.te-new-thread-button:active {
+  background-color: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .te-new-thread-button::before {
+    display: none;
+  }
+}
+
 .te-statusbar {
   display: flex;
   align-items: center;
