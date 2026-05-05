@@ -48,7 +48,7 @@ h6 {
   position: relative;
   opacity: var(--base-opacity);
   background-color: var(--base-bg);
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   box-shadow: inset 0 1px 0 transparent;
   overflow: hidden;
 }
@@ -204,7 +204,8 @@ body {
   --panel-gap: 0;
   --panel-radius: 0;
   --panel-padding: 12px 16px;
-  --border-subtle: color-mix(in srgb, white 14%, transparent);
+  --border-subtle: #ffffff;
+  --color-border-subtle: #ffffff;
   --neon-glow: 0 0 8px color-mix(in srgb, var(--color-accent-default) 15%, transparent);
   --color-accent-focus: color-mix(in srgb, var(--color-accent-default) 30%, transparent);
   --color-accent-subtle: color-mix(in srgb, var(--color-accent-default) 15%, transparent);
@@ -308,7 +309,7 @@ body {
   gap: 8px;
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.20);
+  border: 0.5px solid rgba(255, 255, 255, 0.20);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
   transition:
@@ -366,7 +367,7 @@ body {
   padding: 8px 10px;
   text-align: left;
   border-radius: 4px;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   background: transparent;
   transition:
     background-color 150ms ease-out,
@@ -413,7 +414,7 @@ body {
 
 .sidebar-popover {
   background: rgba(6, 6, 10, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(20px) saturate(1.4);
@@ -510,7 +511,7 @@ body {
   justify-content: center;
   width: 26px;
   height: 26px;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: 10px;
   background: transparent;
   color: var(--color-text-secondary);
@@ -635,7 +636,7 @@ body {
 
 .file-row-hover[data-selected='true'] {
   background: color-mix(in srgb, var(--color-accent-default) 12%, transparent);
-  outline: 1px solid color-mix(in srgb, var(--color-accent-default) 24%, transparent);
+  outline: 0.5px solid color-mix(in srgb, var(--color-accent-default) 24%, transparent);
   outline-offset: -1px;
 }
 
@@ -705,7 +706,7 @@ body {
 .file-row-hover[data-dragging='true'],
 .tree-directory-row[data-dragging='true'] {
   background: color-mix(in srgb, var(--color-accent-default) 10%, transparent);
-  outline: 1px solid color-mix(in srgb, var(--color-accent-default) 50%, transparent);
+  outline: 0.5px solid color-mix(in srgb, var(--color-accent-default) 50%, transparent);
   outline-offset: -1px;
   opacity: 0.7;
 }
@@ -713,7 +714,7 @@ body {
 /* Drop target folder — smooth 100ms ease via base .tree-directory-row transition */
 .tree-directory-row[data-drop-target='true'] {
   background: color-mix(in srgb, var(--color-accent-default) 16%, transparent);
-  outline: 1px solid color-mix(in srgb, var(--color-accent-default) 48%, transparent);
+  outline: 0.5px solid color-mix(in srgb, var(--color-accent-default) 48%, transparent);
   outline-offset: -1px;
 }
 .tree-directory-row[data-drop-target='true'] > .truncate {
@@ -723,7 +724,7 @@ body {
 
 /* External file drop zone on the whole tree container */
 .file-tree[data-drop-active='true'] {
-  outline: 1px dashed color-mix(in srgb, var(--color-accent-default) 40%, transparent);
+  outline: 0.5px dashed color-mix(in srgb, var(--color-accent-default) 40%, transparent);
   outline-offset: -2px;
   border-radius: 4px;
 }
@@ -773,7 +774,7 @@ body {
 
 .ProseMirror .te-table-header,
 .ProseMirror .te-table-cell {
-  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+  border: 0.5px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
   padding: 6px 10px;
   vertical-align: top;
   min-width: 60px;
@@ -1109,7 +1110,7 @@ body {
   gap: 0;
   flex-shrink: 0;
   padding: 6px 16px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 0.5px solid var(--border-subtle);
   background: var(--color-bg-base);
 }
 
@@ -1122,7 +1123,7 @@ body {
   text-transform: uppercase;
   color: var(--color-text-muted);
   background: transparent;
-  border: 1px solid var(--color-border-default);
+  border: 0.5px solid var(--color-border-default);
   cursor: pointer;
   transition:
     background-color 120ms ease-out,
@@ -1511,7 +1512,7 @@ body {
 }
 
 .mermaid-error {
-  border: 1px solid #ef4444;
+  border: 0.5px solid #ef4444;
   border-radius: var(--radius-container);
   padding: 0.75em 1em;
 }
@@ -1596,7 +1597,7 @@ body {
   min-width: 35px;
   padding: 4px 2px 8px 3px;
   box-sizing: border-box;
-  border: 1px solid var(--border-subtle);
+  border: 0.5px solid var(--border-subtle);
   border-radius: 4px;
   background: var(--color-bg-rail);
   overflow: visible;
@@ -1605,7 +1606,7 @@ body {
 
 
 .canvas-toolrail__divider {
-  height: 1px;
+  height: 0.5px;
   width: 18px;
   margin: 6px 0;
   background: var(--border-subtle);
@@ -1620,7 +1621,7 @@ body {
   height: 26px;
   padding: 4px 6px;
   box-sizing: border-box;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: 2px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1674,7 +1675,7 @@ body {
   padding: 5px 10px;
   border-radius: 6px;
   background: var(--chrome-panel-elevated);
-  border: 1px solid var(--chrome-panel-border);
+  border: 0.5px solid var(--chrome-panel-border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -1968,7 +1969,7 @@ body {
   padding: 0.75em 1em;
   border-radius: 4px;
   background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-default);
+  border: 0.5px solid var(--color-border-default);
   overflow-x: auto;
   margin: 0 0 0.85em;
 }
@@ -1992,7 +1993,7 @@ body {
 
 .thread-prose hr {
   border: 0;
-  border-top: 1px solid var(--color-border-default);
+  border-top: 0.5px solid var(--color-border-default);
   margin: 1.4em 0;
 }
 
@@ -2004,7 +2005,7 @@ body {
 
 .thread-prose th,
 .thread-prose td {
-  border: 1px solid var(--color-border-default);
+  border: 0.5px solid var(--color-border-default);
   padding: 0.4em 0.65em;
   text-align: left;
 }
@@ -2060,7 +2061,7 @@ body {
 }
 
 .canvas-card__action-btn {
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   background: transparent;
   transition:
     background-color 150ms ease-out,
@@ -2074,7 +2075,7 @@ body {
 }
 
 .canvas-card__badge {
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.05);
   font-family: var(--font-mono);
   letter-spacing: 0.14em;
@@ -2084,7 +2085,7 @@ body {
 .canvas-minimap {
   position: absolute;
   overflow: hidden;
-  border: 1px solid var(--chrome-panel-border);
+  border: 0.5px solid var(--chrome-panel-border);
   border-radius: 4px;
   background: var(--canvas-hud-bg);
   backdrop-filter: blur(16px);
@@ -2108,7 +2109,7 @@ body {
 }
 
 .canvas-zoom-indicator {
-  border: 1px solid var(--chrome-panel-border);
+  border: 0.5px solid var(--chrome-panel-border);
   border-radius: 2px;
   background: var(--canvas-hud-bg);
   backdrop-filter: blur(16px);
@@ -2129,7 +2130,7 @@ body {
 }
 
 .settings-header {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 0.5px solid var(--border-subtle);
 }
 
 .settings-kicker {
@@ -2158,7 +2159,7 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 2px;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -2199,7 +2200,7 @@ body {
 .settings-section-heading::after {
   content: '';
   flex: 1;
-  height: 1px;
+  height: 0.5px;
   background: var(--border-subtle);
 }
 
@@ -2209,7 +2210,7 @@ body {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 0.5px solid var(--border-subtle);
 }
 
 .settings-row + .settings-row {
@@ -2244,7 +2245,7 @@ body {
 .settings-input,
 .settings-select {
   min-height: 26px;
-  border: 1px solid var(--color-border-default);
+  border: 0.5px solid var(--color-border-default);
   border-radius: 2px;
   background: transparent;
   color: var(--color-text-primary);
@@ -2291,14 +2292,14 @@ body {
   padding: 10px 12px;
   margin: 4px 0 8px;
   border-radius: 4px;
-  border: 1px solid var(--color-border-default);
+  border: 0.5px solid var(--color-border-default);
   background: color-mix(in srgb, var(--color-text-primary) 2%, transparent);
 }
 
 .settings-footer {
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 0.5px solid var(--border-subtle);
   display: flex;
   justify-content: flex-end;
 }
@@ -2324,13 +2325,13 @@ body {
 }
 
 .settings-button {
-  border: 1px solid var(--color-border-default);
+  border: 0.5px solid var(--color-border-default);
   background: transparent;
   color: var(--color-text-secondary);
 }
 
 .settings-primary-button {
-  border: 1px solid var(--color-accent-default);
+  border: 0.5px solid var(--color-accent-default);
   background: var(--color-accent-default);
   color: var(--color-bg-base);
 }

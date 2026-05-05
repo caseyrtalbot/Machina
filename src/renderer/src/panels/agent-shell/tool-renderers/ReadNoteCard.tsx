@@ -214,7 +214,7 @@ function ReadNotePreview({
     width: PREVIEW_WIDTH,
     maxHeight: PREVIEW_MAX_HEIGHT,
     background: colors.bg.elevated,
-    border: `1px solid ${colors.border.default}`,
+    border: `0.5px solid ${colors.border.default}`,
     borderRadius: borderRadius.container,
     boxShadow: '0 12px 28px rgba(0, 0, 0, 0.45)',
     overflow: 'hidden',
@@ -230,7 +230,7 @@ function ReadNotePreview({
       <div
         style={{
           padding: '6px 10px',
-          borderBottom: `1px solid ${colors.border.subtle}`,
+          borderBottom: `0.5px solid ${colors.border.subtle}`,
           fontFamily: typography.fontFamily.mono,
           fontSize: 10,
           letterSpacing: '0.06em',

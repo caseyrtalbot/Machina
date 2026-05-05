@@ -187,7 +187,7 @@ export function DockTabBar({
         alignItems: 'stretch',
         height: spacing.dockTabBarHeight,
         flexShrink: 0,
-        borderBottom: `1px solid ${colors.tab.border}`
+        borderBottom: `0.5px solid ${colors.tab.border}`
       }}
     >
       <div
@@ -284,7 +284,7 @@ export function DockTabBar({
                   : '2px solid transparent',
                 borderBottom: isActive
                   ? `1.5px solid ${colors.accent.default}`
-                  : `1px solid transparent`,
+                  : `0.5px solid transparent`,
                 color: isActive ? colors.tab.fgActive : colors.tab.fg,
                 fontFamily: typography.fontFamily.mono,
                 fontSize: typography.metadata.size,

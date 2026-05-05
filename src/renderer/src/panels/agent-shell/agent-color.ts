@@ -7,7 +7,7 @@ export function agentPillStyle(_agent: AgentIdentity): {
 } {
   return {
     background: 'transparent',
-    border: '1px solid transparent',
+    border: '0.5px solid transparent',
     color: 'var(--color-text-primary)'
   }
 }

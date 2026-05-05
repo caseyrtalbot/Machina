@@ -314,7 +314,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
           <div
             className="flex items-center justify-between shrink-0 px-3 py-1.5"
             style={{
-              borderTop: `1px solid ${colors.border.subtle}`,
+              borderTop: `0.5px solid ${colors.border.subtle}`,
               backgroundColor: colors.accent.muted
             }}
           >

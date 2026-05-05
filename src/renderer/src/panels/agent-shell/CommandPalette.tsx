@@ -23,7 +23,7 @@ function PaletteFooterHint({
         style={{
           padding: '1px 5px',
           background: 'transparent',
-          border: `1px solid ${colors.border.default}`,
+          border: `0.5px solid ${colors.border.default}`,
           borderRadius: borderRadius.inline,
           fontSize: 10,
           color: colors.text.muted
@@ -116,7 +116,7 @@ export function CommandPalette({
         onClick={(e) => e.stopPropagation()}
         style={{
           background: colors.bg.base,
-          border: `1px solid ${colors.text.primary}`,
+          border: `0.5px solid ${colors.text.primary}`,
           borderRadius: borderRadius.tool,
           width: 560,
           maxHeight: '60vh',
@@ -132,7 +132,7 @@ export function CommandPalette({
             alignItems: 'center',
             gap: 10,
             padding: '12px 16px',
-            borderBottom: `1px solid ${colors.border.subtle}`
+            borderBottom: `0.5px solid ${colors.border.subtle}`
           }}
         >
           <span
@@ -180,7 +180,7 @@ export function CommandPalette({
             style={{
               padding: '2px 6px',
               background: 'transparent',
-              border: `1px solid ${colors.border.default}`,
+              border: `0.5px solid ${colors.border.default}`,
               borderRadius: borderRadius.inline,
               fontFamily: typography.fontFamily.mono,
               fontSize: 10,
@@ -292,7 +292,7 @@ export function CommandPalette({
             display: 'flex',
             gap: 14,
             padding: '8px 18px',
-            borderTop: `1px solid ${colors.border.subtle}`,
+            borderTop: `0.5px solid ${colors.border.subtle}`,
             background: colors.bg.base,
             fontFamily: typography.fontFamily.mono,
             fontSize: 10,

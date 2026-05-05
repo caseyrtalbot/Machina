@@ -77,7 +77,7 @@ export function ThreadPanel() {
           padding: '0 20px',
           flexShrink: 0,
           boxSizing: 'border-box',
-          borderBottom: `1px solid ${colors.border.subtle}`,
+          borderBottom: `0.5px solid ${colors.border.subtle}`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -236,7 +236,7 @@ function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
         height: 28,
         borderRadius: borderRadius.round,
         background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
+        border: `0.5px solid ${colors.border.default}`,
         color: colors.text.secondary,
         cursor: 'pointer',
         display: 'inline-flex',
@@ -284,7 +284,7 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
         textTransform: typography.metadata.textTransform,
         padding: '4px 10px',
         borderRadius: borderRadius.inline,
-        border: `1px solid ${on ? colors.accent.default : colors.border.subtle}`,
+        border: `0.5px solid ${on ? colors.accent.default : colors.border.subtle}`,
         background: on
           ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
           : 'transparent',
@@ -364,7 +364,7 @@ function InflightAssistant({
     <article
       data-role="assistant"
       data-inflight="true"
-      style={{ padding: '20px 24px', borderBottom: `1px solid ${colors.border.subtle}` }}
+      style={{ padding: '20px 24px', borderBottom: `0.5px solid ${colors.border.subtle}` }}
     >
       <div
         style={{

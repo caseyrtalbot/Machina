@@ -165,7 +165,7 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
         padding: '16px 14px',
         backgroundColor: 'rgba(20, 20, 20, 0.92)',
         backdropFilter: 'blur(12px)',
-        border: '1px solid var(--color-border-default)',
+        border: '0.5px solid var(--color-border-default)',
         scrollbarWidth: 'thin',
         scrollbarColor: 'var(--color-border-default) transparent'
       }}
@@ -284,7 +284,7 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
           style={{
             backgroundColor: 'var(--color-bg-elevated)',
             color: colors.text.secondary,
-            border: '1px solid var(--color-border-default)'
+            border: '0.5px solid var(--color-border-default)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = colors.accent.default
@@ -301,7 +301,7 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
           style={{
             backgroundColor: 'var(--color-bg-elevated)',
             color: colors.text.secondary,
-            border: '1px solid var(--color-border-default)'
+            border: '0.5px solid var(--color-border-default)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = colors.accent.default

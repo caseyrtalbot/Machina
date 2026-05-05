@@ -148,7 +148,7 @@ export function ImportPalette({
           width: 420,
           maxHeight: 480,
           background: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`,
+          border: `0.5px solid ${colors.border.default}`,
           borderRadius: borderRadius.container,
           display: 'flex',
           flexDirection: 'column',
@@ -162,7 +162,7 @@ export function ImportPalette({
             alignItems: 'center',
             gap: 8,
             padding: '10px 14px',
-            borderBottom: `1px solid ${colors.border.subtle}`
+            borderBottom: `0.5px solid ${colors.border.subtle}`
           }}
         >
           <input
@@ -186,7 +186,7 @@ export function ImportPalette({
               background: 'rgba(255, 255, 255, 0.06)',
               padding: '2px 6px',
               borderRadius: 4,
-              border: `1px solid ${colors.border.subtle}`
+              border: `0.5px solid ${colors.border.subtle}`
             }}
           >
             {'\u2318'}G

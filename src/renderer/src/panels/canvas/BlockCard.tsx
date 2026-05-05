@@ -201,7 +201,7 @@ function BlockCardInner({ node }: BlockCardProps) {
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
         color: statusColor,
-        border: `1px solid ${statusColor}`,
+        border: `0.5px solid ${statusColor}`,
         borderRadius: 4,
         padding: '1px 6px',
         whiteSpace: 'nowrap'
@@ -266,7 +266,7 @@ function BlockCardInner({ node }: BlockCardProps) {
                   fontSize: 10,
                   fontFamily: typography.fontFamily.mono,
                   color: revealed ? colors.claude.warning : colors.text.muted,
-                  border: `1px solid ${revealed ? colors.claude.warning : colors.border.default}`,
+                  border: `0.5px solid ${revealed ? colors.claude.warning : colors.border.default}`,
                   borderRadius: 4,
                   padding: '1px 6px',
                   background: 'transparent',

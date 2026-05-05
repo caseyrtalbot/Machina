@@ -256,7 +256,7 @@ export function DailyNoteSection({
             // uppercase 10px label. No filled pills.
             style={{
               background: 'transparent',
-              border: `1px solid ${colors.border.subtle}`,
+              border: `0.5px solid ${colors.border.subtle}`,
               borderRadius: borderRadius.inline,
               color: colors.text.muted,
               cursor: 'pointer',

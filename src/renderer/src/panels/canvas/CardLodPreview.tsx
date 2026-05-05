@@ -55,7 +55,7 @@ function CardLodPreviewInner({ node }: CardLodPreviewProps) {
         backgroundColor: color,
         opacity: 0.15,
         borderRadius: borderRadius.card,
-        border: isSelected ? `2px solid ${colors.accent.default}` : `1px solid ${color}`
+        border: isSelected ? `2px solid ${colors.accent.default}` : `0.5px solid ${color}`
       }}
       onClick={handleClick}
     >

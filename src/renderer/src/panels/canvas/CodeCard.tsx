@@ -128,7 +128,7 @@ export function CodeCard({ node }: CodeCardProps) {
         {/* Language selector bar */}
         <div
           className="flex items-center px-2 py-1 shrink-0"
-          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
+          style={{ borderBottom: `0.5px solid ${colors.border.subtle}` }}
         >
           <div className="relative">
             <button

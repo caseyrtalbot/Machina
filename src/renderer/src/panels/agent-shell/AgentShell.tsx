@@ -122,7 +122,7 @@ function WindowDragRegion() {
         paddingRight: 8,
         boxSizing: 'border-box',
         background: colors.bg.chrome,
-        borderBottom: `1px solid ${colors.border.subtle}`
+        borderBottom: `0.5px solid ${colors.border.subtle}`
       }}
     >
       <div
@@ -185,7 +185,7 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
         background: floatingPanel.glass.bg,
         backdropFilter: floatingPanel.glass.blur,
         WebkitBackdropFilter: floatingPanel.glass.blur,
-        border: `1px solid ${colors.border.subtle}`,
+        border: `0.5px solid ${colors.border.subtle}`,
         borderRadius: floatingPanel.borderRadius,
         color: colors.text.primary,
         fontFamily: typography.fontFamily.body,
@@ -251,7 +251,7 @@ function WelcomeKbd({ children }: { readonly children: React.ReactNode }) {
         padding: '0 5px',
         margin: '0 2px',
         verticalAlign: 'baseline',
-        border: `1px solid ${colors.border.subtle}`,
+        border: `0.5px solid ${colors.border.subtle}`,
         borderRadius: borderRadius.inline,
         fontFamily: typography.fontFamily.mono,
         fontSize: 10,

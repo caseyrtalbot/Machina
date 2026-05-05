@@ -50,7 +50,7 @@ export function AgentPicker({
       role="menu"
       style={{
         background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
+        border: `0.5px solid ${colors.border.default}`,
         padding: 4,
         borderRadius: borderRadius.tool
       }}

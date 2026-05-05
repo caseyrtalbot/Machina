@@ -115,7 +115,7 @@ export function MarkdownCard({ node }: MarkdownCardProps) {
         {/* Mode toggle bar */}
         <div
           className="flex items-center justify-between px-2 py-1 shrink-0"
-          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
+          style={{ borderBottom: `0.5px solid ${colors.border.subtle}` }}
         >
           <span className="text-xs" style={{ color: colors.text.muted }}>
             {viewMode === 'rendered' ? 'Edit' : 'Source'}

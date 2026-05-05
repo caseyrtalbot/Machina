@@ -53,7 +53,7 @@ export function OntologyPreview({
         style={{
           ...barBase,
           backgroundColor: 'rgba(239,83,80,0.15)',
-          border: '1px solid rgba(239,83,80,0.3)'
+          border: '0.5px solid rgba(239,83,80,0.3)'
         }}
       >
         <span>{errorMessage ?? 'Failed to organize'}</span>
@@ -78,7 +78,7 @@ export function OntologyPreview({
       style={{
         ...barBase,
         backgroundColor: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        border: '0.5px solid rgba(255,255,255,0.1)',
         backdropFilter: 'blur(12px)'
       }}
     >
@@ -90,7 +90,7 @@ export function OntologyPreview({
         style={{
           ...btnBase,
           backgroundColor: 'rgba(76,175,80,0.2)',
-          border: '1px solid rgba(76,175,80,0.4)',
+          border: '0.5px solid rgba(76,175,80,0.4)',
           color: '#66bb6a'
         }}
       >
@@ -101,7 +101,7 @@ export function OntologyPreview({
         style={{
           ...btnBase,
           backgroundColor: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          border: '0.5px solid rgba(255,255,255,0.1)',
           color: colors.text.secondary
         }}
       >
@@ -113,7 +113,7 @@ export function OntologyPreview({
           style={{
             ...btnBase,
             backgroundColor: 'rgba(171,71,188,0.15)',
-            border: '1px solid rgba(171,71,188,0.3)',
+            border: '0.5px solid rgba(171,71,188,0.3)',
             color: '#ce93d8'
           }}
         >

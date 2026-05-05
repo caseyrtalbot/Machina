@@ -86,7 +86,7 @@ export function WriteNoteCard({
           lineHeight: 1.55,
           background: colors.bg.base,
           borderRadius: borderRadius.inline,
-          border: `1px solid ${colors.border.subtle}`,
+          border: `0.5px solid ${colors.border.subtle}`,
           fontFamily: typography.fontFamily.mono
         }}
       >
@@ -118,7 +118,7 @@ export function WriteNoteCard({
               padding: '5px 14px',
               fontSize: 12,
               borderRadius: borderRadius.inline,
-              border: `1px solid ${colors.accent.default}`,
+              border: `0.5px solid ${colors.accent.default}`,
               background: 'color-mix(in srgb, var(--color-accent-default) 14%, transparent)',
               color: colors.text.primary,
               cursor: submitting ? 'wait' : 'pointer'
@@ -133,7 +133,7 @@ export function WriteNoteCard({
               padding: '5px 14px',
               fontSize: 12,
               borderRadius: borderRadius.inline,
-              border: `1px solid ${colors.border.default}`,
+              border: `0.5px solid ${colors.border.default}`,
               background: 'transparent',
               color: colors.text.muted,
               cursor: submitting ? 'wait' : 'pointer'

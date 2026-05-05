@@ -82,7 +82,7 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
         minWidth: MENU_MIN_WIDTH,
         padding: MENU_PADDING,
         background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
+        border: `0.5px solid ${colors.border.default}`,
         borderRadius: borderRadius.container,
         boxShadow: '0 6px 20px rgba(0, 0, 0, 0.35)',
         zIndex: 1000,

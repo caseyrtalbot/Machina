@@ -127,7 +127,7 @@ export function OutlinePanel({ editor }: OutlinePanelProps) {
                 // Hairline indent guide for nested headings: a left border on the
                 // button itself, offset to sit just inside the indent column.
                 borderLeft:
-                  depth > 0 ? `1px solid ${colors.border.subtle}` : '1px solid transparent',
+                  depth > 0 ? `0.5px solid ${colors.border.subtle}` : '0.5px solid transparent',
                 borderTop: 'none',
                 borderRight: 'none',
                 borderBottom: 'none',

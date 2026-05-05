@@ -47,7 +47,7 @@ export class PanelErrorBoundary extends Component<Props, State> {
               style={{
                 backgroundColor: colors.accent.muted,
                 color: colors.accent.default,
-                border: `1px solid ${colors.border.default}`
+                border: `0.5px solid ${colors.border.default}`
               }}
             >
               Retry

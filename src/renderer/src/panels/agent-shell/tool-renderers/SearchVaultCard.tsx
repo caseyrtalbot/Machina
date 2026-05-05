@@ -75,7 +75,7 @@ export function SearchVaultCard({
               borderBottom:
                 i === Math.min(hits.length, PREVIEW_LIMIT) - 1
                   ? 'none'
-                  : `1px solid ${colors.border.subtle}`
+                  : `0.5px solid ${colors.border.subtle}`
             }}
           >
             <a

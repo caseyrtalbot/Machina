@@ -26,7 +26,7 @@ function CodeSnippet({ code }: { code: string }) {
       className="flex items-center justify-between rounded px-3 py-2 mt-3"
       style={{
         backgroundColor: 'rgba(255, 255, 255, 0.04)',
-        border: `1px solid ${colors.border.subtle}`,
+        border: `0.5px solid ${colors.border.subtle}`,
         fontFamily: 'var(--font-mono, monospace)',
         fontSize: 13
       }}
@@ -64,7 +64,7 @@ function InstallStep() {
         className="mt-4 flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors"
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.06)',
-          border: `1px solid ${colors.border.subtle}`,
+          border: `0.5px solid ${colors.border.subtle}`,
           color: colors.text.primary
         }}
         onMouseEnter={(e) => {
@@ -188,7 +188,7 @@ export function OnboardingOverlay() {
           backgroundColor: 'rgba(8, 8, 12, 0.88)',
           backdropFilter: 'blur(24px) saturate(1.3)',
           WebkitBackdropFilter: 'blur(24px) saturate(1.3)',
-          border: `1px solid ${colors.border.subtle}`,
+          border: `0.5px solid ${colors.border.subtle}`,
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
         }}
       >
@@ -202,7 +202,7 @@ export function OnboardingOverlay() {
           <div
             className="flex justify-center py-2.5 text-xs"
             style={{
-              borderTop: `1px solid rgba(255, 255, 255, 0.04)`,
+              borderTop: `0.5px solid rgba(255, 255, 255, 0.04)`,
               color: colors.text.muted
             }}
           >

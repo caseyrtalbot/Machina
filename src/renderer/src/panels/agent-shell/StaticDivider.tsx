@@ -17,7 +17,7 @@ export function StaticDivider() {
           top: 0,
           bottom: 0,
           left: 1,
-          width: 1,
+          width: 0.5,
           background: colors.border.subtle
         }}
       />

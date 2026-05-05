@@ -78,7 +78,7 @@ function Toggle({ value, onChange, ariaLabel }: ToggleProps) {
         height: 20,
         borderRadius: borderRadius.inline,
         backgroundColor: value ? colors.accent.soft : 'transparent',
-        border: `1px solid ${value ? colors.accent.default : colors.border.default}`,
+        border: `0.5px solid ${value ? colors.accent.default : colors.border.default}`,
         padding: 0
       }}
     >
@@ -160,7 +160,7 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
               padding: 0,
               borderRadius: borderRadius.inline,
               background: p.hex,
-              border: `1px solid ${active ? colors.text.primary : colors.border.default}`,
+              border: `0.5px solid ${active ? colors.text.primary : colors.border.default}`,
               cursor: 'pointer',
               transition: 'border-color 120ms ease-out'
             }}
@@ -180,8 +180,8 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
           background: accentId === 'custom' ? customHex : 'transparent',
           border:
             accentId === 'custom'
-              ? `1px solid ${colors.text.primary}`
-              : `1px dashed ${colors.border.default}`,
+              ? `0.5px solid ${colors.text.primary}`
+              : `0.5px dashed ${colors.border.default}`,
           color: colors.text.muted,
           fontFamily: typography.fontFamily.mono,
           fontSize: 11,
@@ -284,13 +284,13 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         className="settings-shell flex flex-col h-full w-full"
         style={{
           backgroundColor: colors.bg.base,
-          borderLeft: `1px solid ${colors.border.subtle}`
+          borderLeft: `0.5px solid ${colors.border.subtle}`
         }}
       >
         {/* Header */}
         <div
           className="settings-header flex items-center justify-between px-4 pt-10 pb-3 flex-shrink-0"
-          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
+          style={{ borderBottom: `0.5px solid ${colors.border.subtle}` }}
         >
           <div className="flex flex-col gap-2">
             <span

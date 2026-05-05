@@ -53,7 +53,6 @@ export function ThreadInputBar() {
     <div
       style={{
         position: 'relative',
-        padding: '14px 16px 16px',
         background: colors.bg.base
       }}
     >
@@ -65,10 +64,9 @@ export function ThreadInputBar() {
           display: 'flex',
           alignItems: 'flex-end',
           gap: 10,
-          padding: '12px 14px 12px 16px',
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.subtle}`,
-          borderRadius: borderRadius.tool,
+          padding: '14px 20px 16px',
+          background: colors.bg.base,
+          borderTop: `0.5px solid ${colors.border.subtle}`,
           transition: `background ${transitions.fast}, border-color ${transitions.fast}`
         }}
       >
@@ -121,7 +119,7 @@ export function ThreadInputBar() {
               flexShrink: 0,
               padding: '4px 10px',
               background: 'transparent',
-              border: `1px solid ${colors.border.default}`,
+              border: `0.5px solid ${colors.border.default}`,
               borderRadius: borderRadius.inline,
               color: colors.text.secondary,
               cursor: 'pointer',
@@ -190,7 +188,7 @@ function Kbd({ children }: { readonly children: React.ReactNode }) {
         minWidth: 16,
         height: 16,
         padding: '0 4px',
-        border: `1px solid ${colors.border.subtle}`,
+        border: `0.5px solid ${colors.border.subtle}`,
         borderRadius: 3,
         fontFamily: typography.fontFamily.mono,
         fontSize: 10,

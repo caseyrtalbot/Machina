@@ -64,7 +64,7 @@ const pillStyle: React.CSSProperties = {
   letterSpacing: '0.08em',
   borderRadius: borderRadius.inline,
   padding: '2px 8px',
-  border: `1px solid ${colors.border.default}`,
+  border: `0.5px solid ${colors.border.default}`,
   backgroundColor: 'var(--color-bg-surface)',
   color: colors.text.primary,
   lineHeight: 1.4
@@ -154,7 +154,7 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
           className="absolute left-0 top-full mt-1 z-30 shadow-lg overflow-hidden"
           style={{
             backgroundColor: colors.bg.elevated,
-            border: `1px solid ${colors.border.default}`,
+            border: `0.5px solid ${colors.border.default}`,
             borderRadius: borderRadius.inline,
             minWidth: 160
           }}
@@ -401,7 +401,7 @@ export function FrontmatterHeader({
             letterSpacing: typography.metadata.letterSpacing,
             fontSize: typography.metadata.size,
             fontWeight: 600,
-            border: `1px solid ${typeColor}60`,
+            border: `0.5px solid ${typeColor}60`,
             borderRadius: borderRadius.inline,
             padding: '2px 8px',
             backgroundColor: `${typeColor}10`,
@@ -462,7 +462,7 @@ export function FrontmatterHeader({
         style={{
           display: 'grid',
           gap: '0.55rem',
-          borderTop: `1px solid ${colors.border.default}`,
+          borderTop: `0.5px solid ${colors.border.default}`,
           paddingTop: '0.9rem'
         }}
       >
@@ -546,7 +546,7 @@ function RelationshipSection({
       style={{
         marginTop: '1.1rem',
         paddingTop: '0.9rem',
-        borderTop: `1px solid ${colors.border.default}`
+        borderTop: `0.5px solid ${colors.border.default}`
       }}
     >
       <SectionLabel as="div" style={{ marginBottom: '0.7rem' }}>

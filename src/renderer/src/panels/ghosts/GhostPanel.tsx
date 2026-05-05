@@ -149,7 +149,7 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
         overflowY: 'auto',
         background: 'rgba(14, 16, 22, 0.96)',
         backdropFilter: 'blur(20px) saturate(1.3)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: '0.5px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 10,
         padding: '14px 16px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
@@ -180,7 +180,7 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
           style={{
             padding: '6px 0',
             borderBottom:
-              i < ghost.references.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none'
+              i < ghost.references.length - 1 ? '0.5px solid rgba(255, 255, 255, 0.05)' : 'none'
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 500, color: '#c0c7d0', marginBottom: 2 }}>
@@ -241,7 +241,7 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
           fontSize: 11,
           color: '#c0c7d0',
           background: 'rgba(20, 22, 28, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '0.5px solid rgba(255, 255, 255, 0.1)',
           padding: '3px 8px',
           borderRadius: 5,
           whiteSpace: 'nowrap',
@@ -517,7 +517,7 @@ export function GhostPanel() {
               style={{
                 color: colors.text.primary,
                 padding: '14px 0 6px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                borderBottom: '0.5px solid rgba(255, 255, 255, 0.06)',
                 marginBottom: 2
               }}
             >

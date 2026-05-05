@@ -68,14 +68,15 @@ interface StructuralColors {
   }
 }
 
-// Neutral gray-black hairline / text palette. Borders are white-tinted so they
-// stay legible against the solid #111113 surface; text returns to a near-white
-// → muted-gray scale that pairs cleanly with the warm Ember accent.
+// Neutral gray-black hairline / text palette. Borders are pure white so panel
+// dividers, header rules, and surface separators read as a continuous 1px
+// hairline grid against the #000 surface. Text returns to a near-white →
+// muted-gray scale that pairs cleanly with the warm Ember accent.
 export const STRUCTURAL_COLORS: StructuralColors = {
   border: {
-    default: 'rgba(255, 255, 255, 0.18)',
-    subtle: 'rgba(255, 255, 255, 0.08)',
-    strong: 'rgba(255, 255, 255, 0.28)'
+    default: '#ffffff',
+    subtle: '#ffffff',
+    strong: '#ffffff'
   },
   text: {
     primary: '#ebebeb',

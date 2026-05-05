@@ -163,7 +163,7 @@ export function VaultSelector({
               flexShrink: 0,
               borderRadius: borderRadius.inline,
               background: colors.accent.soft,
-              border: `1px solid ${colors.accent.line}`
+              border: `0.5px solid ${colors.accent.line}`
             }}
           >
             <svg

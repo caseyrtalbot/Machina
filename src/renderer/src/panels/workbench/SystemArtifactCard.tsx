@@ -38,7 +38,7 @@ function StatusPill({
       style={{
         color: accentColor,
         backgroundColor: accentColor + '14',
-        border: `1px solid ${accentColor}24`
+        border: `0.5px solid ${accentColor}24`
       }}
     >
       {status}
@@ -167,7 +167,7 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
               style={{
                 backgroundColor: accentColor + '14',
                 color: accentColor,
-                border: `1px solid ${accentColor}24`,
+                border: `0.5px solid ${accentColor}24`,
                 fontFamily: typography.fontFamily.mono
               }}
               title="Restore this pattern's saved canvas layout"

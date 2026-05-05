@@ -175,7 +175,7 @@ function RibbonDivider() {
       aria-hidden
       style={{
         width: 18,
-        height: 1,
+        height: 0.5,
         margin: '6px 0',
         background: colors.border.subtle
       }}
@@ -228,7 +228,7 @@ function RibbonAction({
     height: ACTION_HEIGHT,
     padding: '4px 6px',
     boxSizing: 'border-box',
-    border: `1px solid ${border}`,
+    border: `0.5px solid ${border}`,
     borderRadius: borderRadius.inline,
     background,
     color,

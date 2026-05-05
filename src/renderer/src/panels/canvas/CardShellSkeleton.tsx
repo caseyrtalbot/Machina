@@ -16,14 +16,14 @@ export function CardShellSkeleton({ node }: CardShellSkeletonProps) {
         height: node.size.height,
         backgroundColor: colors.bg.surface,
         borderRadius: borderRadius.card,
-        border: `1px solid ${colors.border.default}`,
+        border: `0.5px solid ${colors.border.default}`,
         opacity: 0.6
       }}
     >
       {/* Header skeleton */}
       <div
         className="px-3 py-2 shrink-0"
-        style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
+        style={{ borderBottom: `0.5px solid ${colors.border.subtle}` }}
       >
         <div
           className="h-3 rounded"

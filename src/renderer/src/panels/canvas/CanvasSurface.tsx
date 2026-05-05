@@ -308,7 +308,7 @@ export function CanvasSurface({
         <div
           className="absolute inset-2 rounded-lg pointer-events-none"
           style={{
-            border: `1px dashed ${colors.accent.default}`,
+            border: `0.5px dashed ${colors.accent.default}`,
             background:
               'linear-gradient(180deg, color-mix(in srgb, var(--color-accent-default) 10%, transparent), color-mix(in srgb, var(--color-accent-default) 4%, transparent))',
             boxShadow:

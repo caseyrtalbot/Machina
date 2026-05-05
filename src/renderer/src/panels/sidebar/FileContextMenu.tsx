@@ -153,7 +153,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
         backgroundColor: floatingPanel.glass.popoverBg,
         backdropFilter: floatingPanel.glass.popoverBlur,
         WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
-        border: '1px solid var(--color-border-subtle)',
+        border: '0.5px solid var(--color-border-subtle)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
         transition: `opacity ${transitions.tooltip}`,
         fontSize: '13px'
@@ -180,7 +180,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
             )}
           </button>
           {action.separator && (
-            <div className="my-1" style={{ borderTop: '1px solid var(--color-border-subtle)' }} />
+            <div className="my-1" style={{ borderTop: '0.5px solid var(--color-border-subtle)' }} />
           )}
         </div>
       ))}
@@ -271,7 +271,7 @@ export function RenameInput({ initialValue, onConfirm, onCancel }: RenameInputPr
       className="w-full bg-transparent outline-none text-sm px-1 py-0.5 rounded"
       style={{
         color: colors.text.primary,
-        border: `1px solid ${colors.accent.default}`,
+        border: `0.5px solid ${colors.accent.default}`,
         backgroundColor: colors.bg.base
       }}
     />

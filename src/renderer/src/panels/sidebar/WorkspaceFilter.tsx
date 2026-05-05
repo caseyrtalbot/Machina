@@ -13,7 +13,7 @@ function chipStyle(active: boolean): React.CSSProperties {
   return {
     backgroundColor: active ? colors.accent.soft : 'transparent',
     color: active ? colors.accent.default : colors.text.muted,
-    border: `1px solid ${active ? colors.accent.line : colors.border.subtle}`,
+    border: `0.5px solid ${active ? colors.accent.line : colors.border.subtle}`,
     borderRadius: borderRadius.inline,
     fontFamily: typography.fontFamily.mono,
     fontSize: typography.metadata.size,

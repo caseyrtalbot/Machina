@@ -67,7 +67,7 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
           flexShrink: 0,
           display: 'flex',
           alignItems: 'stretch',
-          borderBottom: `1px solid ${colors.border.subtle}`,
+          borderBottom: `0.5px solid ${colors.border.subtle}`,
           boxSizing: 'border-box'
         }}
       >
@@ -93,7 +93,7 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
           />
         ))}
       </ul>
-      <footer style={{ padding: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
+      <footer style={{ padding: 8, borderTop: `0.5px solid ${colors.border.subtle}` }}>
         {pickerOpen ? (
           <AgentPicker
             onPick={(a) => {
@@ -358,7 +358,7 @@ function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
         background: hovered
           ? 'color-mix(in srgb, var(--color-accent-default) 8%, transparent)'
           : 'transparent',
-        border: `1px solid ${hovered ? colors.accent.line : 'transparent'}`,
+        border: `0.5px solid ${hovered ? colors.accent.line : 'transparent'}`,
         color: hovered ? colors.accent.default : colors.text.muted,
         borderRadius: borderRadius.inline,
         cursor: 'pointer',
@@ -415,7 +415,7 @@ function RenameInput({
       style={{
         flex: 1,
         background: colors.bg.base,
-        border: `1px solid ${colors.border.default}`,
+        border: `0.5px solid ${colors.border.default}`,
         borderRadius: borderRadius.inline,
         color: colors.text.primary,
         fontFamily: typography.fontFamily.mono,

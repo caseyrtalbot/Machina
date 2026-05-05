@@ -67,7 +67,7 @@ export function ResizeHandle({ side, width, onChange, onCommit }: ResizeHandlePr
           top: 0,
           bottom: 0,
           left: 1,
-          width: 1,
+          width: 0.5,
           background: showAccent ? colors.accent.muted : colors.border.subtle,
           transition: `background ${transitions.fast}`
         }}
