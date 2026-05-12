@@ -56,11 +56,11 @@ function singleQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`
 }
 
-export type SpawnResult =
+type SpawnResult =
   | { readonly ok: true; readonly sessionId: string }
   | { readonly ok: false; readonly error: string }
 
-export interface CliThreadSpawnerOptions {
+interface CliThreadSpawnerOptions {
   readonly shellService: ShellService
   readonly bridge: CliAgentThreadBridge
   readonly detect?: () => Promise<readonly CLIAgentInstallation[]>

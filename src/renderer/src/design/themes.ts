@@ -50,25 +50,6 @@ export const ENV_DEFAULTS: EnvironmentSettings = {
   canvasGrid: true
 }
 
-interface BaseRgb {
-  readonly r: number
-  readonly g: number
-  readonly b: number
-}
-
-interface ThemeBaseColors {
-  readonly canvasSurface: BaseRgb
-  readonly cardBody: BaseRgb
-}
-
-// Pure-black base. The thread, sidebar, dock, and ribbon all read as the
-// same #000 surface; canvas cards sit slightly lifted (cardBody) so they
-// register as objects against the void.
-export const BASE_COLORS: ThemeBaseColors = {
-  canvasSurface: { r: 0, g: 0, b: 0 },
-  cardBody: { r: 10, g: 10, b: 12 }
-}
-
 interface StructuralColors {
   readonly border: {
     readonly default: string

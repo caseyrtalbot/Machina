@@ -27,7 +27,7 @@ function statusEquals(a: ClaudeStatus, b: ClaudeStatus): boolean {
   )
 }
 
-export interface ClaudeStatusServiceOptions {
+interface ClaudeStatusServiceOptions {
   readonly exec?: ExecFn
 }
 

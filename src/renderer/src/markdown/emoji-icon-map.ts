@@ -4,7 +4,7 @@
  * both `⚠️` and `⚠` collapse to the same lookup. Unmapped emojis fall
  * through to their original character.
  */
-export const EMOJI_TO_LUCIDE: Readonly<Record<string, string>> = {
+const EMOJI_TO_LUCIDE: Readonly<Record<string, string>> = {
   // Files & documents
   '📄': 'FileText',
   '📃': 'FileText',

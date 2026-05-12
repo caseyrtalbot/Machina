@@ -21,7 +21,7 @@ function tabIdentity(tab: DockTab): string {
   return id
 }
 
-export interface SurfaceDockProps {
+interface SurfaceDockProps {
   readonly width?: number
 }
 

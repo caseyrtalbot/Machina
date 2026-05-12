@@ -305,5 +305,5 @@ function BlockCardInner({ node }: BlockCardProps) {
   )
 }
 
-export const BlockCard = memo(BlockCardInner)
+const BlockCard = memo(BlockCardInner)
 export default BlockCard

@@ -1,4 +1,4 @@
-export interface NativeToolSpec {
+interface NativeToolSpec {
   readonly name: string
   readonly description: string
   readonly input_schema: {
@@ -8,7 +8,7 @@ export interface NativeToolSpec {
   }
 }
 
-export const READ_NOTE_TOOL: NativeToolSpec = {
+const READ_NOTE_TOOL: NativeToolSpec = {
   name: 'read_note',
   description:
     'Read a vault note by path relative to the vault root. Returns the file content and the line range that was read.',
@@ -24,7 +24,7 @@ export const READ_NOTE_TOOL: NativeToolSpec = {
   }
 }
 
-export const LIST_VAULT_TOOL: NativeToolSpec = {
+const LIST_VAULT_TOOL: NativeToolSpec = {
   name: 'list_vault',
   description:
     'List notes in the vault matching one or more glob patterns. Returns matched paths relative to the vault root. Defaults to "**/*.md" when globs is omitted. Always ignores ".machina/**".',
@@ -41,7 +41,7 @@ export const LIST_VAULT_TOOL: NativeToolSpec = {
   }
 }
 
-export const SEARCH_VAULT_TOOL: NativeToolSpec = {
+const SEARCH_VAULT_TOOL: NativeToolSpec = {
   name: 'search_vault',
   description:
     'Search vault notes for a case-sensitive literal substring. Returns up to 200 hits (path, line, trimmed snippet), a `truncated` flag set when the cap was hit (more matches exist — narrow the query or scope), and an `engine` field ("ripgrep" or "fallback") indicating which backend ran. Regex metacharacters are matched literally. Always ignores ".machina/**".',
@@ -63,7 +63,7 @@ export const SEARCH_VAULT_TOOL: NativeToolSpec = {
   }
 }
 
-export const WRITE_NOTE_TOOL: NativeToolSpec = {
+const WRITE_NOTE_TOOL: NativeToolSpec = {
   name: 'write_note',
   description:
     'Create or overwrite a vault note. The user is shown a diff and must accept before the file is written, unless the thread is in auto-accept mode. Returns whether the note was newly created and the byte count written.',
@@ -83,7 +83,7 @@ export const WRITE_NOTE_TOOL: NativeToolSpec = {
   }
 }
 
-export const EDIT_NOTE_TOOL: NativeToolSpec = {
+const EDIT_NOTE_TOOL: NativeToolSpec = {
   name: 'edit_note',
   description:
     'Edit a vault note by literal find/replace. The find string must appear exactly once in the file or the call fails loudly. The user is shown a diff and must accept before the file is written, unless the thread is in auto-accept mode. Returns the edited path and added/removed line counts.',
@@ -108,7 +108,7 @@ export const EDIT_NOTE_TOOL: NativeToolSpec = {
   }
 }
 
-export const READ_CANVAS_TOOL: NativeToolSpec = {
+const READ_CANVAS_TOOL: NativeToolSpec = {
   name: 'read_canvas',
   description:
     'Read a canvas by id. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the canvas id, version, viewport, pinned cards, and edges. Errors with CANVAS_NOT_FOUND if the canvas does not exist.',
@@ -121,7 +121,7 @@ export const READ_CANVAS_TOOL: NativeToolSpec = {
   }
 }
 
-export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
+const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
   name: 'pin_to_canvas',
   description:
     "Pin a card to a canvas. To pin an existing vault note (PREFERRED for any .md file already in the vault), set card.path to the note's relative path — the canvas pins a live note card that renders the file's actual content with full markdown formatting (headings, bold, lists, wikilinks). Do NOT retype or paraphrase the note's contents into card.content; reference it by path. Use card.content only when authoring a free-form synthesis card with no source note; that body is pinned as a markdown card and rendered as rich text. canvasId \"default\" is the visible main canvas. Returns the new card id. Not subject to the approval gate; reversible via unpin_from_canvas.",
@@ -160,7 +160,7 @@ export const PIN_TO_CANVAS_TOOL: NativeToolSpec = {
   }
 }
 
-export const UNPIN_FROM_CANVAS_TOOL: NativeToolSpec = {
+const UNPIN_FROM_CANVAS_TOOL: NativeToolSpec = {
   name: 'unpin_from_canvas',
   description:
     'Remove a previously-pinned card from a canvas by card id. Use canvasId "default" for the visible main canvas; other ids map to the app canvas directory. Returns the removed card id. Errors with CANVAS_NOT_FOUND if the canvas is missing or CARD_NOT_FOUND if no card with that id exists. Not subject to the approval gate.',
@@ -177,7 +177,7 @@ export const UNPIN_FROM_CANVAS_TOOL: NativeToolSpec = {
   }
 }
 
-export const LIST_CANVASES_TOOL: NativeToolSpec = {
+const LIST_CANVASES_TOOL: NativeToolSpec = {
   name: 'list_canvases',
   description:
     'List all canvases in the vault by id. Always includes "default" if the visible main canvas exists, plus any canvases stored under the app canvas directory. Returns an array of { canvasId, cardCount }.',
@@ -188,7 +188,7 @@ export const LIST_CANVASES_TOOL: NativeToolSpec = {
   }
 }
 
-export const FOCUS_CANVAS_TOOL: NativeToolSpec = {
+const FOCUS_CANVAS_TOOL: NativeToolSpec = {
   name: 'focus_canvas',
   description:
     'Set the persisted viewport of a canvas so it pans/zooms to the given coordinates the next time it is opened. Use canvasId "default" for the visible main canvas. Note: when the canvas is currently open in the dock, the renderer owns viewport state until the canvas is reopened — agents pinning a card and immediately calling focus_canvas should rely on the user re-opening the canvas to see the new viewport. Returns the applied viewport.',
@@ -210,7 +210,7 @@ export const FOCUS_CANVAS_TOOL: NativeToolSpec = {
   }
 }
 
-export const OPEN_DOCK_TAB_TOOL: NativeToolSpec = {
+const OPEN_DOCK_TAB_TOOL: NativeToolSpec = {
   name: 'open_dock_tab',
   description:
     'Open a surface dock tab in the current thread. Expands the dock if it was collapsed. Tab kinds: canvas, editor, terminal, graph, ghosts, health. canvas/editor/terminal accept an optional id, path, or sessionId; the others take no payload. Returns the new tab index.',
@@ -239,7 +239,7 @@ export const OPEN_DOCK_TAB_TOOL: NativeToolSpec = {
   }
 }
 
-export const CLOSE_DOCK_TAB_TOOL: NativeToolSpec = {
+const CLOSE_DOCK_TAB_TOOL: NativeToolSpec = {
   name: 'close_dock_tab',
   description:
     'Close a surface dock tab in the current thread by index, or by kind (closes the first tab of that kind). Returns the closed index, or null if no matching tab existed.',

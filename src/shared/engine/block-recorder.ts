@@ -13,7 +13,6 @@
 
 import {
   appendOutput,
-  cancelBlock,
   completeBlock,
   pendingBlock,
   startBlock,
@@ -25,7 +24,7 @@ import { type BlockDetector, type BlockEvent } from './block-detector'
 
 export type RecordedEvent = { readonly kind: 'pty-bytes'; readonly data: string } | BlockEvent
 
-export interface BlockRecorder {
+interface BlockRecorder {
   recordEvent(event: RecordedEvent): void
   serialize(): string
   events(): readonly RecordedEvent[]
@@ -68,7 +67,7 @@ export function parseRecording(serialized: string): readonly RecordedEvent[] {
   return out
 }
 
-export interface ReplayOptions {
+interface ReplayOptions {
   readonly sessionId?: string
   readonly idFactory?: () => string
 }
@@ -149,25 +148,5 @@ export function replay(
   }
 
   finalize()
-  return blocks
-}
-
-/**
- * Marks the current block as cancelled at the supplied timestamp. Exposed
- * for fixture generators that record an explicit cancellation rather than
- * relying on a non-zero exit code from the shell.
- */
-export function replayWithCancel(
-  serialized: string,
-  detector: BlockDetector,
-  cancelAt: number,
-  opts: ReplayOptions = {}
-): readonly Block[] {
-  const blocks = [...replay(serialized, detector, opts)]
-  const last = blocks[blocks.length - 1]
-  if (last && last.state.kind === 'running') {
-    const cancelled = cancelBlock(last, cancelAt)
-    if (cancelled.ok) blocks[blocks.length - 1] = cancelled.value
-  }
   return blocks
 }

@@ -5,8 +5,6 @@ import { parseArtifact } from '../engine/parser'
 import { buildGraph } from '../engine/graph-builder'
 import type { ParseError } from '../engine/types'
 import type { Artifact } from '@shared/types'
-import { defaultSystemArtifactFilename } from '@shared/system-artifacts'
-import type { SystemArtifactKind } from '@shared/system-artifacts'
 
 interface SyncArtifactResult {
   readonly artifactId: string | null
@@ -143,21 +141,4 @@ export async function syncSystemArtifactFromDisk(path: string): Promise<SyncArti
     title: artifact.title,
     path
   }
-}
-
-export async function createAndOpenSystemArtifact(options: {
-  readonly kind: SystemArtifactKind
-  readonly filename: string
-  readonly content: string
-  readonly vaultPath: string
-}): Promise<SyncArtifactResult> {
-  const path = await window.api.vault.createSystemArtifact(
-    options.vaultPath,
-    options.kind,
-    defaultSystemArtifactFilename(options.filename),
-    options.content
-  )
-  const synced = await syncSystemArtifactFromDisk(path)
-  openArtifactInEditor(path, synced.title)
-  return synced
 }

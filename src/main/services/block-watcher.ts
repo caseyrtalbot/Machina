@@ -25,7 +25,7 @@ export interface BlockUpdate {
   readonly block: Block
 }
 
-export interface BlockWatcherOptions {
+interface BlockWatcherOptions {
   readonly onUpdate: (update: BlockUpdate) => void
   /** Inject for tests; defaults to a uuid-ish counter. */
   readonly nextBlockId?: () => string

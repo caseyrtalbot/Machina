@@ -15,7 +15,7 @@ export interface ContextMenuPosition {
   readonly y: number
 }
 
-export interface ContextMenuProps {
+interface ContextMenuProps {
   readonly position: ContextMenuPosition
   readonly items: readonly ContextMenuItem[]
   readonly onClose: () => void

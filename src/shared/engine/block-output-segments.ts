@@ -1,6 +1,6 @@
 import type { SecretRef } from './block-model'
 
-export interface OutputSegment {
+interface OutputSegment {
   readonly text: string
   readonly secret: SecretRef | null
 }

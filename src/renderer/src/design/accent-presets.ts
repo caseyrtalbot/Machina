@@ -24,13 +24,6 @@ export const ACCENT_PRESETS = [
 export type AccentPresetId = (typeof ACCENT_PRESETS)[number]['id']
 export type AccentId = AccentPresetId | 'custom'
 
-export interface AccentPreset {
-  readonly id: AccentPresetId
-  readonly hex: string
-  readonly label: string
-  readonly note: string
-}
-
 const VALID_ACCENT_IDS: ReadonlySet<string> = new Set<string>([
   ...ACCENT_PRESETS.map((p) => p.id),
   'custom'

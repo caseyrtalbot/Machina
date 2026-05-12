@@ -205,7 +205,8 @@ h6 {
 .te-new-thread-button {
   position: relative;
   width: 100%;
-  padding: 8px 10px;
+  min-height: 22px;
+  padding: 0 10px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;

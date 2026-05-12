@@ -1,5 +1,4 @@
 import type { OntologySnapshot, OntologyLayoutResult } from './engine/ontology-types'
-import type { AgentContext, BlockId } from './engine/block-model'
 
 export type CanvasNodeType =
   | 'text'
@@ -36,34 +35,6 @@ export interface PdfNodeMeta {
   readonly src: string
   readonly pageCount: number
   readonly currentPage: number
-}
-
-export interface TerminalBlockNodeMeta {
-  readonly sessionId: string
-  readonly blockId: BlockId
-  readonly command: string
-  readonly exitCode: number | null
-  readonly startedAtMs: number | null
-  readonly finishedAtMs: number | null
-  readonly cwd: string | null
-  readonly agentContext: AgentContext | null
-}
-
-export interface SystemArtifactNodeMeta {
-  readonly artifactKind: 'session' | 'pattern' | 'tension'
-  readonly artifactId: string
-  readonly status: string
-  readonly filePath: string
-  readonly summary?: string
-  readonly signal: string
-  readonly fileRefCount: number
-  readonly question?: string
-  readonly hasSnapshot?: boolean
-  readonly snapshotPath?: string
-  readonly commandCount?: number
-  readonly fileTouchCount?: number
-  readonly connections: readonly string[]
-  readonly tensionRefs: readonly string[]
 }
 
 export interface CanvasNode {

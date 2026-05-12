@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { colors, transitions } from '../../design/tokens'
 
-export type ResizeHandleSide = 'sidebar' | 'dock'
+type ResizeHandleSide = 'sidebar' | 'dock'
 
-export interface ResizeHandleProps {
+interface ResizeHandleProps {
   /** Which pane this handle controls. `sidebar` lives to the right of the sidebar
    * (drag right grows the sidebar); `dock` lives to the left of the dock (drag
    * right shrinks the dock). */

@@ -20,7 +20,7 @@ import { Statusbar } from '../../components/Statusbar'
 const WINDOW_HEADER_HEIGHT = 39
 const WINDOW_CONTROLS_CONTAINER_WIDTH = 148
 
-export interface AgentShellProps {
+interface AgentShellProps {
   readonly onOpenSettings?: () => void
   readonly onChangeVault?: () => void
 }

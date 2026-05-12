@@ -37,7 +37,7 @@ export interface CliAgentThreadMessageEvent {
   readonly message: AssistantMessage
 }
 
-export interface CliAgentThreadBridgeOptions {
+interface CliAgentThreadBridgeOptions {
   readonly onMessage: (event: CliAgentThreadMessageEvent) => void
 }
 

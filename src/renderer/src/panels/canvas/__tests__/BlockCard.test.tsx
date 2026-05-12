@@ -107,14 +107,14 @@ describe('BlockCard', () => {
 
   it('renders the command as the card title', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'ls -la', 0))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     expect(screen.getByTestId('card-title').textContent).toContain('ls -la')
   })
 
   it('shows exit code chip for completed blocks (success)', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hi\n'))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const status = screen.getByTestId('block-status')
     expect(status.textContent).toContain('0')
@@ -123,7 +123,7 @@ describe('BlockCard', () => {
 
   it('shows exit code chip for completed blocks (failure)', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'false', 1))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const status = screen.getByTestId('block-status')
     expect(status.textContent).toContain('1')
@@ -132,7 +132,7 @@ describe('BlockCard', () => {
 
   it('shows running indicator for running blocks', async () => {
     useBlockStore.getState().applyUpdate('s1', buildRunning('b1', 's1', 'sleep 100'))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const status = screen.getByTestId('block-status')
     expect(status.getAttribute('data-state')).toBe('running')
@@ -141,7 +141,7 @@ describe('BlockCard', () => {
 
   it('shows cancelled badge for cancelled blocks', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCancelled('b1', 's1', 'sleep 100'))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const status = screen.getByTestId('block-status')
     expect(status.getAttribute('data-state')).toBe('cancelled')
@@ -152,21 +152,21 @@ describe('BlockCard', () => {
     useBlockStore
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hello world\n'))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     expect(screen.getByTestId('block-output').textContent).toContain('hello world')
   })
 
   it('renders cwd basename when available', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'pwd', 0))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const cwd = screen.getByTestId('block-cwd')
     expect(cwd.textContent).toContain('work')
   })
 
   it('falls back to metadata when block is not in the store', async () => {
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(
       <BlockCard
         node={makeBlockNode('s1', 'b-missing', {
@@ -182,7 +182,7 @@ describe('BlockCard', () => {
 
   it('updates when the underlying block transitions running → completed', async () => {
     useBlockStore.getState().applyUpdate('s1', buildRunning('b1', 's1', 'make'))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     const { rerender } = render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     expect(screen.getByTestId('block-status').getAttribute('data-state')).toBe('running')
 
@@ -199,7 +199,7 @@ describe('BlockCard', () => {
     useBlockStore
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const output = screen.getByTestId('block-output')
     // 5.6 will replace the secret bytes with mask glyphs; here we assert the
@@ -212,7 +212,7 @@ describe('BlockCard', () => {
     useBlockStore
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const reveal = screen.getByTestId('block-reveal-toggle')
     expect(reveal.getAttribute('data-revealed')).toBe('false')
@@ -227,7 +227,7 @@ describe('BlockCard', () => {
     useBlockStore
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const output = screen.getByTestId('block-output')
     expect(output.textContent).not.toContain(fake)
@@ -242,7 +242,7 @@ describe('BlockCard', () => {
     useBlockStore
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hello world\n'))
-    const { BlockCard } = await import('../BlockCard')
+    const { default: BlockCard } = await import('../BlockCard')
     render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
     const output = screen.getByTestId('block-output')
     expect(output.textContent).toContain('hello world')

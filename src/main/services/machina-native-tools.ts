@@ -46,7 +46,7 @@ function awaitApproval(toolUseId: string): Promise<ApprovalDecision> {
   })
 }
 
-export interface ToolContext {
+interface ToolContext {
   readonly vaultPath: string
   readonly autoAccept: boolean
   readonly toolUseId?: string
@@ -69,7 +69,7 @@ export interface ToolContext {
   readonly signal?: AbortSignal
 }
 
-export type NativeToolResult =
+type NativeToolResult =
   | { ok: true; output: unknown; pendingUserApproval?: boolean }
   | { ok: false; error: { code: ToolErrorCode; message: string; hint?: string } }
 

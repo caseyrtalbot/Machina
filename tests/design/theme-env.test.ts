@@ -18,27 +18,28 @@ function stubMatchMedia(matches = false): void {
 }
 
 describe('ENV_DEFAULTS', () => {
-  const allEnvKeys: readonly (keyof EnvironmentSettings)[] = [
-    'canvasTranslucency',
+  const numericEnvKeys: readonly (keyof EnvironmentSettings)[] = [
     'cardOpacity',
     'cardHeaderDarkness',
     'cardBlur',
     'gridDotVisibility',
-    'activityBarOpacity',
     'cardTitleFontSize',
     'cardBodyFontSize',
     'sidebarFontSize'
   ]
 
-  it('dark defaults keep activity rail opacity at 40', () => {
-    expect(ENV_DEFAULTS.activityBarOpacity).toBe(40)
-  })
-
-  it('all env keys are present in defaults', () => {
-    for (const key of allEnvKeys) {
+  it('numeric env keys are present and typed as numbers', () => {
+    for (const key of numericEnvKeys) {
       expect(ENV_DEFAULTS).toHaveProperty(key)
       expect(typeof ENV_DEFAULTS[key]).toBe('number')
     }
+  })
+
+  it('categorical env keys default to expected variants', () => {
+    expect(ENV_DEFAULTS.density).toBe('default')
+    expect(ENV_DEFAULTS.radii).toBe('square')
+    expect(ENV_DEFAULTS.backgroundTint).toBe('pure')
+    expect(ENV_DEFAULTS.canvasGrid).toBe(true)
   })
 })
 
@@ -50,7 +51,6 @@ describe('ThemeProvider environment CSS vars', () => {
     useSettingsStore.setState({
       env: {
         ...ENV_DEFAULTS,
-        activityBarOpacity: 34,
         sidebarFontSize: 15,
         cardBlur: 18,
         cardTitleFontSize: 14
@@ -69,11 +69,10 @@ describe('ThemeProvider environment CSS vars', () => {
     document.documentElement.removeAttribute('style')
   })
 
-  it('applies shared environment variables for rail chrome and sidebar sizing', () => {
+  it('applies env-driven CSS variables for card and sidebar sizing', () => {
     render(createElement(ThemeProvider, null, createElement('div', null, 'themed')))
 
     const rootStyle = document.documentElement.style
-    expect(rootStyle.getPropertyValue('--chrome-rail-bg')).toBe('rgba(17, 17, 19, 0.34)')
     expect(rootStyle.getPropertyValue('--env-card-blur')).toBe('18px')
     expect(rootStyle.getPropertyValue('--env-card-title-font-size')).toBe('14px')
     expect(rootStyle.getPropertyValue('--env-card-body-font-size')).toBe('16px')

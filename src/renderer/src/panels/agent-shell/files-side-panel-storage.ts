@@ -1,9 +1,9 @@
 const OPEN_STORAGE_KEY = 'te.files-side-panel-open'
 const WIDTH_STORAGE_KEY = 'te.files-side-panel-width'
 
-export const FILES_PANEL_DEFAULT_WIDTH = 360
-export const FILES_PANEL_MIN_WIDTH = 280
-export const FILES_PANEL_MAX_WIDTH = 720
+const FILES_PANEL_DEFAULT_WIDTH = 360
+const FILES_PANEL_MIN_WIDTH = 280
+const FILES_PANEL_MAX_WIDTH = 720
 
 export function readPersistedFilesPanelOpen(): boolean {
   try {

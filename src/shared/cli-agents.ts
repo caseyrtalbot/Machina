@@ -80,8 +80,6 @@ export const CLI_AGENTS = [
   }
 ] as const satisfies readonly CLIAgentSpec[]
 
-export type CLIAgentId = (typeof CLI_AGENTS)[number]['id']
-
 /** Returns the spec for `id`, or `null` if no agent is registered under it. */
 export function getAgentSpec(id: string): CLIAgentSpec | null {
   return CLI_AGENTS.find((a) => a.id === id) ?? null

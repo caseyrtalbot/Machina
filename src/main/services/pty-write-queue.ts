@@ -17,7 +17,7 @@ export type PtyWrite =
       readonly data: string
     }
 
-export type PtyWriteFlusher = (write: PtyWrite) => void | Promise<void>
+type PtyWriteFlusher = (write: PtyWrite) => void | Promise<void>
 
 export class PtyWriteQueue {
   private readonly queue: PtyWrite[] = []

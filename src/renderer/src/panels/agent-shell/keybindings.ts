@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 
-export interface AgentShellKeybindingOptions {
+interface AgentShellKeybindingOptions {
   readonly toggleDock: () => void
   readonly openPalette: () => void
   readonly closePalette: () => void

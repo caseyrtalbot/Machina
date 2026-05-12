@@ -13,8 +13,6 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { CLI_AGENTS, type CLIAgentInstallation, type CLIAgentSpec } from '../../shared/cli-agents'
 
-export type { CLIAgentInstallation }
-
 /** Subset of `promisify(execFile)` we depend on. */
 export type ExecFn = (
   cmd: string,

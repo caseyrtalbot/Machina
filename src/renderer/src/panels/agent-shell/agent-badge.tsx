@@ -38,13 +38,7 @@ export function AgentBadge({
   )
 }
 
-export function AgentIcon({
-  agent,
-  size
-}: {
-  readonly agent: AgentIdentity
-  readonly size: number
-}) {
+function AgentIcon({ agent, size }: { readonly agent: AgentIdentity; readonly size: number }) {
   const common: CSSProperties = {
     flexShrink: 0,
     display: 'block'

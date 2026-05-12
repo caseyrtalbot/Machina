@@ -70,7 +70,7 @@ function validateEdge(value: unknown): string | null {
   return null
 }
 
-export function validateCanvasMutationOp(
+function validateCanvasMutationOp(
   op: CanvasMutationOp,
   existingNodeIds: Set<string>,
   addedNodeIds: Set<string>

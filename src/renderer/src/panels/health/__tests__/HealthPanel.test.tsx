@@ -82,40 +82,6 @@ vi.mock('../../../store/editor-store', () => ({
   )
 }))
 
-vi.mock('../../../design/tokens', () => ({
-  colors: {
-    bg: { base: '#0e1016', surface: '#12141c', elevated: '#1a1d28' },
-    border: { default: 'rgba(255,255,255,0.08)', subtle: 'rgba(255,255,255,0.04)' },
-    text: {
-      primary: '#e0e4eb',
-      secondary: '#a0a8b5',
-      muted: '#5a6070',
-      disabled: '#3e3e3e'
-    },
-    accent: {
-      default: '#7c3aed',
-      hover: '#8b5cf6',
-      muted: 'rgba(124,58,237,0.1)',
-      soft: 'rgba(124,58,237,0.14)',
-      line: 'rgba(124,58,237,0.45)'
-    },
-    claude: { ready: '#4ec983', warning: '#dfa11a', error: '#ff847d' }
-  },
-  borderRadius: { container: 4, inline: 2, tool: 4, card: 0, round: '50%' },
-  typography: {
-    fontFamily: {
-      display: 'system-ui',
-      body: 'system-ui',
-      mono: 'monospace'
-    },
-    metadata: {
-      size: '10px',
-      letterSpacing: '0.14em',
-      textTransform: 'uppercase' as const
-    }
-  }
-}))
-
 vi.mock('@shared/engine/vault-health', () => ({
   computeDerivedHealth: vi.fn(() => ({
     runs: [],

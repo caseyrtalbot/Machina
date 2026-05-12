@@ -5,7 +5,7 @@ import { useEditorStore } from '../store/editor-store'
 import { useThreadStore } from '../store/thread-store'
 import { formatModelLabel } from '@shared/format-model-label'
 
-export interface StatusbarItem {
+interface StatusbarItem {
   readonly key: string
   readonly text: string
   readonly tone?: 'success' | 'warn' | 'danger' | 'accent' | 'muted'

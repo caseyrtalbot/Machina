@@ -67,10 +67,6 @@ vi.mock('@shared/canvas-types', () => ({
   createCanvasNode: vi.fn()
 }))
 
-vi.mock('../../../engine/claude-md-template', () => ({
-  generateClaudeMd: vi.fn()
-}))
-
 vi.mock('../../../hooks/use-claude-status', () => ({
   useClaudeStatus: vi.fn(() => ({ installed: true, authenticated: true }))
 }))

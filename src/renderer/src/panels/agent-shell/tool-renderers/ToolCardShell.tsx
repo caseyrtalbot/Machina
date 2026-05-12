@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { CSSProperties, MouseEventHandler, ReactNode, Ref } from 'react'
 import { borderRadius, colors } from '../../../design/tokens'
 
-export type ToolCardVariant = 'pill' | 'block' | 'error'
+type ToolCardVariant = 'pill' | 'block' | 'error'
 
 interface Props {
   readonly variant: ToolCardVariant

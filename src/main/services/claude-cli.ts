@@ -54,7 +54,7 @@ export type ClaudeCliStreamEvent =
   | { readonly kind: 'thinking-delta'; readonly text: string }
   | { readonly kind: 'text-delta'; readonly text: string }
 
-export type ClaudeCliErrorTag = 'stalled' | 'cap' | 'cli-error' | 'not-found'
+type ClaudeCliErrorTag = 'stalled' | 'cap' | 'cli-error' | 'not-found'
 
 export type OnStreamEvent = (ev: ClaudeCliStreamEvent) => void
 export type CallClaudeFn = (prompt: string, onEvent?: OnStreamEvent) => Promise<string>

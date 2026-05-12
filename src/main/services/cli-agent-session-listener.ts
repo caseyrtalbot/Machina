@@ -27,13 +27,9 @@ import {
 import { stripTerminalControls } from '@shared/engine/terminal-text'
 import type { Block } from '@shared/engine/block-model'
 
-export type {
-  CLIAgentSessionContext,
-  CLIAgentSessionState,
-  CLIAgentSessionStatus
-} from '@shared/cli-agent-session-types'
+export type { CLIAgentSessionStatus } from '@shared/cli-agent-session-types'
 
-export interface CLIAgentSessionListenerOptions {
+interface CLIAgentSessionListenerOptions {
   readonly onStatus: (status: CLIAgentSessionStatus) => void
   readonly onContext: (status: CLIAgentSessionStatus) => void
 }

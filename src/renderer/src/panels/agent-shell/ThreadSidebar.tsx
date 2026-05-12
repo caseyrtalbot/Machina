@@ -7,7 +7,7 @@ import { AgentPicker } from './AgentPicker'
 import { AgentBadge } from './agent-badge'
 import type { AgentIdentity } from '@shared/agent-identity'
 
-export interface ThreadSidebarProps {
+interface ThreadSidebarProps {
   readonly width?: number
   readonly onChangeVault?: () => void
 }
@@ -93,7 +93,12 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
           />
         ))}
       </ul>
-      <footer style={{ padding: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
+      <footer
+        style={{
+          padding: '14px 8px 16px',
+          borderTop: `1px solid ${colors.border.subtle}`
+        }}
+      >
         {pickerOpen ? (
           <AgentPicker
             onPick={(a) => {

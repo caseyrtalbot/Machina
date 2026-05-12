@@ -22,7 +22,7 @@ interface IndexDoc {
   readonly haystack: string
 }
 
-export interface PaletteSourcesOptions {
+interface PaletteSourcesOptions {
   readonly closePalette: () => void
 }
 

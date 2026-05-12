@@ -12,7 +12,7 @@ import {
 const TRIGGER_BUTTON_SIZE = 26
 const RESIZE_HANDLE_WIDTH = 6
 
-export interface HeaderFilesToggleButtonProps {
+interface HeaderFilesToggleButtonProps {
   readonly open: boolean
   readonly onToggle: () => void
 }
@@ -61,7 +61,7 @@ export function HeaderFilesToggleButton({ open, onToggle }: HeaderFilesToggleBut
   )
 }
 
-export interface HeaderFilesSidePanelProps {
+interface HeaderFilesSidePanelProps {
   readonly open: boolean
   readonly onClose: () => void
   readonly onChangeVault?: () => void

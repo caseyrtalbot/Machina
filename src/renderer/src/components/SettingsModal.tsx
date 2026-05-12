@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors, borderRadius, typography } from '../design/tokens'
+import { colors, borderRadius, typography, zIndex } from '../design/tokens'
 import { ACCENT_PRESETS, type AccentId } from '../design/accent-presets'
 import { FontPicker } from './FontPicker'
 
@@ -333,27 +333,40 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-dialog-title"
-      className="fixed top-0 right-0 bottom-0 z-40 flex"
+      className="fixed inset-0 flex items-center justify-center"
       style={{
-        width: 360,
-        transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform 200ms ease-out',
-        pointerEvents: isOpen ? 'auto' : 'none'
+        zIndex: zIndex.modal,
+        opacity: isOpen ? 1 : 0,
+        pointerEvents: isOpen ? 'auto' : 'none',
+        transition: 'opacity 180ms ease-out'
       }}
     >
+      {/* Scrim — click to dismiss */}
       <div
-        className="settings-shell flex flex-col h-full w-full"
+        aria-hidden
+        onClick={onClose}
+        className="absolute inset-0"
+        style={{ background: 'var(--bg-overlay)' }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title"
+        className="settings-shell relative flex flex-col"
         style={{
+          width: 'min(560px, calc(100vw - 64px))',
+          maxHeight: 'min(720px, calc(100vh - 96px))',
           backgroundColor: colors.bg.base,
-          borderLeft: `1px solid ${colors.border.subtle}`
+          border: `1px solid ${colors.border.subtle}`,
+          borderRadius: borderRadius.container,
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6)',
+          transform: isOpen ? 'scale(1)' : 'scale(0.98)',
+          transition: 'transform 180ms ease-out'
         }}
       >
         {/* Header */}
         <div
-          className="settings-header flex items-center justify-between px-4 pt-10 pb-3 flex-shrink-0"
+          className="settings-header flex items-center justify-between px-4 py-3 flex-shrink-0"
           style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
         >
           <div className="flex flex-col gap-2">

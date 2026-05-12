@@ -21,7 +21,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
 
-export interface SideDockRibbonProps {
+interface SideDockRibbonProps {
   readonly onOpenPalette: () => void
   readonly onOpenSettings?: () => void
 }
