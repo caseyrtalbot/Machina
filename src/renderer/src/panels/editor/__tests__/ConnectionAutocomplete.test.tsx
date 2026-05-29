@@ -27,8 +27,8 @@ function makeArtifact(id: string, title: string, modified = '2026-04-10'): Artif
 }
 
 const artifacts: Artifact[] = [
-  makeArtifact('n-vibe', 'Vibe Coding', '2026-04-15'),
-  makeArtifact('n-llm', 'LLM Council', '2026-04-14'),
+  makeArtifact('n-vibe', 'Design Patterns', '2026-04-15'),
+  makeArtifact('n-llm', 'API Reference', '2026-04-14'),
   makeArtifact('n-ag04', 'ag04', '2026-04-13'),
   makeArtifact('n-agents', 'Agent Persona Research', '2026-04-12'),
   makeArtifact('n-self', 'Current Note', '2026-04-10'),
@@ -54,8 +54,8 @@ describe('ConnectionAutocomplete', () => {
     )
     const input = screen.getByPlaceholderText('Add connection…') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'vibe' } })
-    expect(screen.getByText('Vibe Coding')).toBeTruthy()
-    expect(screen.queryByText('LLM Council')).toBeNull()
+    expect(screen.getByText('Design Patterns')).toBeTruthy()
+    expect(screen.queryByText('API Reference')).toBeNull()
   })
 
   it('excludes the current artifact and already-connected ids', () => {
@@ -63,13 +63,13 @@ describe('ConnectionAutocomplete', () => {
       <ConnectionAutocomplete
         artifacts={artifacts}
         currentArtifactId="n-self"
-        existingConnections={['Vibe Coding']}
+        existingConnections={['Design Patterns']}
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />
     )
     // Empty query shows recency-sorted suggestions (capped at 8)
-    expect(screen.queryByText('Vibe Coding')).toBeNull()
+    expect(screen.queryByText('Design Patterns')).toBeNull()
     expect(screen.queryByText('Current Note')).toBeNull()
   })
 
@@ -102,7 +102,7 @@ describe('ConnectionAutocomplete', () => {
     const input = screen.getByPlaceholderText('Add connection…')
     fireEvent.change(input, { target: { value: 'llm' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onSelect).toHaveBeenCalledWith('LLM Council')
+    expect(onSelect).toHaveBeenCalledWith('API Reference')
   })
 
   it('ArrowDown moves highlight and Enter picks the new item', () => {
@@ -117,10 +117,10 @@ describe('ConnectionAutocomplete', () => {
       />
     )
     const input = screen.getByPlaceholderText('Add connection…')
-    // Empty query → recency-sorted list. Top is "Vibe Coding" (2026-04-15).
+    // Empty query → recency-sorted list. Top is "Design Patterns" (2026-04-15).
     fireEvent.keyDown(input, { key: 'ArrowDown' }) // second item
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onSelect).toHaveBeenCalledWith('LLM Council')
+    expect(onSelect).toHaveBeenCalledWith('API Reference')
   })
 
   it('Escape calls onClose', () => {
@@ -152,8 +152,8 @@ describe('ConnectionAutocomplete', () => {
     fireEvent.change(screen.getByPlaceholderText('Add connection…'), {
       target: { value: 'vibe' }
     })
-    fireEvent.click(screen.getByText('Vibe Coding'))
-    expect(onSelect).toHaveBeenCalledWith('Vibe Coding')
+    fireEvent.click(screen.getByText('Design Patterns'))
+    expect(onSelect).toHaveBeenCalledWith('Design Patterns')
   })
 
   it('shows "no matches" row when query has zero hits', () => {

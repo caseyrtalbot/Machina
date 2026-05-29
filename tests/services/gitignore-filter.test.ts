@@ -45,7 +45,7 @@ describe('createIgnoreFilter', () => {
     const ig = createIgnoreFilter(DEFAULT_PATTERNS)
 
     expect(ig.ignores('.hidden-file')).toBe(true)
-    expect(ig.ignores('.obsidian/config.json')).toBe(true)
+    expect(ig.ignores('.app-config/config.json')).toBe(true)
     expect(ig.ignores('.vscode/settings.json')).toBe(true)
     expect(ig.ignores('.env.local')).toBe(true)
     expect(ig.ignores('src/visible.ts')).toBe(false)

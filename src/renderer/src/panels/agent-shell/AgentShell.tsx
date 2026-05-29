@@ -136,7 +136,7 @@ function WindowDragRegion({
   readonly centerSlot?: ReactNode
   readonly rightSlot?: ReactNode
 }) {
-  // Reserve an Obsidian-sized 148x39 titlebar control zone across the left of
+  // Reserve a 148x39 titlebar control zone across the left of
   // the shell and keep the rest of the header draggable. The strip sits above
   // the three-pane layout, so interactive elements stay pointer-clickable
   // without per-button no-drag wiring.

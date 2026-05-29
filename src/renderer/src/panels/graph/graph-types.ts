@@ -35,7 +35,7 @@ export type PhysicsResult =
   | { type: 'ready' }
   | { type: 'error'; message: string }
 
-/** Tunable force parameters (Obsidian-inspired defaults) */
+/** Tunable force parameters (graph-layout defaults) */
 export interface ForceParams {
   readonly centerStrength: number // 0.48 — gravity toward center
   readonly repelStrength: number // -250 — many-body repulsion (negative = repel)

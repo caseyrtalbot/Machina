@@ -183,24 +183,24 @@ See <node>Note Two</node> and <node>Note Three</node> for more.`
     expect(result.value.concepts).toEqual(['Note Two', 'Note Three'])
   })
 
-  it('handles Obsidian-style frontmatter with custom properties', () => {
+  it('handles frontmatter with custom properties', () => {
     const md = `---
-title: The Four Pillars
-Parent: "[[VIBE CODING]]"
+title: Project Overview
+Parent: "[[Methodology]]"
 Source: Notion
-tags: [methodology]
+tags: [reference]
 ---
 
-# The Four Pillars
+# Project Overview
 
-AI as Scheduled Capacity.`
+An overview of the approach.`
 
-    const result = parseArtifact(md, 'The Four Pillars.md')
+    const result = parseArtifact(md, 'Project Overview.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.id).toBe('The Four Pillars')
-    expect(result.value.title).toBe('The Four Pillars')
-    expect(result.value.tags).toEqual(['methodology'])
+    expect(result.value.id).toBe('Project Overview')
+    expect(result.value.title).toBe('Project Overview')
+    expect(result.value.tags).toEqual(['reference'])
     expect(result.value.type).toBe('note')
   })
 })
@@ -208,23 +208,23 @@ AI as Scheduled Capacity.`
 describe('related field with wikilink stripping', () => {
   it('strips [[brackets]] from related values', () => {
     const md = `---
-id: atmamun
-title: Atmamun
+id: topic-note
+title: Topic Note
 related:
-  - "[[Fooled by Randomness]]"
-  - "[[Antifragile]]"
-  - "[[Skin in the Game]]"
+  - "[[Design Patterns]]"
+  - "[[Systems Thinking]]"
+  - "[[Distributed Systems]]"
 ---
 
-A book about the mind.`
+A note about the topic.`
 
-    const result = parseArtifact(md, 'Atmamun.md')
+    const result = parseArtifact(md, 'Topic Note.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.related).toEqual([
-      'Fooled by Randomness',
-      'Antifragile',
-      'Skin in the Game'
+      'Design Patterns',
+      'Systems Thinking',
+      'Distributed Systems'
     ])
   })
 
@@ -233,7 +233,7 @@ A book about the mind.`
 id: test
 title: Test
 related:
-  - "[[The Black Swan|Black Swan]]"
+  - "[[Clean Architecture|Architecture]]"
 ---
 
 Body.`
@@ -241,7 +241,7 @@ Body.`
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.related).toEqual(['The Black Swan'])
+    expect(result.value.related).toEqual(['Clean Architecture'])
   })
 
   it('defaults to empty array when related is absent', () => {
@@ -265,7 +265,7 @@ title: Both Fields
 connections:
   - g13
 related:
-  - "[[Antifragile]]"
+  - "[[Systems Thinking]]"
 ---
 
 Body.`
@@ -274,7 +274,7 @@ Body.`
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.connections).toEqual(['g13'])
-    expect(result.value.related).toEqual(['Antifragile'])
+    expect(result.value.related).toEqual(['Systems Thinking'])
   })
 })
 
@@ -285,13 +285,13 @@ id: test
 title: Test
 ---
 
-Naval recommends [[The Book of Secrets]] and [[Atmamun]] for deep study.`
+The guide covers [[Refactoring]] and [[Domain Modeling]] for deep study.`
 
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.bodyLinks).toEqual(
-      expect.arrayContaining(['the book of secrets', 'atmamun'])
+      expect.arrayContaining(['refactoring', 'domain modeling'])
     )
     expect(result.value.bodyLinks).toHaveLength(2)
   })
@@ -316,12 +316,12 @@ id: test
 title: Test
 ---
 
-[[Antifragile]] is great. As I said, [[Antifragile]] changed my thinking.`
+[[Systems Thinking]] is great. As I said, [[Systems Thinking]] changed my thinking.`
 
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.bodyLinks).toEqual(['antifragile'])
+    expect(result.value.bodyLinks).toEqual(['systems thinking'])
   })
 
   it('returns empty array when body has no wikilinks', () => {
@@ -343,16 +343,18 @@ Just plain text with no links.`
 id: test
 title: Test
 related:
-  - "[[Direct Truth]]"
+  - "[[Type Systems]]"
 ---
 
-Naval also recommends [[Atmamun]] alongside [[Direct Truth]].`
+The guide also covers [[Domain Modeling]] alongside [[Type Systems]].`
 
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.related).toEqual(['Direct Truth'])
-    expect(result.value.bodyLinks).toEqual(expect.arrayContaining(['atmamun', 'direct truth']))
+    expect(result.value.related).toEqual(['Type Systems'])
+    expect(result.value.bodyLinks).toEqual(
+      expect.arrayContaining(['domain modeling', 'type systems'])
+    )
   })
 
   it('normalizes [[Foo]] and [[foo]] to same target', () => {

@@ -45,8 +45,8 @@ function makeArtifact(overrides: Partial<Artifact> & { id: string; title: string
 
 describe('isPathGhost', () => {
   it('returns true for path-based IDs', () => {
-    expect(isPathGhost("Naval's Library/Themes/Radical Truth")).toBe(true)
-    expect(isPathGhost('Books/Jed Talks 1')).toBe(true)
+    expect(isPathGhost('Project Notes/Themes/Systems Thinking')).toBe(true)
+    expect(isPathGhost('Reading List/Talks 1')).toBe(true)
   })
 
   it('returns false for simple idea references', () => {
@@ -68,14 +68,14 @@ describe('stripWikilinksFromContext', () => {
   })
 
   it('uses last path segment for path-style targets without alias', () => {
-    expect(stripWikilinksFromContext("in [[Naval's Library/Themes/Radical Truth]] we find")).toBe(
-      'in Radical Truth we find'
+    expect(stripWikilinksFromContext('in [[Project Notes/Themes/Systems Thinking]] we find')).toBe(
+      'in Systems Thinking we find'
     )
   })
 
   it('uses alias over path for path-style targets with alias', () => {
-    expect(stripWikilinksFromContext("[[Naval's Library/Themes/Truth|Truth]] is important")).toBe(
-      'Truth is important'
+    expect(stripWikilinksFromContext('[[Project Notes/Themes/Clarity|Clarity]] is important')).toBe(
+      'Clarity is important'
     )
   })
 
@@ -165,16 +165,16 @@ describe('buildGhostIndex', () => {
       nodes: [
         makeNode('src', '/vault/src.md'),
         makeNode('Richard Hamming'), // idea ghost - should appear
-        makeNode("Naval's Library/Themes/Truth") // path ghost - should be filtered
+        makeNode('Project Notes/Themes/Clarity') // path ghost - should be filtered
       ],
-      edges: [makeEdge('src', 'Richard Hamming'), makeEdge('src', "Naval's Library/Themes/Truth")]
+      edges: [makeEdge('src', 'Richard Hamming'), makeEdge('src', 'Project Notes/Themes/Clarity')]
     }
 
     const artifacts = [
       makeArtifact({
         id: 'src',
         title: 'Source',
-        body: "[[Richard Hamming]] and [[Naval's Library/Themes/Truth]]"
+        body: '[[Richard Hamming]] and [[Project Notes/Themes/Clarity]]'
       })
     ]
 

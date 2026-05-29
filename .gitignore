@@ -32,7 +32,6 @@ docs/working/
 docs/superpowers/
 docs/forge/
 docs/architecture/safety-subsystem.md
-README.md
 
 # Ephemeral project state
 .machina-project-canvas.json

@@ -23,7 +23,7 @@ describe('parseFrontmatter', () => {
     expect(result.raw).toContain('---')
   })
 
-  it('extracts block-style arrays (Obsidian tags)', () => {
+  it('extracts block-style arrays (YAML list tags)', () => {
     const md = '---\ntags:\n  - thinking\n  - writing\n  - tools\n---\n\nContent here.'
     const result = parseFrontmatter(md)
     expect(result.data.tags).toEqual(['thinking', 'writing', 'tools'])

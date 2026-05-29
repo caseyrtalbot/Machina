@@ -1,7 +1,7 @@
 /**
  * Wikilink resolver — multi-strategy resolution for [[wikilink]] targets.
  *
- * Handles Obsidian-style linking conventions:
+ * Handles wiki-style [[link]] conventions:
  * - Simple: [[Note Title]]
  * - Aliased: [[target|display]] (alias stripped before resolution)
  * - Path-based: [[Folder/Sub/Note]]

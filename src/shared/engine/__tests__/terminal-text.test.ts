@@ -42,8 +42,8 @@ describe('stripTerminalControls', () => {
   })
 
   it('handles a realistic prompt-redraw sequence', () => {
-    const raw = `${ESC}[0m${ESC}[27m${ESC}[24m${ESC}[Jcaseytalbot@host % ${ESC}[K${ESC}[?2004h`
-    expect(stripTerminalControls(raw)).toBe('caseytalbot@host % ')
+    const raw = `${ESC}[0m${ESC}[27m${ESC}[24m${ESC}[Juser@host % ${ESC}[K${ESC}[?2004h`
+    expect(stripTerminalControls(raw)).toBe('user@host % ')
   })
 })
 
@@ -57,7 +57,7 @@ describe('extractCommand', () => {
   })
 
   it('peels off a zsh prompt prefix on the first line', () => {
-    expect(extractCommand('caseytalbot@host / % ls -la\nApplications\n')).toBe('ls -la')
+    expect(extractCommand('user@host / % ls -la\nApplications\n')).toBe('ls -la')
   })
 
   it('peels off a bash $ prompt prefix', () => {
@@ -91,7 +91,7 @@ describe('dropPromptHeader', () => {
   })
 
   it('drops a zsh prompt + command echo line and keeps the rest', () => {
-    const raw = 'caseytalbot@host / % ls -la\nApplications\nbin\n'
+    const raw = 'user@host / % ls -la\nApplications\nbin\n'
     expect(dropPromptHeader(raw)).toBe('Applications\nbin\n')
   })
 

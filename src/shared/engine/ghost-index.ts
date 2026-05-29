@@ -21,7 +21,7 @@ export interface GhostEntry {
 
 /**
  * Returns true if a ghost ID looks like a folder path rather than an idea reference.
- * Path-based wikilinks (e.g. "Naval's Library/Themes/Radical Truth") are structural
+ * Path-based wikilinks (e.g. "Project Notes/Themes/Systems Thinking") are structural
  * navigation, not intellectual gaps worth triaging.
  */
 export function isPathGhost(id: string): boolean {
@@ -30,7 +30,7 @@ export function isPathGhost(id: string): boolean {
 
 /**
  * Strip [[wikilink]] syntax from a context snippet, keeping the display text readable.
- * "see [[Naval's Library/Themes/Truth|Truth]] for" → "see Truth for"
+ * "see [[Project Notes/Themes/Clarity|Clarity]] for" → "see Clarity for"
  * "Author: [[Richard Hamming]]" → "Author: Richard Hamming"
  */
 export function stripWikilinksFromContext(text: string): string {

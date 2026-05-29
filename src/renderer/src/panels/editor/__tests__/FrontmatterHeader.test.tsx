@@ -8,7 +8,7 @@ vi.mock('../../../store/vault-store', () => {
   const artifacts: Artifact[] = [
     {
       id: 'n-vibe',
-      title: 'Vibe Coding',
+      title: 'Design Patterns',
       type: 'note',
       created: '2026-04-01',
       modified: '2026-04-15',
@@ -28,7 +28,7 @@ vi.mock('../../../store/vault-store', () => {
     },
     {
       id: 'n-llm',
-      title: 'LLM Council',
+      title: 'API Reference',
       type: 'note',
       created: '2026-04-01',
       modified: '2026-04-14',
@@ -125,33 +125,33 @@ describe('FrontmatterHeader — connection remove', () => {
     const onFrontmatterChange = vi.fn()
     render(
       <FrontmatterHeader
-        artifact={makeArtifact({ connections: ['Vibe Coding', 'LLM Council', 'ag04'] })}
-        frontmatter={{ connections: ['Vibe Coding', 'LLM Council', 'ag04'] }}
+        artifact={makeArtifact({ connections: ['Design Patterns', 'API Reference', 'ag04'] })}
+        frontmatter={{ connections: ['Design Patterns', 'API Reference', 'ag04'] }}
         mode="rich"
         onFrontmatterChange={onFrontmatterChange}
       />
     )
 
-    const removeBtn = screen.getByLabelText('Remove connection LLM Council')
+    const removeBtn = screen.getByLabelText('Remove connection API Reference')
     fireEvent.click(removeBtn)
 
     expect(onFrontmatterChange).toHaveBeenCalledTimes(1)
     const raw = onFrontmatterChange.mock.calls[0][0] as string
-    expect(raw).toContain('Vibe Coding')
+    expect(raw).toContain('Design Patterns')
     expect(raw).toContain('ag04')
-    expect(raw).not.toContain('LLM Council')
+    expect(raw).not.toContain('API Reference')
   })
 
   it('does not render × when non-editable', () => {
     render(
       <FrontmatterHeader
-        artifact={makeArtifact({ connections: ['Vibe Coding'] })}
-        frontmatter={{ connections: ['Vibe Coding'] }}
+        artifact={makeArtifact({ connections: ['Design Patterns'] })}
+        frontmatter={{ connections: ['Design Patterns'] }}
         mode="rich"
         // no onFrontmatterChange
       />
     )
-    expect(screen.queryByLabelText('Remove connection Vibe Coding')).toBeNull()
+    expect(screen.queryByLabelText('Remove connection Design Patterns')).toBeNull()
   })
 })
 
@@ -170,18 +170,18 @@ describe('FrontmatterHeader — connection add', () => {
     fireEvent.click(screen.getByText('+ add connection'))
     const input = screen.getByPlaceholderText('Add connection…')
     fireEvent.change(input, { target: { value: 'vibe' } })
-    fireEvent.click(screen.getByText('Vibe Coding'))
+    fireEvent.click(screen.getByText('Design Patterns'))
 
     expect(onFrontmatterChange).toHaveBeenCalledTimes(1)
     const raw = onFrontmatterChange.mock.calls[0][0] as string
-    expect(raw).toContain('Vibe Coding')
+    expect(raw).toContain('Design Patterns')
   })
 
   it('+ add connection is not rendered in non-editable mode', () => {
     render(
       <FrontmatterHeader
-        artifact={makeArtifact({ connections: ['Vibe Coding'] })}
-        frontmatter={{ connections: ['Vibe Coding'] }}
+        artifact={makeArtifact({ connections: ['Design Patterns'] })}
+        frontmatter={{ connections: ['Design Patterns'] }}
         mode="rich"
         // no onFrontmatterChange
       />
