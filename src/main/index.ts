@@ -48,7 +48,7 @@ const PROD_CSP = [
   "worker-src 'self' blob:"
 ].join('; ')
 
-const APP_ID = 'com.caseytalbot.machina'
+const APP_ID = 'com.machina.app'
 const WINDOW_STATE_KEY = 'window.bounds'
 const WINDOW_STATE_SAVE_DEBOUNCE_MS = 300
 

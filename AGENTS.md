@@ -108,10 +108,10 @@ before-quit → preventDefault → typedSend('app:will-quit')
 
 ### Key Subsystems
 
-- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (6 edge types with provenance) → ghost-index.ts. search-engine.ts: MiniSearch (title x10, tags x5, body x1). All runs in vault-worker.ts Web Worker.
-- **Canvas** (`panels/canvas/`): Pixi.js 8 infinite pan-zoom. 12 card types: `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `project-folder`, `terminal-block`. Click-to-focus, click-again-to-interact.
+- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds with provenance) → ghost-index.ts. search-engine.ts: MiniSearch (title x10, tags x5, body x1). All runs in vault-worker.ts Web Worker.
+- **Canvas** (`panels/canvas/`): React DOM with a CSS-transform pan-zoom layer (`CanvasSurface.tsx`), not Pixi (Pixi drives only the graph view). 12 card types: `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `project-folder`, `terminal-block`. Click-to-focus, click-again-to-interact.
 - **Ontology** (`engine/ontology-*`): Tag-first grouping with link-analysis fallback, computed in ontology-worker.ts. `GroupProvenance` tracks source (user tags, links, AI).
-- **Agents**: PTY sessions via agent-spawner.ts. session-tailer.ts emits `SessionMilestone` events. IPC: `window.api.agent`.
+- **Agents**: Three paths, all bypassing the MCP safety subsystem. (1) PTY Claude sessions via agent-spawner.ts; session-tailer.ts emits `SessionMilestone` events; IPC `window.api.agent`; pre-spawn rollback `vault-git.ts:commitPreAgentSnapshot`. (2) In-app Anthropic SDK agent via machina-native-agent.ts (`@anthropic-ai/sdk` messages.create with a tool loop over `NATIVE_TOOLS` / machina-native-tools.ts); IPC `window.api.agentNative`. (3) CLI thread spawner via cli-thread-spawner.ts running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print`; IPC `window.api.thread`.
 - **System Artifacts**: Structured markdown in `.machina/artifacts/{sessions,patterns,tensions}/`. Schemas in `system-artifacts.ts`.
 - **Web Workers**: vault-worker (parse+graph), graph-physics-worker (D3-force), ontology-worker (grouping+layout), project-map-worker (filesystem→canvas).
 

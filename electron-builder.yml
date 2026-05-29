@@ -1,4 +1,4 @@
-appId: com.caseytalbot.machina
+appId: com.machina.app
 productName: Machina
 directories:
   buildResources: build
