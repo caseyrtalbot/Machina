@@ -1,6 +1,14 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from 'node:fs'
+import {
+  mkdtempSync,
+  writeFileSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  symlinkSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -1272,6 +1280,72 @@ describe('machina-native-tools focus_canvas', () => {
       if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
     } finally {
       rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+// XC-1: the note tools used a weak safeJoin (resolve + startsWith) with no
+// symlink resolution and no deny list, so an agent could read/write through a
+// symlink that escapes the vault or touch sensitive segments like .git. They
+// now route through the canonical PathGuard. These regressions prove the gap
+// is closed; they fail against the old safeJoin implementation.
+describe('machina-native-tools PathGuard hardening (XC-1)', () => {
+  it('rejects write_note to a deny-listed .git segment', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const res = await callTool(
+        'write_note',
+        { path: '.git/config', content: 'pwned' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+      // The guard must reject before any disk write happens.
+      expect(existsSync(path.join(v, '.git', 'config'))).toBe(false)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects read_note through a symlink that escapes the vault', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    const outside = mkdtempSync(path.join(tmpdir(), 'outside-'))
+    try {
+      writeFileSync(path.join(outside, 'secret.md'), 'top secret\n')
+      // A symlink inside the vault pointing at an external directory. safeJoin
+      // never resolved it, so reads followed the link straight out of the vault.
+      symlinkSync(outside, path.join(v, 'escape'))
+      const res = await callTool(
+        'read_note',
+        { path: 'escape/secret.md' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects edit_note through a symlink that escapes the vault', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    const outside = mkdtempSync(path.join(tmpdir(), 'outside-'))
+    try {
+      writeFileSync(path.join(outside, 'target.md'), 'before\n')
+      symlinkSync(outside, path.join(v, 'escape'))
+      const res = await callTool(
+        'edit_note',
+        { path: 'escape/target.md', find: 'before', replace: 'after' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+      // The external file must be untouched.
+      expect(readFileSync(path.join(outside, 'target.md'), 'utf8')).toBe('before\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+      rmSync(outside, { recursive: true, force: true })
     }
   })
 })
