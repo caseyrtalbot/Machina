@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from 'react'
 import { CardShell } from './CardShell'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useBlockStore } from '../../store/block-store'
-import { colors, typography } from '../../design/tokens'
+import { borderRadius, colors, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { Block, BlockState, SecretRef } from '@shared/engine/block-model'
 import { segmentOutput, maskSegmentText } from '@shared/engine/block-output-segments'
@@ -128,7 +128,7 @@ function renderOutput(
           data-revealed="true"
           style={{
             background: 'color-mix(in srgb, currentColor 8%, transparent)',
-            borderRadius: 2,
+            borderRadius: borderRadius.inline,
             padding: '0 2px'
           }}
           title={`${seg.secret.kind} (revealed)`}
@@ -145,7 +145,7 @@ function renderOutput(
         data-revealed="false"
         style={{
           background: 'color-mix(in srgb, currentColor 12%, transparent)',
-          borderRadius: 2,
+          borderRadius: borderRadius.inline,
           padding: '0 2px',
           letterSpacing: '0.04em'
         }}
@@ -199,10 +199,10 @@ function BlockCardInner({ node }: BlockCardProps) {
         fontSize: 10,
         fontFamily: typography.fontFamily.mono,
         textTransform: 'uppercase',
-        letterSpacing: '0.06em',
+        letterSpacing: typography.metadata.letterSpacing,
         color: statusColor,
         border: `1px solid ${statusColor}`,
-        borderRadius: 4,
+        borderRadius: borderRadius.tool,
         padding: '1px 6px',
         whiteSpace: 'nowrap'
       }}
@@ -267,12 +267,12 @@ function BlockCardInner({ node }: BlockCardProps) {
                   fontFamily: typography.fontFamily.mono,
                   color: revealed ? colors.claude.warning : colors.text.muted,
                   border: `1px solid ${revealed ? colors.claude.warning : colors.border.default}`,
-                  borderRadius: 4,
+                  borderRadius: borderRadius.tool,
                   padding: '1px 6px',
                   background: 'transparent',
                   cursor: 'pointer',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.06em'
+                  letterSpacing: typography.metadata.letterSpacing
                 }}
               >
                 {revealed ? 'hide' : `reveal (${resolved.secrets.length})`}

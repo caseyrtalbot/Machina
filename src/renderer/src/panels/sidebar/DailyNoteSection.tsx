@@ -184,9 +184,9 @@ export function DailyNoteSection({
                 style={{
                   color: colors.text.muted,
                   fontFamily: typography.fontFamily.mono,
-                  fontSize: 9,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
+                  fontSize: typography.microLabel.size,
+                  letterSpacing: typography.microLabel.letterSpacing,
+                  textTransform: typography.microLabel.textTransform,
                   lineHeight: '16px'
                 }}
               >
@@ -217,7 +217,11 @@ export function DailyNoteSection({
                     background: isToday ? colors.accent.default : 'none',
                     border: 'none',
                     borderRadius: borderRadius.inline,
-                    color: isToday ? '#0a0a0c' : hasNote ? colors.text.primary : colors.text.muted,
+                    color: isToday
+                      ? 'var(--color-accent-fg)'
+                      : hasNote
+                        ? colors.text.primary
+                        : colors.text.muted,
                     cursor: 'pointer',
                     fontFamily: typography.fontFamily.mono,
                     fontSize: '10px',

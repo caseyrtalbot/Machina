@@ -1,5 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
-import { colors, borderRadius, typography, zIndex } from '../../design/tokens'
+import {
+  colors,
+  borderRadius,
+  floatingPanel,
+  transitions,
+  typography,
+  zIndex
+} from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { buildIndex, buildPaletteItems, searchPalette, type PaletteItem } from './palette-sources'
 
@@ -104,7 +111,9 @@ export function CommandPalette({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--color-bg-elevated)',
+          background: floatingPanel.glass.bg,
+          backdropFilter: floatingPanel.glass.blur,
+          WebkitBackdropFilter: floatingPanel.glass.blur,
           border: '1px solid var(--line-default)',
           borderRadius: borderRadius.tool,
           width: 640,
@@ -112,8 +121,7 @@ export function CommandPalette({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow:
-            '0 24px 64px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02)'
+          boxShadow: floatingPanel.shadow
         }}
       >
         <div
@@ -121,7 +129,7 @@ export function CommandPalette({
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            padding: '14px 18px',
+            padding: '12px 16px',
             borderBottom: '1px solid var(--line-subtle)'
           }}
         >
@@ -203,15 +211,15 @@ export function CommandPalette({
                   position: 'relative',
                   borderLeft: `2px solid ${isActive ? 'var(--color-accent-default)' : 'transparent'}`,
                   paddingLeft: isActive ? 16 : 18,
-                  transition: 'background 80ms linear'
+                  transition: `background ${transitions.micro}`
                 }}
               >
                 <span
                   style={{
                     fontFamily: typography.fontFamily.mono,
-                    fontSize: 9,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.12em',
+                    fontSize: typography.microLabel.size,
+                    textTransform: typography.microLabel.textTransform,
+                    letterSpacing: typography.microLabel.letterSpacing,
                     color: colors.text.muted,
                     width: 64,
                     flexShrink: 0
@@ -262,8 +270,8 @@ export function CommandPalette({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
-            padding: '8px 14px',
+            gap: 12,
+            padding: '8px 16px',
             borderTop: '1px solid var(--line-subtle)',
             background: 'var(--color-bg-surface)',
             fontFamily: typography.fontFamily.mono,

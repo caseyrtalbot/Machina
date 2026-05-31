@@ -23,7 +23,7 @@ export const HighlightMark = Mark.create({
       'mark',
       mergeAttributes(HTMLAttributes, {
         style:
-          'background: rgba(234, 179, 8, 0.15); color: inherit; border-radius: 2px; padding: 0 2px'
+          'background: rgba(234, 179, 8, 0.15); color: inherit; border-radius: 0; padding: 0 2px'
       }),
       0
     ]

@@ -218,7 +218,7 @@ export function ConnectionDragOverlay() {
       <DragPreviewLine drag={drag} />
       <div className="fixed inset-0 pointer-events-none z-40">
         <div
-          className="text-xs px-2 py-1 rounded"
+          className="text-xs px-2 py-1"
           style={{
             position: 'fixed',
             left: drag.cursorX + 10,

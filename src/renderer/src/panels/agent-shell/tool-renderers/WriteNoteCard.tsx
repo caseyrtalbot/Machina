@@ -115,12 +115,13 @@ export function WriteNoteCard({
             onClick={() => void decide(true)}
             disabled={submitting}
             style={{
-              padding: '5px 14px',
+              padding: '4px 12px',
               fontSize: 12,
               borderRadius: borderRadius.inline,
               border: `1px solid ${colors.accent.default}`,
               background: 'color-mix(in srgb, var(--color-accent-default) 14%, transparent)',
               color: colors.text.primary,
+              opacity: submitting ? 0.5 : 1,
               cursor: submitting ? 'wait' : 'pointer'
             }}
           >
@@ -130,12 +131,13 @@ export function WriteNoteCard({
             onClick={() => void decide(false)}
             disabled={submitting}
             style={{
-              padding: '5px 14px',
+              padding: '4px 12px',
               fontSize: 12,
               borderRadius: borderRadius.inline,
               border: `1px solid ${colors.border.default}`,
               background: 'transparent',
               color: colors.text.muted,
+              opacity: submitting ? 0.5 : 1,
               cursor: submitting ? 'wait' : 'pointer'
             }}
           >

@@ -1,5 +1,5 @@
 import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from 'react'
-import { spacing, typography, transitions } from './tokens'
+import { spacing, typography, transitions, floatingPanel } from './tokens'
 import {
   STRUCTURAL_COLORS,
   CHROME_BG_HEX,
@@ -158,6 +158,17 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
     '--env-sidebar-tertiary-font-size',
     `${Math.max(env.sidebarFontSize - 3, 10)}px`
   )
+
+  // ── Motion + elevation catalog (static; emitted from tokens so CSS and
+  // inline-style consumers share one source — :root holds matching fallbacks) ──
+  root.style.setProperty('--t-micro', transitions.micro)
+  root.style.setProperty('--t-fast', transitions.fast)
+  root.style.setProperty('--t-med', transitions.med)
+  root.style.setProperty('--t-slow', transitions.slow)
+  root.style.setProperty('--t-surface', transitions.surface)
+  root.style.setProperty('--shadow-floating', floatingPanel.shadow)
+  root.style.setProperty('--shadow-compact', floatingPanel.shadowCompact)
+  root.style.setProperty('--shadow-card', floatingPanel.shadowCard)
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

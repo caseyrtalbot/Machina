@@ -213,8 +213,8 @@ function RibbonAction({
   const background =
     interactive && hovered
       ? tone === 'danger'
-        ? 'color-mix(in srgb, #ff847d 10%, transparent)'
-        : 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)'
+        ? 'color-mix(in srgb, var(--signal-danger) 10%, transparent)'
+        : 'var(--bg-tint-text)'
       : 'transparent'
 
   const style: CSSProperties = {

@@ -5,7 +5,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
-import { colors, transitions, typography } from '../../design/tokens'
+import { colors, transitions, typography, borderRadius, floatingPanel } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { groupByFrequency } from './ghost-sections'
 
@@ -147,11 +147,11 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
         maxHeight: 'calc(100vh - 40px)',
         overflowY: 'auto',
         background: 'rgba(14, 16, 22, 0.96)',
-        backdropFilter: 'blur(20px) saturate(1.3)',
+        backdropFilter: floatingPanel.glass.blur,
         border: '1px solid var(--line-default)',
-        borderRadius: 10,
-        padding: '14px 16px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
+        borderRadius: borderRadius.card,
+        padding: '12px 16px',
+        boxShadow: floatingPanel.shadow,
         zIndex: 100
       }}
     >
@@ -182,10 +182,14 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
               i < ghost.references.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none'
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 500, color: '#c0c7d0', marginBottom: 2 }}>
+          <div
+            style={{ fontSize: 12, fontWeight: 500, color: colors.text.primary, marginBottom: 2 }}
+          >
             {ref.fileTitle}
           </div>
-          <div style={{ fontSize: 11, color: '#5a6070', lineHeight: 1.45 }}>{ref.context}</div>
+          <div style={{ fontSize: 11, color: colors.text.secondary, lineHeight: 1.45 }}>
+            {ref.context}
+          </div>
         </div>
       ))}
     </div>
@@ -220,10 +224,10 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 5,
+        borderRadius: borderRadius.tool,
         border: 'none',
-        background: hovered ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-        color: hovered ? '#c0c7d0' : '#5a6070',
+        background: hovered ? 'var(--bg-tint-text)' : 'transparent',
+        color: hovered ? colors.text.primary : colors.text.secondary,
         cursor: 'pointer',
         transition: `background ${transitions.focusRing}, color ${transitions.focusRing}`,
         position: 'relative',
@@ -238,16 +242,16 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
           left: '50%',
           transform: 'translateX(-50%)',
           fontSize: 11,
-          color: '#c0c7d0',
+          color: colors.text.primary,
           background: 'rgba(20, 22, 28, 0.95)',
           border: '1px solid var(--line-default)',
           padding: '3px 8px',
-          borderRadius: 5,
+          borderRadius: borderRadius.tool,
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
           opacity: hovered ? 1 : 0,
           transition: `opacity ${transitions.focusRing}`,
-          backdropFilter: 'blur(8px)',
+          backdropFilter: 'blur(12px)',
           zIndex: 50
         }}
       >
@@ -509,9 +513,9 @@ export function GhostPanel() {
               as="div"
               style={{
                 color: colors.text.primary,
-                padding: '14px 0 6px',
+                padding: '12px 0 8px',
                 borderBottom: '1px solid var(--line-faint)',
-                marginBottom: 2
+                marginBottom: 4
               }}
             >
               {section.label}

@@ -1,5 +1,5 @@
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
-import { colors } from '../../design/tokens'
+import { colors, floatingPanel } from '../../design/tokens'
 
 interface FolderMapPreviewProps {
   readonly plan: CanvasMutationPlan
@@ -75,7 +75,7 @@ export function FolderMapPreviewGhosts({ plan }: { readonly plan: CanvasMutation
               y={y}
               width={width}
               height={height}
-              rx={6}
+              rx={0}
               fill={colors.bg.elevated}
               fillOpacity={0.15}
               stroke={colors.accent.default}
@@ -125,14 +125,14 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
         alignItems: 'center',
         gap: '12px',
         padding: '10px 20px',
-        borderRadius: '10px',
+        borderRadius: 'var(--r-tool)',
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
-        backdropFilter: 'blur(12px)',
+        backdropFilter: floatingPanel.glass.blur,
         fontSize: '13px',
         color: 'var(--color-text-secondary)',
         zIndex: 100,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+        boxShadow: floatingPanel.shadowCompact
       }}
     >
       <span>
@@ -144,7 +144,7 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
         onClick={onApply}
         style={{
           padding: '4px 14px',
-          borderRadius: '6px',
+          borderRadius: 0,
           border: 'none',
           background: 'var(--color-accent-default)',
           color: 'var(--color-text-on-accent)',
@@ -159,7 +159,7 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
         onClick={onCancel}
         style={{
           padding: '4px 14px',
-          borderRadius: '6px',
+          borderRadius: 0,
           border: '1px solid var(--color-border-subtle)',
           background: 'transparent',
           color: 'var(--color-text-secondary)',

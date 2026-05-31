@@ -85,7 +85,7 @@ export const CalloutBlock = Node.create({
         style: [
           `background: ${style.bg}`,
           `border-left: 3px solid ${style.border}`,
-          'border-radius: 4px',
+          'border-radius: 0',
           'padding: 12px 16px',
           'margin: 8px 0'
         ].join('; ')

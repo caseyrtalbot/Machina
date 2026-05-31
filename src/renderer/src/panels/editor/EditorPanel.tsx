@@ -333,7 +333,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
           style={{
             // Console callout: 2px accent left-bar + accent-soft tint
             borderLeft: `2px solid ${colors.claude.warning}`,
-            backgroundColor: 'color-mix(in srgb, #dfa11a 10%, transparent)',
+            backgroundColor: `color-mix(in srgb, ${colors.claude.warning} 10%, transparent)`,
             borderBottom: `1px solid ${colors.border.subtle}`,
             color: colors.claude.warning,
             fontFamily: typography.fontFamily.mono
@@ -341,9 +341,9 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
         >
           <span
             style={{
-              fontSize: '11px',
+              fontSize: typography.metadata.size,
               textTransform: 'uppercase',
-              letterSpacing: '0.12em',
+              letterSpacing: typography.metadata.letterSpacing,
               fontWeight: 600
             }}
           >

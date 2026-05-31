@@ -146,7 +146,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[180px] py-1 rounded-md shadow-xl"
+      className="fixed z-50 min-w-[180px] py-1 shadow-xl"
       style={{
         left: adjustedPosition.x,
         top: adjustedPosition.y,
@@ -154,7 +154,7 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
         backdropFilter: floatingPanel.glass.popoverBlur,
         WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
         border: '1px solid var(--color-border-subtle)',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        boxShadow: floatingPanel.shadow,
         transition: `opacity ${transitions.tooltip}`,
         fontSize: '13px'
       }}
@@ -164,8 +164,8 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
           <button
             className="w-full text-left px-3 py-1.5 flex items-center justify-between transition-colors cursor-default"
             style={{
-              color: action.danger ? '#EF4444' : colors.text.primary,
-              backgroundColor: focusedIndex === idx ? colors.bg.surface : undefined
+              color: action.danger ? 'var(--signal-danger)' : colors.text.primary,
+              backgroundColor: focusedIndex === idx ? 'var(--bg-tint-text)' : undefined
             }}
             onMouseEnter={() => setFocusedIndex(idx)}
             onMouseLeave={() => setFocusedIndex(-1)}

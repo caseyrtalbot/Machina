@@ -311,7 +311,7 @@ export function CanvasSurface({
       {/* Drag-over overlay */}
       {dragOver && (
         <div
-          className="absolute inset-2 rounded-lg pointer-events-none"
+          className="absolute inset-2 pointer-events-none"
           style={{
             border: `0.5px dashed ${colors.accent.default}`,
             background:

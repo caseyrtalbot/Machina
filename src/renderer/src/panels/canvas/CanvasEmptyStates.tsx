@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { colors, transitions, typography } from '../../design/tokens'
+import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 
 export function CanvasWelcomeCard() {
   const [isHovered, setIsHovered] = useState(false)
@@ -20,20 +20,20 @@ export function CanvasWelcomeCard() {
         style={{
           width: 360,
           padding: '32px 28px',
-          borderRadius: 16,
+          borderRadius: borderRadius.card,
           backgroundColor: 'var(--canvas-card-bg)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          backdropFilter: floatingPanel.glass.blur,
+          WebkitBackdropFilter: floatingPanel.glass.blur,
           border: '1px solid var(--canvas-card-border)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)'
+          boxShadow: floatingPanel.shadow
         }}
       >
         <div
           style={{
-            fontSize: 11,
+            fontSize: typography.metadata.size,
             fontFamily: typography.fontFamily.mono,
             color: colors.text.muted,
-            letterSpacing: '0.12em',
+            letterSpacing: typography.metadata.letterSpacing,
             textTransform: 'uppercase',
             marginBottom: 12
           }}
@@ -72,14 +72,14 @@ export function CanvasWelcomeCard() {
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           style={{
-            padding: '9px 20px',
+            padding: '8px 20px',
             fontSize: 13,
             fontWeight: 500,
             fontFamily: typography.fontFamily.body,
-            color: 'var(--color-accent-fg, #fff)',
+            color: 'var(--color-accent-fg, #1a0f08)',
             backgroundColor: isHovered ? colors.accent.hover : colors.accent.default,
             border: 'none',
-            borderRadius: 8,
+            borderRadius: borderRadius.tool,
             cursor: 'pointer',
             transition: `background-color ${transitions.default}`,
             lineHeight: 1.5

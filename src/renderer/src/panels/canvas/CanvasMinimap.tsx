@@ -200,7 +200,7 @@ export function CanvasMinimap({
             height: Math.max(2, node.size.height * scale),
             backgroundColor: LOD_COLORS[node.type] ?? '#94a3b8',
             opacity: 0.6,
-            borderRadius: 1,
+            borderRadius: 0,
             pointerEvents: 'none'
           }}
         />
@@ -216,7 +216,7 @@ export function CanvasMinimap({
           height: Math.max(4, vpRect.height * scale),
           border: '1px solid color-mix(in srgb, var(--color-accent-default) 70%, transparent)',
           backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)',
-          borderRadius: 2,
+          borderRadius: 0,
           cursor: 'grab',
           pointerEvents: 'auto'
         }}

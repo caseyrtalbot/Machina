@@ -34,25 +34,27 @@ function dotStyle(status: TerminalStatus['status']): React.CSSProperties {
     case 'busy':
       return {
         ...base,
-        backgroundColor: '#60a5fa',
+        backgroundColor: 'var(--signal-info)',
         animation: 'te-dock-pulse 2s ease-in-out infinite',
-        boxShadow: '0 0 6px #60a5fa'
+        boxShadow: '0 0 6px var(--signal-info)'
       }
     case 'error':
       return {
         ...base,
-        backgroundColor: '#ef4444',
+        backgroundColor: 'var(--signal-danger)',
         animation: 'te-dock-pulse 1s ease-in-out infinite',
-        boxShadow: '0 0 6px #ef4444'
+        boxShadow: '0 0 6px var(--signal-danger)'
       }
     case 'dead':
       return { ...base, backgroundColor: colors.text.muted }
     case 'claude':
+      // No teal signal token exists; an active agent session reads as a
+      // "working" state, so it reuses --signal-info like busy.
       return {
         ...base,
-        backgroundColor: '#00e5bf',
+        backgroundColor: 'var(--signal-info)',
         animation: 'te-dock-pulse 2s ease-in-out infinite',
-        boxShadow: '0 0 6px #00e5bf'
+        boxShadow: '0 0 6px var(--signal-info)'
       }
   }
 }
@@ -80,11 +82,11 @@ function TerminalPill({
     gap: spacing.unit,
     padding: '4px 8px',
     backgroundColor: isError
-      ? 'rgba(239, 68, 68, 0.06)'
+      ? 'color-mix(in srgb, var(--signal-danger) 10%, transparent)'
       : hovered
         ? floatingPanel.glass.inputBgFocus
         : floatingPanel.glass.inputBg,
-    border: `1px solid ${isError ? 'rgba(239, 68, 68, 0.15)' : colors.border.subtle}`,
+    border: `1px solid ${isError ? 'color-mix(in srgb, var(--signal-danger) 30%, transparent)' : colors.border.subtle}`,
     borderRadius: borderRadius.inline,
     cursor: 'pointer',
     transition: `background ${transitions.hover}`,

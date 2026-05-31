@@ -31,12 +31,12 @@ function initMermaid(m: (typeof import('mermaid'))['default']): void {
     theme: 'dark',
     darkMode: true,
     themeVariables: {
-      primaryColor: '#1e293b',
-      primaryBorderColor: '#475569',
-      primaryTextColor: '#e2e8f0',
+      primaryColor: resolveCssVar('--color-bg-elevated', '#1e293b'),
+      primaryBorderColor: resolveCssVar('--color-border-default', '#475569'),
+      primaryTextColor: resolveCssVar('--color-text-primary', '#e2e8f0'),
       lineColor: resolveCssVar('--color-text-secondary', '#9a9a9a'),
-      secondaryColor: '#334155',
-      tertiaryColor: '#1e293b',
+      secondaryColor: resolveCssVar('--color-bg-surface', '#334155'),
+      tertiaryColor: resolveCssVar('--color-bg-elevated', '#1e293b'),
       fontFamily: 'var(--font-mono)',
       fontSize: '14px'
     }

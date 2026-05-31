@@ -6,6 +6,7 @@ export class LabelLayer {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
   private dpr: number
+  private fontFamily: string | null = null
 
   constructor() {
     this.canvas = document.createElement('canvas')
@@ -60,7 +61,12 @@ export class LabelLayer {
     const ch = h / dpr
 
     const fontSize = Math.min(Math.max(11 / viewport.scale, 8), 14) * labelScale
-    ctx.font = `500 ${fontSize}px "DM Sans", system-ui, sans-serif`
+    if (this.fontFamily === null) {
+      this.fontFamily =
+        getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() ||
+        'system-ui, sans-serif'
+    }
+    ctx.font = `500 ${fontSize}px ${this.fontFamily}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
 

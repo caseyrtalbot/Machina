@@ -78,8 +78,9 @@ function EnvSlider({
           style={{
             fontSize: 10,
             color: colors.text.muted,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase'
+            letterSpacing: 'var(--label-tracking)',
+            textTransform: 'uppercase',
+            fontFamily: 'var(--font-mono)'
           }}
         >
           {label}

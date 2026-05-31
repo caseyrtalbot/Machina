@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors, floatingPanel } from '../../design/tokens'
 
 interface CardContextMenuProps {
   readonly x: number
@@ -32,7 +32,8 @@ function MenuItem({ label, onClick, disabled }: MenuItemProps) {
         cursor: disabled ? 'default' : 'pointer'
       }}
       onMouseEnter={(e) => {
-        if (!disabled) (e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
+        if (!disabled)
+          (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-tint-text)'
       }}
       onMouseLeave={(e) => {
         ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
@@ -73,13 +74,13 @@ export function CardContextMenu({
       style={{
         left: x,
         top: y,
-        backgroundColor: colors.bg.elevated,
+        backgroundColor: floatingPanel.glass.popoverBg,
         borderColor: colors.border.default,
-        borderRadius: 8,
+        borderRadius: borderRadius.card,
         minWidth: 180,
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)'
+        boxShadow: floatingPanel.shadowCompact,
+        backdropFilter: floatingPanel.glass.popoverBlur,
+        WebkitBackdropFilter: floatingPanel.glass.popoverBlur
       }}
       onClick={(e) => e.stopPropagation()}
     >

@@ -236,7 +236,7 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
         bottom: 20,
         right: 20,
         maxWidth: 300,
-        padding: '14px 16px 12px',
+        padding: '12px 16px',
         background: floatingPanel.glass.bg,
         backdropFilter: floatingPanel.glass.blur,
         WebkitBackdropFilter: floatingPanel.glass.blur,

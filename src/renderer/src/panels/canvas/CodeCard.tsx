@@ -65,7 +65,7 @@ export function CodeCard({ node }: CodeCardProps) {
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         EditorView.theme({
           '&': { height: '100%', fontSize: '13px' },
-          '.cm-scroller': { fontFamily: '"JetBrains Mono", monospace', overflow: 'auto' },
+          '.cm-scroller': { fontFamily: 'var(--font-code)', overflow: 'auto' },
           '.cm-content': { padding: '8px 0' }
         }),
         EditorView.updateListener.of((update) => {
@@ -146,7 +146,7 @@ export function CodeCard({ node }: CodeCardProps) {
             </button>
             {showLangPicker && (
               <div
-                className="absolute top-full left-0 mt-1 rounded border shadow-lg py-1 z-50"
+                className="absolute top-full left-0 mt-1 border shadow-lg py-1 z-50"
                 style={{
                   backgroundColor: colors.bg.elevated,
                   borderColor: colors.border.default,

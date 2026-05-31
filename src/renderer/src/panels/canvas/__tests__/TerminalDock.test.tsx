@@ -232,11 +232,13 @@ describe('TerminalDock', () => {
     const dots = screen.getAllByTestId('status-dot')
     expect(dots).toHaveLength(5)
 
-    // Verify dot background colors match spec
-    expect(dots[0].style.backgroundColor).toBe('#3dca8d') // idle
-    expect(dots[1].style.backgroundColor).toBe('#60a5fa') // busy
-    expect(dots[2].style.backgroundColor).toBe('#ef4444') // error
-    expect(dots[3].style.backgroundColor).toBe('#00e5bf') // claude
+    // Verify dot background colors match spec (status colors now semantic tokens;
+    // dots stay round per knife-edge exception). claude reuses --signal-info (it is a
+    // "working" state like busy) — there is no distinct mint signal token.
+    expect(dots[0].style.backgroundColor).toBe('#3dca8d') // idle (semantic.cluster)
+    expect(dots[1].style.backgroundColor).toBe('var(--signal-info)') // busy
+    expect(dots[2].style.backgroundColor).toBe('var(--signal-danger)') // error
+    expect(dots[3].style.backgroundColor).toBe('var(--signal-info)') // claude
     // dead uses CSS variable, check it exists
     expect(dots[4].style.backgroundColor).toBeTruthy()
   })

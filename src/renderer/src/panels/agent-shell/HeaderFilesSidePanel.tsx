@@ -32,7 +32,7 @@ export function HeaderFilesToggleButton({ open, onToggle }: HeaderFilesToggleBut
     background: open
       ? 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
       : hovered
-        ? 'rgba(255, 255, 255, 0.05)'
+        ? 'var(--bg-tint-text)'
         : 'transparent',
     color: open ? colors.accent.default : hovered ? colors.text.primary : colors.text.secondary,
     display: 'inline-flex',

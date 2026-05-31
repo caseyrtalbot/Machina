@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Editor, Range } from '@tiptap/core'
-import { typography, colors, transitions } from '../../../design/tokens'
+import { typography, colors, transitions, borderRadius } from '../../../design/tokens'
 
 export interface SlashCommandItem {
   readonly title: string
@@ -87,7 +87,7 @@ export function SlashCommandList({ items, command }: SlashCommandListProps) {
           className="flex items-center gap-3 text-left"
           style={{
             padding: '8px 12px',
-            backgroundColor: index === selectedIndex ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+            backgroundColor: index === selectedIndex ? 'var(--bg-tint-accent)' : 'transparent',
             border: 'none',
             cursor: 'pointer',
             color: colors.text.primary,
@@ -103,8 +103,8 @@ export function SlashCommandList({ items, command }: SlashCommandListProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 6,
-              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+              borderRadius: borderRadius.inline,
+              backgroundColor: 'var(--bg-tint-text)',
               fontSize: 14,
               flexShrink: 0
             }}

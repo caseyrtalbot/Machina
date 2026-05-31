@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { borderRadius, colors } from '../design/tokens'
+import { borderRadius, colors, floatingPanel } from '../design/tokens'
 
 export interface ContextMenuItem {
   readonly id: string
@@ -81,10 +81,12 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
         left: clamped.x,
         minWidth: MENU_MIN_WIDTH,
         padding: MENU_PADDING,
-        background: colors.bg.elevated,
+        background: floatingPanel.glass.popoverBg,
+        backdropFilter: floatingPanel.glass.popoverBlur,
+        WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
         border: `1px solid ${colors.border.default}`,
         borderRadius: borderRadius.container,
-        boxShadow: '0 6px 20px rgba(0, 0, 0, 0.35)',
+        boxShadow: floatingPanel.shadowCompact,
         zIndex: 1000,
         fontSize: 12
       }}
@@ -107,7 +109,7 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
             textAlign: 'left',
             padding: '6px 10px',
             border: 'none',
-            background: active === i && !item.disabled ? colors.bg.base : 'transparent',
+            background: active === i && !item.disabled ? 'var(--bg-tint-text)' : 'transparent',
             color: item.disabled
               ? colors.text.muted
               : item.destructive

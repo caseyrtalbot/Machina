@@ -1,4 +1,4 @@
-import { colors } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
 
 interface SavedToBadgeProps {
   readonly relativePath: string
@@ -18,7 +18,7 @@ export function SavedToBadge({ relativePath, onOpen }: SavedToBadgeProps) {
       style={{
         backgroundColor: colors.accent.muted,
         color: colors.text.secondary,
-        borderRadius: 4,
+        borderRadius: borderRadius.inline,
         maxWidth: '100%',
         cursor: 'pointer'
       }}

@@ -34,11 +34,13 @@ function StatusPill({
 }) {
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.08em]"
+      className="px-2 py-0.5 text-[10px] uppercase"
       style={{
         color: accentColor,
         backgroundColor: accentColor + '14',
-        border: `1px solid ${accentColor}24`
+        border: `1px solid ${accentColor}24`,
+        letterSpacing: 'var(--label-tracking)',
+        fontFamily: typography.fontFamily.mono
       }}
     >
       {status}
@@ -49,7 +51,7 @@ function StatusPill({
 function StatChip({ label, value }: { readonly label: string; readonly value: string | number }) {
   return (
     <span
-      className="px-1.5 py-0.5 rounded text-[10px]"
+      className="px-1.5 py-0.5 text-[10px]"
       style={{
         backgroundColor: 'rgba(255, 255, 255, 0.04)',
         color: colors.text.muted,
@@ -115,7 +117,7 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
         {/* Header: kind badge + status */}
         <div className="flex items-center gap-2">
           <span
-            className="shrink-0 flex items-center justify-center rounded text-[10px] font-bold"
+            className="shrink-0 flex items-center justify-center text-[10px] font-bold"
             style={{
               width: 24,
               height: 24,
@@ -163,7 +165,7 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
           {kind === 'pattern' && meta.hasSnapshot && (
             <button
               onClick={handleRestore}
-              className="px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-colors"
+              className="px-1.5 py-0.5 text-[10px] cursor-pointer transition-colors"
               style={{
                 backgroundColor: accentColor + '14',
                 color: accentColor,

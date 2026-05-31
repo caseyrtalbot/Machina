@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors, borderRadius, typography, zIndex } from '../design/tokens'
+import {
+  colors,
+  borderRadius,
+  typography,
+  transitions,
+  floatingPanel,
+  zIndex
+} from '../design/tokens'
 import { ACCENT_PRESETS, type AccentId } from '../design/accent-presets'
 import { FontPicker } from './FontPicker'
 
@@ -91,7 +98,7 @@ function Toggle({ value, onChange, ariaLabel }: ToggleProps) {
           borderRadius: borderRadius.inline,
           backgroundColor: value ? colors.accent.default : colors.text.muted,
           left: value ? 'calc(100% - 15px)' : 3,
-          transition: 'left 150ms ease-out, background-color 150ms ease-out'
+          transition: `left ${transitions.hover}, background-color ${transitions.hover}`
         }}
       />
     </button>
@@ -114,7 +121,7 @@ function SelectInput({ value, options, onChange }: SelectInputProps) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="settings-select text-xs rounded"
+      className="settings-select text-xs"
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
@@ -174,15 +181,15 @@ function SegmentedControl<T extends string>({
             style={{
               padding: '4px 10px',
               fontFamily: typography.fontFamily.mono,
-              fontSize: 11,
-              letterSpacing: '0.06em',
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
               textTransform: 'uppercase',
               color: active ? 'var(--color-accent-default)' : colors.text.secondary,
               background: active ? 'var(--bg-tint-accent)' : 'transparent',
               border: 'none',
               borderLeft: i === 0 ? 'none' : `1px solid ${colors.border.subtle}`,
               cursor: 'pointer',
-              transition: 'color 120ms ease-out, background 120ms ease-out'
+              transition: `color ${transitions.fast}, background ${transitions.fast}`
             }}
           >
             {opt.label}
@@ -226,7 +233,7 @@ function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps
               background: p.hex,
               border: `1px solid ${active ? colors.text.primary : colors.border.default}`,
               cursor: 'pointer',
-              transition: 'border-color 120ms ease-out'
+              transition: `border-color ${transitions.fast}`
             }}
           />
         )
@@ -338,7 +345,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         zIndex: zIndex.modal,
         opacity: isOpen ? 1 : 0,
         pointerEvents: isOpen ? 'auto' : 'none',
-        transition: 'opacity 180ms ease-out'
+        transition: `opacity ${transitions.modalFade}`
       }}
     >
       {/* Scrim — click to dismiss */}
@@ -359,9 +366,9 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
           backgroundColor: colors.bg.base,
           border: `1px solid ${colors.border.subtle}`,
           borderRadius: borderRadius.container,
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6)',
+          boxShadow: floatingPanel.shadow,
           transform: isOpen ? 'scale(1)' : 'scale(0.98)',
-          transition: 'transform 180ms ease-out'
+          transition: `transform ${transitions.surface}`
         }}
       >
         {/* Header */}
@@ -444,7 +451,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                 spellCheck={false}
                 aria-label="Custom accent hex"
                 placeholder="#ffb454"
-                className="settings-input text-xs rounded"
+                className="settings-input text-xs"
                 style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
               />
             </div>

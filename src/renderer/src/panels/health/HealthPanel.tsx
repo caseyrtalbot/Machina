@@ -86,7 +86,7 @@ function RefreshButton() {
         justifyContent: 'center',
         width: 24,
         height: 24,
-        borderRadius: 5,
+        borderRadius: 0,
         border: 'none',
         background: 'transparent',
         color: colors.text.muted,
@@ -261,9 +261,9 @@ function DegradedState({ issues }: { readonly issues: readonly HealthIssue[] }) 
           <SectionLabel
             as="h3"
             style={{
-              padding: '14px 0 6px',
+              padding: '12px 0 8px',
               borderBottom: '1px solid var(--line-faint)',
-              marginBottom: 2,
+              marginBottom: 4,
               marginTop: 0
             }}
           >

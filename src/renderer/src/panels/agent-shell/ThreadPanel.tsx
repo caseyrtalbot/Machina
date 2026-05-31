@@ -3,7 +3,7 @@ import { useThreadStore } from '../../store/thread-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { colors, borderRadius, transitions, typography } from '../../design/tokens'
+import { colors, borderRadius, transitions, typography, floatingPanel } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
@@ -160,7 +160,7 @@ function EmptyState() {
         justifyContent: 'flex-start',
         height: '100%',
         padding: '18% 32px 0',
-        gap: 14,
+        gap: 12,
         boxSizing: 'border-box'
       }}
     >
@@ -234,7 +234,7 @@ function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
         right: 20,
         width: 28,
         height: 28,
-        borderRadius: borderRadius.round,
+        borderRadius: borderRadius.inline,
         background: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,
         color: colors.text.secondary,
@@ -243,7 +243,7 @@ function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: 0,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        boxShadow: floatingPanel.shadowCompact,
         transition: `color ${transitions.fast}, border-color ${transitions.fast}`
       }}
     >
@@ -298,7 +298,7 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
         style={{
           width: 22,
           height: 12,
-          borderRadius: borderRadius.pill,
+          borderRadius: borderRadius.inline,
           background: on
             ? colors.accent.default
             : 'color-mix(in srgb, var(--color-text-primary) 18%, transparent)',
@@ -314,7 +314,7 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
             left: on ? 12 : 2,
             width: 8,
             height: 8,
-            borderRadius: '50%',
+            borderRadius: borderRadius.inline,
             background: on ? colors.bg.base : colors.text.primary,
             transition: `left ${transitions.fast}, background ${transitions.fast}`
           }}

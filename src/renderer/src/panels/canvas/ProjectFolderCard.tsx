@@ -66,7 +66,7 @@ function ProjectFolderCard({ node }: ProjectFolderCardProps) {
               style={{
                 fontSize: '11px',
                 padding: '1px 6px',
-                borderRadius: '10px',
+                borderRadius: 'var(--r-inline)',
                 background: colors.bg.surface,
                 color: colors.text.secondary,
                 fontWeight: 500,

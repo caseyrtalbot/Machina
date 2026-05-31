@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useSettingsStore } from '@renderer/store/settings-store'
-import { colors } from '@renderer/design/tokens'
+import { colors, floatingPanel, typography } from '@renderer/design/tokens'
 import type { ForceParams } from './graph-types'
 import { DEFAULT_FORCE_PARAMS } from './graph-types'
 
@@ -96,8 +96,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="flex flex-col gap-2">
       <div
-        className="text-xs font-semibold uppercase tracking-wider"
-        style={{ color: colors.text.muted, fontSize: 10, letterSpacing: '1.5px' }}
+        className="font-semibold"
+        style={{
+          color: colors.text.muted,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform
+        }}
       >
         {title}
       </div>
@@ -158,13 +164,14 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
 
   return (
     <div
-      className="absolute top-12 right-3 z-10 flex flex-col gap-4 overflow-y-auto rounded-lg"
+      className="absolute top-12 right-3 z-10 flex flex-col gap-4 overflow-y-auto"
       style={{
         width: 240,
         maxHeight: 'calc(100% - 24px)',
         padding: '16px 14px',
-        backgroundColor: 'rgba(20, 20, 20, 0.92)',
-        backdropFilter: 'blur(12px)',
+        backgroundColor: floatingPanel.glass.bg,
+        backdropFilter: floatingPanel.glass.blur,
+        boxShadow: floatingPanel.shadow,
         border: '1px solid var(--color-border-default)',
         scrollbarWidth: 'thin',
         scrollbarColor: 'var(--color-border-default) transparent'
@@ -182,7 +189,7 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
           style={{
             width: 6,
             height: 6,
-            backgroundColor: settled ? '#34d399' : '#fbbf24'
+            backgroundColor: settled ? 'var(--signal-success)' : 'var(--signal-warn)'
           }}
           title={settled ? 'Settled' : `Simulating (${(alpha * 100).toFixed(0)}%)`}
         />

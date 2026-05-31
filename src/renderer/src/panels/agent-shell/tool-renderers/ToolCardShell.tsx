@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, MouseEventHandler, ReactNode, Ref } from 'react'
-import { borderRadius, colors } from '../../../design/tokens'
+import { colors } from '../../../design/tokens'
 
 type ToolCardVariant = 'pill' | 'block' | 'error'
 
@@ -70,7 +70,7 @@ export function ToolCardShell({
         alignItems,
         marginTop: 8,
         padding,
-        borderRadius: isError ? borderRadius.tool : 0,
+        borderRadius: 0,
         background: isError ? ERROR_BG : 'transparent',
         border: isError ? `1px solid ${ERROR_BORDER}` : '1px solid transparent',
         fontSize: 12,

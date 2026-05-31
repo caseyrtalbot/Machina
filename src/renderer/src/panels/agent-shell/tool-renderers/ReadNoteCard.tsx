@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { borderRadius, colors, typography } from '../../../design/tokens'
+import { borderRadius, colors, floatingPanel, typography } from '../../../design/tokens'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
@@ -216,7 +216,7 @@ function ReadNotePreview({
     background: colors.bg.elevated,
     border: `1px solid ${colors.border.default}`,
     borderRadius: borderRadius.container,
-    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.45)',
+    boxShadow: floatingPanel.shadow,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -233,7 +233,7 @@ function ReadNotePreview({
           borderBottom: `1px solid ${colors.border.subtle}`,
           fontFamily: typography.fontFamily.mono,
           fontSize: 10,
-          letterSpacing: '0.06em',
+          letterSpacing: 'var(--label-tracking)',
           textTransform: 'uppercase',
           color: colors.text.muted,
           whiteSpace: 'nowrap',

@@ -95,18 +95,18 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
         <div
           className="flex items-center justify-between px-3 py-1.5 shrink-0"
           style={{
-            backgroundColor: 'rgba(234, 179, 8, 0.12)',
-            borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
-            color: '#eab308'
+            backgroundColor: 'color-mix(in srgb, var(--signal-warn) 12%, transparent)',
+            borderBottom: '1px solid color-mix(in srgb, var(--signal-warn) 30%, transparent)',
+            color: 'var(--signal-warn)'
           }}
         >
           <span className="text-xs">File changed externally</span>
           <span className="flex gap-1.5">
             <button
-              className="text-xs px-1.5 py-0.5 rounded cursor-pointer"
+              className="text-xs px-2 py-1 cursor-pointer"
               style={{
-                backgroundColor: 'rgba(234, 179, 8, 0.2)',
-                color: '#eab308',
+                backgroundColor: 'color-mix(in srgb, var(--signal-warn) 20%, transparent)',
+                color: 'var(--signal-warn)',
                 border: 'none'
               }}
               onClick={() => doc.resolveConflict('disk')}
@@ -114,7 +114,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
               Reload
             </button>
             <button
-              className="text-xs px-1.5 py-0.5 rounded cursor-pointer"
+              className="text-xs px-2 py-1 cursor-pointer"
               style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.06)',
                 color: colors.text.secondary,
@@ -144,13 +144,13 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {dirPath && (
-            <span className="text-xs shrink-0" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
+            <span className="text-xs shrink-0" style={{ color: colors.text.muted }}>
               {dirPath}/
             </span>
           )}
           <span
             className="text-xs truncate"
-            style={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 500 }}
+            style={{ color: colors.text.secondary, fontWeight: 500 }}
           >
             {filename}
           </span>
@@ -161,7 +161,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
             e.stopPropagation()
             closeSplit()
           }}
-          className="canvas-split-editor__close flex items-center justify-center rounded cursor-pointer shrink-0"
+          className="canvas-split-editor__close flex items-center justify-center cursor-pointer shrink-0"
           style={{
             width: 24,
             height: 24,

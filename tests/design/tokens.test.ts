@@ -37,11 +37,13 @@ describe('design tokens', () => {
 
 describe('extended design tokens', () => {
   it('has border-radius constants', () => {
-    // Console-direction radii: hairline-square. See `tokens.ts`.
-    expect(borderRadius.container).toBe(4)
-    expect(borderRadius.inline).toBe(2)
-    expect(borderRadius.tool).toBe(4)
+    // Console-direction radii: KNIFE-EDGE (all rectangular surfaces 0). See `tokens.ts`.
+    expect(borderRadius.container).toBe(0)
+    expect(borderRadius.inline).toBe(0)
+    expect(borderRadius.tool).toBe(0)
     expect(borderRadius.card).toBe(0)
+    // Exceptions that stay curved: pill (toggle tracks) + round (dots/knobs/avatars).
+    expect(borderRadius.pill).toBe(999)
     expect(borderRadius.round).toBe('50%')
   })
 

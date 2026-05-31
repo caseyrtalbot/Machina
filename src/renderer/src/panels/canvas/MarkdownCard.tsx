@@ -122,7 +122,7 @@ export function MarkdownCard({ node }: MarkdownCardProps) {
           </span>
           <button
             onClick={toggleMode}
-            className="text-xs px-2 py-0.5 rounded"
+            className="text-xs px-2 py-0.5"
             style={{
               backgroundColor: colors.accent.muted,
               color: colors.text.secondary

@@ -2,7 +2,7 @@ import { useEffect, useCallback, useRef } from 'react'
 import { Terminal, UserCircle, CheckCircle, Copy, ArrowSquareOut } from '@phosphor-icons/react'
 import { useClaudeStatus } from '../hooks/use-claude-status'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors } from '../design/tokens'
+import { colors, floatingPanel } from '../design/tokens'
 
 const RECHECK_INTERVAL_MS = 5_000
 const AUTO_DISMISS_MS = 2_000
@@ -23,7 +23,7 @@ function CodeSnippet({ code }: { code: string }) {
 
   return (
     <div
-      className="flex items-center justify-between rounded px-3 py-2 mt-3"
+      className="flex items-center justify-between px-3 py-2 mt-3"
       style={{
         backgroundColor: 'rgba(255, 255, 255, 0.04)',
         border: `1px solid ${colors.border.subtle}`,
@@ -34,10 +34,16 @@ function CodeSnippet({ code }: { code: string }) {
       <code style={{ color: colors.text.primary }}>{code}</code>
       <button
         onClick={handleCopy}
-        className="ml-3 p-1 rounded hover:bg-white/10 transition-colors"
+        className="ml-3 p-1 transition-colors"
         title="Copy to clipboard"
         aria-label="Copy to clipboard"
         style={{ color: colors.text.muted }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--bg-tint-text)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent'
+        }}
       >
         <Copy size={14} />
       </button>
@@ -61,7 +67,7 @@ function InstallStep() {
       </p>
       <button
         onClick={handleOpenDocs}
-        className="mt-4 flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors"
+        className="mt-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.06)',
           border: `1px solid ${colors.border.subtle}`,
@@ -182,14 +188,14 @@ export function OnboardingOverlay() {
     >
       <div
         ref={panelRef}
-        className="te-popover-enter rounded-md overflow-hidden"
+        className="te-popover-enter overflow-hidden"
         style={{
           width: 340,
           backgroundColor: 'rgba(8, 8, 12, 0.88)',
-          backdropFilter: 'blur(24px) saturate(1.3)',
-          WebkitBackdropFilter: 'blur(24px) saturate(1.3)',
+          backdropFilter: floatingPanel.glass.blur,
+          WebkitBackdropFilter: floatingPanel.glass.blur,
           border: `1px solid ${colors.border.subtle}`,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+          boxShadow: floatingPanel.shadow
         }}
       >
         <div className="px-6 py-6">

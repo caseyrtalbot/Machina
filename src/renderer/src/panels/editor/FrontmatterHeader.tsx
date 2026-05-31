@@ -421,7 +421,7 @@ export function FrontmatterHeader({
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
             color: colors.text.muted,
-            letterSpacing: '0.08em'
+            letterSpacing: typography.metadata.letterSpacing
           }}
         >
           <span style={{ textTransform: 'uppercase' }}>

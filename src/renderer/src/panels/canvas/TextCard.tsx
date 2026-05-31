@@ -119,7 +119,7 @@ function TextCardImpl({ node }: TextCardProps) {
             <span />
           )}
           {errorMsg && (
-            <span className="text-[10px]" style={{ color: '#c44' }} role="alert">
+            <span className="text-[10px]" style={{ color: 'var(--signal-danger)' }} role="alert">
               {errorMsg}
             </span>
           )}

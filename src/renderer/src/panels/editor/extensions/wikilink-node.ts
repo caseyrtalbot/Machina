@@ -59,7 +59,7 @@ export const WikilinkNode = Node.create<WikilinkNodeOptions>({
         'data-wikilink-target': target,
         class: 'te-wikilink',
         style:
-          'color: var(--color-accent-default); cursor: pointer; background: rgba(255,255,255,0.04); padding: 1px 4px; border-radius: 3px;'
+          'color: var(--color-accent-default); cursor: pointer; background: rgba(255,255,255,0.04); padding: 1px 4px; border-radius: 0;'
       }),
       alias ?? target
     ]

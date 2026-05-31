@@ -334,9 +334,11 @@ function SystemArtifactCollections({
                       </span>
                       {item.status && (
                         <span
-                          className="block truncate uppercase tracking-[0.08em]"
+                          className="block truncate uppercase"
                           style={{
                             color: colors.text.muted,
+                            fontFamily: typography.fontFamily.mono,
+                            letterSpacing: 'var(--label-tracking)',
                             fontSize: 'var(--env-sidebar-tertiary-font-size)'
                           }}
                         >

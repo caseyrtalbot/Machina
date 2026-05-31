@@ -288,7 +288,7 @@ export function DockTabBar({
                 color: isActive ? colors.tab.fgActive : colors.tab.fg,
                 fontFamily: typography.fontFamily.mono,
                 fontSize: typography.metadata.size,
-                letterSpacing: '0.06em',
+                letterSpacing: typography.metadata.letterSpacing,
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 outline: 'none',

@@ -178,6 +178,14 @@ export const typography = {
     size: '10px',
     letterSpacing: '0.14em',
     textTransform: 'uppercase' as const
+  },
+  // Sub-10px label for the densest chrome (calendar weekday, palette tag).
+  // Reach for this only where `metadata` (10px) won't fit; bump everything
+  // else up to 10px rather than minting new sub-token sizes.
+  microLabel: {
+    size: '9px',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const
   }
 } as const
 
@@ -201,19 +209,23 @@ export const transitions = {
   commandPalette: '150ms ease-out'
 } as const
 
-// Console-direction radii: hairline-square. Cards sit flat (0px), pills and
-// inline chips get a 2px hint, tool/container surfaces stay at 4px so panels
-// don't feel knife-edged. Reach for `card: 0` for canvas cards and modal
-// surfaces; `inline: 2` for pills/chips/tabs; `tool: 4` for tool cards and
-// toolbars; `container: 4` for panel-level containers.
+// Console-direction radii: KNIFE-EDGE. Every rectangular surface sits flat at
+// 0 (cards, pills, chips, tabs, buttons, inputs, tool cards, toolbars,
+// containers). Only `pill` (toggle tracks) and `round` (dots / knobs / avatars)
+// stay curved. Wired to the `--r-*` CSS vars via RADII_VARS.square in themes.ts.
 export const borderRadius = {
-  container: 4,
-  inline: 2,
-  tool: 4,
+  container: 0,
+  inline: 0,
+  tool: 0,
   card: 0,
   pill: 999,
   round: '50%'
 } as const
+
+// Shared icon geometry. One stroke weight + two sizes so every Lucide icon
+// reads at the same density. Pull these instead of per-call strokeWidth/size.
+export const iconStroke = 1.5
+export const iconSize = { sm: 14, md: 16 } as const
 
 /**
  * Z-index scale. Higher numbers paint on top.
@@ -252,7 +264,7 @@ export const canvasTokens = {
   cardBorder: 'var(--canvas-card-border)',
   textHeading: 'var(--canvas-text-heading)',
   blockquoteBar: 'var(--canvas-blockquote-bar)',
-  cardRadius: 6,
+  cardRadius: 0,
   contentPadding: 24,
   badgeGreen: '#4caf50',
   linkCyan: '#5cb8c4',
@@ -269,9 +281,12 @@ export const canvasTokens = {
 } as const
 
 export const floatingPanel = {
-  borderRadius: 12,
+  borderRadius: 0,
   shadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4)',
   shadowCompact: '0 4px 16px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.25)',
+  // Single tokenized depth tier for canvas cards (JC10) — one subtle drop,
+  // replacing the ad-hoc multi-layer shadows. Emitted as `--shadow-card`.
+  shadowCard: '0 2px 8px rgba(0,0,0,0.35)',
   glass: {
     bg: 'rgba(4, 4, 8, 0.90)',
     blur: 'blur(24px) saturate(1.4)',

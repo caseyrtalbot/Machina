@@ -101,7 +101,7 @@ export function BooleanInput({ value, onChange }: BooleanInputProps) {
           height: 10,
           borderRadius: borderRadius.inline,
           backgroundColor: value ? colors.accent.default : colors.text.muted,
-          transition: 'left 0.15s ease'
+          transition: `left ${transitions.fast}`
         }}
       />
     </button>
@@ -399,12 +399,12 @@ export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps
         onClick={() => setOpen(!open)}
         style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: '8px',
-          letterSpacing: '0.1em',
+          fontSize: typography.microLabel.size,
+          letterSpacing: typography.microLabel.letterSpacing,
           color: colors.text.muted,
           opacity: triggerVisible ? 0.5 : 0,
           pointerEvents: triggerVisible ? 'auto' : 'none',
-          textTransform: 'uppercase',
+          textTransform: typography.microLabel.textTransform,
           background: 'none',
           border: 'none',
           cursor: 'pointer',

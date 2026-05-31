@@ -398,7 +398,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
             </p>
             <button
               onClick={handleRestart}
-              className="text-xs px-3 py-1 rounded border"
+              className="text-xs px-3 py-1 border"
               style={{
                 borderColor: colors.border.default,
                 color: colors.accent.default

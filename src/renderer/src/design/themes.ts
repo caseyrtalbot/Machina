@@ -14,8 +14,8 @@ export const CHROME_BG_HEX = '#050508'
  * Drives `--row-h`, `--ui-fs`, `--ui-fs-sm`, and panel padding. */
 export type Density = 'compact' | 'default' | 'comfy'
 
-/** Card / button / pill corner radii. `square` is the Linear-precision
- * default (0px / 2px / 4px); `soft` rounds everything off (6px / 4px / 8px). */
+/** Card / button / pill corner radii. `square` is the Console knife-edge
+ * default (all 0px); `soft` rounds everything off (6px / 4px / 8px). */
 export type Radii = 'square' | 'soft'
 
 /** Background tint variant. `pure` is true #000; `near-black` is a cool
@@ -153,13 +153,13 @@ export const DENSITY_VARS: Record<Density, Record<string, string>> = {
   }
 }
 
-/** Radii presets. `square` matches the Linear hairline-square direction;
- * `soft` is the rounded-corner alternate. */
+/** Radii presets. `square` is the knife-edge direction (all 0px); `soft`
+ * is the rounded-corner alternate. */
 export const RADII_VARS: Record<Radii, Record<string, string>> = {
   square: {
     '--r-card': '0px',
-    '--r-inline': '2px',
-    '--r-tool': '4px'
+    '--r-inline': '0px',
+    '--r-tool': '0px'
   },
   soft: {
     '--r-card': '6px',

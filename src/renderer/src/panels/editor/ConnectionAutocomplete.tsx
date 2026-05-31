@@ -99,7 +99,7 @@ export function ConnectionAutocomplete({
 
   return (
     <div
-      className="absolute left-0 top-full mt-1 z-30 rounded-md shadow-lg overflow-hidden"
+      className="absolute left-0 top-full mt-1 z-30 shadow-lg overflow-hidden"
       style={{
         backgroundColor: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,

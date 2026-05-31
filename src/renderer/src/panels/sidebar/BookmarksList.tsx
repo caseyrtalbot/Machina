@@ -1,7 +1,15 @@
 import { useState } from 'react'
+import { Star } from 'lucide-react'
 import { useUiStore } from '../../store/ui-store'
 import { useVaultStore } from '../../store/vault-store'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
+import {
+  borderRadius,
+  colors,
+  iconSize,
+  iconStroke,
+  transitions,
+  typography
+} from '../../design/tokens'
 
 interface BookmarksListProps {
   activeFilePath: string | null
@@ -91,15 +99,12 @@ export function BookmarksList({ activeFilePath, onFileSelect }: BookmarksListPro
                 }}
                 title={`${item.path}\nRight-click to remove`}
               >
-                <span
+                <Star
                   className="shrink-0"
-                  style={{
-                    color: isActive ? colors.accent.default : colors.text.muted,
-                    fontSize: 'var(--env-sidebar-tertiary-font-size)'
-                  }}
-                >
-                  ★
-                </span>
+                  size={iconSize.sm}
+                  strokeWidth={iconStroke}
+                  color={isActive ? colors.accent.default : colors.text.muted}
+                />
                 <span
                   className="truncate flex-1"
                   style={{

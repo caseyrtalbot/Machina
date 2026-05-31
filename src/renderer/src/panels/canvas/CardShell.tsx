@@ -3,7 +3,14 @@ import { createPortal } from 'react-dom'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
-import { borderRadius, colors, canvasTokens, transitions, typography } from '../../design/tokens'
+import {
+  borderRadius,
+  colors,
+  canvasTokens,
+  floatingPanel,
+  transitions,
+  typography
+} from '../../design/tokens'
 import { useEnv } from '../../design/Theme'
 import {
   startConnectionDrag,
@@ -97,7 +104,7 @@ function ConvertMenu({
         border: `1px solid ${colors.border.default}`,
         borderRadius: canvasTokens.cardRadius,
         zIndex: 50,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        boxShadow: floatingPanel.shadowCompact
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -170,7 +177,7 @@ function TitleBarButton({
         opacity: 0.4,
         cursor: 'pointer',
         padding: '0 2px',
-        borderRadius: 4
+        borderRadius: borderRadius.tool
       }}
       aria-label={label}
       title={label}
@@ -309,12 +316,12 @@ export function CardShell({
             ? '1px solid color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border))'
             : `1px solid ${canvasTokens.cardBorder}`,
         boxShadow: isLocked
-          ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 32%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 18px 36px rgba(0, 0, 0, 0.32)'
+          ? `0 0 0 1px color-mix(in srgb, var(--color-accent-default) 32%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, ${floatingPanel.shadowCard}`
           : isFocused
-            ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 26%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 14px 30px rgba(0, 0, 0, 0.28)'
+            ? `0 0 0 1px color-mix(in srgb, var(--color-accent-default) 26%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, ${floatingPanel.shadowCard}`
             : isSelected
-              ? '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 42%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 26px rgba(0, 0, 0, 0.24)'
-              : '0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 22px rgba(0, 0, 0, 0.22)',
+              ? `0 0 0 1px color-mix(in srgb, var(--color-accent-default) 42%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, ${floatingPanel.shadowCard}`
+              : `0 1px 0 rgba(255,255,255,0.03) inset, ${floatingPanel.shadowCard}`,
         overflow: 'hidden',
         contain: isTerminalCard ? undefined : 'layout style',
         backdropFilter:
@@ -323,8 +330,7 @@ export function CardShell({
           isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.4)`,
         ...(isActive
           ? ({
-              '--activity-color': 'rgba(167, 139, 250, 0.3)',
-              animation: 'te-card-glow 2s ease-in-out infinite'
+              boxShadow: `0 0 0 1px var(--color-accent-line), ${floatingPanel.shadowCard}`
             } as React.CSSProperties)
           : {})
       }}
@@ -345,12 +351,12 @@ export function CardShell({
       <div
         className="canvas-card__titlebar flex items-center justify-between shrink-0 select-none"
         style={{
-          padding: '7px 11px',
+          padding: '8px 12px',
           background: isTerminalCard
             ? 'linear-gradient(180deg, rgba(3, 3, 5, 0.96), rgba(3, 3, 5, 0.9))'
             : `color-mix(in srgb, var(--canvas-card-bg) 70%, var(--color-bg-elevated))`,
           borderBottom: `1px solid ${canvasTokens.cardBorder}`,
-          borderRadius: `${borderRadius.tool - 1}px ${borderRadius.tool - 1}px 0 0`,
+          borderRadius: 0,
           cursor: 'grab'
         }}
         onPointerDown={onDragStart}
@@ -393,14 +399,14 @@ export function CardShell({
           <span
             className="canvas-card__badge shrink-0 ml-2"
             style={{
-              color: '#818cf8',
+              color: 'var(--color-accent-default)',
               fontSize: 9,
               fontFamily: typography.fontFamily.mono,
               letterSpacing: '0.14em',
               padding: '1px 6px',
               borderRadius: borderRadius.inline,
-              border: '1px solid color-mix(in srgb, #818cf8 32%, transparent)',
-              background: 'color-mix(in srgb, #818cf8 10%, transparent)'
+              border: '1px solid color-mix(in srgb, var(--color-accent-default) 32%, transparent)',
+              background: 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
             }}
           >
             PROJECT
@@ -501,7 +507,7 @@ export function CardShell({
               opacity: 0.4,
               cursor: 'pointer',
               padding: '0 2px',
-              borderRadius: 4,
+              borderRadius: borderRadius.tool,
               border: 'none',
               background: 'none'
             }}
@@ -548,9 +554,11 @@ export function CardShell({
             top: 0,
             bottom: 0,
             width: 2,
-            borderRadius: `${borderRadius.tool - 1}px 0 0 ${borderRadius.tool - 1}px`,
+            borderRadius: 0,
             backgroundColor:
-              origin === 'source' ? 'rgba(96, 165, 250, 0.5)' : 'rgba(74, 222, 128, 0.4)',
+              origin === 'source'
+                ? 'color-mix(in srgb, var(--signal-info) 50%, transparent)'
+                : 'color-mix(in srgb, var(--signal-success) 40%, transparent)',
             pointerEvents: 'none',
             zIndex: 6
           }}
@@ -577,7 +585,7 @@ export function CardShell({
             position: 'absolute',
             width: 8,
             height: 8,
-            borderRadius: 2,
+            borderRadius: 0,
             backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 74%, white 26%)',
             boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)',
             cursor: 'crosshair',

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { colors, borderRadius, typography } from '../design/tokens'
+import { colors, borderRadius, typography, floatingPanel } from '../design/tokens'
 import {
   ALL_FONT_OPTIONS,
   FONT_CATEGORIES,
@@ -140,7 +140,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
             backgroundColor: colors.bg.elevated,
             border: `1px solid ${colors.border.strong}`,
             borderRadius: borderRadius.tool,
-            boxShadow: '0 24px 48px rgba(0,0,0,0.6)'
+            boxShadow: floatingPanel.shadow
           }}
         >
           {/* Search input */}

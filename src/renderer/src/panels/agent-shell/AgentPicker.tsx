@@ -68,9 +68,7 @@ export function AgentPicker({
               padding: '6px 10px',
               cursor: 'pointer',
               borderRadius: borderRadius.inline,
-              background: isActive
-                ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
-                : 'transparent',
+              background: isActive ? 'var(--bg-tint-accent)' : 'transparent',
               color: isActive ? colors.accent.default : colors.text.secondary,
               fontFamily: typography.fontFamily.mono,
               fontSize: typography.metadata.size,

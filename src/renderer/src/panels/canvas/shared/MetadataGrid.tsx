@@ -12,7 +12,7 @@ interface MetadataGridProps {
 const pillStyle: React.CSSProperties = {
   display: 'inline-block',
   padding: '1px 8px',
-  borderRadius: 10,
+  borderRadius: 0,
   fontSize: 11,
   fontFamily: typography.fontFamily.mono,
   backgroundColor: 'rgba(255, 255, 255, 0.06)',
@@ -68,10 +68,10 @@ export function MetadataGrid({ entries }: MetadataGridProps) {
           <span
             style={{
               fontFamily: typography.fontFamily.mono,
-              fontSize: 11,
+              fontSize: 10,
               color: 'var(--color-text-secondary)',
               textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              letterSpacing: 'var(--label-tracking)',
               lineHeight: 1.8,
               userSelect: 'none',
               whiteSpace: 'nowrap'

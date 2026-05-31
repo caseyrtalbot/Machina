@@ -33,7 +33,7 @@ export async function createEditorExtensions(
     EditorView.theme({
       '&': { height: '100%', fontSize },
       '.cm-scroller': {
-        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        fontFamily: 'var(--font-code)',
         overflow: 'auto'
       },
       '.cm-content': { padding: contentPadding }

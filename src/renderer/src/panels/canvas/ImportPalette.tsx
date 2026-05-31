@@ -185,7 +185,7 @@ export function ImportPalette({
               color: colors.text.muted,
               background: 'rgba(255, 255, 255, 0.06)',
               padding: '2px 6px',
-              borderRadius: 4,
+              borderRadius: borderRadius.inline,
               border: `1px solid ${colors.border.subtle}`
             }}
           >
@@ -319,7 +319,7 @@ function PaletteRow({
         opacity: disabled ? 0.5 : 1
       }}
       onMouseEnter={(e) => {
-        if (!disabled) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+        if (!disabled) e.currentTarget.style.background = 'var(--bg-tint-text)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent'
@@ -344,7 +344,7 @@ function CountBadge({
         color: colors.text.muted,
         background: colors.accent.muted,
         padding: '1px 7px',
-        borderRadius: 10,
+        borderRadius: borderRadius.inline,
         marginLeft: 'auto',
         flexShrink: 0
       }}

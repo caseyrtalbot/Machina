@@ -14,7 +14,7 @@ import {
   Zap,
   type LucideIcon
 } from 'lucide-react'
-import { colors } from '../../design/tokens'
+import { colors, borderRadius, floatingPanel } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNodeType, type CanvasNode } from '@shared/canvas-types'
 
 interface CanvasContextMenuProps {
@@ -111,7 +111,7 @@ export function CanvasContextMenu({
         gridTemplateColumns: `${ICON_PX + 4}px 1fr auto`
       }}
       onMouseEnter={(e) => {
-        ;(e.currentTarget as HTMLElement).style.backgroundColor = colors.accent.muted
+        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-tint-text)'
       }}
       onMouseLeave={(e) => {
         ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
@@ -142,13 +142,13 @@ export function CanvasContextMenu({
       style={{
         left: x,
         top: y,
-        backgroundColor: colors.bg.elevated,
+        backgroundColor: floatingPanel.glass.popoverBg,
         borderColor: colors.border.default,
-        borderRadius: 8,
+        borderRadius: borderRadius.card,
         minWidth: 220,
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)'
+        boxShadow: floatingPanel.shadowCompact,
+        backdropFilter: floatingPanel.glass.popoverBlur,
+        WebkitBackdropFilter: floatingPanel.glass.popoverBlur
       }}
     >
       {MENU_SECTIONS.map((section) => {

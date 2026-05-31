@@ -74,8 +74,7 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         style={{
           backgroundColor: floatingPanel.glass.bg,
           backdropFilter: floatingPanel.glass.blur,
-          // Console-direction: hairline border on a near-square chrome surface.
-          // Tool radius (4px) keeps shadow corners clean; full square felt knife-edged.
+          // Console-direction: hairline border on a knife-edge chrome surface.
           border: `1px solid ${colors.border.default}`,
           borderRadius: borderRadius.tool,
           boxShadow: floatingPanel.shadowCompact
@@ -110,7 +109,7 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
           onClick={() => editor.chain().focus().toggleCode().run()}
           title="Inline code (Cmd+E)"
         >
-          <span style={{ fontFamily: 'monospace', fontSize: 12 }}>&lt;/&gt;</span>
+          <span style={{ fontFamily: typography.fontFamily.mono, fontSize: 12 }}>&lt;/&gt;</span>
         </FormatButton>
 
         <FormatButton
@@ -120,7 +119,7 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         >
           <span
             style={{
-              backgroundColor: 'color-mix(in srgb, #dfa11a 30%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--signal-warn) 30%, transparent)',
               padding: '0 3px',
               borderRadius: borderRadius.inline,
               fontSize: 12,

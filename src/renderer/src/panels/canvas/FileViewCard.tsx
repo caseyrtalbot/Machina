@@ -295,7 +295,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
           )}
           {!loading && error && (
             <div style={{ padding: 28 }}>
-              <span className="text-sm" style={{ color: '#ef4444' }}>
+              <span className="text-sm" style={{ color: 'var(--signal-danger)' }}>
                 {error}
               </span>
             </div>

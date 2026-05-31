@@ -104,7 +104,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
         }),
         EditorView.theme({
           '&': { height: '100%', fontSize: '14px' },
-          '.cm-scroller': { fontFamily: '"JetBrains Mono", monospace' },
+          '.cm-scroller': { fontFamily: 'var(--font-code)' },
           '.cm-content': { padding: '16px 0' }
         })
       ]

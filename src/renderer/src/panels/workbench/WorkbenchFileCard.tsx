@@ -65,13 +65,13 @@ export function WorkbenchFileCard({ node }: WorkbenchFileCardProps) {
       <div
         className="flex items-center gap-2 px-2.5 py-2 h-full workbench-file-card-enter"
         style={{
-          boxShadow: isActive ? `0 0 12px 2px ${langColor}44` : undefined,
+          boxShadow: isActive ? `0 0 0 1px ${colors.accent.line}` : undefined,
           transition: `box-shadow ${transitions.surface}`
         }}
       >
         {/* Language icon */}
         <div
-          className="shrink-0 flex items-center justify-center rounded text-[10px] font-bold"
+          className="shrink-0 flex items-center justify-center text-[10px] font-bold"
           style={{
             width: 28,
             height: 28,
@@ -102,7 +102,7 @@ export function WorkbenchFileCard({ node }: WorkbenchFileCardProps) {
         {/* Touch count badge */}
         {touchCount > 0 && (
           <div
-            className="shrink-0 flex items-center justify-center rounded-full text-[10px] font-semibold"
+            className="shrink-0 flex items-center justify-center text-[10px] font-semibold"
             style={{
               minWidth: 20,
               height: 20,

@@ -345,7 +345,7 @@ export function VaultSelector({
                   setCtxMenu(null)
                 }}
                 className="sidebar-popover-item"
-                style={{ color: '#EF4444' }}
+                style={{ color: 'var(--signal-danger)' }}
               >
                 Remove from History
               </button>

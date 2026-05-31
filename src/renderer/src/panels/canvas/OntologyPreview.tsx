@@ -3,7 +3,15 @@
  * Displays group/card counts and provides Apply / Cancel / Agent actions.
  */
 
-import { colors, typography } from '../../design/tokens'
+import {
+  borderRadius,
+  colors,
+  floatingPanel,
+  getArtifactColor,
+  typography
+} from '../../design/tokens'
+
+const researchHue = getArtifactColor('research')
 
 interface OntologyPreviewProps {
   readonly phase: 'preview' | 'error' | 'loading'
@@ -25,7 +33,7 @@ const barBase: React.CSSProperties = {
   alignItems: 'center',
   gap: 12,
   padding: '8px 16px',
-  borderRadius: 8,
+  borderRadius: borderRadius.tool,
   fontFamily: typography.fontFamily.mono,
   fontSize: 13,
   color: colors.text.primary
@@ -33,7 +41,7 @@ const barBase: React.CSSProperties = {
 
 const btnBase: React.CSSProperties = {
   padding: '4px 12px',
-  borderRadius: 6,
+  borderRadius: borderRadius.tool,
   cursor: 'pointer',
   fontSize: 13
 }
@@ -52,8 +60,8 @@ export function OntologyPreview({
       <div
         style={{
           ...barBase,
-          backgroundColor: 'rgba(239,83,80,0.15)',
-          border: '1px solid rgba(239,83,80,0.3)'
+          backgroundColor: 'color-mix(in srgb, var(--signal-danger) 15%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--signal-danger) 30%, transparent)'
         }}
       >
         <span>{errorMessage ?? 'Failed to organize'}</span>
@@ -77,9 +85,9 @@ export function OntologyPreview({
     <div
       style={{
         ...barBase,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        backdropFilter: 'blur(12px)'
+        backgroundColor: floatingPanel.glass.popoverBg,
+        border: '1px solid var(--line-default)',
+        backdropFilter: floatingPanel.glass.popoverBlur
       }}
     >
       <span style={{ opacity: 0.6 }}>
@@ -89,9 +97,9 @@ export function OntologyPreview({
         onClick={onApply}
         style={{
           ...btnBase,
-          backgroundColor: 'rgba(76,175,80,0.2)',
-          border: '1px solid rgba(76,175,80,0.4)',
-          color: '#66bb6a'
+          backgroundColor: 'color-mix(in srgb, var(--signal-success) 20%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--signal-success) 40%, transparent)',
+          color: 'var(--signal-success)'
         }}
       >
         Apply
@@ -101,7 +109,7 @@ export function OntologyPreview({
         style={{
           ...btnBase,
           backgroundColor: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          border: '1px solid var(--line-default)',
           color: colors.text.secondary
         }}
       >
@@ -112,9 +120,9 @@ export function OntologyPreview({
           onClick={onRunAgent}
           style={{
             ...btnBase,
-            backgroundColor: 'rgba(171,71,188,0.15)',
-            border: '1px solid rgba(171,71,188,0.3)',
-            color: '#ce93d8'
+            backgroundColor: `color-mix(in srgb, ${researchHue} 15%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${researchHue} 30%, transparent)`,
+            color: researchHue
           }}
         >
           + Agent Analysis

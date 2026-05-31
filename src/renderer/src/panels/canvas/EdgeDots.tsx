@@ -5,7 +5,7 @@ import type { CanvasNode } from '@shared/canvas-types'
 
 const DOT_SIZE = 8
 const PADDING = 20
-const DEFAULT_COLOR = '#667383'
+const DEFAULT_COLOR = EDGE_KIND_COLORS.connection
 
 function getNodeTitle(node: CanvasNode): string {
   if (node.type === 'note' || node.type === 'file-view') {

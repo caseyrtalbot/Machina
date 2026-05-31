@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { colors } from '../design/tokens'
+import { colors, typography } from '../design/tokens'
 
 interface Props {
   name: string
@@ -43,7 +43,7 @@ export class PanelErrorBoundary extends Component<Props, State> {
             </p>
             <button
               onClick={this.handleRetry}
-              className="text-xs px-3 py-1.5 rounded-md transition-colors"
+              className="text-xs px-3 py-1.5 transition-colors"
               style={{
                 backgroundColor: colors.accent.muted,
                 color: colors.accent.default,
@@ -55,7 +55,7 @@ export class PanelErrorBoundary extends Component<Props, State> {
             {this.state.error && (
               <button
                 onClick={() => this.setState((s) => ({ showDetails: !s.showDetails }))}
-                className="ml-2 text-xs px-3 py-1.5 rounded-md"
+                className="ml-2 text-xs px-3 py-1.5"
                 style={{ color: colors.text.muted }}
               >
                 {this.state.showDetails ? 'Hide details' : 'Show details'}
@@ -63,11 +63,11 @@ export class PanelErrorBoundary extends Component<Props, State> {
             )}
             {this.state.showDetails && this.state.error && (
               <pre
-                className="mt-3 text-left text-[11px] p-3 rounded overflow-auto max-h-40"
+                className="mt-3 text-left text-[11px] p-3 overflow-auto max-h-40"
                 style={{
                   backgroundColor: colors.bg.base,
                   color: colors.text.secondary,
-                  fontFamily: '"JetBrains Mono", monospace'
+                  fontFamily: typography.fontFamily.mono
                 }}
               >
                 {this.state.error.message}

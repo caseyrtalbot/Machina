@@ -69,7 +69,7 @@ export function SaveTextCardDialog({
         style={{
           backgroundColor: colors.bg.elevated,
           borderColor: colors.border.default,
-          borderRadius: 10,
+          borderRadius: 0,
           color: colors.text.primary
         }}
         onClick={(e) => e.stopPropagation()}
@@ -109,7 +109,7 @@ export function SaveTextCardDialog({
             </div>
             <div
               className="border overflow-auto"
-              style={{ borderColor: colors.border.subtle, borderRadius: 6, maxHeight: 180 }}
+              style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 180 }}
             >
               {folders.map((f) => (
                 <button
@@ -133,10 +133,10 @@ export function SaveTextCardDialog({
               value={filename}
               onChange={(e) => setFilename(e.target.value)}
               className="px-2 py-1 text-sm bg-transparent border outline-none"
-              style={{ borderColor: colors.border.default, borderRadius: 4 }}
+              style={{ borderColor: colors.border.default, borderRadius: 0 }}
             />
             {collisionWarning && (
-              <div className="text-xs" style={{ color: '#c08a00' }}>
+              <div className="text-xs" style={{ color: 'var(--signal-warn)' }}>
                 {collisionWarning} A unique suffix will be added on save.
               </div>
             )}
@@ -149,11 +149,11 @@ export function SaveTextCardDialog({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search vault files..."
               className="px-2 py-1 text-sm bg-transparent border outline-none"
-              style={{ borderColor: colors.border.default, borderRadius: 4 }}
+              style={{ borderColor: colors.border.default, borderRadius: 0 }}
             />
             <div
               className="border overflow-auto"
-              style={{ borderColor: colors.border.subtle, borderRadius: 6, maxHeight: 240 }}
+              style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 240 }}
             >
               {filteredFiles.map((f) => (
                 <button
@@ -194,7 +194,7 @@ export function SaveTextCardDialog({
             style={{
               backgroundColor: canSave ? colors.accent.default : colors.bg.surface,
               color: canSave ? 'var(--color-accent-fg)' : colors.text.muted,
-              borderRadius: 4,
+              borderRadius: 0,
               opacity: canSave ? 1 : 0.5,
               cursor: canSave ? 'pointer' : 'default'
             }}

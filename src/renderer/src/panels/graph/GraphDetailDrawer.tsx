@@ -5,7 +5,13 @@ import { useEditorStore } from '@renderer/store/editor-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { useThreadStore } from '@renderer/store/thread-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
-import { colors, floatingPanel, getArtifactColor, transitions } from '../../design/tokens'
+import {
+  colors,
+  floatingPanel,
+  getArtifactColor,
+  transitions,
+  typography
+} from '../../design/tokens'
 import { buildGhostIndex } from '../../engine/ghost-index'
 import type { Artifact } from '@shared/types'
 
@@ -49,7 +55,8 @@ function BacklinksList({
         className="text-[10px] uppercase font-medium mb-1.5"
         style={{
           color: colors.text.muted,
-          letterSpacing: '0.15em'
+          letterSpacing: '0.15em',
+          fontFamily: typography.fontFamily.mono
         }}
       >
         Backlinks
@@ -277,7 +284,11 @@ function GhostDrawerContent({
         <div>
           <div
             className="text-[10px] uppercase font-medium mb-1.5"
-            style={{ color: colors.text.muted, letterSpacing: '0.15em' }}
+            style={{
+              color: colors.text.muted,
+              letterSpacing: '0.15em',
+              fontFamily: typography.fontFamily.mono
+            }}
           >
             Referenced by
           </div>

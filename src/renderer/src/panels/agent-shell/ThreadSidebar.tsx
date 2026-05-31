@@ -95,7 +95,7 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
       </ul>
       <footer
         style={{
-          padding: '14px 8px 16px',
+          padding: '12px 8px 16px',
           borderTop: `1px solid ${colors.border.subtle}`
         }}
       >
