@@ -52,6 +52,41 @@ describe('replaceSection', () => {
     if (!r.ok) return
     expect(r.value).toBe(FILE)
   })
+
+  // Regression: extractSection's join('\n') maps both a zero-line span ([]) and a
+  // single empty line (['']) to '', so replacing with '' must round-trip exactly
+  // for both. These two cases previously broke in opposite directions.
+  it('round-trips a section with a zero-line body (adjacent headings)', () => {
+    const content = ['## A', '## B', 'b body'].join('\n') // A has zero body lines
+    const map = { a: 'A', b: 'B' }
+    const body = extractSection(content, 'a', map)
+    expect(body).toEqual({ ok: true, value: '' })
+    if (!body.ok) return
+    expect(replaceSection(content, 'a', body.value, map)).toEqual({ ok: true, value: content })
+  })
+
+  it('round-trips a trailing section with an empty body (file ends in newline)', () => {
+    const content = ['intro', '', '## A', 'a body', '', '## B', ''].join('\n') // B empty, trailing \n
+    const map = { a: 'A', b: 'B' }
+    const body = extractSection(content, 'b', map)
+    expect(body).toEqual({ ok: true, value: '' })
+    if (!body.ok) return
+    expect(replaceSection(content, 'b', body.value, map)).toEqual({ ok: true, value: content })
+  })
+
+  // The exact fast-check counterexample (seed 1409772745): a body whose first line
+  // is itself a heading line ('# ') makes findSectionSpan close the span at once.
+  // NOTE: extractSection truncates at the embedded heading (returns '' not '# ') —
+  // that body-vs-heading ambiguity is a separate, still-open latent issue; this
+  // test only pins the round-trip idempotency the property test enforces.
+  it('round-trips a section whose body starts with a heading-like line', () => {
+    const content = ['intro', '', '## h', '# ', 'tail'].join('\n')
+    const map = { c0: 'h' }
+    const body = extractSection(content, 'c0', map)
+    expect(body.ok).toBe(true)
+    if (!body.ok) return
+    expect(replaceSection(content, 'c0', body.value, map)).toEqual({ ok: true, value: content })
+  })
 })
 
 describe('addSection', () => {

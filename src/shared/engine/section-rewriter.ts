@@ -62,6 +62,17 @@ export function extractSection(
   return { ok: true, value: bodyLines.join('\n') }
 }
 
+// extractSection serialises a span's body lines with '\n', and that join is
+// lossy in exactly one place: an empty span ([]) and a single empty line ([''])
+// both serialise to ''. To stay a true inverse of extractSection, restore the
+// original span verbatim when the body is unchanged; for a genuine edit, treat
+// '' as an empty (zero-line) body and otherwise split on '\n'.
+function resolveBodyLines(newBody: string, originalBody: readonly string[]): readonly string[] {
+  if (newBody === originalBody.join('\n')) return originalBody
+  if (newBody === '') return []
+  return newBody.split('\n')
+}
+
 export function replaceSection(
   fileContent: string,
   sectionId: string,
@@ -78,9 +89,7 @@ export function replaceSection(
   const headingLine = lines[span.start]
   const before = lines.slice(0, span.start)
   const after = lines.slice(span.end)
-  // newBody is treated as the joined lines of the span body (matches what
-  // extractSection returns), so we round-trip via split without trimming.
-  const bodyLines = newBody.split('\n')
+  const bodyLines = resolveBodyLines(newBody, lines.slice(span.start + 1, span.end))
 
   const next = [...before, headingLine, ...bodyLines, ...after].join('\n')
   return { ok: true, value: next }
