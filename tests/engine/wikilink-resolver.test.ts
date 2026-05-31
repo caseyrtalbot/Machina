@@ -108,4 +108,22 @@ describe('buildResolutionMaps + resolveBodyLink', () => {
   test('returns null for unresolved', () => {
     expect(resolveBodyLink('nonexistent', maps)).toBeNull()
   })
+
+  test('strips #heading anchor before resolving to the base note', () => {
+    expect(resolveBodyLink('claude-code moc#some-heading', maps)).toBe('Claude-Code MOC')
+  })
+
+  test('strips #^block-ref anchor before resolving to the base note', () => {
+    expect(resolveBodyLink('quick reference#^block-id', maps)).toBe('Quick Reference')
+  })
+
+  test('strips anchor on path-style targets and resolves by stem', () => {
+    expect(resolveBodyLink('caseys-claude-code/claude-code moc#heading', maps)).toBe(
+      'Claude-Code MOC'
+    )
+  })
+
+  test('returns null for a pure in-page anchor (target starts with #)', () => {
+    expect(resolveBodyLink('#section', maps)).toBeNull()
+  })
 })

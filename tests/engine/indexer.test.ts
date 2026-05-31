@@ -78,4 +78,18 @@ describe('VaultIndex', () => {
     const ids = backlinks.map((b) => b.id).sort()
     expect(ids).toEqual(['c1', 'g2'])
   })
+
+  it('returns a backlink when the only reference is an anchored wikilink', () => {
+    const index = new VaultIndex()
+    index.addFile(
+      'target.md',
+      `---\nid: target\ntitle: Target\ntype: gene\ncreated: 2026-03-12\nmodified: 2026-03-12\n---\nThe target note`
+    )
+    index.addFile(
+      'referrer.md',
+      `---\nid: referrer\ntitle: Referrer\ntype: gene\ncreated: 2026-03-12\nmodified: 2026-03-12\n---\nSee [[Target#Some Heading]] for context`
+    )
+    const backlinks = index.getBacklinks('target')
+    expect(backlinks.map((b) => b.id)).toContain('referrer')
+  })
 })

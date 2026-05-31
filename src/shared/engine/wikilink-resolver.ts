@@ -149,17 +149,22 @@ export function resolveBodyLink(
     readonly byLowerStem: ReadonlyMap<string, string>
   }
 ): string | null {
+  // Strip any #heading / #^block-ref anchor so [[Note#Section]] resolves to the
+  // base note. A pure in-page anchor (#section) yields an empty base and no match.
+  const base = parseWikilinkTarget(lowerTarget).target
+  if (!base) return null
+
   // Exact id match
-  const byId = maps.byLowerId.get(lowerTarget)
+  const byId = maps.byLowerId.get(base)
   if (byId) return byId
 
   // Exact title match
-  const byTitle = maps.byLowerTitle.get(lowerTarget)
+  const byTitle = maps.byLowerTitle.get(base)
   if (byTitle) return byTitle
 
   // Stem match for path-style targets
-  if (lowerTarget.includes('/')) {
-    const stem = stemFromTarget(lowerTarget)
+  if (base.includes('/')) {
+    const stem = stemFromTarget(base)
     const byStem = maps.byLowerStem.get(stem)
     if (byStem) return byStem
   }
