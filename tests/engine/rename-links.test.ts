@@ -105,7 +105,6 @@ describe('rewriteWikilinks', () => {
   })
 
   it('does not match a longer stem when renaming an anchored link', () => {
-    // Renaming 'Old' must not touch '[[Older#X]]' or '[[OldThing#Y]]'.
     expect(rewriteWikilinks('[[Older#X]] and [[OldThing#Y]]', 'Old', 'New')).toBe(
       '[[Older#X]] and [[OldThing#Y]]'
     )

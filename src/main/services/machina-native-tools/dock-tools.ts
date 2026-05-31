@@ -1,19 +1,11 @@
+import { DOCK_TAB_KINDS } from '@shared/dock-types'
 import type { DockTab, DockTabKind } from '@shared/dock-types'
 import type { NativeToolResult, ToolContext } from './context'
 
-const DOCK_KINDS: readonly DockTabKind[] = [
-  'canvas',
-  'editor',
-  'terminal',
-  'graph',
-  'ghosts',
-  'health'
-]
-
 function buildDockTab(input: Record<string, unknown>): DockTab | { error: string } {
   const kind = typeof input.kind === 'string' ? input.kind : null
-  if (!kind || !DOCK_KINDS.includes(kind as DockTabKind)) {
-    return { error: `open_dock_tab: kind must be one of ${DOCK_KINDS.join('|')}` }
+  if (!kind || !DOCK_TAB_KINDS.includes(kind as DockTabKind)) {
+    return { error: `open_dock_tab: kind must be one of ${DOCK_TAB_KINDS.join('|')}` }
   }
   switch (kind as DockTabKind) {
     case 'canvas':

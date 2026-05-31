@@ -159,8 +159,7 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
     `${Math.max(env.sidebarFontSize - 3, 10)}px`
   )
 
-  // ── Motion + elevation catalog (static; emitted from tokens so CSS and
-  // inline-style consumers share one source — :root holds matching fallbacks) ──
+  // ── Motion + elevation catalog (static; from tokens) ──
   root.style.setProperty('--t-micro', transitions.micro)
   root.style.setProperty('--t-fast', transitions.fast)
   root.style.setProperty('--t-med', transitions.med)

@@ -2,14 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { teConfigPath } from './paths'
 import type { VaultConfig } from '@shared/types'
 
-/**
- * Read and parse the vault's TE config. Returns null when the file is missing
- * or malformed — every caller treats "no config" as "use defaults", so
- * swallowing here removes three copies of the same try/parse/catch block.
- *
- * Electron-free (raw fs + JSON) so it stays usable from the headless mcp-cli
- * path as well as the IPC handlers.
- */
+/** Read and parse the vault's TE config, or null when the file is missing or malformed. */
 export async function readVaultConfig(vaultPath: string): Promise<VaultConfig | null> {
   try {
     return JSON.parse(await readFile(teConfigPath(vaultPath), 'utf-8')) as VaultConfig

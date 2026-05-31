@@ -177,11 +177,8 @@ function resolveWikilink(
 
 const isRelative = (ref: string): boolean => ref.startsWith('./') || ref.startsWith('../')
 
-/**
- * One entry per file class. The edge loop dispatches on extension to a single
- * analyzer; all per-class variation (extractor, edge kind, unresolved policy,
- * resolution strategy, unresolved format) lives here so a fix lands once.
- */
+// One entry per file class. The edge loop dispatches on extension to a single
+// analyzer, so all per-class variation lives here and a fix lands once.
 interface Analyzer {
   readonly exts: ReadonlySet<string>
   readonly kind: ProjectMapEdgeKind

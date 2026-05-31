@@ -329,9 +329,9 @@ export function CardShell({
         WebkitBackdropFilter:
           isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.4)`,
         ...(isActive
-          ? ({
+          ? {
               boxShadow: `0 0 0 1px var(--color-accent-line), ${floatingPanel.shadowCard}`
-            } as React.CSSProperties)
+            }
           : {})
       }}
       onClick={handleClick}

@@ -108,11 +108,6 @@ const quitCoordinator = new QuitCoordinator()
 const claudeStatus = new ClaudeStatusService()
 let healthMonitor: VaultHealthMonitor | null = null
 
-/**
- * Lazily create the singleton VaultHealthMonitor, or stop the existing one so
- * it can rebind to a new vault. Folds the create-or-reset branch out of the
- * reconfigure controller so that flow reads as a linear sequence.
- */
 function ensureHealthMonitor(): VaultHealthMonitor {
   if (healthMonitor) {
     healthMonitor.stop()
@@ -125,13 +120,8 @@ function ensureHealthMonitor(): VaultHealthMonitor {
   return healthMonitor
 }
 
-/**
- * Reconfigure all vault-scoped services when a vault is initialized or switched.
- * Awaited from vault:init so failures surface to the caller instead of becoming
- * unhandled rejections. Rebuilds the index + MCP server, re-points the agent and
- * actions services, and rebinds the health monitor. Services update on vault
- * switch without re-registering IPC handlers.
- */
+// Awaited from vault:init so failures surface to the caller instead of
+// becoming unhandled rejections.
 async function reconfigureForVault(vaultPath: string): Promise<void> {
   // Drop any pending-write suppression flags inherited from the previous
   // vault. Otherwise an inflight write against the old vault can leak
