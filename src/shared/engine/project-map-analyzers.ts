@@ -5,6 +5,7 @@
 
 import type {
   ProjectMapEdge,
+  ProjectMapEdgeKind,
   ProjectMapNode,
   ProjectMapOptions,
   ProjectMapSnapshot
@@ -26,7 +27,7 @@ export function extractImportSpecifiers(code: string): readonly string[] {
   let match: RegExpExecArray | null
   while ((match = esImportRe.exec(code)) !== null) {
     const spec = match[1]
-    if (spec.startsWith('./') || spec.startsWith('../')) {
+    if ((spec.startsWith('./') || spec.startsWith('../')) && !specifiers.includes(spec)) {
       specifiers.push(spec)
     }
   }
@@ -110,7 +111,8 @@ export function extractMarkdownRefs(content: string): readonly string[] {
 
   const mdLinkRe = /\[(?:[^\]]*)\]\((\.[^)]+)\)/g
   while ((match = mdLinkRe.exec(content)) !== null) {
-    const href = match[1]
+    // Drop a #heading or ?query suffix — the link targets the file, not the fragment.
+    const href = match[1].split(/[#?]/)[0]
     if (href.startsWith('./') || href.startsWith('../')) {
       refs.push(href)
     }
@@ -134,7 +136,7 @@ export function extractConfigPathRefs(content: string): readonly string[] {
     refs.push(match[1])
   }
 
-  const yamlPathRe = /:\s+(\.\.\/.+|\.\/\S+)/g
+  const yamlPathRe = /:\s+(\.\.\/\S+|\.\/\S+)/g
   while ((match = yamlPathRe.exec(content)) !== null) {
     const val = match[1]
     if (!refs.includes(val)) refs.push(val)
@@ -170,6 +172,60 @@ function resolveWikilink(
   }
   return null
 }
+
+// ─── Analyzer Table ─────────────────────────────────────────────────
+
+const isRelative = (ref: string): boolean => ref.startsWith('./') || ref.startsWith('../')
+
+/**
+ * One entry per file class. The edge loop dispatches on extension to a single
+ * analyzer; all per-class variation (extractor, edge kind, unresolved policy,
+ * resolution strategy, unresolved format) lives here so a fix lands once.
+ */
+interface Analyzer {
+  readonly exts: ReadonlySet<string>
+  readonly kind: ProjectMapEdgeKind
+  readonly trackUnresolved: boolean
+  extract(content: string): readonly string[]
+  resolve(
+    ref: string,
+    importingFile: string,
+    allFilePaths: ReadonlySet<string>,
+    rootPath: string
+  ): string | null
+  formatUnresolved(ref: string): string
+}
+
+const ANALYZERS: readonly Analyzer[] = [
+  {
+    exts: TS_EXTENSIONS,
+    kind: 'imports',
+    trackUnresolved: true,
+    extract: extractImportSpecifiers,
+    resolve: resolveImportPath,
+    formatUnresolved: (ref) => ref
+  },
+  {
+    exts: MD_EXTENSIONS,
+    kind: 'references',
+    trackUnresolved: true,
+    extract: extractMarkdownRefs,
+    // Relative links resolve like imports; bare names resolve by filename stem.
+    resolve: (ref, importingFile, allFilePaths, rootPath) =>
+      isRelative(ref)
+        ? resolveImportPath(ref, importingFile, allFilePaths, rootPath)
+        : resolveWikilink(ref, allFilePaths, rootPath),
+    formatUnresolved: (ref) => (isRelative(ref) ? ref : `[[${ref}]]`)
+  },
+  {
+    exts: CONFIG_EXTENSIONS,
+    kind: 'references',
+    trackUnresolved: false,
+    extract: extractConfigPathRefs,
+    resolve: resolveImportPath,
+    formatUnresolved: (ref) => ref
+  }
+]
 
 // ─── Snapshot Builder ──────────────────────────────────────────────
 
@@ -315,72 +371,23 @@ export function buildProjectMapSnapshot(
     }
   }
 
-  // Build import/reference edges
+  // Build import/reference edges: one analyzer per file class (see ANALYZERS).
   for (const file of files) {
     if (file.content === null || file.error || isBinaryPath(file.path)) continue
     const sourceNode = fileNodes.get(file.path)
     if (!sourceNode || !includedIds.has(sourceNode.id)) continue
 
-    const ext = file.path.slice(file.path.lastIndexOf('.')).toLowerCase()
+    const ext = path.extname(file.path).toLowerCase()
+    const analyzer = ANALYZERS.find((a) => a.exts.has(ext))
+    if (!analyzer) continue
 
-    // TS/JS imports
-    if (TS_EXTENSIONS.has(ext)) {
-      const specifiers = extractImportSpecifiers(file.content)
-      for (const spec of specifiers) {
-        const resolved = resolveImportPath(spec, file.path, allFilePaths, rootPath)
-        if (resolved) {
-          const targetNode = fileNodes.get(resolved)
-          if (targetNode && includedIds.has(targetNode.id)) {
-            edges.push({ source: sourceNode.id, target: targetNode.id, kind: 'imports' })
-          }
-        } else {
-          unresolvedRefs.push(`${sourceNode.relativePath}: ${spec}`)
-        }
-      }
-    }
-
-    // Markdown refs
-    if (MD_EXTENSIONS.has(ext)) {
-      const refs = extractMarkdownRefs(file.content)
-      for (const ref of refs) {
-        // Try as relative path first
-        if (ref.startsWith('./') || ref.startsWith('../')) {
-          const resolved = resolveImportPath(ref, file.path, allFilePaths, rootPath)
-          if (resolved) {
-            const targetNode = fileNodes.get(resolved)
-            if (targetNode && includedIds.has(targetNode.id)) {
-              edges.push({ source: sourceNode.id, target: targetNode.id, kind: 'references' })
-            }
-          } else {
-            unresolvedRefs.push(`${sourceNode.relativePath}: ${ref}`)
-          }
-        } else {
-          // Wikilink -- resolve by filename stem
-          const resolved = resolveWikilink(ref, allFilePaths, rootPath)
-          if (resolved) {
-            const targetNode = fileNodes.get(resolved)
-            if (targetNode && includedIds.has(targetNode.id)) {
-              edges.push({ source: sourceNode.id, target: targetNode.id, kind: 'references' })
-            }
-          } else {
-            unresolvedRefs.push(`${sourceNode.relativePath}: [[${ref}]]`)
-          }
-        }
-      }
-    }
-
-    // Config path refs
-    if (CONFIG_EXTENSIONS.has(ext)) {
-      const refs = extractConfigPathRefs(file.content)
-      for (const ref of refs) {
-        const resolved = resolveImportPath(ref, file.path, allFilePaths, rootPath)
-        if (resolved) {
-          const targetNode = fileNodes.get(resolved)
-          if (targetNode && includedIds.has(targetNode.id)) {
-            edges.push({ source: sourceNode.id, target: targetNode.id, kind: 'references' })
-          }
-        }
-        // Config refs that don't resolve are silently ignored
+    for (const ref of analyzer.extract(file.content)) {
+      const resolved = analyzer.resolve(ref, file.path, allFilePaths, rootPath)
+      const targetNode = resolved ? fileNodes.get(resolved) : undefined
+      if (targetNode && includedIds.has(targetNode.id)) {
+        edges.push({ source: sourceNode.id, target: targetNode.id, kind: analyzer.kind })
+      } else if (!resolved && analyzer.trackUnresolved) {
+        unresolvedRefs.push(`${sourceNode.relativePath}: ${analyzer.formatUnresolved(ref)}`)
       }
     }
   }

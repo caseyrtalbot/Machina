@@ -62,6 +62,11 @@ describe('extractImportSpecifiers', () => {
     const code = `import { foo } from '@shared/types'`
     expect(extractImportSpecifiers(code)).toEqual([])
   })
+
+  it('dedups repeated static imports of the same specifier', () => {
+    const code = `import { a } from './x'\nimport { b } from './x'`
+    expect(extractImportSpecifiers(code)).toEqual(['./x'])
+  })
 })
 
 describe('resolveImportPath', () => {
@@ -174,6 +179,13 @@ describe('extractMarkdownRefs', () => {
   it('handles empty content', () => {
     expect(extractMarkdownRefs('')).toEqual([])
   })
+
+  it('strips #anchor and ?query from relative links so they resolve', () => {
+    expect(extractMarkdownRefs(`[setup](./setup.md#config) and [v](./a.md?v=2)`)).toEqual([
+      './setup.md',
+      './a.md'
+    ])
+  })
 })
 
 describe('extractConfigPathRefs', () => {
@@ -196,6 +208,12 @@ describe('extractConfigPathRefs', () => {
 
   it('handles empty content', () => {
     expect(extractConfigPathRefs('')).toEqual([])
+  })
+
+  it('does not swallow a trailing comment in a YAML path value', () => {
+    expect(extractConfigPathRefs(`main: ../src/index.ts  # entry point`)).toEqual([
+      '../src/index.ts'
+    ])
   })
 })
 
