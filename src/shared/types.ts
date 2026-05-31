@@ -140,6 +140,9 @@ export interface VaultConfig {
     outputDir?: string // default: 'clusters/'
     captureEnabled?: boolean // default: true
   }
+  watcher?: {
+    ignorePatterns?: string[] // user-supplied extra chokidar ignore globs
+  }
 }
 
 export interface UiPersistedState {

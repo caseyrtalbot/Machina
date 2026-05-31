@@ -3,6 +3,7 @@ import { FileService } from '../services/file-service'
 import { createVaultIgnoreFilter } from '../services/vault-watcher'
 import { PathGuard } from '../services/path-guard'
 import { teConfigPath, teStatePath, teArtifactPath, assertWithinVault } from '../utils/paths'
+import { getIgnorePatterns } from '../utils/vault-config'
 import { defaultSystemArtifactFilename } from '@shared/system-artifacts'
 import { TE_DIR } from '@shared/constants'
 import { typedHandle } from '../typed-ipc'
@@ -18,10 +19,10 @@ const fileService = new FileService()
 let activePathGuard: PathGuard | null = null
 
 /** Callback invoked after vault:init completes. Set via onVaultReady(). */
-let vaultReadyCallback: ((vaultPath: string) => void) | null = null
+let vaultReadyCallback: ((vaultPath: string) => Promise<void> | void) | null = null
 
 /** Register a callback to fire when a vault is initialized. */
-export function onVaultReady(cb: (vaultPath: string) => void): void {
+export function onVaultReady(cb: (vaultPath: string) => Promise<void> | void): void {
   vaultReadyCallback = cb
 }
 
@@ -119,14 +120,7 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:list-all-files', async (args) => {
-    let customPatterns: string[] = []
-    try {
-      const configContent = await fileService.readFile(teConfigPath(args.dir))
-      const config = JSON.parse(configContent)
-      customPatterns = config?.watcher?.ignorePatterns ?? []
-    } catch {
-      // Config doesn't exist or is malformed; use defaults only
-    }
+    const customPatterns = await getIgnorePatterns(args.dir)
     const ignoreFilter = await createVaultIgnoreFilter(args.dir, customPatterns)
     return fileService.listAllFilesRecursive(args.dir, ignoreFilter)
   })
@@ -180,7 +174,9 @@ export function registerFilesystemIpc(): void {
   typedHandle('vault:init', async (args) => {
     setActiveVault(args.vaultPath)
     await fileService.initVault(args.vaultPath)
-    vaultReadyCallback?.(args.vaultPath)
+    // Await so index/MCP/health wiring completes before vault:init resolves and
+    // any rejection propagates to the renderer instead of going unhandled.
+    await vaultReadyCallback?.(args.vaultPath)
   })
 
   typedHandle('vault:read-config', async (args) => {
@@ -218,11 +214,14 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('vault:list-commands', async (args) => {
-    guardPath(args.dirPath, 'vault:list-commands')
+    // Validate-then-use: list and join against the guard-resolved path, never
+    // the raw arg, so a symlinked dirPath cannot read outside the vault.
+    const resolved = guardPath(args.dirPath, 'vault:list-commands')
     const { readdir } = await import('node:fs/promises')
+    const { join } = await import('node:path')
     try {
-      const entries = await readdir(args.dirPath)
-      return entries.filter((f) => f.endsWith('.md')).map((f) => `${args.dirPath}/${f}`)
+      const entries = await readdir(resolved)
+      return entries.filter((f) => f.endsWith('.md')).map((f) => join(resolved, f))
     } catch {
       return []
     }

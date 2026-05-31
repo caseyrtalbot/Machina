@@ -1,24 +1,15 @@
 import { VaultWatcher } from '../services/vault-watcher'
-import { FileService } from '../services/file-service'
-import { teConfigPath } from '../utils/paths'
 import { typedHandle, typedSend } from '../typed-ipc'
+import { getIgnorePatterns } from '../utils/vault-config'
 import { getDocumentManager } from './documents'
 import { getMainWindow } from '../window-registry'
 import { recordFileChange } from './health'
 
 const watcher = new VaultWatcher()
-const fileService = new FileService()
 
 export function registerWatcherIpc(): void {
   typedHandle('vault:watch-start', async (args) => {
-    let customPatterns: string[] = []
-    try {
-      const configContent = await fileService.readFile(teConfigPath(args.vaultPath))
-      const config = JSON.parse(configContent)
-      customPatterns = config?.watcher?.ignorePatterns ?? []
-    } catch {
-      // Config doesn't exist or is malformed; use defaults only
-    }
+    const customPatterns = await getIgnorePatterns(args.vaultPath)
 
     await watcher.start(
       args.vaultPath,

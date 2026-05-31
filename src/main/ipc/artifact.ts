@@ -1,10 +1,8 @@
-import { readFile } from 'fs/promises'
 import { typedHandle } from '../typed-ipc'
 import { ArtifactMaterializer } from '../services/artifact-materializer'
 import { getDocumentManager } from './documents'
 import { AgentArtifactDraftSchema, type AgentArtifactDraft } from '@shared/agent-artifact-types'
-import { teConfigPath } from '../utils/paths'
-import type { VaultConfig } from '@shared/types'
+import { readVaultConfig } from '../utils/vault-config'
 
 let materializer: ArtifactMaterializer | null = null
 
@@ -19,15 +17,9 @@ function getMaterializer(): ArtifactMaterializer {
 }
 
 async function readOutputDir(vaultPath: string, kind: AgentArtifactDraft['kind']): Promise<string> {
-  try {
-    const configPath = teConfigPath(vaultPath)
-    const raw = await readFile(configPath, 'utf-8')
-    const config = JSON.parse(raw) as VaultConfig
-    if (kind === 'cluster') return config.cluster?.outputDir ?? 'clusters/'
-    return config.compile?.outputDir ?? 'compiled/'
-  } catch {
-    return kind === 'cluster' ? 'clusters/' : 'compiled/'
-  }
+  const config = await readVaultConfig(vaultPath)
+  if (kind === 'cluster') return config?.cluster?.outputDir ?? 'clusters/'
+  return config?.compile?.outputDir ?? 'compiled/'
 }
 
 export function registerArtifactIpc(): void {

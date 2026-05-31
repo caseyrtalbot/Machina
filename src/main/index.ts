@@ -108,6 +108,54 @@ const quitCoordinator = new QuitCoordinator()
 const claudeStatus = new ClaudeStatusService()
 let healthMonitor: VaultHealthMonitor | null = null
 
+/**
+ * Lazily create the singleton VaultHealthMonitor, or stop the existing one so
+ * it can rebind to a new vault. Folds the create-or-reset branch out of the
+ * reconfigure controller so that flow reads as a linear sequence.
+ */
+function ensureHealthMonitor(): VaultHealthMonitor {
+  if (healthMonitor) {
+    healthMonitor.stop()
+    return healthMonitor
+  }
+  const errorLog = new FsErrorLog(32, (path) => getDocumentManager().hasPendingWrite(path))
+  healthMonitor = new VaultHealthMonitor(getVaultWatcher(), errorLog, (report) =>
+    emitHealthReport(report)
+  )
+  return healthMonitor
+}
+
+/**
+ * Reconfigure all vault-scoped services when a vault is initialized or switched.
+ * Awaited from vault:init so failures surface to the caller instead of becoming
+ * unhandled rejections. Rebuilds the index + MCP server, re-points the agent and
+ * actions services, and rebinds the health monitor. Services update on vault
+ * switch without re-registering IPC handlers.
+ */
+async function reconfigureForVault(vaultPath: string): Promise<void> {
+  // Drop any pending-write suppression flags inherited from the previous
+  // vault. Otherwise an inflight write against the old vault can leak
+  // suppression into the new one and swallow legitimate external-change
+  // notifications for same-pathed files.
+  getDocumentManager().clearPendingWrites()
+
+  const deps = await initVaultIndex(vaultPath)
+  mcpLifecycle.createForVault(vaultPath, {
+    ...deps,
+    documentManager: getDocumentManager()
+  })
+
+  const monitor = new PtyMonitor(vaultPath, getShellService().getPtyService())
+  const spawner = new AgentSpawner(getShellService(), vaultPath)
+  setAgentServices(monitor, spawner)
+  setActionsVaultRoot(vaultPath)
+
+  const health = ensureHealthMonitor()
+  setHealthMonitor(health)
+  health.switchVault(vaultPath)
+  health.start(vaultPath)
+}
+
 function createWindow(): BrowserWindow {
   const savedWindowState = readAppConfigValue<WindowState>(WINDOW_STATE_KEY)
   const initialWindowState = resolveInitialWindowState(
@@ -236,41 +284,10 @@ app.whenReady().then(() => {
   claudeStatus.start()
   quitCoordinator.registerIpc()
 
-  // Wire MCP server creation and agent monitoring to vault initialization.
-  // Reads all .md files, builds VaultIndex + SearchEngine, then creates MCP
-  // server with populated deps so search and graph queries return real data.
-  // Wire MCP + agent services to vault initialization.
-  // Services update on vault switch without re-registering IPC handlers.
-  onVaultReady(async (vaultPath) => {
-    // Drop any pending-write suppression flags inherited from the previous
-    // vault. Otherwise an inflight write against the old vault can leak
-    // suppression into the new one and swallow legitimate external-change
-    // notifications for same-pathed files.
-    getDocumentManager().clearPendingWrites()
-
-    const deps = await initVaultIndex(vaultPath)
-    mcpLifecycle.createForVault(vaultPath, {
-      ...deps,
-      documentManager: getDocumentManager()
-    })
-
-    const monitor = new PtyMonitor(vaultPath, getShellService().getPtyService())
-    const spawner = new AgentSpawner(getShellService(), vaultPath)
-    setAgentServices(monitor, spawner)
-    setActionsVaultRoot(vaultPath)
-
-    if (!healthMonitor) {
-      const errorLog = new FsErrorLog(32, (path) => getDocumentManager().hasPendingWrite(path))
-      healthMonitor = new VaultHealthMonitor(getVaultWatcher(), errorLog, (report) =>
-        emitHealthReport(report)
-      )
-    } else {
-      healthMonitor.stop()
-    }
-    setHealthMonitor(healthMonitor)
-    healthMonitor.switchVault(vaultPath)
-    healthMonitor.start(vaultPath)
-  })
+  // Wire MCP + agent + health services to vault initialization. The controller
+  // rebuilds the index + MCP server and re-points services on each vault switch
+  // without re-registering IPC handlers.
+  onVaultReady(reconfigureForVault)
 
   createWindow()
   registerWatcherIpc()
