@@ -126,17 +126,38 @@ export function migrateLegacyWikilinks(markdown: string): string {
 }
 
 /**
- * Values needing double-quoting to survive a YAML reparse: empty strings,
- * leading/trailing whitespace, a leading indicator char, any YAML-significant
- * character, or a string that would otherwise coerce to a bool/null/number.
+ * A plain (unquoted) YAML scalar gets reinterpreted on reparse when it looks
+ * like a null, boolean, number, or timestamp (js-yaml, via gray-matter, coerces
+ * it off the string type), or when it carries a YAML-significant character or
+ * surrounding whitespace. Those must be double-quoted to round-trip as strings.
+ * Modeled per YAML type rather than one catch-all regex, which silently missed
+ * 1e10, .5, +5, 0x1F, 1_000, .inf/.nan, and bare dates (string -> number/Date
+ * on the main-process reparse). frontmatter-gray-matter-roundtrip.test.ts locks
+ * the exact cases against the real gray-matter path.
  */
-const NEEDS_QUOTE = /[:#[\]{}&*!|>'"%@`,]|^[\s?-]|\s$|^(?:true|false|null|~|-?\d+(?:\.\d+)?)$/i
+const YAML_SIGNIFICANT = /[:#[\]{}&*!|>'"%@`,]|^[\s?-]|\s$/
+const YAML_NULL = /^(?:null|~)$/i
+const YAML_BOOL = /^(?:true|false)$/i
+const YAML_NUMBER =
+  /^[-+]?(?:0x[0-9a-fA-F_]+|0o[0-7_]+|(?:\d[\d_]*)?\.?\d[\d_]*(?:[eE][-+]?\d+)?|\.(?:inf|nan))$/i
+const YAML_TIMESTAMP = /^\d{4}-\d\d?-\d\d?(?:[Tt ].*)?$/
+
+function needsQuote(value: string): boolean {
+  return (
+    value === '' ||
+    YAML_SIGNIFICANT.test(value) ||
+    YAML_NULL.test(value) ||
+    YAML_BOOL.test(value) ||
+    YAML_NUMBER.test(value) ||
+    YAML_TIMESTAMP.test(value)
+  )
+}
 
 /** Serialize one scalar to a YAML token. Inverse of `parseScalarValue` + `decodeQuoted`. */
 function encodeScalar(value: string | number | boolean): string {
   if (typeof value === 'boolean') return value ? 'true' : 'false'
   if (typeof value === 'number') return String(value)
-  if (value === '' || NEEDS_QUOTE.test(value)) {
+  if (needsQuote(value)) {
     const escaped = value
       .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')

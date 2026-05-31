@@ -244,7 +244,14 @@ describe('serializeFrontmatter', () => {
     ['empty string', ''],
     ['number-looking string', '90210'],
     ['bool-looking string', 'true'],
-    ['comma', 'a, b, c']
+    ['comma', 'a, b, c'],
+    ['exponent-looking string', '1e10'],
+    ['leading-dot number', '.5'],
+    ['plus-signed number', '+5'],
+    ['hex-looking string', '0x1F'],
+    ['underscored number', '1_000'],
+    ['special float', '.inf'],
+    ['bare date', '2026-04-06']
   ])('round-trips a string value with %s', (_label, value) => {
     const out = serializeFrontmatter({ field: value })
     expect(parseFrontmatter(out + '\nBody').data.field).toBe(value)
@@ -258,10 +265,17 @@ describe('serializeFrontmatter', () => {
   })
 
   it('keeps plain alphanumeric values unquoted (no formatting churn)', () => {
-    const out = serializeFrontmatter({ title: 'My Note', created: '2026-04-06', n: 5, b: true })
+    const out = serializeFrontmatter({ title: 'My Note', slug: 'my-note', n: 5, b: true })
     expect(out).toContain('title: My Note')
-    expect(out).toContain('created: 2026-04-06')
+    expect(out).toContain('slug: my-note')
     expect(out).toContain('n: 5')
     expect(out).toContain('b: true')
+  })
+
+  it('quotes string values that would coerce to a number or date on reparse', () => {
+    const out = serializeFrontmatter({ created: '2026-04-06', big: '1e10', frac: '.5' })
+    expect(out).toContain('created: "2026-04-06"')
+    expect(out).toContain('big: "1e10"')
+    expect(out).toContain('frac: ".5"')
   })
 })

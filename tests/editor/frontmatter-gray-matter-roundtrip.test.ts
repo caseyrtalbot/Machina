@@ -31,6 +31,13 @@ describe('serializeFrontmatter → gray-matter reparse (C1)', () => {
     ['backslash path', { v: 'C:\\a\\b' }, { v: 'C:\\a\\b' }],
     ['number-looking string', { zip: '90210' }, { zip: '90210' }],
     ['bool-looking string', { label: 'true' }, { label: 'true' }],
+    ['exponent string', { big: '1e10' }, { big: '1e10' }],
+    ['leading-dot string', { frac: '.5' }, { frac: '.5' }],
+    ['plus-signed string', { v: '+5' }, { v: '+5' }],
+    ['hex string', { v: '0x1F' }, { v: '0x1F' }],
+    ['underscored number string', { v: '1_000' }, { v: '1_000' }],
+    ['special float string', { v: '.inf' }, { v: '.inf' }],
+    ['bare date string', { created: '2026-04-06' }, { created: '2026-04-06' }],
     ['array w/ specials', { tags: ['a: b', '#x', 'ok'] }, { tags: ['a: b', '#x', 'ok'] }]
   ])('reparses %s losslessly through gray-matter', (_l, input, expected) => {
     expect(reparse(serializeFrontmatter(input))).toEqual(expected)
@@ -39,6 +46,14 @@ describe('serializeFrontmatter → gray-matter reparse (C1)', () => {
   it('number/bool-looking strings stay strings (not coerced) after gray-matter', () => {
     expect(typeof reparse(serializeFrontmatter({ zip: '90210' })).zip).toBe('string')
     expect(typeof reparse(serializeFrontmatter({ label: 'true' })).label).toBe('string')
+    expect(typeof reparse(serializeFrontmatter({ big: '1e10' })).big).toBe('string')
+    expect(typeof reparse(serializeFrontmatter({ frac: '.5' })).frac).toBe('string')
+  })
+
+  it('a bare date string stays a string and does not become a Date', () => {
+    const out = reparse(serializeFrontmatter({ created: '2026-04-06' }))
+    expect(out.created).toBe('2026-04-06')
+    expect(out.created instanceof Date).toBe(false)
   })
 
   it('preserves real numbers and booleans as their type', () => {
