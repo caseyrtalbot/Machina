@@ -238,13 +238,13 @@ function GhostDrawerContent({
   }, [graph, artifacts, ghostId])
 
   const handleCreate = useCallback(async () => {
-    const refPaths = artifacts
-      .filter((a) => ghostEntry?.references.some((r) => r.fileTitle === a.title))
-      .map((a) => useVaultStore.getState().artifactPathById[a.id] ?? '')
+    const pathById = useVaultStore.getState().artifactPathById
+    const refPaths = (ghostEntry?.references ?? [])
+      .map((r) => pathById[r.sourceId] ?? '')
       .filter(Boolean)
 
     await emerge(ghostId, ghostId, refPaths)
-  }, [ghostId, artifacts, ghostEntry, emerge])
+  }, [ghostId, ghostEntry, emerge])
 
   return (
     <>

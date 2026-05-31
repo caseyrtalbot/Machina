@@ -396,9 +396,11 @@ describe('MCP Server', () => {
       expect(jsonMatch).not.toBeNull()
       const ghosts = JSON.parse(jsonMatch![1].trim())
       expect(ghosts).toHaveLength(1)
-      // Context should be stripped
+      // Context should be stripped; sourceId + fileTitle remain
       for (const ref of ghosts[0].references) {
         expect(ref).not.toHaveProperty('context')
+        expect(ref).toHaveProperty('sourceId')
+        expect(ref).toHaveProperty('fileTitle')
       }
 
       await client.close()

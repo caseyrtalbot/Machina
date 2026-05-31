@@ -131,7 +131,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         includeContext === false
           ? ghosts.map((g) => ({
               ...g,
-              references: g.references.map(({ filePath, fileTitle }) => ({ filePath, fileTitle }))
+              references: g.references.map(({ sourceId, fileTitle }) => ({ sourceId, fileTitle }))
             }))
           : ghosts
       const json = JSON.stringify(entries)

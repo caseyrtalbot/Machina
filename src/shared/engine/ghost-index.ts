@@ -8,7 +8,8 @@
 import type { KnowledgeGraph, Artifact } from '@shared/types'
 
 export interface GhostReference {
-  readonly filePath: string
+  /** Id of the artifact that references this ghost (maps to a real file). */
+  readonly sourceId: string
   readonly fileTitle: string
   readonly context: string
 }
@@ -144,7 +145,7 @@ export function buildGhostIndex(
       if (!displayContext) continue
 
       references.push({
-        filePath: ghostId,
+        sourceId: srcId,
         fileTitle: artifact.title,
         context: displayContext
       })

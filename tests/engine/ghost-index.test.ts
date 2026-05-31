@@ -156,6 +156,9 @@ describe('buildGhostIndex', () => {
     expect(result[0].id).toBe('Richard Hamming')
     expect(result[0].referenceCount).toBe(1)
     expect(result[0].references[0].fileTitle).toBe('You and Your Research')
+    // sourceId is the referencing artifact's id (not the ghost's own id),
+    // so the renderer can map a reference straight to its source file.
+    expect(result[0].references[0].sourceId).toBe('essay-1')
     expect(result[0].references[0].context).toContain('Richard Hamming')
     // Context should have wikilinks stripped
     expect(result[0].references[0].context).not.toContain('[[')

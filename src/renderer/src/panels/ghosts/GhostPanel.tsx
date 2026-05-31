@@ -8,7 +8,6 @@ import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
 import { colors, transitions, typography } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { groupByFrequency } from './ghost-sections'
-import type { Artifact } from '@shared/types'
 
 // ---------------------------------------------------------------------------
 // SVG Icons (14x14 viewBox 0 0 16 16)
@@ -265,11 +264,10 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
 interface GhostRowProps {
   readonly ghost: GhostEntry
   readonly maxCount: number
-  readonly artifacts: readonly Artifact[]
   readonly onDismiss: () => void
 }
 
-function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
+function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
   const [hovered, setHovered] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
   const contextBtnRef = useRef<HTMLButtonElement>(null)
@@ -280,16 +278,11 @@ function GhostRow({ ghost, maxCount, artifacts, onDismiss }: GhostRowProps) {
   const handleCreate = useCallback(async () => {
     if (isEmerging) return
 
-    const refPaths = artifacts
-      .filter((a) => ghost.references.some((r) => r.fileTitle === a.title))
-      .map((a) => {
-        const pathById = useVaultStore.getState().artifactPathById
-        return pathById[a.id] ?? ''
-      })
-      .filter(Boolean)
+    const pathById = useVaultStore.getState().artifactPathById
+    const refPaths = ghost.references.map((r) => pathById[r.sourceId] ?? '').filter(Boolean)
 
     await emerge(ghost.id, ghost.id, refPaths)
-  }, [ghost, artifacts, emerge, isEmerging])
+  }, [ghost, emerge, isEmerging])
 
   const handleShowGraph = useCallback(() => {
     useThreadStore.getState().openOrFocusDockTab({ kind: 'graph' })
@@ -528,7 +521,6 @@ export function GhostPanel() {
                 key={ghost.id}
                 ghost={ghost}
                 maxCount={maxCount}
-                artifacts={artifacts}
                 onDismiss={() => dismissGhost(ghost.id)}
               />
             ))}
