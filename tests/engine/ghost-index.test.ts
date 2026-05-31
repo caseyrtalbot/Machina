@@ -6,6 +6,7 @@ import {
   isPathGhost,
   stripWikilinksFromContext
 } from '../../src/renderer/src/engine/ghost-index'
+import { buildGraph } from '../../src/shared/engine/graph-builder'
 import type { KnowledgeGraph, GraphNode, GraphEdge, Artifact } from '../../src/shared/types'
 
 function makeNode(id: string, path?: string): GraphNode {
@@ -272,6 +273,32 @@ describe('buildGhostIndex', () => {
 
     // Deduplicated to one reference per source file
     expect(result[0].referenceCount).toBe(1)
+  })
+
+  it('does not emit real cross-referencing artifacts as ghosts', () => {
+    // buildGraph never stamps `path` on its nodes, so the old `!node.path`
+    // predicate flagged every node — two real, file-backed artifacts that
+    // reference each other surfaced the referenced one as a ghost. Build the
+    // graph the real way to prove the fix gates on artifact membership, not path.
+    const artifacts = [
+      makeArtifact({
+        id: 'a',
+        title: 'A',
+        body: 'see [[b]]',
+        bodyLinks: ['b'],
+        related: ['b']
+      }),
+      makeArtifact({
+        id: 'b',
+        title: 'B',
+        body: 'see [[a]]',
+        bodyLinks: ['a'],
+        related: ['a']
+      })
+    ]
+    const graph = buildGraph(artifacts)
+
+    expect(buildGhostIndex(graph, artifacts)).toEqual([])
   })
 })
 

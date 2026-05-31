@@ -68,8 +68,9 @@ function escapeRegex(str: string): string {
 /**
  * Build the ghost index from the knowledge graph and parsed artifacts.
  *
- * Ghost nodes are graph nodes with no `path` (no backing .md file).
- * For each ghost, collects all referencing artifacts with sentence context.
+ * Ghost nodes are graph nodes with no backing artifact (an unresolved
+ * [[wikilink]] target). For each ghost, collects all referencing artifacts
+ * with sentence context.
  *
  * Filters out path-based ghosts (containing '/') which are structural
  * navigation wikilinks, not intellectual gaps worth triaging.
@@ -80,9 +81,17 @@ export function buildGhostIndex(
   graph: KnowledgeGraph,
   artifacts: readonly Artifact[]
 ): readonly GhostEntry[] {
+  const artifactById = new Map<string, Artifact>()
+  for (const a of artifacts) {
+    artifactById.set(a.id, a)
+  }
+
+  // A ghost is a graph node with no backing artifact. buildGraph never stamps
+  // `path` on nodes, so the old `!node.path` predicate matched every node and
+  // leaned entirely on the context heuristic below; gate on artifact membership.
   const ghostIds = new Set<string>()
   for (const node of graph.nodes) {
-    if (!node.path && !isPathGhost(node.id)) ghostIds.add(node.id)
+    if (!artifactById.has(node.id) && !isPathGhost(node.id)) ghostIds.add(node.id)
   }
 
   if (ghostIds.size === 0) return []
@@ -107,11 +116,6 @@ export function buildGhostIndex(
         reverseEdges.set(edge.source, new Set([edge.target]))
       }
     }
-  }
-
-  const artifactById = new Map<string, Artifact>()
-  for (const a of artifacts) {
-    artifactById.set(a.id, a)
   }
 
   const entries: GhostEntry[] = []
