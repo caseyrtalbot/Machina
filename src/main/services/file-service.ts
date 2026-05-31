@@ -1,8 +1,6 @@
-import { readFile, writeFile, unlink, readdir, mkdir, rename, stat, realpath } from 'fs/promises'
+import { readFile, writeFile, unlink, readdir, mkdir, stat, realpath } from 'fs/promises'
 import { join, extname, dirname } from 'path'
 import { existsSync } from 'fs'
-import { tmpdir } from 'os'
-import { randomUUID } from 'crypto'
 import {
   teDirPath,
   teConfigPath,
@@ -11,6 +9,7 @@ import {
   teArtifactKindDirPath,
   teArtifactPath
 } from '../utils/paths'
+import { atomicWrite } from '../utils/atomic-write'
 import { shouldIgnore } from './gitignore-filter'
 import type { FsErrorLog } from './fs-error-log'
 import type { Ignore } from 'ignore'
@@ -55,20 +54,7 @@ export class FileService {
 
   async writeFile(path: string, content: string): Promise<void> {
     try {
-      const tmpPath = join(tmpdir(), `te-write-${randomUUID()}.tmp`)
-      try {
-        await writeFile(tmpPath, content, 'utf-8')
-        await rename(tmpPath, path)
-      } catch (err: unknown) {
-        // Cross-device rename: fall back to same-directory atomic write
-        if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
-          const localTmp = path + '.tmp'
-          await writeFile(localTmp, content, 'utf-8')
-          await rename(localTmp, path)
-        } else {
-          throw err
-        }
-      }
+      await atomicWrite(path, content)
     } catch (err: unknown) {
       this.errorLog?.push(path, String(err))
       throw err

@@ -7,6 +7,14 @@ import { randomUUID } from 'node:crypto'
 import { ArtifactMaterializer } from '../artifact-materializer'
 import type { CompiledArticleDraft } from '@shared/agent-artifact-types'
 
+// Partial-mock the shared atomic writer so the real implementation runs by
+// default and individual tests can inject a one-shot write failure.
+vi.mock('../../utils/atomic-write', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../utils/atomic-write')>()
+  return { ...actual, atomicWrite: vi.fn(actual.atomicWrite) }
+})
+import { atomicWrite } from '../../utils/atomic-write'
+
 function createTestVault(): string {
   const base = join(tmpdir(), `te-mat-test-${Date.now()}-${randomUUID().slice(0, 8)}`)
   mkdirSync(base, { recursive: true })
@@ -143,13 +151,11 @@ describe('ArtifactMaterializer', () => {
       const draft1 = makeDraft({ title: 'Good One' })
       const draft2 = makeDraft({ title: 'Bad One' })
 
-      // Spy on the internal write: first call writes for real, second fails
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const writeSpy = vi.spyOn(materializer as any, '_atomicWrite')
-      writeSpy
-        .mockImplementationOnce(async (...args: unknown[]) => {
+      // First write succeeds for real, second fails — exercises mid-batch rollback.
+      vi.mocked(atomicWrite)
+        .mockImplementationOnce(async (path: string, content: string) => {
           const { writeFile: fsWriteFile } = await import('fs/promises')
-          await fsWriteFile(args[0] as string, args[1] as string, 'utf-8')
+          await fsWriteFile(path, content, 'utf-8')
         })
         .mockRejectedValueOnce(new Error('disk full'))
 

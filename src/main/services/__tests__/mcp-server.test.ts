@@ -211,6 +211,38 @@ describe('MCP Server', () => {
     await server.close()
   })
 
+  it('project.map_folder rejects an out-of-vault rootPath', async () => {
+    const { client, server } = await createConnectedPair(vaultRoot)
+
+    const result = await client.callTool({
+      name: 'project.map_folder',
+      arguments: { rootPath: '/etc' }
+    })
+
+    expect(result.isError).toBe(true)
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text
+    expect(text).toContain('Path guard violation')
+
+    await client.close()
+    await server.close()
+  })
+
+  it('canvas.get_snapshot rejects an out-of-vault canvasPath', async () => {
+    const { client, server } = await createConnectedPair(vaultRoot)
+
+    const result = await client.callTool({
+      name: 'canvas.get_snapshot',
+      arguments: { canvasPath: '/etc/passwd' }
+    })
+
+    expect(result.isError).toBe(true)
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text
+    expect(text).toContain('Path guard violation')
+
+    await client.close()
+    await server.close()
+  })
+
   it('search.query returns openable source paths for vault.read_file', async () => {
     const { client, server } = await createConnectedPair(vaultRoot)
 

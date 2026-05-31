@@ -8,6 +8,14 @@ import { randomUUID } from 'node:crypto'
 import { ArtifactMaterializer } from '../../src/main/services/artifact-materializer'
 import type { AgentArtifactDraft } from '../../src/shared/agent-artifact-types'
 
+// Partial-mock the shared atomic writer: real implementation by default, with a
+// one-shot rejection used to simulate a failed write in the materialize-fail action.
+vi.mock('../../src/main/utils/atomic-write', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/main/utils/atomic-write')>()
+  return { ...actual, atomicWrite: vi.fn(actual.atomicWrite) }
+})
+import { atomicWrite } from '../../src/main/utils/atomic-write'
+
 function createTestVault(): string {
   const base = join(tmpdir(), `te-prop-${Date.now()}-${randomUUID().slice(0, 8)}`)
   mkdirSync(base, { recursive: true })
@@ -70,20 +78,12 @@ describe('ArtifactMaterializer property tests', () => {
                 break
               }
               case 'materialize-fail': {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const origWrite = (mat as any)['_atomicWrite']
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ;(mat as any)['_atomicWrite'] = async () => {
-                  throw new Error('injected failure')
-                }
+                vi.mocked(atomicWrite).mockRejectedValueOnce(new Error('injected failure'))
                 try {
                   const draft = makeDraft(action.title)
                   await mat.materializeBatch([draft], vault, outputDir)
                 } catch {
                   // Expected failure
-                } finally {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  ;(mat as any)['_atomicWrite'] = origWrite
                 }
                 break
               }

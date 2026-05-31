@@ -154,6 +154,8 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
       }
     },
     async ({ rootPath, expandDepth, maxNodes }) => {
+      // Enforce the vault boundary + audit before any filesystem walk.
+      const resolvedRoot = facade.assertReadable(rootPath, 'project.map_folder')
       const opts = {
         ...DEFAULT_PROJECT_MAP_OPTIONS,
         ...(expandDepth !== undefined ? { expandDepth } : {}),
@@ -185,11 +187,11 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         }
       }
 
-      await walkDir(rootPath)
+      await walkDir(resolvedRoot)
 
-      const snapshot = buildProjectMapSnapshot(rootPath, fileInputs, opts)
+      const snapshot = buildProjectMapSnapshot(resolvedRoot, fileInputs, opts)
       const json = JSON.stringify(snapshot)
-      const wrapped = wrapSpotlighting('project.map_folder', rootPath, json)
+      const wrapped = wrapSpotlighting('project.map_folder', resolvedRoot, json)
       return { content: [{ type: 'text' as const, text: wrapped }] }
     }
   )
@@ -204,12 +206,13 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
       }
     },
     async ({ canvasPath }) => {
-      const raw = await readFile(canvasPath, 'utf-8')
+      const resolved = facade.assertReadable(canvasPath, 'canvas.get_snapshot')
+      const raw = await readFile(resolved, 'utf-8')
       const file: CanvasFile = JSON.parse(raw)
-      const stats = await stat(canvasPath)
+      const stats = await stat(resolved)
       const result = { file, mtime: stats.mtime.toISOString() }
       const json = JSON.stringify(result)
-      const wrapped = wrapSpotlighting('canvas.get_snapshot', canvasPath, json)
+      const wrapped = wrapSpotlighting('canvas.get_snapshot', resolved, json)
       return { content: [{ type: 'text' as const, text: wrapped }] }
     }
   )
@@ -337,14 +340,16 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         }
       },
       async ({ canvasPath, expectedMtime, plan }) => {
+        // Enforce the vault boundary + audit before prompting or touching disk.
+        const resolved = facade.assertReadable(canvasPath, 'canvas.apply_plan')
         const rateExceeded = rateLimiter?.isExceeded() ?? false
 
         const decision = await gate.confirm({
           tool: 'canvas.apply_plan',
-          path: canvasPath,
+          path: resolved,
           description: rateExceeded
             ? 'Write rate limit exceeded. Confirm to continue.'
-            : `Apply ${plan.summary.addedNodes} nodes + ${plan.summary.addedEdges} edges to ${canvasPath}`,
+            : `Apply ${plan.summary.addedNodes} nodes + ${plan.summary.addedEdges} edges to ${resolved}`,
           contentPreview: JSON.stringify(plan.summary)
         })
 
@@ -356,7 +361,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         }
 
         // Optimistic lock: check mtime
-        const stats = await stat(canvasPath)
+        const stats = await stat(resolved)
         const currentMtime = stats.mtime.toISOString()
         if (currentMtime !== expectedMtime) {
           return {
@@ -371,7 +376,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         }
 
         // Validate all ops
-        const raw = await readFile(canvasPath, 'utf-8')
+        const raw = await readFile(resolved, 'utf-8')
         const file = JSON.parse(raw) as Partial<CanvasFile>
         const existingNodes = Array.isArray(file.nodes) ? file.nodes : []
         const error = validateCanvasMutationOps(
@@ -388,7 +393,7 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
         rateLimiter?.record()
 
         // Ops validated by validateCanvasOp loop above; cast is safe post-validation
-        opts?.dispatchCanvasPlan?.(plan as unknown as CanvasMutationPlan, canvasPath)
+        opts?.dispatchCanvasPlan?.(plan as unknown as CanvasMutationPlan, resolved)
 
         return {
           content: [

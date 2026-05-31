@@ -12,6 +12,7 @@ import {
   type VaultMachinaConfig
 } from '../../shared/thread-storage-types'
 import { encodeThread, decodeThread } from './thread-md'
+import { atomicWrite } from '../utils/atomic-write'
 
 const SAFE_ID = /^[a-z0-9-]+$/
 
@@ -125,7 +126,7 @@ export class ThreadStorage {
 
   async writeConfig(cfg: VaultMachinaConfig): Promise<void> {
     await fs.mkdir(path.dirname(this.configFile()), { recursive: true })
-    await fs.writeFile(this.configFile(), JSON.stringify(cfg, null, 2), 'utf8')
+    await atomicWrite(this.configFile(), JSON.stringify(cfg, null, 2))
   }
 }
 

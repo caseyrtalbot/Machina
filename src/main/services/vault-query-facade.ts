@@ -4,9 +4,10 @@
  * Wraps PathGuard (boundary enforcement) and AuditLogger (security audit trail)
  * to provide query and write methods for the MCP server.
  */
-import { readFile, stat, writeFile as fsWriteFile, open } from 'node:fs/promises'
+import { readFile, stat, open } from 'node:fs/promises'
 import matter from 'gray-matter'
 import { PathGuardError } from '@shared/agent-types'
+import { atomicWrite } from '../utils/atomic-write'
 import type { PathGuard } from './path-guard'
 import type { AuditLogger } from './audit-logger'
 import type { SearchEngine, SearchHit } from '@shared/engine/search-engine'
@@ -68,6 +69,40 @@ export class VaultQueryFacade {
     this.searchEngine = deps?.searchEngine
     this.vaultIndex = deps?.vaultIndex
     this.documentManager = deps?.documentManager
+  }
+
+  /**
+   * Enforce the vault boundary for a raw read path and record an audit entry.
+   * Returns the canonicalized in-vault path; throws (logged as 'denied') for
+   * out-of-vault, deny-listed, or null-byte paths. Lets tools that do their own
+   * filesystem I/O (project.map_folder, canvas.get_snapshot) share the same
+   * PathGuard + audit chokepoint as readFile/writeFile.
+   */
+  assertReadable(filePath: string, tool: string): string {
+    const start = Date.now()
+    try {
+      const resolved = this.guard.assertWithinVault(filePath)
+      this.logger.log({
+        ts: new Date().toISOString(),
+        tool,
+        args: { path: filePath },
+        affectedPaths: [resolved],
+        decision: 'allowed',
+        durationMs: Date.now() - start
+      })
+      return resolved
+    } catch (err) {
+      this.logger.log({
+        ts: new Date().toISOString(),
+        tool,
+        args: { path: filePath },
+        affectedPaths: [filePath],
+        decision: 'denied',
+        durationMs: Date.now() - start,
+        error: err instanceof PathGuardError ? err.message : String(err)
+      })
+      throw err
+    }
   }
 
   async readFile(filePath: string): Promise<string> {
@@ -132,7 +167,8 @@ export class VaultQueryFacade {
     // Register with DocumentManager to suppress vault watcher echo
     this.documentManager?.registerExternalWrite(resolved)
 
-    await fsWriteFile(resolved, stamped, 'utf-8')
+    // Atomic write so an interrupted agent write never truncates a user's note.
+    await atomicWrite(resolved, stamped)
 
     this.logger.log({
       ts: new Date().toISOString(),
