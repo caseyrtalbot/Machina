@@ -75,4 +75,39 @@ describe('rewriteWikilinks', () => {
   it('handles deeply nested path prefixes', () => {
     expect(rewriteWikilinks('[[a/b/c/OldName]]', 'OldName', 'newname')).toBe('[[a/b/c/newname]]')
   })
+
+  it('rewrites a heading-anchored link and preserves the anchor', () => {
+    expect(rewriteWikilinks('see [[Old#Section]]', 'Old', 'New')).toBe('see [[New#Section]]')
+  })
+
+  it('rewrites a block-ref-anchored link and preserves the anchor', () => {
+    expect(rewriteWikilinks('see [[Old#^abc123]]', 'Old', 'New')).toBe('see [[New#^abc123]]')
+  })
+
+  it('rewrites an anchored link with an alias', () => {
+    expect(rewriteWikilinks('[[Old#Section|display]]', 'Old', 'New')).toBe(
+      '[[New#Section|display]]'
+    )
+  })
+
+  it('rewrites a path-prefixed anchored link', () => {
+    expect(rewriteWikilinks('[[docs/Old#Section]]', 'Old', 'New')).toBe('[[docs/New#Section]]')
+  })
+
+  it('rewrites a path-prefixed anchored link with an alias', () => {
+    expect(rewriteWikilinks('[[docs/Old#Heading|disp]]', 'Old', 'New')).toBe(
+      '[[docs/New#Heading|disp]]'
+    )
+  })
+
+  it('preserves an empty anchor', () => {
+    expect(rewriteWikilinks('[[Old#]]', 'Old', 'New')).toBe('[[New#]]')
+  })
+
+  it('does not match a longer stem when renaming an anchored link', () => {
+    // Renaming 'Old' must not touch '[[Older#X]]' or '[[OldThing#Y]]'.
+    expect(rewriteWikilinks('[[Older#X]] and [[OldThing#Y]]', 'Old', 'New')).toBe(
+      '[[Older#X]] and [[OldThing#Y]]'
+    )
+  })
 })
