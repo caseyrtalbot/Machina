@@ -31,10 +31,14 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const handleChangeVault = useCallback(async () => {
-    const path = await window.api.fs.selectVault()
-    if (path) {
-      setSettingsOpen(false)
-      await onLoadVault(path)
+    try {
+      const path = await window.api.fs.selectVault()
+      if (path) {
+        setSettingsOpen(false)
+        await onLoadVault(path)
+      }
+    } catch (err) {
+      logError('change-vault', err)
     }
   }, [onLoadVault])
 
@@ -42,7 +46,7 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   useEffect(() => {
     const handler = (e: Event) => {
       const path = (e as CustomEvent<string>).detail
-      if (path) void onLoadVault(path)
+      if (path) onLoadVault(path).catch((err) => logError('open-vault', err))
     }
     window.addEventListener('te:open-vault', handler)
     return () => window.removeEventListener('te:open-vault', handler)
@@ -207,9 +211,11 @@ export default function App() {
   useEffect(() => {
     window.api.config
       .read('app', 'lastVaultPath')
-      .then((savedPath) => {
-        if (typeof savedPath === 'string' && savedPath) orchestrateLoad(savedPath)
-      })
+      // Return the load chain so its rejections (vault.init, watchStart, chunk
+      // reads with timeout) route to the .catch instead of going unhandled.
+      .then((savedPath) =>
+        typeof savedPath === 'string' && savedPath ? orchestrateLoad(savedPath) : undefined
+      )
       .catch((err) => logError('load-last-vault', err))
   }, [orchestrateLoad])
 

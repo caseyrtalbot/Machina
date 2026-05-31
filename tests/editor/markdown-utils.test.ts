@@ -223,4 +223,45 @@ describe('serializeFrontmatter', () => {
     expect(reparsed.data.order).toBe(5)
     expect(reparsed.data.tags).toEqual(['x', 'y'])
   })
+
+  // --- Regression: values with YAML-significant chars must not corrupt on reparse (C1) ---
+
+  it('quotes a value containing a colon so it reparses intact', () => {
+    const result = serializeFrontmatter({ title: 'Notes: part 2' })
+    expect(result).toBe('---\ntitle: "Notes: part 2"\n---\n')
+    expect(parseFrontmatter(result + '\nBody').data.title).toBe('Notes: part 2')
+  })
+
+  it.each([
+    ['colon', 'a: b'],
+    ['leading bracket', '[draft]'],
+    ['leading brace', '{x}'],
+    ['hash', '#tag'],
+    ['leading dash', '- bullet'],
+    ['quotes inside', 'she said "hi"'],
+    ['backslash', 'C:\\path'],
+    ['leading/trailing space', '  spaced  '],
+    ['empty string', ''],
+    ['number-looking string', '90210'],
+    ['bool-looking string', 'true'],
+    ['comma', 'a, b, c']
+  ])('round-trips a string value with %s', (_label, value) => {
+    const out = serializeFrontmatter({ field: value })
+    expect(parseFrontmatter(out + '\nBody').data.field).toBe(value)
+    // number/bool-looking strings must stay strings, not coerce
+    expect(typeof parseFrontmatter(out + '\nBody').data.field).toBe('string')
+  })
+
+  it('round-trips array items containing significant chars', () => {
+    const out = serializeFrontmatter({ tags: ['a: b', '#x', 'plain'] })
+    expect(parseFrontmatter(out + '\nBody').data.tags).toEqual(['a: b', '#x', 'plain'])
+  })
+
+  it('keeps plain alphanumeric values unquoted (no formatting churn)', () => {
+    const out = serializeFrontmatter({ title: 'My Note', created: '2026-04-06', n: 5, b: true })
+    expect(out).toContain('title: My Note')
+    expect(out).toContain('created: 2026-04-06')
+    expect(out).toContain('n: 5')
+    expect(out).toContain('b: true')
+  })
 })

@@ -5,11 +5,24 @@
 
 export type PropertyValue = string | number | boolean | readonly string[]
 
+const ESCAPE_MAP: Record<string, string> = { n: '\n', t: '\t', '"': '"', '\\': '\\' }
+
+/** Strip surrounding quotes from a YAML scalar token and unescape. Inverse of `encodeScalar`. */
+function decodeQuoted(raw: string): string {
+  if (raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')) {
+    return raw.slice(1, -1).replace(/\\(.)/g, (_, c) => ESCAPE_MAP[c] ?? c)
+  }
+  if (raw.length >= 2 && raw.startsWith("'") && raw.endsWith("'")) {
+    return raw.slice(1, -1).replace(/''/g, "'")
+  }
+  return raw
+}
+
 /** Parse a YAML scalar value, preserving booleans and numbers. Quoted values stay strings. */
 function parseScalarValue(raw: string): string | number | boolean {
   const isQuoted =
     (raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))
-  if (isQuoted) return raw.slice(1, -1)
+  if (isQuoted) return decodeQuoted(raw)
 
   if (raw === 'true') return true
   if (raw === 'false') return false
@@ -58,7 +71,7 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     // Array item under a key
     if (/^\s+-\s/.test(trimmed) && currentKey) {
       if (!currentList) currentList = []
-      currentList.push(trimmed.replace(/^\s+-\s*/, '').replace(/^['"]|['"]$/g, ''))
+      currentList.push(decodeQuoted(trimmed.replace(/^\s+-\s*/, '')))
       continue
     }
 
@@ -85,7 +98,7 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
       data[k] = value
         .slice(1, -1)
         .split(',')
-        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+        .map((s) => decodeQuoted(s.trim()))
         .filter(Boolean)
     } else {
       data[k] = parseScalarValue(value)
@@ -113,8 +126,32 @@ export function migrateLegacyWikilinks(markdown: string): string {
 }
 
 /**
+ * Values needing double-quoting to survive a YAML reparse: empty strings,
+ * leading/trailing whitespace, a leading indicator char, any YAML-significant
+ * character, or a string that would otherwise coerce to a bool/null/number.
+ */
+const NEEDS_QUOTE = /[:#[\]{}&*!|>'"%@`,]|^[\s?-]|\s$|^(?:true|false|null|~|-?\d+(?:\.\d+)?)$/i
+
+/** Serialize one scalar to a YAML token. Inverse of `parseScalarValue` + `decodeQuoted`. */
+function encodeScalar(value: string | number | boolean): string {
+  if (typeof value === 'boolean') return value ? 'true' : 'false'
+  if (typeof value === 'number') return String(value)
+  if (value === '' || NEEDS_QUOTE.test(value)) {
+    const escaped = value
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t')
+    return `"${escaped}"`
+  }
+  return value
+}
+
+/**
  * Serialize frontmatter data back to a raw YAML block.
- * Only used if the original raw block is unavailable.
+ * Runs on every property edit (FrontmatterHeader.dispatchChange), so it must
+ * produce YAML that round-trips through both `parseFrontmatter` and the
+ * main-process gray-matter reparse. Scalars are quoted when unsafe (`encodeScalar`).
  */
 export function serializeFrontmatter(data: Record<string, PropertyValue>): string {
   const entries = Object.entries(data)
@@ -123,9 +160,9 @@ export function serializeFrontmatter(data: Record<string, PropertyValue>): strin
   const lines = entries.map(([key, value]) => {
     if (Array.isArray(value)) {
       if (value.length === 0) return `${key}:`
-      return `${key}:\n${value.map((v) => `  - ${v}`).join('\n')}`
+      return `${key}:\n${value.map((v) => `  - ${encodeScalar(v)}`).join('\n')}`
     }
-    return `${key}: ${value}`
+    return `${key}: ${encodeScalar(value as string | number | boolean)}`
   })
 
   return `---\n${lines.join('\n')}\n---\n`
