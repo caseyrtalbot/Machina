@@ -8,6 +8,7 @@ import {
   setAgentContext,
   type BlockMetadata
 } from '../block-model'
+import { SECRET_RESCAN_OVERLAP } from '../secrets'
 
 const meta = (): BlockMetadata => ({
   sessionId: 's1',
@@ -176,6 +177,26 @@ describe('appendOutput', () => {
     expect(after3.secrets).toHaveLength(2)
     expect(after3.secrets[0].kind).toBe('anthropic')
     expect(after3.secrets[1].kind).toBe('aws-access')
+  })
+
+  it('retains a secret whose span straddles the rescan-window boundary', () => {
+    const b = pendingBlock('b1', meta())
+    const enc = new TextEncoder()
+    // 57-char secret, terminated by a space so the greedy rule stops at its true end.
+    const secret = 'sk-ant-' + 'D'.repeat(50)
+    const chunk1 = `${secret} `
+    // Size the filler so the final append's naive rescanStart (len - OVERLAP)
+    // lands 10 chars into the secret span — i.e. start < rescanStart < end.
+    const straddleOffset = 10
+    const filler = 'x'.repeat(SECRET_RESCAN_OVERLAP + straddleOffset - chunk1.length)
+    const after1 = appendOutput(b, enc.encode(chunk1), chunk1)
+    expect(after1.secrets).toHaveLength(1)
+    const after2 = appendOutput(after1, enc.encode(filler), filler)
+    expect(after2.secrets).toHaveLength(1)
+    // outputText.length is now OVERLAP + straddleOffset; the next append makes the
+    // naive rescanStart = straddleOffset, which bisects the secret at [0, 57).
+    const after3 = appendOutput(after2, enc.encode('!'), '!')
+    expect(after3.secrets).toEqual([{ kind: 'anthropic', start: 0, end: secret.length }])
   })
 })
 

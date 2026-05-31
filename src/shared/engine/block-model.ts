@@ -124,7 +124,13 @@ export function appendOutput(block: Block, chunkBytes: Uint8Array, chunkText: st
 
   // Re-scan only the new chunk plus an overlap window so a secret split across
   // two chunks still flags. Secrets fully outside the rescan region are kept.
-  const rescanStart = Math.max(0, block.outputText.length - SECRET_RESCAN_OVERLAP)
+  // If a prior secret straddles the naive window boundary, widen the window back
+  // to its start so the whole token is re-found (else it falls out of both the
+  // kept-filter and the sliced rescan and silently leaks). Secrets are
+  // non-overlapping and sorted, so at most one can contain the boundary point.
+  const naiveStart = Math.max(0, block.outputText.length - SECRET_RESCAN_OVERLAP)
+  const straddler = block.secrets.find((s) => s.start < naiveStart && s.end > naiveStart)
+  const rescanStart = straddler ? straddler.start : naiveStart
   const rescanRegion = outputText.slice(rescanStart)
   const newRefs = scanSecrets(rescanRegion).map((s) => ({
     kind: s.kind,
