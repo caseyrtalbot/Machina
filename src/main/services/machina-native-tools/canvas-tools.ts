@@ -125,6 +125,13 @@ export async function pinToCanvas(
     const next: CanvasFileShape = { ...canvas, nodes }
     try {
       await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      ctx.audit?.log({
+        ts: new Date().toISOString(),
+        tool: 'pin_to_canvas',
+        args: { canvasId, cardId: node.id },
+        affectedPaths: [path.relative(ctx.vaultPath, file)],
+        decision: 'allowed'
+      })
       ctx.dispatchCanvasPlan?.(
         buildAgentPlan([{ type: 'add-node', node }], { ...EMPTY_PLAN_SUMMARY, addedNodes: 1 }),
         file
@@ -176,6 +183,13 @@ export async function unpinFromCanvas(
     const next: CanvasFileShape = { ...canvas, nodes: nextNodes, edges: nextEdges }
     try {
       await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      ctx.audit?.log({
+        ts: new Date().toISOString(),
+        tool: 'unpin_from_canvas',
+        args: { canvasId, cardId },
+        affectedPaths: [path.relative(ctx.vaultPath, file)],
+        decision: 'allowed'
+      })
       // remove-node in applyPlanOps cascades to drop matching edges, so we
       // do not need to enumerate removed edges in the plan ops.
       ctx.dispatchCanvasPlan?.(
@@ -259,6 +273,13 @@ export async function focusCanvas(
     const next: CanvasFileShape = { ...canvas, viewport }
     try {
       await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
+      ctx.audit?.log({
+        ts: new Date().toISOString(),
+        tool: 'focus_canvas',
+        args: { canvasId },
+        affectedPaths: [path.relative(ctx.vaultPath, file)],
+        decision: 'allowed'
+      })
       return { ok: true, output: { canvasId, viewport } }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

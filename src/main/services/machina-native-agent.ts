@@ -1,9 +1,13 @@
+import { join } from 'node:path'
+import { app } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
 import { resolveAnthropicKey } from './anthropic-key'
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { NATIVE_TOOLS } from '@shared/machina-native-tools'
 import { callTool, clearApproval } from './machina-native-tools'
+import { AuditLogger } from './audit-logger'
+import { WriteRateLimiter } from './hitl-gate'
 import type { AgentNativeEventBody, DockAction } from '@shared/ipc-channels'
 import type { DockTab } from '@shared/dock-types'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
@@ -199,6 +203,16 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
   // resolve a kind to the right index without an extra round-trip.
   let dockTabs: DockTab[] = opts.dockTabsSnapshot ? [...opts.dockTabsSnapshot] : []
 
+  // One audit sink + write-velocity tracker per run. The in-app native agent
+  // previously left no audit trail and, under autoAccept, no write checkpoint.
+  // Audit logs go outside the vault, next to the MCP path's, at app userData/audit.
+  // Scope note: unlike the MCP path's per-vault WriteRateLimiter (mcp-lifecycle),
+  // this one is per-run, so it guards against a single runaway turn emitting many
+  // writes — NOT cross-turn velocity. That's the intended threat here; a burst
+  // spread thin across many turns is not what autoAccept loops produce.
+  const audit = new AuditLogger(join(app.getPath('userData'), 'audit'))
+  const rateLimiter = new WriteRateLimiter()
+
   void (async () => {
     try {
       for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
@@ -269,7 +283,9 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
               const window = getMainWindow()
               if (window) typedSend(window, 'canvas:agent-plan-accepted', { plan, canvasPath })
             },
-            signal: abort.signal
+            signal: abort.signal,
+            audit,
+            rateLimiter
           })
           emittedToolUseIds.delete(tu.id)
           // Restart the timeout for the next SDK iteration.

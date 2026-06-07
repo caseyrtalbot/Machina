@@ -3,9 +3,15 @@ import type { Thread, ThreadMessage, ToolCall, ToolResult } from '@shared/thread
 import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { TE_DIR } from '@shared/constants'
+import { withTimeout } from '../utils/ipc-timeout'
 
 const MACHINA_NATIVE_SYSTEM_PROMPT =
   'You are Machina, a thoughtful assistant for the user’s vault. Keep replies concise and grounded.'
+
+// run() resolves once the main process has accepted the request and produced a
+// runId; model output streams later over agent-native:event. Bound only that
+// call-to-runId latency so a stalled IPC can't leave the input bar wedged.
+const AGENT_RUN_START_TIMEOUT_MS = 15_000
 
 interface ThreadState {
   vaultPath: string | null
@@ -303,17 +309,48 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
           : []
       )
     const dockTabsSnapshot = get().dockTabsByThreadId[id] ?? []
-    const { runId } = await window.api.agentNative.run({
-      vaultPath: v,
-      threadId: id,
-      model: t.model,
-      systemPrompt: MACHINA_NATIVE_SYSTEM_PROMPT,
-      userMessage: text,
-      historyMessages: history,
-      autoAccept: t.autoAcceptSession ?? false,
-      dockTabsSnapshot
-    })
-    set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
+    try {
+      const { runId } = await withTimeout(
+        window.api.agentNative.run({
+          vaultPath: v,
+          threadId: id,
+          model: t.model,
+          systemPrompt: MACHINA_NATIVE_SYSTEM_PROMPT,
+          userMessage: text,
+          historyMessages: history,
+          autoAccept: t.autoAcceptSession ?? false,
+          dockTabsSnapshot
+        }),
+        AGENT_RUN_START_TIMEOUT_MS,
+        `agent-native:run ${id}`
+      )
+      set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
+    } catch (err) {
+      // The turn never started (timeout or IPC failure). Clear the in-flight
+      // flag so the input bar unwedges, and surface why as a system message.
+      // Tradeoff: run() returns the runId synchronously today, so the only way
+      // to time out is a hung/contended main process. If run() were merely slow
+      // and resolved just after 15s, its late runId is dropped here — strictly
+      // better than the prior infinite wedge, but the rare orphaned run would
+      // not be Stop-abortable. Acceptable until run() can actually block.
+      const message = err instanceof Error ? err.message : String(err)
+      set((s) => {
+        const flight = { ...s.inFlightByThreadId }
+        delete flight[id]
+        return { inFlightByThreadId: flight }
+      })
+      const failed = get().threadsById[id]
+      if (failed) {
+        const sys: ThreadMessage = {
+          role: 'system',
+          body: `Agent run failed to start: ${message}`,
+          sentAt: new Date().toISOString()
+        }
+        const next: Thread = { ...failed, messages: [...failed.messages, sys] }
+        set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
+        await window.api.thread.save(v, next)
+      }
+    }
   },
 
   appendAssistantStreamChunk: (threadId, chunk) =>

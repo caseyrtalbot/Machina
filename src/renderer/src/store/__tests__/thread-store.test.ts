@@ -122,6 +122,33 @@ describe('thread-store', () => {
     expect((window as any).api.thread.save).not.toHaveBeenCalled()
   })
 
+  it('clears in-flight and appends a system message when agentNative.run never returns a runId', async () => {
+    vi.useFakeTimers()
+    try {
+      // run() returns a promise that never resolves — simulates the main process
+      // accepting the IPC but never producing a runId (the wedge condition).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.agentNative = { run: vi.fn(() => new Promise(() => {})) }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: sampleThread('a') }
+      })
+      const p = useThreadStore.getState().appendUserMessage('hello')
+      // Advance past the 15s start-timeout, flushing microtasks along the way.
+      await vi.advanceTimersByTimeAsync(15_000)
+      await p
+
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+      const msgs = useThreadStore.getState().threadsById['a'].messages
+      const sys = msgs.find((m) => m.role === 'system')
+      expect(sys).toBeDefined()
+      expect(sys?.body).toContain('failed to start')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('toggleAutoAccept flips the per-thread autoAcceptSession flag in memory only (no disk write)', () => {
     useThreadStore.setState({
       vaultPath: '/v',

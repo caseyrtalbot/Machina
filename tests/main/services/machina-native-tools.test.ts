@@ -16,6 +16,8 @@ import {
   clearApproval,
   decideApproval
 } from '../../../src/main/services/machina-native-tools'
+import { WriteRateLimiter } from '../../../src/main/services/hitl-gate'
+import type { AuditEntry } from '../../../src/shared/agent-types'
 
 describe('machina-native-tools read_note', () => {
   it('reads a vault note', async () => {
@@ -582,6 +584,160 @@ describe('machina-native-tools write_note', () => {
       expect(r1.ok).toBe(false)
       const r2 = await callTool('write_note', { path: 'a.md' }, { vaultPath: v, autoAccept: true })
       expect(r2.ok).toBe(false)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('machina-native-tools audit + write-velocity checkpoint', () => {
+  function captureAudit(): { entries: AuditEntry[]; audit: { log: (e: AuditEntry) => void } } {
+    const entries: AuditEntry[] = []
+    return { entries, audit: { log: (e) => entries.push(e) } }
+  }
+
+  it('writes an allowed audit entry on a successful write_note', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const { entries, audit } = captureAudit()
+      const res = await callTool(
+        'write_note',
+        { path: 'a.md', content: 'hi\n' },
+        { vaultPath: v, autoAccept: true, audit }
+      )
+      expect(res.ok).toBe(true)
+      expect(entries).toHaveLength(1)
+      expect(entries[0].tool).toBe('write_note')
+      expect(entries[0].decision).toBe('allowed')
+      expect(entries[0].affectedPaths).toEqual(['a.md'])
+      expect(entries[0].args).toMatchObject({ path: 'a.md', created: true })
+      expect(typeof entries[0].ts).toBe('string')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('writes an allowed audit entry on a successful edit_note', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'e.md'), 'before\n')
+      const { entries, audit } = captureAudit()
+      const res = await callTool(
+        'edit_note',
+        { path: 'e.md', find: 'before', replace: 'after' },
+        { vaultPath: v, autoAccept: true, audit }
+      )
+      expect(res.ok).toBe(true)
+      expect(entries).toHaveLength(1)
+      expect(entries[0].tool).toBe('edit_note')
+      expect(entries[0].decision).toBe('allowed')
+      expect(entries[0].affectedPaths).toEqual(['e.md'])
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('audits a successful pin_to_canvas', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      mkdirSync(path.join(v, '.machina', 'canvas'), { recursive: true })
+      writeFileSync(
+        path.join(v, '.machina', 'canvas', 'main.json'),
+        JSON.stringify({ version: 1, nodes: [], edges: [] }, null, 2)
+      )
+      const { entries, audit } = captureAudit()
+      const res = await callTool(
+        'pin_to_canvas',
+        { canvasId: 'main', card: { title: 'Pinned' } },
+        { vaultPath: v, autoAccept: true, audit }
+      )
+      expect(res.ok).toBe(true)
+      expect(entries).toHaveLength(1)
+      expect(entries[0].tool).toBe('pin_to_canvas')
+      expect(entries[0].decision).toBe('allowed')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('does NOT audit a write rejected at the approval gate', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const { entries, audit } = captureAudit()
+      const promise = callTool(
+        'write_note',
+        { path: 'denied.md', content: 'x' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          audit,
+          toolUseId: 'toolu_audit_deny',
+          emitPending: () => {}
+        }
+      )
+      await new Promise((r) => setTimeout(r, 20))
+      decideApproval('toolu_audit_deny', false, 'no')
+      const res = await promise
+      expect(res.ok).toBe(false)
+      expect(entries).toHaveLength(0)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('forces a human checkpoint under autoAccept once the write velocity is exceeded', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const limiter = new WriteRateLimiter()
+      // Pre-load to the 10/min threshold so the next write trips isExceeded().
+      for (let i = 0; i < 10; i++) limiter.record()
+      let pendingEmitted = false
+      const promise = callTool(
+        'write_note',
+        { path: 'gated.md', content: 'x' },
+        {
+          vaultPath: v,
+          autoAccept: true, // would normally skip the prompt
+          rateLimiter: limiter,
+          toolUseId: 'toolu_rate_1',
+          emitPending: () => {
+            pendingEmitted = true
+          }
+        }
+      )
+      await new Promise((r) => setTimeout(r, 20))
+      expect(pendingEmitted).toBe(true) // checkpoint forced despite autoAccept
+      expect(existsSync(path.join(v, 'gated.md'))).toBe(false) // write held pending approval
+      decideApproval('toolu_rate_1', true)
+      const res = await promise
+      expect(res.ok).toBe(true)
+      expect(existsSync(path.join(v, 'gated.md'))).toBe(true)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('does not force a checkpoint under autoAccept while velocity is under the limit', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const limiter = new WriteRateLimiter()
+      let pendingEmitted = false
+      const res = await callTool(
+        'write_note',
+        { path: 'ok.md', content: 'x' },
+        {
+          vaultPath: v,
+          autoAccept: true,
+          rateLimiter: limiter,
+          toolUseId: 'toolu_rate_2',
+          emitPending: () => {
+            pendingEmitted = true
+          }
+        }
+      )
+      expect(res.ok).toBe(true)
+      expect(pendingEmitted).toBe(false)
+      expect(existsSync(path.join(v, 'ok.md'))).toBe(true)
     } finally {
       rmSync(v, { recursive: true, force: true })
     }

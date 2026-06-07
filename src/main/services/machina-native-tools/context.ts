@@ -3,8 +3,9 @@ import type { ToolErrorCode } from '@shared/thread-types'
 import type { AgentNativeApprovalPreview, DockAction } from '@shared/ipc-channels'
 import type { DockTab } from '@shared/dock-types'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
-import { PathGuardError } from '@shared/agent-types'
+import { PathGuardError, type AuditEntry } from '@shared/agent-types'
 import { PathGuard } from '../path-guard'
+import type { WriteRateLimiter } from '../hitl-gate'
 
 interface ApprovalDecision {
   readonly accept: boolean
@@ -57,6 +58,14 @@ export interface ToolContext {
    * pin_to_canvas) check or wire this to short-circuit instead of running to
    * completion after the user has already pressed Stop. */
   readonly signal?: AbortSignal
+  /** Append-only audit sink for security-relevant writes. Injected per run by
+   * the native agent runner so in-app writes leave the same NDJSON trail the
+   * headless MCP path already produces. Absent in unit calls that don't assert it. */
+  readonly audit?: { readonly log: (entry: AuditEntry) => void }
+  /** Sliding-window write-velocity tracker shared across a run's writes. Under
+   * autoAccept, an exceeded limiter forces a one-off human checkpoint on the
+   * next write so a looping agent can't write unboundedly without review. */
+  readonly rateLimiter?: WriteRateLimiter
 }
 
 export type NativeToolResult =

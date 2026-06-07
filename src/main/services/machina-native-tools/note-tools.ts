@@ -287,12 +287,17 @@ export async function writeNote(
   content: string,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
+  const start = Date.now()
   const resolved = resolveInVault(ctx.vaultPath, rel)
   if (!resolved.ok) return resolved
   const abs = resolved.abs
   const created = !(await pathExists(abs))
 
-  if (!ctx.autoAccept && ctx.toolUseId && ctx.emitPending) {
+  // autoAccept skips the per-write confirm — but a runaway agent looping on
+  // writes should still hit a human checkpoint. An exceeded write velocity
+  // forces the approval prompt for this one write even under autoAccept.
+  const forceCheckpoint = ctx.rateLimiter?.isExceeded() ?? false
+  if ((!ctx.autoAccept || forceCheckpoint) && ctx.toolUseId && ctx.emitPending) {
     ctx.emitPending(ctx.toolUseId, {
       approvalKind: 'write_note',
       preview: { path: rel, content, created }
@@ -313,6 +318,15 @@ export async function writeNote(
   try {
     await fs.mkdir(path.dirname(abs), { recursive: true })
     await atomicWrite(abs, content)
+    ctx.rateLimiter?.record()
+    ctx.audit?.log({
+      ts: new Date().toISOString(),
+      tool: 'write_note',
+      args: { path: rel, created },
+      affectedPaths: [rel],
+      decision: 'allowed',
+      durationMs: Date.now() - start
+    })
     return {
       ok: true,
       output: { created, path: rel, bytes: Buffer.byteLength(content, 'utf8') }
@@ -350,6 +364,7 @@ export async function editNote(
   replace: string,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
+  const start = Date.now()
   const resolved = resolveInVault(ctx.vaultPath, rel)
   if (!resolved.ok) return resolved
   const abs = resolved.abs
@@ -388,7 +403,8 @@ export async function editNote(
     }
   }
 
-  if (!ctx.autoAccept && ctx.toolUseId && ctx.emitPending) {
+  const forceCheckpoint = ctx.rateLimiter?.isExceeded() ?? false
+  if ((!ctx.autoAccept || forceCheckpoint) && ctx.toolUseId && ctx.emitPending) {
     ctx.emitPending(ctx.toolUseId, {
       approvalKind: 'edit_note',
       preview: { path: rel, find, replace }
@@ -409,6 +425,15 @@ export async function editNote(
   const next = content.replace(find, replace)
   try {
     await atomicWrite(abs, next)
+    ctx.rateLimiter?.record()
+    ctx.audit?.log({
+      ts: new Date().toISOString(),
+      tool: 'edit_note',
+      args: { path: rel },
+      affectedPaths: [rel],
+      decision: 'allowed',
+      durationMs: Date.now() - start
+    })
     return {
       ok: true,
       output: {
