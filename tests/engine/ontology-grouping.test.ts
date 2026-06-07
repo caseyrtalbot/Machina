@@ -178,7 +178,7 @@ describe('computeOntologySnapshot', () => {
       expect(childGroups.map((g) => g.label).sort()).toEqual(['emergence', 'feedback'])
     })
 
-    it('flattens tags deeper than MAX_GROUP_DEPTH', () => {
+    it('flattens tags deeper than two levels', () => {
       const cards = [makeCard('c1')]
       const fileToId: Record<string, string> = { '/vault/c1.md': 'a1' }
       const artifacts: Record<string, TestArtifact> = {
@@ -199,6 +199,25 @@ describe('computeOntologySnapshot', () => {
         kind: 'user-tag',
         tagPaths: ['systems/feedback/positive']
       })
+    })
+
+    it('flattens arbitrarily deep tags into a single child label', () => {
+      const cards = [makeCard('c1')]
+      const fileToId: Record<string, string> = { '/vault/c1.md': 'a1' }
+      const artifacts: Record<string, TestArtifact> = {
+        a1: makeArtifact('a1', ['systems/a/b/c'])
+      }
+
+      const result = computeOntologySnapshot({
+        cards,
+        fileToId,
+        artifacts,
+        graphEdges: []
+      })
+
+      const childGroups = Object.values(result.groupsById).filter((g) => g.parentGroupId !== null)
+      expect(childGroups).toHaveLength(1)
+      expect(childGroups[0].label).toBe('a/b/c')
     })
   })
 

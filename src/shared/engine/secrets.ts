@@ -18,6 +18,14 @@ interface Rule {
 
 // Higher priority wins on overlap. Order roughly mirrors specificity.
 const RULES: readonly Rule[] = [
+  // PEM private-key blocks span multiple lines. Top priority so the whole block
+  // span wins overlap — a base64 body line that happens to match another shape
+  // can't carve the block into fragments.
+  {
+    kind: 'pem-private-key',
+    priority: 110,
+    pattern: /-----BEGIN[ A-Z]*PRIVATE KEY-----[\s\S]*?-----END[ A-Z]*PRIVATE KEY-----/g
+  },
   { kind: 'anthropic', priority: 100, pattern: /sk-ant-[A-Za-z0-9\-_]{40,}/g },
   // High-FP standalone, but unambiguous when prefixed by AWS_SECRET_ACCESS_KEY=.
   // Promoted above env-var-key so the captured value range wins on overlap.
@@ -31,7 +39,9 @@ const RULES: readonly Rule[] = [
     priority: 90,
     pattern: /(?:OPENAI|ANTHROPIC|GITHUB|AWS|GOOGLE|GCP)_(?:API_)?(?:SECRET_ACCESS_)?KEY=\S+/g
   },
+  { kind: 'google-api', priority: 85, pattern: /AIza[0-9A-Za-z\-_]{35}/g },
   { kind: 'openai', priority: 80, pattern: /sk-[A-Za-z0-9]{32,}/g },
+  { kind: 'slack', priority: 75, pattern: /xox[baprs]-[0-9A-Za-z-]{10,}/g },
   { kind: 'github-pat', priority: 70, pattern: /ghp_[A-Za-z0-9]{36}/g },
   { kind: 'aws-access', priority: 60, pattern: /AKIA[0-9A-Z]{16}/g },
   {

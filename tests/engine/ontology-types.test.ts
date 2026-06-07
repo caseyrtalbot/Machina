@@ -9,7 +9,6 @@ import {
   type InterGroupEdge,
   type OntologyLayoutResult,
   ONTOLOGY_COLOR_TOKENS,
-  MAX_GROUP_DEPTH,
   LINK_CLUSTER_MIN_SIZE
 } from '@shared/engine/ontology-types'
 
@@ -118,10 +117,6 @@ describe('ontology-types', () => {
   describe('constants', () => {
     it('ONTOLOGY_COLOR_TOKENS has 8 entries', () => {
       expect(ONTOLOGY_COLOR_TOKENS).toHaveLength(8)
-    })
-
-    it('MAX_GROUP_DEPTH is 2', () => {
-      expect(MAX_GROUP_DEPTH).toBe(2)
     })
 
     it('LINK_CLUSTER_MIN_SIZE is 3', () => {

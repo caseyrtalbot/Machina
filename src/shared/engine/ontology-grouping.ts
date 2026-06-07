@@ -8,7 +8,6 @@ import type {
 import {
   groupId,
   revisionId,
-  MAX_GROUP_DEPTH,
   ONTOLOGY_COLOR_TOKENS,
   EDGE_WEIGHT_TABLE,
   LINK_CLUSTER_MIN_SIZE
@@ -245,35 +244,20 @@ function assignPrimaryTags(
 // --- Step 3: Sub-grouping by nested tags ---
 
 /**
- * Parse a full tag path into [rootTag, subTag?], enforcing MAX_GROUP_DEPTH.
+ * Split a full tag path into a root and a single (flattened) sub-label.
  *
- * - "systems" -> ["systems", null]
- * - "systems/feedback" -> ["systems", "feedback"]
- * - "systems/feedback/positive" -> ["systems", "feedback/positive"]  (flattened)
+ * - "systems" -> { root: "systems", sub: null }
+ * - "systems/feedback" -> { root: "systems", sub: "feedback" }
+ * - "systems/feedback/positive" -> { root: "systems", sub: "feedback/positive" }
  *
- * MAX_GROUP_DEPTH = 2 means root (depth 1) + one child (depth 2).
- * Everything beyond depth 2 is collapsed into the child label.
+ * Everything past the root collapses into one child label. The two-level cap
+ * (root + one child) is enforced structurally by buildGroups, which only ever
+ * creates root and child groups — never grandchildren — so there is no depth
+ * arithmetic to do here.
  */
 function parseTagPath(fullTag: string): { root: string; sub: string | null } {
-  const segments = fullTag.split('/')
-  const root = segments[0]
-
-  if (segments.length <= 1) {
-    return { root, sub: null }
-  }
-
-  // MAX_GROUP_DEPTH controls how many nesting levels are allowed.
-  // Depth 1 = root group, depth 2 = one child level.
-  // Segments beyond (MAX_GROUP_DEPTH - 1) get collapsed into a single child label.
-  const maxChildSegments = MAX_GROUP_DEPTH - 1
-  const childSegments = segments.slice(1)
-
-  if (childSegments.length <= maxChildSegments) {
-    return { root, sub: childSegments.join('/') }
-  }
-
-  // Flatten: join all remaining segments into one sub-label
-  return { root, sub: childSegments.join('/') }
+  const [root, ...rest] = fullTag.split('/')
+  return { root, sub: rest.length > 0 ? rest.join('/') : null }
 }
 
 function buildGroups(
@@ -321,7 +305,7 @@ function buildGroups(
         rootGroup.tagPaths.push(assignment.fullTag)
       }
     } else {
-      // Has sub-tag: card goes into a child group (flattened per MAX_GROUP_DEPTH)
+      // Has sub-tag: card goes into a child group (deeper paths flattened into the label)
       const childKey = `${parsed.root}/${parsed.sub}`
 
       let childGroup = childGroups.get(childKey)

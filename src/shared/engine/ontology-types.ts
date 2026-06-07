@@ -12,7 +12,6 @@ export function revisionId(id: string): RevisionId {
 
 // --- Constants ---
 
-export const MAX_GROUP_DEPTH = 2
 export const LINK_CLUSTER_MIN_SIZE = 3
 
 export const ONTOLOGY_COLOR_TOKENS = [

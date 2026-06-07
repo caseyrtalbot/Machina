@@ -74,6 +74,39 @@ describe('scanSecrets', () => {
       expect(hit).toBeDefined()
       expect(text.slice(hit!.start, hit!.end)).toBe('OPENAI_API_KEY=hunter2-not-really-a-key')
     })
+
+    it('flags a Google API key (AIza + 35 chars)', () => {
+      const sample = 'AIza' + 'A'.repeat(35)
+      const text = `googleApiKey=${sample}`
+      const refs = scanSecrets(text)
+      const hit = refs.find((r) => r.kind === 'google-api')
+      expect(hit).toBeDefined()
+      expect(text.slice(hit!.start, hit!.end)).toBe(sample)
+    })
+
+    it('flags a Slack token (xoxb-…)', () => {
+      const sample = 'xoxb-' + '0123456789abcdef'
+      const text = `token ${sample} here`
+      const refs = scanSecrets(text)
+      const hit = refs.find((r) => r.kind === 'slack')
+      expect(hit).toBeDefined()
+      expect(text.slice(hit!.start, hit!.end)).toBe(sample)
+    })
+
+    it('flags an entire PEM private-key block as one span', () => {
+      const sample =
+        '-----BEGIN RSA PRIVATE KEY-----\n' +
+        'MIIEowIBAAKCAQEA1234567890abcdefghijklmnop\n' +
+        'qrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ098765\n' +
+        '-----END RSA PRIVATE KEY-----'
+      const text = `config:\n${sample}\ntrailing`
+      const refs = scanSecrets(text)
+      const hit = refs.find((r) => r.kind === 'pem-private-key')
+      expect(hit).toBeDefined()
+      // Top priority means the whole block is one ref, not fragmented by
+      // any sub-shape its base64 body might match.
+      expect(text.slice(hit!.start, hit!.end)).toBe(sample)
+    })
   })
 
   describe('overlap resolution', () => {
