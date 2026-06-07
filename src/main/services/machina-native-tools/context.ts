@@ -66,6 +66,11 @@ export interface ToolContext {
    * autoAccept, an exceeded limiter forces a one-off human checkpoint on the
    * next write so a looping agent can't write unboundedly without review. */
   readonly rateLimiter?: WriteRateLimiter
+  /** Structural slice of DocumentManager. Injected per run so native note
+   * writes register the self-write and the vault watcher suppresses the echo
+   * (no spurious doc:external-change for an open note) — the same backstop the
+   * MCP path's VaultQueryFacade already applies. Absent in unit calls. */
+  readonly documentManager?: { readonly registerExternalWrite: (path: string) => void }
 }
 
 export type NativeToolResult =

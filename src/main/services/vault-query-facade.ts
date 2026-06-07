@@ -7,7 +7,7 @@
 import { readFile, stat, open } from 'node:fs/promises'
 import matter from 'gray-matter'
 import { PathGuardError } from '@shared/agent-types'
-import { atomicWrite } from '../utils/atomic-write'
+import { writeStampedNote } from '../utils/note-write'
 import type { PathGuard } from './path-guard'
 import type { AuditLogger } from './audit-logger'
 import type { SearchEngine, SearchHit } from '@shared/engine/search-engine'
@@ -161,14 +161,9 @@ export class VaultQueryFacade {
       }
     }
 
-    // Stamp provenance in frontmatter
-    const stamped = this.stampProvenance(content, opts.agentId)
-
-    // Register with DocumentManager to suppress vault watcher echo
-    this.documentManager?.registerExternalWrite(resolved)
-
-    // Atomic write so an interrupted agent write never truncates a user's note.
-    await atomicWrite(resolved, stamped)
+    // Stamp provenance, suppress watcher echo, and write atomically. Shared
+    // with the native agent tools so both write paths use one implementation.
+    await writeStampedNote(resolved, content, opts.agentId, this.documentManager)
 
     this.logger.log({
       ts: new Date().toISOString(),
@@ -204,7 +199,12 @@ export class VaultQueryFacade {
       throw new MissingIdError(filePath)
     }
 
-    // Stamp creation provenance
+    // Stamp creation provenance.
+    // FAST-FOLLOW: this matter.stringify re-parses parsed.content, so a body
+    // that itself starts with '---' (e.g. '---\nid: a\n---\n---\nbody\n') is
+    // shattered — the same class of bug fixed in note-write.stampProvenance.
+    // Lower risk here (create-only, requires a valid id: mapping, never
+    // overwrites). Converge createFile onto the hardened stampProvenance helper.
     const data = {
       ...parsed.data,
       created_by: opts.agentId,
@@ -231,20 +231,6 @@ export class VaultQueryFacade {
       decision: 'allowed',
       durationMs: Date.now() - start
     })
-  }
-
-  /**
-   * Inject modified_by and modified_at into file frontmatter.
-   * Parses existing frontmatter, adds provenance fields, re-serializes.
-   */
-  private stampProvenance(content: string, agentId: string): string {
-    const parsed = matter(content)
-    const data = {
-      ...parsed.data,
-      modified_by: agentId,
-      modified_at: new Date().toISOString()
-    }
-    return matter.stringify(parsed.content, data)
   }
 
   search(query: string, limit?: number): readonly SearchHit[] {

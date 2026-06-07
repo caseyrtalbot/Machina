@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import matter from 'gray-matter'
 import {
   mkdtempSync,
   writeFileSync,
@@ -458,7 +459,11 @@ describe('machina-native-tools write_note', () => {
         expect(out.path).toBe('new.md')
         expect(out.bytes).toBe(12)
       }
-      expect(readFileSync(path.join(v, 'new.md'), 'utf8')).toBe('hello world\n')
+      // Native writes now stamp provenance (converged with the MCP facade): the
+      // body is preserved verbatim and modified_by is recorded in frontmatter.
+      const written = matter(readFileSync(path.join(v, 'new.md'), 'utf8'))
+      expect(written.content).toBe('hello world\n')
+      expect(written.data.modified_by).toBe('native-agent')
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
@@ -477,7 +482,9 @@ describe('machina-native-tools write_note', () => {
       if (res.ok) {
         expect((res.output as { created: boolean }).created).toBe(false)
       }
-      expect(readFileSync(path.join(v, 'existing.md'), 'utf8')).toBe('new\n')
+      const written = matter(readFileSync(path.join(v, 'existing.md'), 'utf8'))
+      expect(written.content).toBe('new\n')
+      expect(written.data.modified_by).toBe('native-agent')
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
@@ -492,7 +499,8 @@ describe('machina-native-tools write_note', () => {
         { vaultPath: v, autoAccept: true }
       )
       expect(res.ok).toBe(true)
-      expect(readFileSync(path.join(v, 'deep/nested/note.md'), 'utf8')).toBe('x')
+      // Body is preserved byte-for-byte (no forced trailing newline).
+      expect(matter(readFileSync(path.join(v, 'deep/nested/note.md'), 'utf8')).content).toBe('x')
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
@@ -542,7 +550,7 @@ describe('machina-native-tools write_note', () => {
       decideApproval('toolu_test_1', true)
       const res = await promise
       expect(res.ok).toBe(true)
-      expect(readFileSync(path.join(v, 'gated.md'), 'utf8')).toBe('gated\n')
+      expect(matter(readFileSync(path.join(v, 'gated.md'), 'utf8')).content).toBe('gated\n')
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
@@ -744,6 +752,111 @@ describe('machina-native-tools audit + write-velocity checkpoint', () => {
   })
 })
 
+describe('machina-native-tools provenance + echo suppression (AD2)', () => {
+  it('registers the external write on a successful write_note so the watcher echo is suppressed', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const documentManager = { registerExternalWrite: vi.fn() }
+      const res = await callTool(
+        'write_note',
+        { path: 'note.md', content: 'body\n' },
+        { vaultPath: v, autoAccept: true, documentManager }
+      )
+      expect(res.ok).toBe(true)
+      expect(documentManager.registerExternalWrite).toHaveBeenCalledOnce()
+      const registered = documentManager.registerExternalWrite.mock.calls[0][0] as string
+      expect(path.isAbsolute(registered)).toBe(true)
+      expect(registered.endsWith('note.md')).toBe(true)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('does NOT register an external write when the write is rejected at the gate', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const documentManager = { registerExternalWrite: vi.fn() }
+      const promise = callTool(
+        'write_note',
+        { path: 'denied.md', content: 'x' },
+        {
+          vaultPath: v,
+          autoAccept: false,
+          documentManager,
+          toolUseId: 'toolu_echo_deny',
+          emitPending: () => {}
+        }
+      )
+      await new Promise((r) => setTimeout(r, 20))
+      decideApproval('toolu_echo_deny', false, 'no')
+      const res = await promise
+      expect(res.ok).toBe(false)
+      expect(documentManager.registerExternalWrite).not.toHaveBeenCalled()
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('registers the external write on a successful edit_note', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'e.md'), 'before\n')
+      const documentManager = { registerExternalWrite: vi.fn() }
+      const res = await callTool(
+        'edit_note',
+        { path: 'e.md', find: 'before', replace: 'after' },
+        { vaultPath: v, autoAccept: true, documentManager }
+      )
+      expect(res.ok).toBe(true)
+      expect(documentManager.registerExternalWrite).toHaveBeenCalledOnce()
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('does not corrupt a write_note body whose first line is --- ', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const body = '---\nthis line is body, not frontmatter\nmore body\n'
+      const res = await callTool(
+        'write_note',
+        { path: 'rule.md', content: body },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(true)
+      const written = matter(readFileSync(path.join(v, 'rule.md'), 'utf8'))
+      expect(written.data.modified_by).toBe('native-agent')
+      expect(written.content).toBe(body)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves existing frontmatter through an edit_note body change (gray-matter round-trip)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(
+        path.join(v, 'fm.md'),
+        '---\nid: note-123\ntags:\n  - alpha\n  - beta\n---\nfirst line\nNEEDLE\nlast line\n'
+      )
+      const res = await callTool(
+        'edit_note',
+        { path: 'fm.md', find: 'NEEDLE', replace: 'REPLACED' },
+        { vaultPath: v, autoAccept: true }
+      )
+      expect(res.ok).toBe(true)
+      const parsed = matter(readFileSync(path.join(v, 'fm.md'), 'utf8'))
+      // Existing frontmatter survives; the body edit applied; provenance stamped.
+      expect(parsed.data.id).toBe('note-123')
+      expect(parsed.data.tags).toEqual(['alpha', 'beta'])
+      expect(parsed.data.modified_by).toBe('native-agent')
+      expect(parsed.content).toBe('first line\nREPLACED\nlast line\n')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('machina-native-tools edit_note', () => {
   it('replaces a unique find with autoAccept and returns diff_stats', async () => {
     const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
@@ -763,7 +876,9 @@ describe('machina-native-tools edit_note', () => {
         expect(out.path).toBe('a.md')
         expect(out.diff_stats).toEqual({ added: 2, removed: 1 })
       }
-      expect(readFileSync(path.join(v, 'a.md'), 'utf8')).toBe('one\nTWO\nadded\nthree\n')
+      const edited = matter(readFileSync(path.join(v, 'a.md'), 'utf8'))
+      expect(edited.content).toBe('one\nTWO\nadded\nthree\n')
+      expect(edited.data.modified_by).toBe('native-agent')
     } finally {
       rmSync(v, { recursive: true, force: true })
     }
@@ -864,7 +979,9 @@ describe('machina-native-tools edit_note', () => {
       decideApproval('toolu_edit_1', true)
       const res = await promise
       expect(res.ok).toBe(true)
-      expect(readFileSync(path.join(v, 'gated.md'), 'utf8')).toBe('before\nFOUND\nafter\n')
+      expect(matter(readFileSync(path.join(v, 'gated.md'), 'utf8')).content).toBe(
+        'before\nFOUND\nafter\n'
+      )
     } finally {
       rmSync(v, { recursive: true, force: true })
     }

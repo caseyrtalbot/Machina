@@ -6,6 +6,7 @@ import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { NATIVE_TOOLS } from '@shared/machina-native-tools'
 import { callTool, clearApproval } from './machina-native-tools'
+import { getDocumentManager } from '../ipc/documents'
 import { AuditLogger } from './audit-logger'
 import { WriteRateLimiter } from './hitl-gate'
 import type { AgentNativeEventBody, DockAction } from '@shared/ipc-channels'
@@ -285,7 +286,8 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
             },
             signal: abort.signal,
             audit,
-            rateLimiter
+            rateLimiter,
+            documentManager: getDocumentManager()
           })
           emittedToolUseIds.delete(tu.id)
           // Restart the timeout for the next SDK iteration.

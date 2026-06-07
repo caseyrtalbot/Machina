@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { glob } from 'glob'
-import { atomicWrite } from '../../utils/atomic-write'
+import { writeStampedNote } from '../../utils/note-write'
 import { awaitApproval, resolveInVault, type NativeToolResult, type ToolContext } from './context'
 
 const SEARCH_HIT_LIMIT = 200
@@ -317,7 +317,9 @@ export async function writeNote(
 
   try {
     await fs.mkdir(path.dirname(abs), { recursive: true })
-    await atomicWrite(abs, content)
+    // Shared safe-write path: stamps provenance + suppresses the watcher echo
+    // (no spurious doc:external-change), same mechanics as the MCP facade.
+    await writeStampedNote(abs, content, 'native-agent', ctx.documentManager)
     ctx.rateLimiter?.record()
     ctx.audit?.log({
       ts: new Date().toISOString(),
@@ -329,6 +331,9 @@ export async function writeNote(
     })
     return {
       ok: true,
+      // bytes = the agent's authored payload size, deliberately excluding the
+      // provenance stamp (which it didn't write and can't predict). Keep it
+      // input-based so the value stays deterministic — do NOT switch to on-disk size.
       output: { created, path: rel, bytes: Buffer.byteLength(content, 'utf8') }
     }
   } catch (err) {
@@ -424,7 +429,7 @@ export async function editNote(
 
   const next = content.replace(find, replace)
   try {
-    await atomicWrite(abs, next)
+    await writeStampedNote(abs, next, 'native-agent', ctx.documentManager)
     ctx.rateLimiter?.record()
     ctx.audit?.log({
       ts: new Date().toISOString(),
