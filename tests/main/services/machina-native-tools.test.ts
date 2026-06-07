@@ -1505,3 +1505,57 @@ describe('machina-native-tools PathGuard hardening (XC-1)', () => {
     }
   })
 })
+
+// QW5: canvas writers computed their file path from canvasId with no PathGuard —
+// the CANVAS_ID_RE check at the barrel was the only boundary. A canvasId that
+// passes the regex but resolves through a symlink out of the vault would escape.
+// canvasFilePath now routes through resolveInVault/PathGuard, so every canvas
+// reader and writer inherits the symlink/traversal backstop.
+describe('machina-native-tools canvas PathGuard backstop (QW5)', () => {
+  const SEED = JSON.stringify({ nodes: [], edges: [] })
+
+  function vaultWithCanvasSymlinkedOut(): { v: string; outside: string } {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    const outside = mkdtempSync(path.join(tmpdir(), 'outside-'))
+    writeFileSync(path.join(outside, 'evil.json'), SEED)
+    mkdirSync(path.join(v, '.machina'), { recursive: true })
+    // .machina/canvas is a symlink pointing out of the vault. canvasId 'evil'
+    // passes CANVAS_ID_RE, so only the PathGuard backstop can catch this.
+    symlinkSync(outside, path.join(v, '.machina', 'canvas'))
+    return { v, outside }
+  }
+
+  it('rejects read_canvas when the canvas path resolves outside the vault', async () => {
+    const { v, outside } = vaultWithCanvasSymlinkedOut()
+    try {
+      const res = await callTool(
+        'read_canvas',
+        { canvasId: 'evil' },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects focus_canvas (a writer) and leaves the external file untouched', async () => {
+    const { v, outside } = vaultWithCanvasSymlinkedOut()
+    try {
+      const res = await callTool(
+        'focus_canvas',
+        { canvasId: 'evil', viewport: { x: 250, y: -100, zoom: 1.5 } },
+        { vaultPath: v, autoAccept: false }
+      )
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error.code).toBe('PATH_OUT_OF_VAULT')
+      // The guard rejects before enqueueCanvasWrite, so no write reaches disk.
+      expect(readFileSync(path.join(outside, 'evil.json'), 'utf8')).toBe(SEED)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+})

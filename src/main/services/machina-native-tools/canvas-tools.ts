@@ -4,7 +4,7 @@ import { createCanvasNode } from '@shared/canvas-types'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import { TE_DIR } from '@shared/constants'
 import { enqueueCanvasWrite } from '../canvas-write-queue'
-import type { NativeToolResult, ToolContext } from './context'
+import { resolveInVault, type NativeToolResult, type ToolContext } from './context'
 
 export const CANVAS_ID_RE = /^[a-zA-Z0-9_-]+$/
 
@@ -24,14 +24,17 @@ interface PinCardInput {
   readonly refs?: readonly string[]
 }
 
-// Canvas writes do not go through resolveInVault/PathGuard — the CANVAS_ID_RE
-// check at the barrel (callTool) IS the boundary, structurally confining the
-// path to .machina/canvas/<id>.json. Do not loosen CANVAS_ID_RE (e.g. to allow
-// '/' for nested canvases) without routing these writes through resolveInVault,
-// or the canvas path loses its symlink/traversal backstop.
-function canvasFilePath(vault: string, canvasId: string): string {
-  if (canvasId === 'default') return path.join(vault, TE_DIR, 'canvas.json')
-  return path.join(vault, TE_DIR, 'canvas', `${canvasId}.json`)
+// canvasId is validated by CANVAS_ID_RE at the barrel (callTool) as a fast first
+// reject, then the computed path is routed through resolveInVault/PathGuard here
+// so every canvas reader and writer inherits the symlink/traversal backstop —
+// the regex alone can't catch a `.machina/canvas/<id>.json` that symlinks out of
+// the vault. Returns a ResolveResult; callers must short-circuit on `!ok`.
+function canvasFilePath(vault: string, canvasId: string): ReturnType<typeof resolveInVault> {
+  const rel =
+    canvasId === 'default'
+      ? path.join(TE_DIR, 'canvas.json')
+      : path.join(TE_DIR, 'canvas', `${canvasId}.json`)
+  return resolveInVault(vault, rel)
 }
 
 function buildAgentPlan(
@@ -56,7 +59,9 @@ const EMPTY_PLAN_SUMMARY: CanvasMutationPlan['summary'] = {
 }
 
 export async function readCanvas(canvasId: string, ctx: ToolContext): Promise<NativeToolResult> {
-  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  const resolved = canvasFilePath(ctx.vaultPath, canvasId)
+  if (!resolved.ok) return resolved
+  const file = resolved.abs
   try {
     const raw = await fs.readFile(file, 'utf8')
     const parsed = JSON.parse(raw) as CanvasFileShape
@@ -84,7 +89,9 @@ export async function pinToCanvas(
   card: PinCardInput,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
-  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  const resolved = canvasFilePath(ctx.vaultPath, canvasId)
+  if (!resolved.ok) return resolved
+  const file = resolved.abs
   return enqueueCanvasWrite(file, async () => {
     let canvas: CanvasFileShape
     try {
@@ -149,7 +156,9 @@ export async function unpinFromCanvas(
   cardId: string,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
-  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  const resolved = canvasFilePath(ctx.vaultPath, canvasId)
+  if (!resolved.ok) return resolved
+  const file = resolved.abs
   return enqueueCanvasWrite(file, async () => {
     let canvas: CanvasFileShape
     try {
@@ -258,7 +267,9 @@ export async function focusCanvas(
   viewport: { x: number; y: number; zoom: number },
   ctx: ToolContext
 ): Promise<NativeToolResult> {
-  const file = canvasFilePath(ctx.vaultPath, canvasId)
+  const resolved = canvasFilePath(ctx.vaultPath, canvasId)
+  if (!resolved.ok) return resolved
+  const file = resolved.abs
   return enqueueCanvasWrite(file, async () => {
     let canvas: CanvasFileShape
     try {

@@ -111,6 +111,18 @@ describe('PathGuard', () => {
     expect(() => guard.assertWithinVault(filePath)).toThrow(PathGuardError)
   })
 
+  it('rejects dotenv-family files (.env.local, .env.production)', () => {
+    expect(() => guard.assertWithinVault(join(vaultRoot, '.env.local'))).toThrow(PathGuardError)
+    expect(() => guard.assertWithinVault(join(vaultRoot, '.env.production'))).toThrow(
+      PathGuardError
+    )
+  })
+
+  it('permits environment.md (not a dotenv file)', () => {
+    const filePath = join(vaultRoot, 'environment.md')
+    expect(guard.assertWithinVault(filePath)).toBe(filePath)
+  })
+
   it('rejects node_modules paths', () => {
     const filePath = join(vaultRoot, 'node_modules', 'pkg', 'index.js')
     expect(() => guard.assertWithinVault(filePath)).toThrow(PathGuardError)

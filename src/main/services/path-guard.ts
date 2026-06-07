@@ -9,8 +9,16 @@
 import { PathGuardError } from '@shared/agent-types'
 import { canonicalizePath } from '../utils/paths'
 
-/** Segments that are always denied, even inside the vault. */
-const DENY_LIST = new Set(['.git', '.ssh', '.env', 'node_modules', '.DS_Store'])
+/** Exact segment names that are always denied, even inside the vault. */
+const DENY_LIST = new Set(['.git', '.ssh', 'node_modules', '.DS_Store'])
+
+/**
+ * Dotenv-family files are always denied: `.env`, `.env.local`, `.env.production`,
+ * etc. A pattern (not an exact-name set entry) so the whole family is caught
+ * while ordinary names like `environment.md` stay permitted. Strictly tightens
+ * the deny list — never newly permits anything.
+ */
+const DOTENV_SEGMENT_RE = /^\.env(\.|$)/
 
 /**
  * Stateless path guard bound to a specific vault root.
@@ -87,7 +95,7 @@ export class PathGuard {
     const segments = relative.split('/')
 
     for (const segment of segments) {
-      if (DENY_LIST.has(segment)) {
+      if (DENY_LIST.has(segment) || DOTENV_SEGMENT_RE.test(segment)) {
         throw new PathGuardError(
           resolved,
           this.resolvedRoot,
