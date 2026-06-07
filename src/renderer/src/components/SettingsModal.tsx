@@ -431,16 +431,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         <div className="settings-content flex-1 overflow-y-auto">
           {/* ── Appearance ── */}
           <SectionHeading>Appearance</SectionHeading>
-          <SettingRow label="Accent">
-            <SelectInput
-              value={accentId === 'custom' ? customAccentHex : accentId}
-              options={ACCENT_PRESETS.map((p) => ({
-                value: p.id,
-                label: `${p.label} · ${p.hex}`
-              }))}
-              onChange={(v) => setAccentId(v as AccentId)}
-            />
-          </SettingRow>
           <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
           {accentId === 'custom' && (
             <div style={{ padding: '0 0 14px' }}>

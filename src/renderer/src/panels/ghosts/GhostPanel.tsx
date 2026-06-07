@@ -312,7 +312,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
           width: 32,
           height: 3,
           background: 'rgba(255, 255, 255, 0.04)',
-          borderRadius: 2,
+          borderRadius: 0,
           overflow: 'hidden',
           flexShrink: 0
         }}
@@ -322,7 +322,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
             width: barWidth,
             height: '100%',
             background: colors.accent.default,
-            borderRadius: 2,
+            borderRadius: 0,
             opacity: 0.5
           }}
         />
@@ -333,7 +333,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
         style={{
           flex: 1,
           fontSize: 13,
-          color: hovered ? colors.text.primary : '#a0a8b5',
+          color: hovered ? colors.text.primary : colors.text.secondary,
           fontWeight: 400,
           whiteSpace: 'nowrap',
           overflow: 'hidden',

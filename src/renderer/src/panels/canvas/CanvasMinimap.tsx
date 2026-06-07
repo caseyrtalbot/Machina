@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import type { CanvasNode, CanvasViewport } from '@shared/canvas-types'
+import { getCardTypeColor } from './canvas-colors'
 
 let minimapInteractionTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -13,16 +14,6 @@ function markMinimapInteracting(active: boolean) {
       useCanvasStore.getState().setInteracting(false)
     }, 150)
   }
-}
-
-/** Type-based colors for minimap rectangles (mirrors CardLodPreview) */
-const LOD_COLORS: Record<string, string> = {
-  text: '#94a3b8',
-  code: '#22d3ee',
-  markdown: '#a78bfa',
-  note: '#38bdf8',
-  image: '#f472b6',
-  terminal: '#34d399'
 }
 
 const MINIMAP_WIDTH = 160
@@ -198,7 +189,7 @@ export function CanvasMinimap({
             top: toMiniY(node.position.y),
             width: Math.max(2, node.size.width * scale),
             height: Math.max(2, node.size.height * scale),
-            backgroundColor: LOD_COLORS[node.type] ?? '#94a3b8',
+            backgroundColor: getCardTypeColor(node.type),
             opacity: 0.6,
             borderRadius: 0,
             pointerEvents: 'none'

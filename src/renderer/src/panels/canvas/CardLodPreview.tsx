@@ -2,21 +2,10 @@ import { memo, useCallback } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, borderRadius } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNode } from '@shared/canvas-types'
+import { getCardTypeColor } from './canvas-colors'
 
 interface CardLodPreviewProps {
   node: CanvasNode
-}
-
-/** Type-based colors for LOD rectangles */
-const LOD_COLORS: Record<string, string> = {
-  text: '#94a3b8',
-  code: '#22d3ee',
-  markdown: '#a78bfa',
-  note: '#38bdf8',
-  image: '#f472b6',
-  terminal: '#34d399',
-  pdf: '#ef4444',
-  'terminal-block': '#10b981'
 }
 
 /**
@@ -40,7 +29,7 @@ function CardLodPreviewInner({ node }: CardLodPreviewProps) {
     [node.id, setSelection, toggleSelection]
   )
 
-  const color = LOD_COLORS[node.type] ?? '#94a3b8'
+  const color = getCardTypeColor(node.type)
   const info = CARD_TYPE_INFO[node.type]
 
   return (

@@ -77,7 +77,7 @@ export function MetadataGrid({ entries }: MetadataGridProps) {
               whiteSpace: 'nowrap'
             }}
           >
-            {key.replace(/_/g, '_')}
+            {key.replace(/_/g, ' ')}
           </span>
           <MetadataValue value={value} />
         </div>
