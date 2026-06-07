@@ -45,7 +45,7 @@ describe('McpLifecycle', () => {
     rmSync(vaultRoot, { recursive: true, force: true })
   })
 
-  it('createForVault accepts deps and creates a running server', () => {
+  it('createForVault builds a server but does NOT report it as running until a transport connects', () => {
     const lifecycle = new McpLifecycle()
     const vaultIndex = new VaultIndex()
     const searchEngine = new SearchEngine()
@@ -69,8 +69,9 @@ describe('McpLifecycle', () => {
     const server = lifecycle.createForVault(vaultRoot, { searchEngine, vaultIndex })
 
     expect(server).toBeDefined()
-    expect(lifecycle.isRunning()).toBe(true)
-    expect(lifecycle.toolCount()).toBe(6)
+    // Built but no transport connected — mcp:status must not advertise it.
+    expect(lifecycle.isRunning()).toBe(false)
+    expect(lifecycle.toolCount()).toBe(0)
   })
 
   it('createForVault still works without deps (backward compatible)', () => {
@@ -78,7 +79,29 @@ describe('McpLifecycle', () => {
     const server = lifecycle.createForVault(vaultRoot)
 
     expect(server).toBeDefined()
+    expect(lifecycle.isRunning()).toBe(false)
+  })
+
+  it('reports running/toolCount only while a transport is connected', async () => {
+    const lifecycle = new McpLifecycle()
+    const server = lifecycle.createForVault(vaultRoot)
+    expect(lifecycle.isRunning()).toBe(false)
+
+    const client = new Client({ name: 'test-client', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+
+    // Now genuinely connected and serving.
     expect(lifecycle.isRunning()).toBe(true)
+    expect(lifecycle.toolCount()).toBe(6)
+
+    await client.close()
+    await server.close()
+
+    // Disconnected again — status falls back to not-running.
+    expect(lifecycle.isRunning()).toBe(false)
+    expect(lifecycle.toolCount()).toBe(0)
   })
 
   describe('MCP data flow with buildVaultDeps', () => {

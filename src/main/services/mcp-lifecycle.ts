@@ -20,16 +20,22 @@ import type { McpStatusProvider } from '../ipc/mcp'
 
 export class McpLifecycle implements McpStatusProvider {
   private server: McpServer | null = null
-  private _created = false
   private _toolCount = 0
 
-  /** Whether the MCP server has been created (not necessarily connected to a transport). */
+  /**
+   * Whether the in-process MCP server is connected to a transport and actually
+   * serving requests. createForVault builds the server with tools registered but
+   * deliberately does NOT connect a transport — the only production transport is
+   * the headless stdio path in mcp-cli.ts. So this stays false in production, and
+   * mcp:status must not advertise a server the renderer can't actually reach.
+   */
   isRunning(): boolean {
-    return this._created
+    return this.server?.isConnected() ?? false
   }
 
+  /** Tools exposed to a connected client; zero while no transport is connected. */
   toolCount(): number {
-    return this._created ? this._toolCount : 0
+    return this.isRunning() ? this._toolCount : 0
   }
 
   /**
@@ -43,7 +49,6 @@ export class McpLifecycle implements McpStatusProvider {
     if (this.server) {
       this.server.close().catch(() => {})
       this.server = null
-      this._created = false
     }
 
     const guard = new PathGuard(vaultRoot)
@@ -61,7 +66,6 @@ export class McpLifecycle implements McpStatusProvider {
 
     this.server = createMcpServer(facade, { gate, rateLimiter, dispatchCanvasPlan })
     this._toolCount = 6 // 4 read + 2 write (gate always provided)
-    this._created = true
     return this.server
   }
 
@@ -70,7 +74,6 @@ export class McpLifecycle implements McpStatusProvider {
     if (this.server) {
       await this.server.close()
       this.server = null
-      this._created = false
     }
   }
 }
