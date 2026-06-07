@@ -16,7 +16,7 @@ interface CanvasFileShape {
   [k: string]: unknown
 }
 
-export interface PinCardInput {
+interface PinCardInput {
   readonly title: string
   readonly path?: string
   readonly content?: string

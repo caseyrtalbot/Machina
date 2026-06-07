@@ -13,8 +13,8 @@ const fileService = new FileService()
 
 /**
  * Active vault PathGuard instance. Set when vault:init is called
- * (the first lifecycle event for any vault). Used by vault:read-file
- * and fs:* handlers that enforce vault-scoped access.
+ * (the first lifecycle event for any vault). Used by fs:* handlers
+ * that enforce vault-scoped access.
  */
 let activePathGuard: PathGuard | null = null
 
@@ -225,12 +225,6 @@ export function registerFilesystemIpc(): void {
     } catch {
       return []
     }
-  })
-
-  typedHandle('vault:read-file', async (args) => {
-    const resolved = guardPath(args.filePath, 'vault:read-file')
-    const { readFile } = await import('node:fs/promises')
-    return readFile(resolved, 'utf-8')
   })
 
   typedHandle('vault:list-system-artifacts', async (args) => {

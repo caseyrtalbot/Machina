@@ -47,7 +47,6 @@ export interface IpcChannels {
   'vault:write-state': { request: { vaultPath: string; state: VaultState }; response: void }
   'vault:init': { request: { vaultPath: string }; response: void }
   'vault:list-commands': { request: { dirPath: string }; response: string[] }
-  'vault:read-file': { request: { filePath: string }; response: string }
   'vault:list-system-artifacts': {
     request: { vaultPath: string; kind?: SystemArtifactKind }
     response: string[]

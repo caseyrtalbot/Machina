@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react'
-import { Terminal, UserCircle, CheckCircle, Copy, ArrowSquareOut } from '@phosphor-icons/react'
+import { Terminal, CircleUser, CircleCheck, Copy, SquareArrowOutUpRight } from 'lucide-react'
 import { useClaudeStatus } from '../hooks/use-claude-status'
 import { useClaudeStatusStore } from '../store/claude-status-store'
 import { colors, floatingPanel } from '../design/tokens'
@@ -58,7 +58,7 @@ function InstallStep() {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <Terminal size={24} weight="regular" style={{ color: colors.text.muted }} />
+      <Terminal size={24} style={{ color: colors.text.muted }} />
       <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
         Install Claude Code
       </h2>
@@ -81,7 +81,7 @@ function InstallStep() {
         }}
       >
         Open Install Guide
-        <ArrowSquareOut size={12} />
+        <SquareArrowOutUpRight size={12} />
       </button>
       <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: colors.text.muted }}>
         <StatusDot color={colors.text.muted} pulse />
@@ -94,7 +94,7 @@ function InstallStep() {
 function AuthStep() {
   return (
     <div className="flex flex-col items-center text-center">
-      <UserCircle size={24} weight="regular" style={{ color: colors.text.muted }} />
+      <CircleUser size={24} style={{ color: colors.text.muted }} />
       <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
         Sign In to Claude
       </h2>
@@ -119,7 +119,7 @@ function ReadyStep({
 }) {
   return (
     <div className="flex flex-col items-center text-center">
-      <CheckCircle size={24} weight="regular" style={{ color: colors.claude.ready }} />
+      <CircleCheck size={24} style={{ color: colors.claude.ready }} />
       <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
         Connected
       </h2>
