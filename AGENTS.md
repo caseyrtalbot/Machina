@@ -26,7 +26,7 @@ Single test: `npx vitest run path/to/file.test.ts`
 
 ## Architecture
 
-Electron app with three process boundaries:
+Electron app with three process boundaries plus shared pure logic:
 
 | Process | Entry | Source |
 |---------|-------|--------|
@@ -92,11 +92,19 @@ Automated canvas changes (folder map, ontology, agents) use optimistic concurren
 
 ### MCP Server
 
-Six tools: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts` (reads); `vault.write_file`, `vault.create_file` (writes gated by TimeoutHitlGate + WriteRateLimiter). Auto-denies after 30s with no user response. Read results wrapped in Spotlighting trust markers. `mcp-cli.ts` provides headless stdio mode.
+Nine tools total. Reads: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`. Writes: `vault.write_file`, `vault.create_file`, `canvas.apply_plan`, gated by `TimeoutHitlGate` + `WriteRateLimiter` with 30s auto-deny. Raw vault-derived read results (`vault.read_file`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`) use Spotlighting trust markers; structured JSON reads (`search.query`, `graph.get_neighbors`) do not. `mcp-cli.ts` is headless stdio and registers reads only. The in-process `mcp-lifecycle.ts` server is built but not transport-connected in production. Safety details live in `docs/architecture/safety-subsystem.md`.
 
 ### Terminal Webview Isolation
 
 Terminal runs in an Electron `<webview>` with its own preload (`src/preload/terminal-webview.ts`) and separate IPC bridge. Keeps xterm.js and PTY data off the main renderer thread.
+
+### Block Protocol (structured shell sessions)
+
+Shell hooks (`resources/shell-hooks/te.{zsh,bash,fish}`) emit OSC `1337;te-...` markers only when `TE_SESSION_ID` is set by `PtyService`. `BlockDetector` parses PTY markers in pure engine code; `BlockWatcher` folds them through immutable block-model transitions and emits `block:update` IPC. Renderer flow: `useBlockUpdates` -> `block-store` -> `terminal-block` cards. Secret spans from `scanSecrets` are masked by render offsets with per-card click-to-reveal. See `docs/architecture/block-protocol.md`.
+
+### PTY Write Arbitration
+
+All PTY writes go through a per-session `PtyWriteQueue` with single-flight drain. `PtyWrite` is `command | bytes | agent-input`, exposed as `write`, `sendRawKeys`, and `writeAgentInput`; use `writeAgentInput` for agent-originated text so future policy can distinguish it from human keystrokes.
 
 ### Coordinated Quit (2-phase)
 
@@ -108,10 +116,11 @@ before-quit → preventDefault → typedSend('app:will-quit')
 
 ### Key Subsystems
 
-- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds with provenance) → ghost-index.ts. search-engine.ts: MiniSearch (title x10, tags x5, body x1). All runs in vault-worker.ts Web Worker.
-- **Canvas** (`panels/canvas/`): React DOM with a CSS-transform pan-zoom layer (`CanvasSurface.tsx`), not Pixi (Pixi drives only the graph view). 12 card types: `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `project-folder`, `terminal-block`. Click-to-focus, click-again-to-interact.
+- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds in `RELATIONSHIP_KINDS`, each with provenance) → ghost-index.ts. search-engine.ts uses MiniSearch weights: title x10, tags x5, body x1. Runs in vault-worker.ts.
+- **Canvas** (`panels/canvas/`): React DOM pan/zoom via `translate(x,y) scale(zoom)` in `CanvasSurface.tsx`; Pixi.js is only for the graph renderer. 12 `CanvasNodeType` card types include `terminal-block`, which projects a `block-store` entry and can be pinned from `TerminalCard`. Click-to-focus, click-again-to-interact.
 - **Ontology** (`engine/ontology-*`): Tag-first grouping with link-analysis fallback, computed in ontology-worker.ts. `GroupProvenance` tracks source (user tags, links, AI).
-- **Agents**: Three paths, all bypassing the MCP safety subsystem. (1) PTY Claude sessions via agent-spawner.ts; session-tailer.ts emits `SessionMilestone` events; IPC `window.api.agent`; pre-spawn rollback `vault-git.ts:commitPreAgentSnapshot`. (2) In-app Anthropic SDK agent via machina-native-agent.ts (`@anthropic-ai/sdk` messages.create with a tool loop over `NATIVE_TOOLS` / machina-native-tools.ts); IPC `window.api.agentNative`. (3) CLI thread spawner via cli-thread-spawner.ts running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print`; IPC `window.api.thread`.
+- **Agents**: Three paths outside the MCP safety subsystem. (1) PTY Claude via `agent-spawner.ts` → `ShellService` → node-pty, with `session-tailer.ts` milestones, `window.api.agent`, and pre-spawn `commitPreAgentSnapshot`. (2) Native Anthropic SDK agent via `machina-native-agent.ts`, using `messages.stream` and `NATIVE_TOOLS`; it has PathGuard (`resolveInVault`) on note ops, per-write HITL approval except under `autoAccept` until the per-run write limiter trips, append-only audit logging on successful writes, no read-time Spotlighting, and strict id regexes for canvas writes. IPC: `window.api.agentNative`. (3) CLI thread PTYs via `cli-thread-spawner.ts` running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print "<prompt>"`; IPC `window.api.thread`. Paths (1) and (3) are trusted to the user's level.
+- **Block Protocol**: Shell hooks → OSC markers → `BlockDetector` → `BlockWatcher` → `block:update` IPC → renderer `block-store` → DOM `terminal-block` cards.
 - **System Artifacts**: Structured markdown in `.machina/artifacts/{sessions,patterns,tensions}/`. Schemas in `system-artifacts.ts`.
 - **Web Workers**: vault-worker (parse+graph), graph-physics-worker (D3-force), ontology-worker (grouping+layout), project-map-worker (filesystem→canvas).
 
@@ -127,11 +136,14 @@ KeepAlive: panels mount once, then `display: none` on tab switch (preserves term
 | editor-store | Active note, mode (rich\|source), dirty, content, cursor, tabs, nav history |
 | canvas-store | Nodes, edges, viewport, selection, split editor |
 | graph-view-store | Viewport, hover/selected node, force params |
+| thread-store | Threads, messages, streaming, dock tabs/layout, in-flight + runId per thread |
+| block-store | Per-session ordered terminal `Block` records |
 | ui-store | Per-note UI state (backlink expansion), persisted via IPC |
-| tab-store | View tabs, persisted |
-| view-store | Active panel/view routing |
-| settings-store | Theme, accent, fonts (localStorage) |
-| workbench-store | Session monitoring, workbench UI |
+| settings-store | Translucency, opacity, blur, font sizes (localStorage) |
+| claude-status-store | Claude CLI availability/status |
+| sidebar-filter-store | Sidebar file-tree filter state |
+| sidebar-selection-store | Sidebar selection state |
+| vault-health-store | Vault health monitor results |
 
 Persistence: `vault-persist.ts` → `.machina/state.json` on 1s debounce. See Coordinated Quit for shutdown.
 
@@ -141,12 +153,13 @@ Tiptap 3 with markdown round-tripping. Extensions: slash commands, bubble menu, 
 
 ### Design System
 
-Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). Six themes, eight accent colors, OKLCH perceptual palette.
+Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). Dark-only UI with one hardcoded accent, `ACCENT_HEX = '#ff8c5a'` (Ember coral) in `design/themes.ts`. `settings-store` v3→v4 removed `theme` and `accentColor`; runtime settings are translucency, opacity, blur, and font sizes only. OKLCH remains for per-artifact colors.
 
 - Import from `design/tokens.ts` — never hardcode hex or px
-- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc.
+- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc. resolve once at startup and are not reassigned
 - `getArtifactColor(type)` for per-type colors
 - Animation keyframes prefixed `te-`
+- For Pixi, mermaid, or other non-CSS consumers needing hex values, read CSS vars once via `getComputedStyle` and memoize; no Zustand subscription is needed because vars are static at runtime
 
 ## Type Conventions
 
@@ -171,3 +184,7 @@ Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) 
 - **Files under 800 lines**, organized by feature/domain.
 - **IPC timeouts**: Wrap critical IPC calls with `withTimeout(call, ms, label)` to prevent renderer hangs.
 - **Buffer shim**: `main.tsx` shims `globalThis.Buffer` before gray-matter import — required for frontmatter parsing in browser context.
+
+## Compact Instructions
+
+When compacting context, preserve IPC contracts and process ownership, active plan paths/status, process-boundary and data-flow decisions, verification evidence, error corrections/root causes, and design token/theme decisions.
