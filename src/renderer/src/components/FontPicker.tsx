@@ -3,8 +3,8 @@ import { colors, borderRadius, typography, floatingPanel } from '../design/token
 import {
   ALL_FONT_OPTIONS,
   FONT_CATEGORIES,
-  buildGoogleFontUrl,
   buildFontFamilyValue,
+  loadRemoteFont,
   type FontCategory,
   type GoogleFontEntry
 } from '../design/google-fonts'
@@ -25,6 +25,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<FontCategory>(categoryFilter ?? 'all')
   const [previewFont, setPreviewFont] = useState<string | null>(null)
+  const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set())
   const containerRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -74,21 +75,22 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
     }
   }, [])
 
-  // Load a font for preview on hover
+  // Load a font for preview on hover. Bundled defaults resolve instantly;
+  // Google Fonts loads report failure so offline previews are honest.
   const handleHover = useCallback((font: GoogleFontEntry) => {
     setPreviewFont(font.name)
-    const url = buildGoogleFontUrl(font)
-    if (!url) return
-
-    // Check if already loaded
-    const linkId = `te-preview-${font.name.replace(/ /g, '-')}`
-    if (document.getElementById(linkId)) return
-
-    const link = document.createElement('link')
-    link.id = linkId
-    link.rel = 'stylesheet'
-    link.href = url
-    document.head.appendChild(link)
+    void loadRemoteFont(font.name).then((ok) => {
+      setFailedPreviews((prev) => {
+        if (prev.has(font.name) === !ok) return prev
+        const next = new Set(prev)
+        if (ok) {
+          next.delete(font.name)
+        } else {
+          next.add(font.name)
+        }
+        return next
+      })
+    })
   }, [])
 
   return (
@@ -222,6 +224,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
               filteredFonts.map((font) => {
                 const isSelected = font.name === value
                 const isHovered = font.name === previewFont
+                const loadFailed = failedPreviews.has(font.name)
                 return (
                   <button
                     key={font.name}
@@ -244,7 +247,7 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
                           : 'transparent',
                       color: isSelected ? colors.accent.default : colors.text.primary,
                       fontFamily:
-                        isHovered || isSelected
+                        (isHovered || isSelected) && !loadFailed
                           ? buildFontFamilyValue(font.name)
                           : typography.fontFamily.mono,
                       fontSize: 12,
@@ -259,10 +262,10 @@ export function FontPicker({ value, onChange, categoryFilter }: FontPickerProps)
                         fontFamily: typography.fontFamily.mono,
                         fontSize: typography.metadata.size,
                         letterSpacing: typography.metadata.letterSpacing,
-                        textTransform: typography.metadata.textTransform
+                        textTransform: loadFailed ? 'none' : typography.metadata.textTransform
                       }}
                     >
-                      {font.category}
+                      {loadFailed ? 'offline — preview unavailable' : font.category}
                     </span>
                   </button>
                 )

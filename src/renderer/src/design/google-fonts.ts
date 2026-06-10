@@ -60,6 +60,17 @@ export const GOOGLE_FONTS: readonly GoogleFontEntry[] = [
   { name: 'Playfair Display', category: 'display', weights: [400, 500, 600, 700] }
 ] as const
 
+/**
+ * Default fonts bundled as local woff2 (assets/fonts/fonts.css) so the
+ * out-of-the-box UI never depends on Google Fonts at runtime (plan 2.14).
+ */
+export const LOCAL_FONT_NAMES = ['Manrope', 'Space Mono'] as const
+
+/** True when a font needs no network load (bundled @font-face or system). */
+export function isLocalFont(name: string): boolean {
+  return name === 'System' || (LOCAL_FONT_NAMES as readonly string[]).includes(name)
+}
+
 /** The built-in system font option (not from Google Fonts) */
 const SYSTEM_FONT_ENTRY: GoogleFontEntry = {
   name: 'System',
@@ -104,3 +115,91 @@ export function buildFontFamilyValue(fontName: string): string {
 /** All unique categories for filtering */
 export const FONT_CATEGORIES = ['all', 'sans-serif', 'serif', 'monospace', 'display'] as const
 export type FontCategory = (typeof FONT_CATEGORIES)[number]
+
+// ── Remote loading (user-chosen non-default fonts) ──
+//
+// Non-default fonts load via fetch() + FontFace instead of injected
+// <link rel="stylesheet"> tags. This keeps style-src/font-src CSP local-only
+// (network access is confined to connect-src) and gives an explicit
+// success/failure signal for offline detection in FontPicker.
+
+/** One @font-face block parsed out of a Google Fonts css2 response. */
+export interface RemoteFontFace {
+  readonly style: string
+  readonly weight: string
+  readonly url: string
+  readonly unicodeRange?: string
+}
+
+/** Parse @font-face blocks from a Google Fonts css2 stylesheet. Pure. */
+export function parseGoogleFontCss(css: string): RemoteFontFace[] {
+  const faces: RemoteFontFace[] = []
+  for (const match of css.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
+    const block = match[1]
+    const url = /src:\s*url\(([^)]+)\)/.exec(block)?.[1]
+    if (!url) continue
+    faces.push({
+      style: /font-style:\s*([^;]+);/.exec(block)?.[1].trim() ?? 'normal',
+      weight: /font-weight:\s*([^;]+);/.exec(block)?.[1].trim() ?? '400',
+      url,
+      unicodeRange: /unicode-range:\s*([^;]+);/.exec(block)?.[1].trim()
+    })
+  }
+  return faces
+}
+
+/** Keep only latin + latin-ext subsets — the app UI is English-first. */
+export function isLatinFace(face: RemoteFontFace): boolean {
+  if (!face.unicodeRange) return true
+  return face.unicodeRange.includes('U+0000-00FF') || face.unicodeRange.includes('U+0100-')
+}
+
+async function fetchAndRegister(fontName: string): Promise<boolean> {
+  const entry = GOOGLE_FONTS.find((f) => f.name === fontName)
+  if (!entry) return false
+  const url = buildGoogleFontUrl(entry)
+  if (!url) return true
+
+  const res = await fetch(url)
+  if (!res.ok) return false
+  const faces = parseGoogleFontCss(await res.text()).filter(isLatinFace)
+  if (faces.length === 0) return false
+
+  await Promise.all(
+    faces.map(async (face) => {
+      const fontRes = await fetch(face.url)
+      if (!fontRes.ok) throw new Error(`font fetch failed: ${fontRes.status}`)
+      const fontFace = new FontFace(fontName, await fontRes.arrayBuffer(), {
+        style: face.style,
+        weight: face.weight,
+        ...(face.unicodeRange ? { unicodeRange: face.unicodeRange } : {})
+      })
+      if (fontFace.status === 'error') throw new Error(`font parse failed: ${face.url}`)
+      document.fonts.add(fontFace)
+    })
+  )
+  return true
+}
+
+const remoteFontLoads = new Map<string, Promise<boolean>>()
+
+/**
+ * Load a user-chosen Google Font into document.fonts.
+ * Resolves true on success (or for local/system fonts which need no load),
+ * false on any failure — callers surface offline state from this signal.
+ * Failures are not cached, so a later attempt retries the network.
+ */
+export function loadRemoteFont(fontName: string): Promise<boolean> {
+  if (isLocalFont(fontName)) return Promise.resolve(true)
+  const inFlight = remoteFontLoads.get(fontName)
+  if (inFlight) return inFlight
+
+  const load = fetchAndRegister(fontName)
+    .catch(() => false)
+    .then((ok) => {
+      if (!ok) remoteFontLoads.delete(fontName)
+      return ok
+    })
+  remoteFontLoads.set(fontName, load)
+  return load
+}
