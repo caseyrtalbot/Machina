@@ -55,8 +55,10 @@ export interface Artifact {
   id: string
   title: string
   type: ArtifactType
-  created: string
-  modified: string
+  /** Frontmatter date, undefined when the file declares none (never fabricated). */
+  created?: string
+  /** Frontmatter date, undefined when the file declares none (never fabricated). */
+  modified?: string
   source?: string
   frame?: string
   signal: Signal

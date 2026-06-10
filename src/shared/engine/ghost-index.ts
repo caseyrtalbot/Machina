@@ -45,10 +45,12 @@ export function stripWikilinksFromContext(text: string): string {
 
 /**
  * Extract ~100 characters of context around a [[wikilink]] match in body text.
+ * Matching is case-insensitive: ghost ids are lowercased, but the body keeps
+ * its original casing (e.g. `[[Richard Hamming]]` vs ghost id `richard hamming`).
  * Returns a clean, readable sentence fragment with wikilink syntax stripped.
  */
 export function extractContext(body: string, targetId: string): string | null {
-  const re = new RegExp(`\\[\\[${escapeRegex(targetId)}(?:\\|[^\\]]+)?\\]\\]`)
+  const re = new RegExp(`\\[\\[${escapeRegex(targetId)}(?:\\|[^\\]]+)?\\]\\]`, 'i')
   const match = re.exec(body)
   if (!match) return null
 
@@ -132,13 +134,16 @@ export function buildGhostIndex(
 
       // Check body for wikilink context
       const context = extractContext(artifact.body, ghostId)
-      // Also check frontmatter relationship arrays
-      const inFrontmatter =
-        artifact.connections.includes(ghostId) ||
-        artifact.clusters_with.includes(ghostId) ||
-        artifact.tensions_with.includes(ghostId) ||
-        artifact.appears_in.includes(ghostId) ||
-        artifact.related.includes(ghostId)
+      // Also check frontmatter relationship arrays (case-insensitive: ghost ids
+      // are lowercased while frontmatter values keep their original casing)
+      const lowerGhost = ghostId.toLowerCase()
+      const inFrontmatter = [
+        artifact.connections,
+        artifact.clusters_with,
+        artifact.tensions_with,
+        artifact.appears_in,
+        artifact.related
+      ].some((refs) => refs.some((ref) => ref.toLowerCase() === lowerGhost))
 
       const displayContext =
         context ?? (inFrontmatter ? `Referenced in frontmatter of "${artifact.title}"` : null)

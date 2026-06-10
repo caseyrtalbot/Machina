@@ -7,41 +7,23 @@ import {
   stripWikilinksFromContext
 } from '../../src/renderer/src/engine/ghost-index'
 import { buildGraph } from '../../src/shared/engine/graph-builder'
-import type { KnowledgeGraph, GraphNode, GraphEdge, Artifact } from '../../src/shared/types'
+import { parseArtifact } from '../../src/shared/engine/parser'
+import type { Artifact, KnowledgeGraph } from '../../src/shared/types'
 
-function makeNode(id: string, path?: string): GraphNode {
-  return {
-    id,
-    title: id,
-    type: 'note',
-    signal: 'untested',
-    connectionCount: 0,
-    path
-  }
+/** Parse real markdown through the production parser; throws on parse failure. */
+function parse(md: string, filename: string): Artifact {
+  const result = parseArtifact(md, filename)
+  if (!result.ok) throw new Error(result.error)
+  return result.value
 }
 
-function makeEdge(source: string, target: string, kind: GraphEdge['kind'] = 'related'): GraphEdge {
-  return { source, target, kind }
-}
-
-function makeArtifact(overrides: Partial<Artifact> & { id: string; title: string }): Artifact {
-  return {
-    type: 'note',
-    created: '2026-01-01',
-    modified: '2026-01-01',
-    signal: 'untested',
-    tags: [],
-    connections: [],
-    clusters_with: [],
-    tensions_with: [],
-    appears_in: [],
-    related: [],
-    concepts: [],
-    bodyLinks: [],
-    body: '',
-    frontmatter: {},
-    ...overrides
-  }
+/** Full production pipeline: markdown files → parser → graph. */
+function buildPipeline(files: ReadonlyArray<readonly [string, string]>): {
+  artifacts: Artifact[]
+  graph: KnowledgeGraph
+} {
+  const artifacts = files.map(([filename, md]) => parse(md, filename))
+  return { artifacts, graph: buildGraph(artifacts) }
 }
 
 describe('isPathGhost', () => {
@@ -130,30 +112,35 @@ describe('extractContext', () => {
     expect(result).not.toContain('\n')
     expect(result).toContain('Target')
   })
+
+  it('matches case-insensitively (lowercase ghost id vs cased body link)', () => {
+    const body = 'Author: [[Richard Hamming]] gave a talk.'
+    const result = extractContext(body, 'richard hamming')
+    expect(result).toContain('Richard Hamming')
+    expect(result).not.toContain('[[')
+  })
 })
 
-describe('buildGhostIndex', () => {
-  it('identifies ghost nodes (nodes without paths)', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [
-        makeNode('essay-1', '/vault/essay.md'),
-        makeNode('Richard Hamming') // ghost - no path
-      ],
-      edges: [makeEdge('essay-1', 'Richard Hamming')]
-    }
+describe('buildGhostIndex (parser → graph → ghost pipeline)', () => {
+  it('capitalized [[Richard Hamming]] produces a ghost entry', () => {
+    const { artifacts, graph } = buildPipeline([
+      [
+        'essay.md',
+        `---
+id: essay-1
+title: You and Your Research
+---
 
-    const artifacts = [
-      makeArtifact({
-        id: 'essay-1',
-        title: 'You and Your Research',
-        body: 'Author: [[Richard Hamming]]'
-      })
-    ]
+Author: [[Richard Hamming]] gave a legendary talk.`
+      ]
+    ])
 
     const result = buildGhostIndex(graph, artifacts)
 
     expect(result).toHaveLength(1)
-    expect(result[0].id).toBe('Richard Hamming')
+    // Ghost nodes are keyed by lowercase id; display casing lives in node.title
+    expect(result[0].id).toBe('richard hamming')
+    expect(graph.nodes.find((n) => n.id === 'richard hamming')?.title).toBe('Richard Hamming')
     expect(result[0].referenceCount).toBe(1)
     expect(result[0].references[0].fileTitle).toBe('You and Your Research')
     // sourceId is the referencing artifact's id (not the ghost's own id),
@@ -164,61 +151,124 @@ describe('buildGhostIndex', () => {
     expect(result[0].references[0].context).not.toContain('[[')
   })
 
-  it('filters out path-based ghost nodes', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [
-        makeNode('src', '/vault/src.md'),
-        makeNode('Richard Hamming'), // idea ghost - should appear
-        makeNode('Project Notes/Themes/Clarity') // path ghost - should be filtered
-      ],
-      edges: [makeEdge('src', 'Richard Hamming'), makeEdge('src', 'Project Notes/Themes/Clarity')]
-    }
+  it('title-based frontmatter connection resolves to the real note — no ghost', () => {
+    const { artifacts, graph } = buildPipeline([
+      [
+        '/vault/Coding/Claude Code Playbook.md',
+        `---
+title: Claude Code Playbook
+---
 
-    const artifacts = [
-      makeArtifact({
-        id: 'src',
-        title: 'Source',
-        body: '[[Richard Hamming]] and [[Project Notes/Themes/Clarity]]'
-      })
-    ]
+Playbook content.`
+      ],
+      [
+        '/vault/note.md',
+        `---
+id: note-1
+title: My Note
+connections:
+  - Claude Code Playbook
+---
+
+Body.`
+      ]
+    ])
+
+    // id derives from filename stem, title from frontmatter — the connection
+    // value is the *title* and must resolve to the real node, not a phantom.
+    const connection = graph.edges.find((e) => e.kind === 'connection')
+    expect(connection?.target).toBe('Claude Code Playbook')
+    expect(buildGhostIndex(graph, artifacts)).toEqual([])
+  })
+
+  it('fenced [[fake link]] produces nothing', () => {
+    const { artifacts, graph } = buildPipeline([
+      [
+        'code-note.md',
+        `---
+id: code-note
+title: Code Note
+---
+
+Real prose with a real [[Genuine Ghost]].
+
+\`\`\`md
+A fenced [[fake link]] that must not become a ghost.
+\`\`\`
+
+Inline \`[[also fake]]\` too.`
+      ]
+    ])
+
+    const result = buildGhostIndex(graph, artifacts)
+
+    expect(result.map((g) => g.id)).toEqual(['genuine ghost'])
+  })
+
+  it('case-split frontmatter and body references converge on one ghost', () => {
+    const { artifacts, graph } = buildPipeline([
+      [
+        'a.md',
+        `---
+id: a
+title: A
+connections:
+  - Richard Hamming
+---
+
+No body links.`
+      ],
+      [
+        'b.md',
+        `---
+id: b
+title: B
+---
+
+See [[richard hamming]] for more.`
+      ]
+    ])
 
     const result = buildGhostIndex(graph, artifacts)
 
     expect(result).toHaveLength(1)
-    expect(result[0].id).toBe('Richard Hamming')
+    expect(result[0].id).toBe('richard hamming')
+    expect(result[0].referenceCount).toBe(2)
+    expect(result[0].references.map((r) => r.sourceId).sort()).toEqual(['a', 'b'])
+  })
+
+  it('filters out path-based ghost nodes', () => {
+    const { artifacts, graph } = buildPipeline([
+      [
+        'src.md',
+        `---
+id: src
+title: Source
+---
+
+[[Richard Hamming]] and [[Project Notes/Themes/Clarity]]`
+      ]
+    ])
+
+    const result = buildGhostIndex(graph, artifacts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('richard hamming')
   })
 
   it('returns empty array when no ghost nodes exist', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [makeNode('a', '/vault/a.md')],
-      edges: []
-    }
-    const result = buildGhostIndex(graph, [])
-    expect(result).toEqual([])
+    const { artifacts, graph } = buildPipeline([
+      ['a.md', `---\nid: a\ntitle: A\n---\n\nPlain note.`]
+    ])
+    expect(buildGhostIndex(graph, artifacts)).toEqual([])
   })
 
   it('sorts by reference count descending', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [
-        makeNode('a', '/vault/a.md'),
-        makeNode('b', '/vault/b.md'),
-        makeNode('c', '/vault/c.md'),
-        makeNode('ghost-few'), // 1 reference
-        makeNode('ghost-many') // 3 references
-      ],
-      edges: [
-        makeEdge('a', 'ghost-few'),
-        makeEdge('a', 'ghost-many'),
-        makeEdge('b', 'ghost-many'),
-        makeEdge('c', 'ghost-many')
-      ]
-    }
-
-    const artifacts = [
-      makeArtifact({ id: 'a', title: 'A', body: '[[ghost-few]] and [[ghost-many]]' }),
-      makeArtifact({ id: 'b', title: 'B', body: '[[ghost-many]]' }),
-      makeArtifact({ id: 'c', title: 'C', body: '[[ghost-many]]' })
-    ]
+    const { artifacts, graph } = buildPipeline([
+      ['a.md', `---\nid: a\ntitle: A\n---\n\n[[ghost-few]] and [[ghost-many]]`],
+      ['b.md', `---\nid: b\ntitle: B\n---\n\n[[ghost-many]]`],
+      ['c.md', `---\nid: c\ntitle: C\n---\n\n[[ghost-many]]`]
+    ])
 
     const result = buildGhostIndex(graph, artifacts)
 
@@ -228,29 +278,20 @@ describe('buildGhostIndex', () => {
     expect(result[1].referenceCount).toBe(1)
   })
 
-  it('skips ghost nodes with zero references', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [makeNode('orphan-ghost')],
-      edges: []
-    }
-    const result = buildGhostIndex(graph, [])
-    expect(result).toEqual([])
-  })
-
   it('handles frontmatter-only references', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [makeNode('src', '/vault/src.md'), makeNode('fm-ghost')],
-      edges: [makeEdge('src', 'fm-ghost', 'connection')]
-    }
+    const { artifacts, graph } = buildPipeline([
+      [
+        'src.md',
+        `---
+id: src
+title: Source
+connections:
+  - fm-ghost
+---
 
-    const artifacts = [
-      makeArtifact({
-        id: 'src',
-        title: 'Source',
-        body: 'No wikilinks here.',
-        connections: ['fm-ghost']
-      })
-    ]
+No wikilinks here.`
+      ]
+    ])
 
     const result = buildGhostIndex(graph, artifacts)
 
@@ -258,19 +299,34 @@ describe('buildGhostIndex', () => {
     expect(result[0].references[0].context).toContain('frontmatter')
   })
 
-  it('handles multiple references from the same file', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [makeNode('src', '/vault/src.md'), makeNode('ghost')],
-      edges: [makeEdge('src', 'ghost')]
-    }
+  it('frontmatter reference matching is case-insensitive', () => {
+    const { artifacts, graph } = buildPipeline([
+      [
+        'src.md',
+        `---
+id: src
+title: Source
+connections:
+  - Richard Hamming
+---
 
-    const artifacts = [
-      makeArtifact({
-        id: 'src',
-        title: 'Source',
-        body: 'First [[ghost]] mention. Second [[ghost]] mention.'
-      })
-    ]
+No wikilinks here.`
+      ]
+    ])
+
+    const result = buildGhostIndex(graph, artifacts)
+
+    // Ghost id is lowercased but the frontmatter value keeps its casing —
+    // membership check must still find it.
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('richard hamming')
+    expect(result[0].references[0].context).toContain('frontmatter')
+  })
+
+  it('handles multiple references from the same file', () => {
+    const { artifacts, graph } = buildPipeline([
+      ['src.md', `---\nid: src\ntitle: Source\n---\n\nFirst [[ghost]] mention. Second [[ghost]].`]
+    ])
 
     const result = buildGhostIndex(graph, artifacts)
 
@@ -283,23 +339,10 @@ describe('buildGhostIndex', () => {
     // predicate flagged every node — two real, file-backed artifacts that
     // reference each other surfaced the referenced one as a ghost. Build the
     // graph the real way to prove the fix gates on artifact membership, not path.
-    const artifacts = [
-      makeArtifact({
-        id: 'a',
-        title: 'A',
-        body: 'see [[b]]',
-        bodyLinks: ['b'],
-        related: ['b']
-      }),
-      makeArtifact({
-        id: 'b',
-        title: 'B',
-        body: 'see [[a]]',
-        bodyLinks: ['a'],
-        related: ['a']
-      })
-    ]
-    const graph = buildGraph(artifacts)
+    const { artifacts, graph } = buildPipeline([
+      ['a.md', `---\nid: a\ntitle: A\nrelated:\n  - b\n---\n\nsee [[b]]`],
+      ['b.md', `---\nid: b\ntitle: B\nrelated:\n  - a\n---\n\nsee [[a]]`]
+    ])
 
     expect(buildGhostIndex(graph, artifacts)).toEqual([])
   })

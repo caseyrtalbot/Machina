@@ -9,8 +9,10 @@ import {
   type InterGroupEdge,
   type OntologyLayoutResult,
   ONTOLOGY_COLOR_TOKENS,
-  LINK_CLUSTER_MIN_SIZE
+  LINK_CLUSTER_MIN_SIZE,
+  EDGE_WEIGHT_TABLE
 } from '@shared/engine/ontology-types'
+import { RELATIONSHIP_KINDS } from '@shared/types'
 
 describe('ontology-types', () => {
   describe('branded types', () => {
@@ -121,6 +123,16 @@ describe('ontology-types', () => {
 
     it('LINK_CLUSTER_MIN_SIZE is 3', () => {
       expect(LINK_CLUSTER_MIN_SIZE).toBe(3)
+    })
+
+    it('EDGE_WEIGHT_TABLE has an explicit weight for every relationship kind', () => {
+      for (const kind of RELATIONSHIP_KINDS) {
+        expect(EDGE_WEIGHT_TABLE[kind], `missing weight for ${kind}`).toBeDefined()
+      }
+    })
+
+    it('derived_from carries an explicit grouping weight', () => {
+      expect(EDGE_WEIGHT_TABLE.derived_from).toBe(3)
     })
   })
 })

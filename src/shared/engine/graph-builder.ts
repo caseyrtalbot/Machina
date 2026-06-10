@@ -54,17 +54,19 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
     source: string,
     target: string,
     kind: RelationshipKind,
-    provenance?: EdgeProvenance
+    provenance?: EdgeProvenance,
+    ghostTitle?: string
   ): void {
     const key = edgeKey(source, target, kind)
     if (edgeSet.has(key)) return
     edgeSet.add(key)
 
-    // Create placeholder node for missing frontmatter reference
+    // Create placeholder node for missing reference. First-seen display casing
+    // wins for the title; later references to the same lowercase id converge here.
     if (!nodes.has(target)) {
       nodes.set(target, {
         id: target,
-        title: target,
+        title: ghostTitle ?? target,
         type: 'note',
         signal: 'untested',
         connectionCount: 0
@@ -114,22 +116,44 @@ export function buildGraph(artifacts: readonly Artifact[]): KnowledgeGraph {
     createdBy: 'auto-detect'
   }
 
+  // Resolve a frontmatter reference (title or id, any casing) to a real node id.
+  // The app's autocomplete inserts titles, so title lookup must come first —
+  // raw values used directly create phantom nodes alongside the real note.
+  // Unresolved references become ghost placeholders keyed by lowercase id so
+  // frontmatter and body references to the same name converge on one node,
+  // with first-seen display casing preserved in the placeholder title.
+  function resolveRef(raw: string): { id: string; title: string } {
+    const lower = raw.toLowerCase()
+    const resolved = lowerTitleToId.get(lower) ?? lowerToId.get(lower)
+    return resolved ? { id: resolved, title: resolved } : { id: lower, title: raw }
+  }
+
   for (const a of artifacts) {
-    for (const id of a.connections) addEdge(a.id, id, 'connection', frontmatterProvenance)
-    for (const id of a.clusters_with) addEdge(a.id, id, 'cluster', frontmatterProvenance)
-    for (const id of a.tensions_with) addEdge(a.id, id, 'tension', frontmatterProvenance)
-    for (const id of a.appears_in) addEdge(a.id, id, 'appears_in', frontmatterProvenance)
-    for (const id of a.related) addEdge(a.id, id, 'related', frontmatterProvenance)
+    const frontmatterRefs: readonly (readonly [readonly string[], RelationshipKind])[] = [
+      [a.connections, 'connection'],
+      [a.clusters_with, 'cluster'],
+      [a.tensions_with, 'tension'],
+      [a.appears_in, 'appears_in'],
+      [a.related, 'related']
+    ]
+    for (const [refs, kind] of frontmatterRefs) {
+      for (const raw of refs) {
+        const ref = resolveRef(raw)
+        addEdge(a.id, ref.id, kind, frontmatterProvenance, ref.title)
+      }
+    }
     for (const link of a.bodyLinks) {
-      const resolvedTarget = resolveBodyLink(link.toLowerCase(), maps) ?? link
-      addEdge(a.id, resolvedTarget, 'related', wikilinkProvenance)
+      const lower = link.toLowerCase()
+      const resolvedTarget = resolveBodyLink(lower, maps)
+      if (resolvedTarget) {
+        addEdge(a.id, resolvedTarget, 'related', wikilinkProvenance)
+      } else {
+        addEdge(a.id, lower, 'related', wikilinkProvenance, link)
+      }
     }
     for (const sourceTitle of a.sources ?? []) {
-      const resolvedTarget =
-        lowerTitleToId.get(sourceTitle.toLowerCase()) ??
-        lowerToId.get(sourceTitle.toLowerCase()) ??
-        sourceTitle
-      addEdge(a.id, resolvedTarget, 'derived_from', frontmatterProvenance)
+      const ref = resolveRef(sourceTitle)
+      addEdge(a.id, ref.id, 'derived_from', frontmatterProvenance, ref.title)
     }
   }
 

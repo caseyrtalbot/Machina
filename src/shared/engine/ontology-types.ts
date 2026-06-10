@@ -113,6 +113,9 @@ export const EDGE_WEIGHT_TABLE: Readonly<Record<string, number>> = {
   cluster: 3,
   tension: 2,
   related: 2,
+  // Explicit provenance: a derived note binds to its source as strongly as a
+  // stated connection. Previously omitted, which silently weighted it 0.
+  derived_from: 3,
   appears_in: 0,
   'co-occurrence': 0
 }

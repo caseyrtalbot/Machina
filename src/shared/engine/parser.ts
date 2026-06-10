@@ -1,6 +1,5 @@
 import matter from 'gray-matter'
 import type { Artifact, Signal } from '@shared/types'
-import type { AgentArtifactDraft } from '@shared/agent-artifact-types'
 
 // Disable gray-matter's JavaScript engine (uses eval) to prevent code injection
 const SAFE_MATTER_OPTIONS = {
@@ -9,7 +8,7 @@ const SAFE_MATTER_OPTIONS = {
   }
 }
 import type { Result } from './types'
-import { extractConceptNodes } from './concept-extractor'
+import { extractConceptNodes, stripCode } from './concept-extractor'
 
 const VALID_SIGNALS = new Set<string>(['untested', 'emerging', 'validated', 'core'])
 const VALID_ORIGINS = new Set<string>(['human', 'source', 'agent'])
@@ -25,20 +24,28 @@ function stripWikilinks(values: string[]): string[] {
   return values.map((v) => v.replace(/^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$/, '$1').trim())
 }
 
-/** Extract [[wikilink]] targets from markdown body text. Deduplicated, case-normalized. */
+/**
+ * Extract [[wikilink]] targets from markdown body text (code stripped first so
+ * fenced blocks and inline spans never create links). Deduplicated
+ * case-insensitively, preserving first-seen casing for display.
+ */
 function extractBodyWikilinks(body: string): readonly string[] {
-  const matches = body.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)
-  const targets = new Set<string>()
+  const matches = stripCode(body).matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)
+  const seen = new Map<string, string>()
   for (const m of matches) {
-    targets.add(m[1].trim().toLowerCase())
+    const raw = m[1].trim()
+    if (!raw) continue
+    const lower = raw.toLowerCase()
+    if (!seen.has(lower)) seen.set(lower, raw)
   }
-  return [...targets]
+  return [...seen.values()]
 }
 
-function toDateString(val: unknown): string {
+/** Coerce a frontmatter date value. Returns undefined when absent — never fabricate "today". */
+function toDateString(val: unknown): string | undefined {
   if (val instanceof Date) return val.toISOString().split('T')[0]
   if (typeof val === 'string') return val
-  return new Date().toISOString().split('T')[0]
+  return undefined
 }
 
 /**
@@ -111,10 +118,11 @@ export function serializeArtifact(artifact: Artifact): string {
   const frontmatter: Record<string, unknown> = {
     id: artifact.id,
     title: artifact.title,
-    type: artifact.type,
-    created: artifact.created,
-    modified: artifact.modified
+    type: artifact.type
   }
+
+  if (artifact.created) frontmatter.created = artifact.created
+  if (artifact.modified) frontmatter.modified = artifact.modified
 
   if (artifact.origin !== 'human') frontmatter.origin = artifact.origin
   if (artifact.sources.length > 0) frontmatter.sources = [...artifact.sources]
@@ -156,67 +164,4 @@ export function serializeArtifact(artifact: Artifact): string {
   }
 
   return matter.stringify(artifact.body, frontmatter)
-}
-
-export function serializeDraft(draft: AgentArtifactDraft, id: string): string {
-  const now = new Date().toISOString()
-
-  if (draft.kind === 'cluster') {
-    // De-dupe heading collisions while preserving order; the resolved
-    // headings are recorded in frontmatter.sections so the projection
-    // can round-trip card identity.
-    const usedHeadings = new Set<string>()
-    const sectionsMap: Record<string, string> = {}
-    const resolvedSections: { heading: string; body: string }[] = []
-    for (const s of draft.sections) {
-      let h = s.heading
-      let n = 2
-      while (usedHeadings.has(h)) h = `${s.heading} (${n++})`
-      usedHeadings.add(h)
-      sectionsMap[s.cardId] = h
-      resolvedSections.push({ heading: h, body: s.body })
-    }
-
-    const frontmatter: Record<string, unknown> = {
-      id,
-      title: draft.title,
-      kind: 'cluster',
-      cluster_id: id,
-      cluster_prompt: draft.prompt,
-      created: now,
-      modified: now,
-      origin: draft.origin,
-      sources: [...draft.sources],
-      sections: sectionsMap
-    }
-    if (draft.tags && draft.tags.length > 0) frontmatter.tags = [...draft.tags]
-
-    const promptIntro = draft.prompt ? `${draft.prompt}\n\n` : ''
-    const body =
-      promptIntro +
-      resolvedSections
-        .map((s) => `## ${s.heading}\n${s.body}${s.body.endsWith('\n') ? '' : '\n'}`)
-        .join('\n')
-
-    return matter.stringify(body, frontmatter)
-  }
-
-  const frontmatter: Record<string, unknown> = {
-    id,
-    title: draft.title,
-    type: 'output',
-    created: now,
-    modified: now
-  }
-
-  if (draft.origin !== 'human') frontmatter.origin = draft.origin
-  if (draft.sources.length > 0) frontmatter.sources = [...draft.sources]
-  if (draft.tags && draft.tags.length > 0) frontmatter.tags = [...draft.tags]
-  if (draft.frontmatterExtras) {
-    for (const [key, value] of Object.entries(draft.frontmatterExtras)) {
-      frontmatter[key] = value
-    }
-  }
-
-  return matter.stringify(draft.body, frontmatter)
 }

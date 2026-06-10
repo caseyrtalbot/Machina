@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractConceptNodes } from '@engine/concept-extractor'
+import { extractConceptNodes, stripCode } from '@engine/concept-extractor'
 
 describe('extractConceptNodes', () => {
   it('extracts simple concept nodes', () => {
@@ -60,5 +60,54 @@ And <node>Note C</node> too.`
 
   it('trims whitespace from terms', () => {
     expect(extractConceptNodes('<node> strategy </node>')).toEqual(['strategy'])
+  })
+
+  it('ignores concept nodes inside fenced code blocks', () => {
+    const body = `Real <node>Alpha</node> here.
+
+\`\`\`html
+Fenced <node>Fake</node> markup.
+\`\`\``
+    expect(extractConceptNodes(body)).toEqual(['Alpha'])
+  })
+
+  it('ignores concept nodes inside inline code spans', () => {
+    expect(extractConceptNodes('Use `<node>Fake</node>` syntax for <node>Real</node>.')).toEqual([
+      'Real'
+    ])
+  })
+})
+
+describe('stripCode', () => {
+  it('removes fenced code blocks', () => {
+    const body = 'before\n```ts\nconst x = "[[fake]]"\n```\nafter'
+    const stripped = stripCode(body)
+    expect(stripped).not.toContain('[[fake]]')
+    expect(stripped).toContain('before')
+    expect(stripped).toContain('after')
+  })
+
+  it('removes tilde-fenced blocks', () => {
+    const body = 'before\n~~~\n[[fake]]\n~~~\nafter'
+    expect(stripCode(body)).not.toContain('[[fake]]')
+  })
+
+  it('removes inline code spans but keeps surrounding prose', () => {
+    expect(stripCode('keep `drop [[this]]` keep too')).toBe('keep  keep too')
+  })
+
+  it('treats an unclosed fence as running to the end', () => {
+    const body = 'prose\n```\n[[fake]]\nstill code'
+    const stripped = stripCode(body)
+    expect(stripped).toContain('prose')
+    expect(stripped).not.toContain('[[fake]]')
+    expect(stripped).not.toContain('still code')
+  })
+
+  it('does not pair backtick and tilde fences with each other', () => {
+    const body = '```\n~~~ not a closer\n[[fake]]\n```\nafter'
+    const stripped = stripCode(body)
+    expect(stripped).not.toContain('[[fake]]')
+    expect(stripped).toContain('after')
   })
 })

@@ -279,7 +279,7 @@ Body.`
 })
 
 describe('bodyLinks extraction from body wikilinks', () => {
-  it('extracts [[wikilinks]] from body text (lowercase-normalized)', () => {
+  it('extracts [[wikilinks]] from body text preserving original casing', () => {
     const md = `---
 id: test
 title: Test
@@ -291,7 +291,7 @@ The guide covers [[Refactoring]] and [[Domain Modeling]] for deep study.`
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.bodyLinks).toEqual(
-      expect.arrayContaining(['refactoring', 'domain modeling'])
+      expect.arrayContaining(['Refactoring', 'Domain Modeling'])
     )
     expect(result.value.bodyLinks).toHaveLength(2)
   })
@@ -307,7 +307,7 @@ See [[Genius - The Life and Science of Richard Feynman|Feynman biography]] for m
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.bodyLinks).toEqual(['genius - the life and science of richard feynman'])
+    expect(result.value.bodyLinks).toEqual(['Genius - The Life and Science of Richard Feynman'])
   })
 
   it('deduplicates repeated wikilinks', () => {
@@ -321,7 +321,7 @@ title: Test
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.bodyLinks).toEqual(['systems thinking'])
+    expect(result.value.bodyLinks).toEqual(['Systems Thinking'])
   })
 
   it('returns empty array when body has no wikilinks', () => {
@@ -353,11 +353,11 @@ The guide also covers [[Domain Modeling]] alongside [[Type Systems]].`
     if (!result.ok) return
     expect(result.value.related).toEqual(['Type Systems'])
     expect(result.value.bodyLinks).toEqual(
-      expect.arrayContaining(['domain modeling', 'type systems'])
+      expect.arrayContaining(['Domain Modeling', 'Type Systems'])
     )
   })
 
-  it('normalizes [[Foo]] and [[foo]] to same target', () => {
+  it('deduplicates [[Foo]] and [[foo]] case-insensitively, keeping first-seen casing', () => {
     const md = `---
 id: test
 title: Test
@@ -368,10 +368,10 @@ See [[Foo]] and [[foo]] and [[FOO]] for details.`
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.bodyLinks).toEqual(['foo'])
+    expect(result.value.bodyLinks).toEqual(['Foo'])
   })
 
-  it('normalizes path-prefixed wikilinks to lowercase', () => {
+  it('preserves casing of path-prefixed wikilinks', () => {
     const md = `---
 id: test
 title: Test
@@ -382,7 +382,54 @@ Check [[archive/MyNote]] for context.`
     const result = parseArtifact(md, 'test.md')
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.bodyLinks).toEqual(['archive/mynote'])
+    expect(result.value.bodyLinks).toEqual(['archive/MyNote'])
+  })
+
+  it('ignores wikilinks inside fenced code blocks and inline code spans', () => {
+    const md = `---
+id: test
+title: Test
+---
+
+A real [[Genuine Link]] here.
+
+\`\`\`md
+A fenced [[fake link]] that must not count.
+\`\`\`
+
+And inline \`[[also fake]]\` too.`
+
+    const result = parseArtifact(md, 'test.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.bodyLinks).toEqual(['Genuine Link'])
+  })
+})
+
+describe('no fabricated dates', () => {
+  it('returns undefined created/modified when frontmatter has no dates', () => {
+    const result = parseArtifact(NO_FRONTMATTER, 'no-fm.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.created).toBeUndefined()
+    expect(result.value.modified).toBeUndefined()
+  })
+
+  it('keeps explicit frontmatter dates', () => {
+    const result = parseArtifact(MINIMAL_MD, 'quick-note.md')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.created).toBe('2026-03-12')
+    expect(result.value.modified).toBe('2026-03-12')
+  })
+
+  it('serializeArtifact omits absent created/modified instead of stamping today', () => {
+    const parsed = parseArtifact(NO_FRONTMATTER, 'no-fm.md')
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    const serialized = serializeArtifact(parsed.value)
+    expect(serialized).not.toMatch(/^created:/m)
+    expect(serialized).not.toMatch(/^modified:/m)
   })
 })
 

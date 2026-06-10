@@ -1,1 +1,1 @@
-export { extractConceptNodes } from '@shared/engine/concept-extractor'
+export { extractConceptNodes, stripCode } from '@shared/engine/concept-extractor'
