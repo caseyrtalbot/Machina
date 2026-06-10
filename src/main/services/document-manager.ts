@@ -36,6 +36,7 @@ type DocumentEventCallback = (
     | { type: 'external-change'; path: string; content: string }
     | { type: 'conflict'; path: string; diskContent: string }
     | { type: 'saved'; path: string }
+    | { type: 'save-failed'; path: string; message: string }
 ) => void
 
 export class DocumentManager {
@@ -282,6 +283,13 @@ export class DocumentManager {
       await this.fs.writeFile(doc.path, doc.content)
     } catch (err) {
       this.clearPendingWrite(doc.path)
+      // Surface to the renderer: the document stays dirty and the user must
+      // know their work is not on disk (full disk, permissions, etc.).
+      this._eventCallback?.({
+        type: 'save-failed',
+        path: doc.path,
+        message: err instanceof Error ? err.message : String(err)
+      })
       throw err
     }
 

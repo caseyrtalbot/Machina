@@ -123,7 +123,8 @@ function createApi() {
     on: {
       docExternalChange: vi.fn(() => () => {}),
       docConflict: vi.fn(() => () => {}),
-      docSaved: vi.fn(() => () => {})
+      docSaved: vi.fn(() => () => {}),
+      docSaveFailed: vi.fn(() => () => {})
     }
   }
 }

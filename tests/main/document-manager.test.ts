@@ -178,6 +178,56 @@ describe('DocumentManager', () => {
     })
   })
 
+  // ─── Save failures ───
+
+  describe('save failures', () => {
+    it('emits save-failed when autosave write fails and keeps the doc dirty', async () => {
+      const events: unknown[] = []
+      dm.onEvent((e) => events.push(e))
+
+      await dm.open('/vault/note.md')
+      dm.update('/vault/note.md', '# Unsaveable')
+      mockFs.writeFile.mockRejectedValueOnce(new Error('ENOSPC: no space left on device'))
+
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(events).toContainEqual({
+        type: 'save-failed',
+        path: '/vault/note.md',
+        message: 'ENOSPC: no space left on device'
+      })
+      expect(dm.getContent('/vault/note.md')!.dirty).toBe(true)
+    })
+
+    it('emits save-failed and rethrows when an explicit save fails', async () => {
+      const events: unknown[] = []
+      dm.onEvent((e) => events.push(e))
+
+      await dm.open('/vault/note.md')
+      dm.update('/vault/note.md', '# Unsaveable')
+      mockFs.writeFile.mockRejectedValueOnce(new Error('EACCES: permission denied'))
+
+      await expect(dm.save('/vault/note.md')).rejects.toThrow('EACCES')
+
+      expect(events).toContainEqual({
+        type: 'save-failed',
+        path: '/vault/note.md',
+        message: 'EACCES: permission denied'
+      })
+      expect(events).not.toContainEqual({ type: 'saved', path: '/vault/note.md' })
+    })
+
+    it('clears the pending-write suppression flag on save failure', async () => {
+      await dm.open('/vault/note.md')
+      dm.update('/vault/note.md', '# Unsaveable')
+      mockFs.writeFile.mockRejectedValueOnce(new Error('ENOSPC'))
+
+      await expect(dm.save('/vault/note.md')).rejects.toThrow()
+
+      expect(dm.hasPendingWrite('/vault/note.md')).toBe(false)
+    })
+  })
+
   // ─── Self-write suppression ───
 
   describe('self-write suppression', () => {

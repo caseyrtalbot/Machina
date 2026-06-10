@@ -1,6 +1,7 @@
-import { app, shell, BrowserWindow, session, screen } from 'electron'
+import { app, shell, BrowserWindow, session, screen, crashReporter, dialog } from 'electron'
 import { execSync } from 'child_process'
-import { join } from 'path'
+import { join, resolve } from 'path'
+import { fileURLToPath } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerFilesystemIpc, onVaultReady } from './ipc/filesystem'
 import { registerWatcherIpc, getVaultWatcher } from './ipc/watcher'
@@ -17,6 +18,7 @@ import { registerThreadIpc } from './ipc/thread-ipc'
 import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { McpLifecycle } from './services/mcp-lifecycle'
+import { initAutoUpdates } from './services/auto-update'
 import { PtyMonitor } from './services/pty-monitor'
 import { initVaultIndex } from './services/vault-indexing'
 import { VaultHealthMonitor } from './services/vault-health-monitor'
@@ -24,7 +26,12 @@ import { FsErrorLog } from './services/fs-error-log'
 import { ClaudeStatusService } from './services/claude-status-service'
 import { getMainWindow, setMainWindow } from './window-registry'
 import { QuitCoordinator } from './services/quit-coordinator'
-import { installMainLogger } from './services/main-logger'
+import {
+  installMainLogger,
+  logRendererConsole,
+  resolveMainLogFilePath
+} from './services/main-logger'
+import { typedHandle } from './typed-ipc'
 import { attachExternalNavigationGuards } from './services/external-navigation'
 import {
   DEFAULT_MAIN_WINDOW_STATE,
@@ -33,9 +40,13 @@ import {
   type WindowState
 } from './services/window-state'
 
+// No 'unsafe-eval': the only dep that needed it (Pixi's new Function uniform
+// codegen) is isolated via the 'pixi.js/unsafe-eval' shim imported by
+// graph-renderer.ts. js-yaml's and pdfjs's eval paths are feature-detected or
+// dead (gray-matter runs with JS types disabled).
 const PROD_CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval'",
+  "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
@@ -48,12 +59,40 @@ const WINDOW_STATE_SAVE_DEBOUNCE_MS = 300
 
 installMainLogger()
 
+// Local minidumps only — no remote telemetry (local-first product). Must be
+// called before app 'ready'.
+crashReporter.start({ uploadToServer: false })
+
 function normalizeProcessError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
 }
 
 function shouldIgnoreProcessError(error: Error): boolean {
   return error.message === 'write EPIPE'
+}
+
+// One dialog per process lifetime: a crash loop must not stack modals.
+let crashDialogShown = false
+
+function offerRelaunchAfterCrash(error: Error): void {
+  if (crashDialogShown || !app.isReady()) return
+  crashDialogShown = true
+  void dialog
+    .showMessageBox({
+      type: 'error',
+      title: 'Machina',
+      message: 'Machina hit an unexpected error.',
+      detail: error.stack ?? error.message,
+      buttons: ['Relaunch', 'Continue'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    .then(({ response }) => {
+      if (response === 0) {
+        app.relaunch()
+        app.exit(0)
+      }
+    })
 }
 
 function reportProcessError(
@@ -66,6 +105,10 @@ function reportProcessError(
   }
 
   console.error(`[main:${kind}]`, normalized)
+
+  if (kind === 'uncaughtException') {
+    offerRelaunchAfterCrash(normalized)
+  }
 }
 
 process.on('uncaughtException', (err) => {
@@ -96,6 +139,9 @@ if (app.isPackaged) {
 if (!process.env.LANG) {
   process.env.LANG = 'en_US.UTF-8'
 }
+
+const RENDERER_CRASH_WINDOW_MS = 60_000
+let rendererCrashTimes: readonly number[] = []
 
 const mcpLifecycle = new McpLifecycle()
 const quitCoordinator = new QuitCoordinator()
@@ -168,6 +214,46 @@ function createWindow(): BrowserWindow {
 
   setMainWindow(window)
 
+  // Crash recovery: reload restores the renderer (PTYs reconnect, state.json
+  // restores). Two crashes inside a minute means a crash loop — ask instead
+  // of spinning.
+  window.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit') return
+    console.error(`[main] renderer process gone: ${details.reason} (exit code ${details.exitCode})`)
+
+    const now = Date.now()
+    rendererCrashTimes = [
+      ...rendererCrashTimes.filter((t) => now - t < RENDERER_CRASH_WINDOW_MS),
+      now
+    ]
+
+    if (rendererCrashTimes.length >= 2) {
+      void dialog
+        .showMessageBox(window, {
+          type: 'error',
+          title: 'Machina',
+          message: 'The window crashed twice in the last minute.',
+          detail: `Reason: ${details.reason}`,
+          buttons: ['Reload', 'Quit'],
+          defaultId: 0,
+          cancelId: 1
+        })
+        .then(({ response }) => {
+          if (window.isDestroyed()) return
+          if (response === 0) {
+            window.webContents.reload()
+          } else {
+            app.quit()
+          }
+        })
+      return
+    }
+
+    if (!window.isDestroyed()) {
+      window.webContents.reload()
+    }
+  })
+
   let persistBoundsTimeout: ReturnType<typeof setTimeout> | null = null
 
   const persistWindowState = (): void => {
@@ -227,10 +313,42 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  const terminalWebviewPreload = resolve(join(__dirname, '../preload/terminal-webview.js'))
+
+  const normalizePreloadPath = (preload: string): string => {
+    try {
+      return resolve(preload.startsWith('file:') ? fileURLToPath(preload) : preload)
+    } catch {
+      return preload
+    }
+  }
+
   app.on('web-contents-created', (_event, contents) => {
     attachExternalNavigationGuards(contents, {
       rendererUrl: process.env['ELECTRON_RENDERER_URL'],
       openExternal: (url) => shell.openExternal(url)
+    })
+
+    // Only the terminal webview, with its dedicated preload, may attach.
+    // Anything else (injected <webview>, tampered preload) is blocked.
+    contents.on('will-attach-webview', (event, webPreferences, params) => {
+      const requested = webPreferences.preload ?? params.preload ?? ''
+      if (normalizePreloadPath(requested) !== terminalWebviewPreload) {
+        console.error('[main] blocked webview attach with unexpected preload:', requested)
+        event.preventDefault()
+        return
+      }
+      webPreferences.preload = terminalWebviewPreload
+      webPreferences.contextIsolation = true
+      webPreferences.nodeIntegration = false
+      webPreferences.nodeIntegrationInSubFrames = false
+    })
+
+    // Forward renderer warnings/errors into main.log so production bug
+    // reports carry renderer context.
+    contents.on('console-message', (details) => {
+      if (details.level !== 'warning' && details.level !== 'error') return
+      logRendererConsole(details.level, details.message, details.sourceId, details.lineNumber)
     })
   })
 
@@ -244,6 +362,11 @@ app.whenReady().then(() => {
       })
     })
   }
+
+  // "Reveal logs" affordance (Settings): open main.log in Finder.
+  typedHandle('app:reveal-logs', () => {
+    shell.showItemInFolder(resolveMainLogFilePath())
+  })
 
   registerConfigIpc()
   registerFilesystemIpc()
@@ -269,6 +392,15 @@ app.whenReady().then(() => {
   registerAgentNativeIpc()
   registerCliThreadIpc()
 
+  // No-ops unless a publish feed is configured (see auto-update.ts).
+  void initAutoUpdates({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    feedUrl: process.env.MACHINA_UPDATE_FEED_URL
+  }).catch((err) => {
+    console.error('[auto-update] init failed', err)
+  })
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -291,8 +423,10 @@ app.on('before-quit', (event) => {
   if (quitCleanupPromise) return
 
   quitCleanupPromise = (async (): Promise<void> => {
-    // Step 1: Signal renderer to flush vault state, wait up to 500ms
-    await quitCoordinator.requestRendererFlush(() => getMainWindow(), 500)
+    // Step 1: Signal renderer to flush vault state, canvas, dirty docs, and
+    // the active thread's dock tabs. 2.5s budget — 500ms raced real multi-file
+    // flushes and silently dropped whatever hadn't landed.
+    await quitCoordinator.requestRendererFlush(() => getMainWindow(), 2500)
 
     // Step 2: Flush all dirty documents
     try {

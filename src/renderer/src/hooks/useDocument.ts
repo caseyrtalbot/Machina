@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { logError } from '../utils/error-logger'
+import { logError, notifyError } from '../utils/error-logger'
 import { withTimeout } from '../utils/ipc-timeout'
 
 interface UseDocumentResult {
@@ -11,6 +11,12 @@ interface UseDocumentResult {
   readonly isConflict: boolean
   /** Disk content when a conflict is detected (null if no conflict) */
   readonly diskContent: string | null
+  /**
+   * Last save failure message, or null. Set when DocumentManager reports a
+   * failed autosave/save (full disk, permissions); cleared by the next
+   * successful save. While set, the document is dirty and NOT on disk.
+   */
+  readonly saveError: string | null
   /** Whether the initial load is in progress */
   readonly loading: boolean
   /** Update the document content (triggers autosave in DocumentManager) */
@@ -36,6 +42,7 @@ export function useDocument(path: string | null): UseDocumentResult {
   const [isDirty, setIsDirty] = useState(false)
   const [isConflict, setIsConflict] = useState(false)
   const [diskContent, setDiskContent] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(path))
   const openedPathRef = useRef<string | null>(null)
 
@@ -49,6 +56,7 @@ export function useDocument(path: string | null): UseDocumentResult {
     setIsDirty(false)
     setIsConflict(false)
     setDiskContent(null)
+    setSaveError(null)
   }
 
   // Open document on mount / path change
@@ -104,12 +112,22 @@ export function useDocument(path: string | null): UseDocumentResult {
     const unsubSaved = window.api.on.docSaved((data) => {
       if (data.path !== path) return
       setIsDirty(false)
+      setSaveError(null)
+    })
+
+    const unsubSaveFailed = window.api.on.docSaveFailed((data) => {
+      if (data.path !== path) return
+      // Stay dirty: the content is NOT on disk. Persist the error until a
+      // save succeeds, and toast so the user stops trusting autosave.
+      setSaveError(data.message)
+      notifyError('doc-save', data.message, `Save failed: changes not on disk (${data.message})`)
     })
 
     return () => {
       unsubExternalChange()
       unsubConflict()
       unsubSaved()
+      unsubSaveFailed()
     }
   }, [path])
 
@@ -127,6 +145,7 @@ export function useDocument(path: string | null): UseDocumentResult {
     if (!path) return
     await window.api.document.save(path)
     setIsDirty(false)
+    setSaveError(null)
   }, [path])
 
   const resolveConflict = useCallback(
@@ -150,5 +169,15 @@ export function useDocument(path: string | null): UseDocumentResult {
     [path]
   )
 
-  return { content, isDirty, isConflict, diskContent, loading, update, save, resolveConflict }
+  return {
+    content,
+    isDirty,
+    isConflict,
+    diskContent,
+    saveError,
+    loading,
+    update,
+    save,
+    resolveConflict
+  }
 }

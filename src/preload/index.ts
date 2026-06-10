@@ -60,7 +60,9 @@ const api = {
     showInFolder: (path: string) => typedInvoke('shell:show-in-folder', { path }),
     openPath: (path: string) => typedInvoke('shell:open-path', { path }),
     openExternal: (url: string) => typedInvoke('shell:open-external', { url }),
-    trashItem: (path: string) => typedInvoke('shell:trash-item', { path })
+    trashItem: (path: string) => typedInvoke('shell:trash-item', { path }),
+    hooksStatus: () => typedInvoke('shell:hooks-status'),
+    installHooks: () => typedInvoke('shell:install-hooks')
   },
 
   // Trimmed to the members the main renderer actually uses; the terminal
@@ -152,6 +154,8 @@ const api = {
     docConflict: (callback: (data: { path: string; diskContent: string }) => void) =>
       typedOn('doc:conflict', callback),
     docSaved: (callback: (data: { path: string }) => void) => typedOn('doc:saved', callback),
+    docSaveFailed: (callback: (data: { path: string; message: string }) => void) =>
+      typedOn('doc:save-failed', callback),
     agentStatesChanged: (callback: (data: { states: readonly AgentSidecarState[] }) => void) =>
       typedOn('agent:states-changed', callback),
     canvasAgentPlanAccepted: (
@@ -176,7 +180,8 @@ const api = {
       typedOn('agent-native:dock-action', callback)
   },
   app: {
-    pathExists: (path: string) => typedInvoke('app:path-exists', { path })
+    pathExists: (path: string) => typedInvoke('app:path-exists', { path }),
+    revealLogs: () => typedInvoke('app:reveal-logs')
   },
   lifecycle: {
     quitReady: () => typedInvoke('app:quit-ready')

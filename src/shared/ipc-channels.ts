@@ -59,6 +59,24 @@ export interface IpcChannels {
   'shell:open-path': { request: { path: string }; response: string }
   'shell:open-external': { request: { url: string }; response: void }
   'shell:trash-item': { request: { path: string }; response: void }
+  // Block-protocol shell hooks (resources/shell-hooks/te.*). Status reports
+  // whether the user's login shell sources the bundled hook; install copies
+  // the hook home and appends a guarded source line to the rc file.
+  'shell:hooks-status': {
+    request: void
+    response: { installed: boolean; shell: 'zsh' | 'bash' | 'fish'; hookPath: string }
+  }
+  'shell:install-hooks': {
+    request: void
+    response: {
+      ok: boolean
+      shell: 'zsh' | 'bash' | 'fish'
+      hookPath: string
+      rcPath: string | null
+      rcUpdated: boolean
+      error?: string
+    }
+  }
 
   // --- Terminal ---
   'terminal:create': {
@@ -104,6 +122,7 @@ export interface IpcChannels {
   // --- App Lifecycle ---
   'app:quit-ready': { request: void; response: void }
   'app:path-exists': { request: { path: string }; response: boolean }
+  'app:reveal-logs': { request: void; response: void }
 
   // --- Config ---
   'config:read': { request: { scope: string; key: string }; response: unknown }
@@ -267,6 +286,9 @@ export interface IpcEvents {
   'doc:external-change': { path: string; content: string }
   'doc:conflict': { path: string; diskContent: string }
   'doc:saved': { path: string }
+  // A disk write (autosave or explicit save) failed. The renderer must keep
+  // the dirty state visible so the user knows their work is not persisted.
+  'doc:save-failed': { path: string; message: string }
 
   // Agent observation events (main -> renderer)
   'agent:states-changed': { states: readonly AgentSidecarState[] }
