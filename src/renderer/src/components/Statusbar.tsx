@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { useVaultStore } from '../store/vault-store'
 import { useEditorStore } from '../store/editor-store'
 import { useThreadStore } from '../store/thread-store'
+import { useIndexingProgress } from '../utils/chunk-loader'
 import { formatModelLabel } from '@shared/format-model-label'
 
 interface StatusbarItem {
@@ -35,7 +36,7 @@ function formatNumber(n: number): string {
  *
  * Pinned to the bottom of the workspace shell, mono 10.5px / 0.06em tracking.
  * Left side reads vault state (indexed file count, graph size, dirty state);
- * right side reads agent state (active model, latency, encoding). Items are
+ * right side reads agent state (active model, run state). Items are
  * derived from the existing stores so the bar reflects actual app state and
  * does not need explicit wiring from each surface.
  */
@@ -51,18 +52,20 @@ export function Statusbar() {
   const inFlight = useThreadStore((s) =>
     s.activeThreadId ? Boolean(s.inFlightByThreadId[s.activeThreadId]) : false
   )
-
-  // Tick once a second so "saved 3s ago" stays fresh without churning the
-  // store. Cheap — string math only when the bar is mounted.
-  const [tick, setTick] = useState(0)
-  useEffect(() => {
-    const id = window.setInterval(() => setTick((n) => n + 1), 1000)
-    return () => window.clearInterval(id)
-  }, [])
+  const indexingTotal = useIndexingProgress((s) => s.total)
+  const indexingDone = useIndexingProgress((s) => s.indexed)
 
   const leftItems: StatusbarItem[] = useMemo(() => {
     const items: StatusbarItem[] = []
-    if (fileCount > 0) {
+    if (indexingTotal > 0) {
+      items.push({
+        key: 'indexing',
+        tone: 'accent',
+        dot: true,
+        text: `Indexing ${formatNumber(indexingDone)}/${formatNumber(indexingTotal)} notes`,
+        title: `${indexingDone} of ${indexingTotal} notes indexed`
+      })
+    } else if (fileCount > 0) {
       items.push({
         key: 'indexed',
         tone: 'success',
@@ -90,7 +93,7 @@ export function Statusbar() {
       items.push({ key: 'saved', text: 'saved' })
     }
     return items
-  }, [fileCount, nodeCount, edgeCount, dirty, activeNotePath])
+  }, [indexingTotal, indexingDone, fileCount, nodeCount, edgeCount, dirty, activeNotePath])
 
   const rightItems: StatusbarItem[] = useMemo(() => {
     const items: StatusbarItem[] = []
@@ -103,14 +106,8 @@ export function Statusbar() {
         text: inFlight ? `${label} · running` : label
       })
     }
-    items.push({ key: 'enc', text: 'UTF-8 · LF' })
     return items
   }, [activeThread, inFlight])
-
-  // Reference the tick so React re-renders for time-relative items if/when
-  // those land. Today the items are time-independent; the interval is kept
-  // for future "saved Xs ago" formatting.
-  void tick
 
   return (
     <div className="te-statusbar" role="status" aria-label="Workspace status">

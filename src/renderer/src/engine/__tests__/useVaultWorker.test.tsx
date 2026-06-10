@@ -43,4 +43,20 @@ describe('useVaultWorker progressive hydration', () => {
     unmount()
     expect(terminate).toHaveBeenCalledTimes(1)
   })
+
+  it('sends a watcher batch as a single update-many message', () => {
+    const { result, unmount } = renderHook(() => useVaultWorker(vi.fn()))
+
+    result.current.updateMany([{ path: '/vault/a.md', content: 'A2' }], ['/vault/b.md'])
+
+    expect(workerMessages).toEqual([
+      {
+        type: 'update-many',
+        updates: [{ path: '/vault/a.md', content: 'A2' }],
+        removes: ['/vault/b.md']
+      }
+    ])
+
+    unmount()
+  })
 })

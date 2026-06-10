@@ -3,6 +3,17 @@ import { buildGraph } from './graph-builder'
 import type { Artifact } from '@shared/types'
 import type { ParseError, WorkerResult } from './types'
 
+export type WorkerInMessage =
+  | { type: 'load'; files: ReadonlyArray<{ path: string; content: string }> }
+  | { type: 'append'; files: ReadonlyArray<{ path: string; content: string }> }
+  | {
+      type: 'update-many'
+      updates: ReadonlyArray<{ path: string; content: string }>
+      removes: readonly string[]
+    }
+
+export type WorkerOutMessage = { type: 'loaded' | 'updated' } & WorkerResult
+
 interface WorkerHelpers {
   addFile: (path: string, content: string) => void
   removeFile: (path: string) => void
@@ -75,4 +86,75 @@ export function createWorkerHelpers(): WorkerHelpers {
   }
 
   return { addFile, removeFile, buildResult, clearAll }
+}
+
+/** Minimum gap between graph rebuilds posted during chunked appends. */
+export const APPEND_POST_INTERVAL_MS = 1000
+
+/**
+ * Message-handling core of the vault worker, factored out of the worker shell
+ * so it can be unit-tested with fake timers.
+ *
+ * Rebuild policy:
+ * - `load` (first chunk) rebuilds and posts immediately so the UI has content.
+ * - `append` (background chunks) throttles to one rebuild+post per
+ *   APPEND_POST_INTERVAL_MS, with a trailing timer that guarantees one final
+ *   post covering every appended file. Without this, a 5k-note vault does
+ *   ~100 escalating O(n²) graph rebuilds during hydration.
+ * - `update-many` (one watcher batch) applies every remove+update, then does a
+ *   single rebuild — instead of one rebuild per changed file.
+ */
+export function createWorkerController(
+  post: (msg: WorkerOutMessage) => void,
+  intervalMs: number = APPEND_POST_INTERVAL_MS
+): { handleMessage: (msg: WorkerInMessage) => void } {
+  const { addFile, removeFile, buildResult, clearAll } = createWorkerHelpers()
+  let appendTimer: ReturnType<typeof setTimeout> | undefined
+  let lastPostAt = Number.NEGATIVE_INFINITY
+
+  function postNow(msgType: 'loaded' | 'updated'): void {
+    if (appendTimer !== undefined) {
+      clearTimeout(appendTimer)
+      appendTimer = undefined
+    }
+    lastPostAt = Date.now()
+    post({ type: msgType, ...buildResult() })
+  }
+
+  function postThrottled(): void {
+    if (appendTimer !== undefined) return // trailing post pending; it will see this batch
+    const wait = intervalMs - (Date.now() - lastPostAt)
+    if (wait <= 0) {
+      postNow('loaded')
+      return
+    }
+    appendTimer = setTimeout(() => {
+      appendTimer = undefined
+      postNow('loaded')
+    }, wait)
+  }
+
+  function handleMessage(msg: WorkerInMessage): void {
+    switch (msg.type) {
+      case 'load':
+        clearAll()
+        for (const file of msg.files) addFile(file.path, file.content)
+        postNow('loaded')
+        break
+      case 'append':
+        for (const file of msg.files) addFile(file.path, file.content)
+        postThrottled()
+        break
+      case 'update-many':
+        for (const path of msg.removes) removeFile(path)
+        for (const file of msg.updates) {
+          removeFile(file.path)
+          addFile(file.path, file.content)
+        }
+        postNow('updated')
+        break
+    }
+  }
+
+  return { handleMessage }
 }

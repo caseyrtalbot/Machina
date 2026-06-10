@@ -2,7 +2,13 @@ import { useState, useCallback, useEffect } from 'react'
 import { logError, notifyError, setErrorNotifier } from './utils/error-logger'
 import { withTimeout } from './utils/ipc-timeout'
 import { perfMark, perfMeasure } from './utils/perf-marks'
-import { chunkArray, readChunk, yieldToEventLoop } from './utils/chunk-loader'
+import {
+  chunkArray,
+  readChunk,
+  yieldToEventLoop,
+  setIndexingProgress,
+  clearIndexingProgress
+} from './utils/chunk-loader'
 import { useVaultWorker } from './engine/useVaultWorker'
 import type { WorkerResult } from './engine/types'
 import { ThemeProvider } from './design/Theme'
@@ -54,6 +60,13 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
     window.addEventListener('te:open-vault', handler)
     return () => window.removeEventListener('te:open-vault', handler)
   }, [onLoadVault])
+
+  // Listen for settings-open requests (e.g. the AUTH error action in threads)
+  useEffect(() => {
+    const handler = () => setSettingsOpen(true)
+    window.addEventListener('te:open-settings', handler)
+    return () => window.removeEventListener('te:open-settings', handler)
+  }, [])
 
   return (
     <div
@@ -166,7 +179,7 @@ export default function App() {
     })
   }, [])
 
-  const { loadFiles, appendFiles, updateFile, removeFile } = useVaultWorker(onWorkerResult)
+  const { loadFiles, appendFiles, updateMany } = useVaultWorker(onWorkerResult)
 
   const orchestrateLoad = useCallback(
     async (path: string) => {
@@ -199,17 +212,26 @@ export default function App() {
       const reader = (p: string) => withTimeout(window.api.fs.readFile(p), 5000, `readFile ${p}`)
       const chunks = chunkArray(mdPaths)
 
-      // First chunk: load synchronously so the UI has content to show.
-      const initialBatch = await readChunk(chunks[0] ?? [], reader, limit)
-      loadFiles(initialBatch)
-      perfMeasure('vault-load', 'vault-load-start')
+      setIndexingProgress(0, mdPaths.length)
+      try {
+        // First chunk: load synchronously so the UI has content to show.
+        const initialBatch = await readChunk(chunks[0] ?? [], reader, limit)
+        loadFiles(initialBatch)
+        perfMeasure('vault-load', 'vault-load-start')
+        let indexed = initialBatch.length
+        setIndexingProgress(indexed, mdPaths.length)
 
-      // Remaining chunks: load in background, yielding between each so the
-      // event loop can process user interactions and paint frames.
-      for (let i = 1; i < chunks.length; i++) {
-        await yieldToEventLoop(16) // ~1 frame of breathing room
-        const batch = await readChunk(chunks[i], reader, limit)
-        appendFiles(batch)
+        // Remaining chunks: load in background, yielding between each so the
+        // event loop can process user interactions and paint frames.
+        for (let i = 1; i < chunks.length; i++) {
+          await yieldToEventLoop(16) // ~1 frame of breathing room
+          const batch = await readChunk(chunks[i], reader, limit)
+          appendFiles(batch)
+          indexed += batch.length
+          setIndexingProgress(indexed, mdPaths.length)
+        }
+      } finally {
+        clearIndexingProgress()
       }
     },
     [appendFiles, loadVault, loadFiles]
@@ -354,14 +376,17 @@ export default function App() {
         }
       }
 
-      // Batch vault worker updates
-      for (const path of mdToRemove) removeFile(path)
-      for (const path of mdToUpdate) {
-        updateFile(path, await window.api.fs.readFile(path))
+      // One worker message per watcher batch — a single graph rebuild
+      // instead of one rebuild per changed file.
+      const updates = await Promise.all(
+        mdToUpdate.map(async (path) => ({ path, content: await window.api.fs.readFile(path) }))
+      )
+      if (updates.length > 0 || mdToRemove.length > 0) {
+        updateMany(updates, mdToRemove)
       }
     })
     return unsub
-  }, [updateFile, removeFile, setFiles])
+  }, [updateMany, setFiles])
 
   const handleOpenFolder = useCallback(async () => {
     try {

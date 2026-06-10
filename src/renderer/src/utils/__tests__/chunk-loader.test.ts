@@ -1,5 +1,13 @@
-import { describe, it, expect, vi } from 'vitest'
-import { chunkArray, readChunk, yieldToEventLoop, DEFAULT_CHUNK_SIZE } from '../chunk-loader'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  chunkArray,
+  readChunk,
+  yieldToEventLoop,
+  DEFAULT_CHUNK_SIZE,
+  useIndexingProgress,
+  setIndexingProgress,
+  clearIndexingProgress
+} from '../chunk-loader'
 
 describe('chunkArray', () => {
   it('splits 200 items into 4 chunks of 50', () => {
@@ -119,6 +127,27 @@ describe('yieldToEventLoop', () => {
     const elapsed = performance.now() - start
     // Should resolve very quickly (within 50ms even on slow CI)
     expect(elapsed).toBeLessThan(50)
+  })
+})
+
+describe('indexing progress store', () => {
+  beforeEach(() => {
+    clearIndexingProgress()
+  })
+
+  it('starts idle (total 0)', () => {
+    expect(useIndexingProgress.getState()).toEqual({ indexed: 0, total: 0 })
+  })
+
+  it('setIndexingProgress publishes indexed/total', () => {
+    setIndexingProgress(50, 5000)
+    expect(useIndexingProgress.getState()).toEqual({ indexed: 50, total: 5000 })
+  })
+
+  it('clearIndexingProgress resets to idle', () => {
+    setIndexingProgress(5000, 5000)
+    clearIndexingProgress()
+    expect(useIndexingProgress.getState()).toEqual({ indexed: 0, total: 0 })
   })
 })
 

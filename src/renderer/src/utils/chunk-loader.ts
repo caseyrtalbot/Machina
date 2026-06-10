@@ -5,8 +5,31 @@
  * can be sent to the vault worker immediately, making the UI interactive
  * while remaining chunks load in the background.
  */
+import { create } from 'zustand'
 
 export const DEFAULT_CHUNK_SIZE = 50
+
+interface IndexingProgressState {
+  /** Notes read and handed to the vault worker so far. */
+  readonly indexed: number
+  /** Total notes in the current hydration pass. 0 means no indexing in progress. */
+  readonly total: number
+}
+
+/**
+ * Chunk-loading progress, published by the App hydration loop and read by the
+ * Statusbar ("Indexing N/M notes"). Lives next to the chunk utilities because
+ * its lifecycle is exactly one progressive-load pass.
+ */
+export const useIndexingProgress = create<IndexingProgressState>(() => ({ indexed: 0, total: 0 }))
+
+export function setIndexingProgress(indexed: number, total: number): void {
+  useIndexingProgress.setState({ indexed, total })
+}
+
+export function clearIndexingProgress(): void {
+  useIndexingProgress.setState({ indexed: 0, total: 0 })
+}
 
 /** Split an array into chunks of `size`. Returns at least one (possibly empty) chunk. */
 export function chunkArray<T>(items: readonly T[], size: number = DEFAULT_CHUNK_SIZE): T[][] {
