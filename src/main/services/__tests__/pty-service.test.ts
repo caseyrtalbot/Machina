@@ -166,7 +166,7 @@ describe('PtyService', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Data callback + reconnect queue
+  // Data callback
   // -------------------------------------------------------------------------
 
   it('fires data callback when session is connected', () => {
@@ -178,18 +178,6 @@ describe('PtyService', () => {
     handler('hello')
 
     expect(onData).toHaveBeenCalledWith('s1', 'hello')
-  })
-
-  it('buffers data in reconnectQueue when disconnected', () => {
-    const onData = vi.fn()
-    service.setCallbacks(onData, vi.fn())
-    service.create('s1', '/tmp')
-    service.detachAll()
-
-    const handler = pty.onData.mock.calls[0][0] as (data: string) => void
-    handler('buffered-chunk')
-
-    expect(onData).not.toHaveBeenCalled()
   })
 
   // -------------------------------------------------------------------------
@@ -206,39 +194,8 @@ describe('PtyService', () => {
     expect(typeof result!.scrollback).toBe('string')
   })
 
-  it('flushes queued data through callback on reconnect', () => {
-    const onData = vi.fn()
-    service.setCallbacks(onData, vi.fn())
-    mockReadSessionMeta.mockReturnValue({ shell: '/bin/zsh', cwd: '/tmp', createdAt: 'now' })
-    service.create('s1', '/tmp')
-    service.detachAll()
-
-    const handler = pty.onData.mock.calls[0][0] as (data: string) => void
-    handler('queued')
-    onData.mockClear()
-
-    service.reconnect('s1', 80, 24)
-
-    expect(onData).toHaveBeenCalledWith('s1', 'queued')
-  })
-
   it('returns null for unknown sessions', () => {
     expect(service.reconnect('nonexistent', 80, 24)).toBeNull()
-  })
-
-  // -------------------------------------------------------------------------
-  // discover()
-  // -------------------------------------------------------------------------
-
-  it('returns disconnected sessions', () => {
-    mockReadSessionMeta.mockReturnValue({ shell: '/bin/zsh', cwd: '/tmp', createdAt: 'now' })
-    service.create('s1', '/tmp')
-    service.detachAll()
-
-    const discovered = service.discover()
-
-    expect(discovered).toHaveLength(1)
-    expect(discovered[0].sessionId).toBe('s1')
   })
 
   // -------------------------------------------------------------------------
@@ -260,20 +217,8 @@ describe('PtyService', () => {
   })
 
   // -------------------------------------------------------------------------
-  // detachAll() / killAll()
+  // killAll()
   // -------------------------------------------------------------------------
-
-  it('detachAll() marks sessions as disconnected', () => {
-    const onData = vi.fn()
-    service.setCallbacks(onData, vi.fn())
-    service.create('s1', '/tmp')
-    service.detachAll()
-
-    const handler = pty.onData.mock.calls[0][0] as (data: string) => void
-    handler('data-after-detach')
-
-    expect(onData).not.toHaveBeenCalled()
-  })
 
   it('killAll() kills all ptys and clears metadata', () => {
     service.create('s1', '/tmp')

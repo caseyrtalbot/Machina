@@ -18,13 +18,12 @@ describe('registerAgentIpc', () => {
     vi.resetModules()
   })
 
-  it('registers handlers for agent:get-states and agent:spawn', async () => {
+  it('registers a handler for agent:get-states', async () => {
     const { registerAgentIpc } = await import('../../src/main/ipc/agents')
 
     registerAgentIpc()
 
     expect(mockIpcHandle).toHaveBeenCalledWith('agent:get-states', expect.any(Function))
-    expect(mockIpcHandle).toHaveBeenCalledWith('agent:spawn', expect.any(Function))
   })
 
   it('agent:get-states returns empty array when no services set', async () => {
@@ -47,7 +46,7 @@ describe('registerAgentIpc', () => {
     const fakeStates: AgentSidecarState[] = [
       {
         sessionId: 'abc123',
-        tmuxName: 'te-abc123',
+        displayName: 'te-abc123',
         status: 'alive',
         pid: 12345,
         currentCommand: 'claude'
@@ -60,7 +59,7 @@ describe('registerAgentIpc', () => {
     } as unknown as import('../../src/main/services/pty-monitor').PtyMonitor
 
     registerAgentIpc()
-    setAgentServices(mockMonitor, null)
+    setAgentServices(mockMonitor)
 
     const getStatesCall = mockIpcHandle.mock.calls.find(
       ([channel]) => channel === 'agent:get-states'
@@ -82,7 +81,7 @@ describe('registerAgentIpc', () => {
     } as unknown as import('../../src/main/services/pty-monitor').PtyMonitor
 
     registerAgentIpc()
-    setAgentServices(mockMonitor, null)
+    setAgentServices(mockMonitor)
 
     expect(mockMonitor.start).toHaveBeenCalledOnce()
     expect(mockMonitor.start).toHaveBeenCalledWith(expect.any(Function))
@@ -95,40 +94,10 @@ describe('registerAgentIpc', () => {
     const monitor2 = { getAgentStates: vi.fn().mockReturnValue([]), start: vi.fn(), stop: vi.fn() }
 
     registerAgentIpc()
-    setAgentServices(monitor1 as never, null)
-    setAgentServices(monitor2 as never, null)
+    setAgentServices(monitor1 as never)
+    setAgentServices(monitor2 as never)
 
     expect(monitor1.stop).toHaveBeenCalledOnce()
     expect(monitor2.start).toHaveBeenCalledOnce()
-  })
-
-  it('agent:spawn calls spawner and returns sessionId', async () => {
-    const { registerAgentIpc, setAgentServices } = await import('../../src/main/ipc/agents')
-
-    const mockSpawner = {
-      spawn: vi.fn().mockReturnValue('spawned-session-123')
-    } as unknown as import('../../src/main/services/agent-spawner').AgentSpawner
-
-    registerAgentIpc()
-    setAgentServices(null, mockSpawner)
-
-    const spawnCall = mockIpcHandle.mock.calls.find(([channel]) => channel === 'agent:spawn')
-    const handler = spawnCall![1]
-    const result = await handler({} as never, { cwd: '/test/dir', prompt: 'do stuff' })
-
-    expect(mockSpawner.spawn).toHaveBeenCalledWith({ cwd: '/test/dir', prompt: 'do stuff' })
-    expect(result).toEqual({ sessionId: 'spawned-session-123' })
-  })
-
-  it('agent:spawn returns error when no spawner set', async () => {
-    const { registerAgentIpc } = await import('../../src/main/ipc/agents')
-
-    registerAgentIpc()
-
-    const spawnCall = mockIpcHandle.mock.calls.find(([channel]) => channel === 'agent:spawn')
-    const handler = spawnCall![1]
-    const result = await handler({} as never, { cwd: '/test/dir' })
-
-    expect(result).toEqual({ error: 'Agent spawner not available' })
   })
 })

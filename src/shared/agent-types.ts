@@ -56,26 +56,6 @@ export interface AgentSidecarState {
 }
 
 // ---------------------------------------------------------------------------
-// Agent spawn types
-// ---------------------------------------------------------------------------
-
-/** Full configuration for spawning an agent process. */
-export interface AgentSpawnConfig {
-  readonly sessionId: string
-  readonly vaultRoot: string
-  readonly cwd: string
-  readonly prompt?: string
-}
-
-/** IPC request shape for spawning an agent (sessionId and vaultRoot added by main). */
-export interface AgentSpawnRequest {
-  readonly cwd: string
-  readonly prompt?: string
-  /** When set, scope the agent to only these file paths (relative to cwd). */
-  readonly selectedFiles?: readonly string[]
-}
-
-// ---------------------------------------------------------------------------
 // Audit types
 // ---------------------------------------------------------------------------
 

@@ -49,7 +49,7 @@ Electron app with three process boundaries plus shared pure logic:
 
 ### IPC Pattern
 
-`typedHandle('channel', handler)` in main → `typedInvoke('channel', args)` in preload → `window.api.namespace.method()` in renderer. Namespaces: `fs`, `vault`, `config`, `document`, `window`, `shell`, `workbench`, `terminal`, `agent`, `canvas`, `on` (events).
+`typedHandle('channel', handler)` in main → `typedInvoke('channel', args)` in preload → `window.api.namespace.method()` in renderer. Namespaces: `fs`, `vault`, `config`, `document`, `shell`, `terminal`, `claude`, `agent`, `agentNative`, `thread`, `cliThread`, `canvas`, `health`, `app`, `lifecycle`, `on` (events).
 
 **Adding a new IPC channel (4 steps):**
 1. Declare in `IpcChannels` or `IpcEvents` in `src/shared/ipc-channels.ts`
@@ -80,7 +80,7 @@ Content pushes happen in user-action callbacks (`handleUpdate`, `onFrontmatterCh
 
 ### DocumentManager (main process)
 
-Single owner of all open file content. Renderer views are thin IPC clients via `useDocument(path)`. Channels: `doc:open/close/update/save/get-content`; events: `doc:external-change/conflict/saved`. Self-write suppression via `_pendingWrites`. Conflict detection uses content comparison (not mtime) for cloud sync compatibility.
+Single owner of all open file content. Renderer views are thin IPC clients via `useDocument(path)`. Channels: `doc:open/close/update/save/save-content`; events: `doc:external-change/conflict/saved`. Self-write suppression via `_pendingWrites`. Conflict detection uses content comparison (not mtime) for cloud sync compatibility.
 
 ### Canvas Mutations (Snapshot-and-Plan)
 
@@ -100,11 +100,11 @@ Terminal runs in an Electron `<webview>` with its own preload (`src/preload/term
 
 ### Block Protocol (structured shell sessions)
 
-Shell hooks (`resources/shell-hooks/te.{zsh,bash,fish}`) emit OSC `1337;te-...` markers only when `TE_SESSION_ID` is set by `PtyService`. `BlockDetector` parses PTY markers in pure engine code; `BlockWatcher` folds them through immutable block-model transitions and emits `block:update` IPC. Renderer flow: `useBlockUpdates` -> `block-store` -> `terminal-block` cards. Secret spans from `scanSecrets` are masked by render offsets with per-card click-to-reveal. See `docs/architecture/block-protocol.md`.
+Shell hooks (`resources/shell-hooks/te.{zsh,bash,fish}`) emit OSC `1337;te-...` markers only when `TE_SESSION_ID` is set by `PtyService`. `BlockDetector` parses PTY markers in pure engine code; `BlockWatcher` folds them through immutable block-model transitions and emits `block:update` IPC. Renderer flow: module-level `window.api.on.blockUpdate` subscription in `block-store` -> `terminal-block` cards. Secret spans from `scanSecrets` are masked by render offsets with per-card click-to-reveal. See `docs/architecture/block-protocol.md`.
 
 ### PTY Write Arbitration
 
-All PTY writes go through a per-session `PtyWriteQueue` with single-flight drain. `PtyWrite` is `command | bytes | agent-input`, exposed as `write`, `sendRawKeys`, and `writeAgentInput`; use `writeAgentInput` for agent-originated text so future policy can distinguish it from human keystrokes.
+All PTY writes go through a per-session `PtyWriteQueue` with single-flight drain. `PtyWrite` is `bytes | agent-input`, exposed as `write`, `sendRawKeys`, and `writeAgentInput`; use `writeAgentInput` for agent-originated text so future policy can distinguish it from human keystrokes.
 
 ### Coordinated Quit (2-phase)
 
@@ -119,14 +119,14 @@ before-quit → preventDefault → typedSend('app:will-quit')
 - **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds in `RELATIONSHIP_KINDS`, each with provenance) → ghost-index.ts. search-engine.ts uses MiniSearch weights: title x10, tags x5, body x1. Runs in vault-worker.ts.
 - **Canvas** (`panels/canvas/`): React DOM pan/zoom via `translate(x,y) scale(zoom)` in `CanvasSurface.tsx`; Pixi.js is only for the graph renderer. 12 `CanvasNodeType` card types include `terminal-block`, which projects a `block-store` entry and can be pinned from `TerminalCard`. Click-to-focus, click-again-to-interact.
 - **Ontology** (`engine/ontology-*`): Tag-first grouping with link-analysis fallback, computed in ontology-worker.ts. `GroupProvenance` tracks source (user tags, links, AI).
-- **Agents**: Three paths outside the MCP safety subsystem. (1) PTY Claude via `agent-spawner.ts` → `ShellService` → node-pty, with `session-tailer.ts` milestones, `window.api.agent`, and pre-spawn `commitPreAgentSnapshot`. (2) Native Anthropic SDK agent via `machina-native-agent.ts`, using `messages.stream` and `NATIVE_TOOLS`; it has PathGuard (`resolveInVault`) on note ops, per-write HITL approval except under `autoAccept` until the per-run write limiter trips, append-only audit logging on successful writes, no read-time Spotlighting. `write_note`/`edit_note` share final-write mechanics with `VaultQueryFacade.writeFile` via `writeStampedNote` (`src/main/utils/note-write.ts`), stamping `modified_by`/`modified_at`, suppressing watcher self-echo through optional `DocumentManager.registerExternalWrite`, preserving note bodies verbatim even when they start with `---`, and keeping facade vs note-tools audit entries separate with no double-log. Canvas writes use a strict id regex (`CANVAS_ID_RE`, fast first reject) and then route through PathGuard (`resolveInVault`) for the symlink/traversal backstop. IPC: `window.api.agentNative`. (3) CLI thread PTYs via `cli-thread-spawner.ts` running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print "<prompt>"`; IPC `window.api.thread`. Paths (1) and (3) are trusted to the user's level. See `docs/architecture/adr/0001-native-agent-stays-on-anthropic-sdk.md`.
+- **Agents**: Two paths outside the MCP safety subsystem. (1) Native Anthropic SDK agent via `machina-native-agent.ts`, using `messages.stream` and `NATIVE_TOOLS`; it has PathGuard (`resolveInVault`) on note ops, per-write HITL approval except under `autoAccept` until the per-run write limiter trips, append-only audit logging on successful writes, no read-time Spotlighting. `write_note`/`edit_note` share final-write mechanics with `VaultQueryFacade.writeFile` via `writeStampedNote` (`src/main/utils/note-write.ts`), stamping `modified_by`/`modified_at`, suppressing watcher self-echo through optional `DocumentManager.registerExternalWrite`, preserving note bodies verbatim even when they start with `---`, and keeping facade vs note-tools audit entries separate with no double-log. Canvas writes use a strict id regex (`CANVAS_ID_RE`, fast first reject) and then route through PathGuard (`resolveInVault`) for the symlink/traversal backstop. IPC: `window.api.agentNative`. (2) CLI thread PTYs via `cli-thread-spawner.ts` running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print "<prompt>"`; IPC `window.api.thread`; trusted to the user's level. `vault-git.ts:commitPreAgentSnapshot` provides pre-run rollback snapshots (wired to CLI threads in plan item 1.8); `pty-monitor.ts` → `agent:get-states` / `agent:states-changed` keeps PTY agent badging alive. See `docs/architecture/adr/0001-native-agent-stays-on-anthropic-sdk.md`.
 - **Block Protocol**: Shell hooks → OSC markers → `BlockDetector` → `BlockWatcher` → `block:update` IPC → renderer `block-store` → DOM `terminal-block` cards.
 - **System Artifacts**: Structured markdown in `.machina/artifacts/{sessions,patterns,tensions}/`. Schemas in `system-artifacts.ts`.
 - **Web Workers**: vault-worker (parse+graph), graph-physics-worker (D3-force), ontology-worker (grouping+layout), project-map-worker (filesystem→canvas).
 
 ### Panel Architecture
 
-KeepAlive: panels mount once, then `display: none` on tab switch (preserves terminal state). Heavy panels (Canvas, Workbench, GraphView, Ghosts) use `React.lazy`.
+KeepAlive: panels mount once, then `display: none` on tab switch (preserves terminal state). Heavy panels (Canvas, GraphView, Ghosts) use `React.lazy`.
 
 ### State Management (Zustand)
 
@@ -139,7 +139,7 @@ KeepAlive: panels mount once, then `display: none` on tab switch (preserves term
 | thread-store | Threads, messages, streaming, dock tabs/layout, in-flight + runId per thread |
 | block-store | Per-session ordered terminal `Block` records |
 | ui-store | Per-note UI state (backlink expansion), persisted via IPC |
-| settings-store | Translucency, opacity, blur, font sizes (localStorage) |
+| settings-store | Accent (preset id + custom hex), opacity, blur, font sizes, density/radii/backgroundTint/canvasGrid (localStorage) |
 | claude-status-store | Claude CLI availability/status |
 | sidebar-filter-store | Sidebar file-tree filter state |
 | sidebar-selection-store | Sidebar selection state |
@@ -153,13 +153,13 @@ Tiptap 3 with markdown round-tripping. Extensions: slash commands, bubble menu, 
 
 ### Design System
 
-Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). Dark-only UI with one hardcoded accent, `ACCENT_HEX = '#ff8c5a'` (Ember coral) in `design/themes.ts`. `settings-store` v3→v4 removed `theme` and `accentColor`; runtime settings are translucency, opacity, blur, and font sizes only. OKLCH remains for per-artifact colors.
+Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). Dark-only UI with a runtime-selectable accent: `ACCENT_PRESETS` in `design/accent-presets.ts` (default `ember`, `#ff8c5a`) plus a `custom` hex, stored as `accentId`/`customAccentHex` in `settings-store` and applied via `applyAccentCssVars`. `EnvironmentSettings` exposes opacity, header darkness, blur, grid-dot visibility, font sizes, `density`, `radii`, `backgroundTint`, and `canvasGrid`. OKLCH remains for per-artifact colors.
 
 - Import from `design/tokens.ts` — never hardcode hex or px
-- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc. resolve once at startup and are not reassigned
+- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc. resolve at startup; only accent vars are reapplied (via `applyAccentCssVars`) when the user changes accent
 - `getArtifactColor(type)` for per-type colors
 - Animation keyframes prefixed `te-`
-- For Pixi, mermaid, or other non-CSS consumers needing hex values, read CSS vars once via `getComputedStyle` and memoize; no Zustand subscription is needed because vars are static at runtime
+- For Pixi, mermaid, or other non-CSS consumers needing hex values, read CSS vars via `getComputedStyle`; note accent vars can change at runtime when the user picks a new accent
 
 ## Type Conventions
 

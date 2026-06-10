@@ -11,7 +11,6 @@ import {
   Terminal,
   TerminalSquare,
   Type,
-  Zap,
   type LucideIcon
 } from 'lucide-react'
 import { colors, borderRadius, floatingPanel } from '../../design/tokens'
@@ -24,7 +23,6 @@ interface CanvasContextMenuProps {
     type: CanvasNodeType,
     overrides?: Partial<Pick<CanvasNode, 'content' | 'metadata'>>
   ) => void
-  readonly onSpawnAgent?: () => void
   readonly onClose: () => void
 }
 
@@ -61,7 +59,6 @@ export function CanvasContextMenu({
   x,
   y,
   onAddCard,
-  onSpawnAgent,
   onClose
 }: CanvasContextMenuProps): React.ReactElement {
   const ref = useRef<HTMLDivElement>(null)
@@ -190,27 +187,6 @@ export function CanvasContextMenu({
           </div>
         )
       })}
-      {onSpawnAgent && (
-        <>
-          <div
-            style={{
-              height: 1,
-              backgroundColor: colors.border.subtle,
-              margin: '4px 8px'
-            }}
-          />
-          {renderRow(
-            Zap,
-            'Spawn Claude Session',
-            undefined,
-            () => {
-              onSpawnAgent()
-              onClose()
-            },
-            'spawn-agent'
-          )}
-        </>
-      )}
     </div>
   )
 }

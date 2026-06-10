@@ -122,8 +122,6 @@ function validateCanvasMutationOp(
       return null
     case 'remove-edge':
       return null
-    case 'materialize-artifact':
-      return 'materialize-artifact: must be rewritten before canvas apply-plan'
   }
 }
 

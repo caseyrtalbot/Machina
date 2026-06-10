@@ -7,13 +7,9 @@ import { registerWatcherIpc, getVaultWatcher } from './ipc/watcher'
 import { registerShellIpc, getShellService } from './ipc/shell'
 import { registerConfigIpc, readAppConfigValue, writeAppConfigValue } from './ipc/config'
 
-import { registerProjectIpc, getProjectWatcher, getSessionTailer } from './ipc/workbench'
 import { registerDocumentIpc, getDocumentManager } from './ipc/documents'
-import { registerMcpIpc } from './ipc/mcp'
 import { registerAgentIpc, setAgentServices, stopAgentServices } from './ipc/agents'
-import { registerActionsIpc, setActionsVaultRoot } from './ipc/actions'
 import { registerCanvasIpc } from './ipc/canvas'
-import { registerArtifactIpc } from './ipc/artifact'
 import { registerGhostEmergeIpc } from './ipc/ghost-emerge'
 import { registerHealthIpc, setHealthMonitor, emitHealthReport } from './ipc/health'
 import { registerClaudeStatusIpc } from './ipc/claude-status'
@@ -22,12 +18,10 @@ import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { PtyMonitor } from './services/pty-monitor'
-import { AgentSpawner } from './services/agent-spawner'
 import { initVaultIndex } from './services/vault-indexing'
 import { VaultHealthMonitor } from './services/vault-health-monitor'
 import { FsErrorLog } from './services/fs-error-log'
 import { ClaudeStatusService } from './services/claude-status-service'
-import { typedHandle } from './typed-ipc'
 import { getMainWindow, setMainWindow } from './window-registry'
 import { QuitCoordinator } from './services/quit-coordinator'
 import { installMainLogger } from './services/main-logger'
@@ -136,9 +130,7 @@ async function reconfigureForVault(vaultPath: string): Promise<void> {
   })
 
   const monitor = new PtyMonitor(vaultPath, getShellService().getPtyService())
-  const spawner = new AgentSpawner(getShellService(), vaultPath)
-  setAgentServices(monitor, spawner)
-  setActionsVaultRoot(vaultPath)
+  setAgentServices(monitor)
 
   const health = ensureHealthMonitor()
   setHealthMonitor(health)
@@ -228,20 +220,6 @@ function createWindow(): BrowserWindow {
   return window
 }
 
-function registerWindowIpc(): void {
-  typedHandle('window:minimize', () => {
-    getMainWindow()?.minimize()
-  })
-  typedHandle('window:maximize', () => {
-    const window = getMainWindow()
-    if (window?.isMaximized()) window.unmaximize()
-    else window?.maximize()
-  })
-  typedHandle('window:close', () => {
-    getMainWindow()?.close()
-  })
-}
-
 app.whenReady().then(() => {
   electronApp.setAppUserModelId(APP_ID)
 
@@ -268,7 +246,6 @@ app.whenReady().then(() => {
   }
 
   registerConfigIpc()
-  registerWindowIpc()
   registerFilesystemIpc()
   registerClaudeStatusIpc(claudeStatus)
   claudeStatus.start()
@@ -284,12 +261,8 @@ app.whenReady().then(() => {
   registerShellIpc()
 
   registerDocumentIpc()
-  registerProjectIpc()
-  registerMcpIpc(mcpLifecycle)
   registerAgentIpc() // Register once at startup, services update via setAgentServices
-  registerActionsIpc()
   registerCanvasIpc()
-  registerArtifactIpc()
   registerGhostEmergeIpc()
   registerHealthIpc()
   registerThreadIpc()
@@ -344,16 +317,12 @@ app.on('before-quit', (event) => {
     const cleanupResults = await Promise.allSettled([
       mcpLifecycle.stop(),
       getShellService().shutdown(),
-      getVaultWatcher().stop(),
-      getProjectWatcher().stop(),
-      getSessionTailer()?.stop() ?? Promise.resolve()
+      getVaultWatcher().stop()
     ])
 
     logCleanupResult('mcp stop', cleanupResults[0])
     logCleanupResult('shell shutdown', cleanupResults[1])
     logCleanupResult('vault watcher stop', cleanupResults[2])
-    logCleanupResult('project watcher stop', cleanupResults[3])
-    logCleanupResult('session tailer stop', cleanupResults[4])
   })()
     .catch((err) => {
       console.error('[quit] cleanup failed', err)

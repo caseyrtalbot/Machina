@@ -23,10 +23,6 @@ export function registerThreadIpc(): void {
     return new ThreadStorage(vaultPath).listArchived()
   })
 
-  typedHandle('thread:read', async ({ vaultPath, id }) => {
-    return new ThreadStorage(vaultPath).readThread(id)
-  })
-
   typedHandle('thread:save', async ({ vaultPath, thread }) => {
     await new ThreadStorage(vaultPath).saveThread(thread)
   })

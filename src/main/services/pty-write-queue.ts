@@ -9,7 +9,6 @@
  */
 
 export type PtyWrite =
-  | { readonly kind: 'command'; readonly text: string }
   | { readonly kind: 'bytes'; readonly data: string }
   | {
       readonly kind: 'agent-input'

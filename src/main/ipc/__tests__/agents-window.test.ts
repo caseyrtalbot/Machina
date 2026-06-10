@@ -18,12 +18,6 @@ vi.mock('../../window-registry', () => ({
   getMainWindow: () => state.currentWindow
 }))
 
-function createMockSpawner() {
-  return {
-    spawn: vi.fn()
-  } as never
-}
-
 describe('registerAgentIpc', () => {
   beforeEach(() => {
     state.currentWindow = { id: 'startup', isDestroyed: () => false, webContents: {} }
@@ -35,16 +29,13 @@ describe('registerAgentIpc', () => {
   it('sends agent state updates to the current window after replacement', () => {
     registerAgentIpc()
 
-    setAgentServices(
-      {
-        stop: vi.fn(),
-        start: vi.fn((callback: typeof state.monitorCallback) => {
-          state.monitorCallback = callback
-        }),
-        getAgentStates: vi.fn().mockReturnValue([])
-      } as never,
-      createMockSpawner()
-    )
+    setAgentServices({
+      stop: vi.fn(),
+      start: vi.fn((callback: typeof state.monitorCallback) => {
+        state.monitorCallback = callback
+      }),
+      getAgentStates: vi.fn().mockReturnValue([])
+    } as never)
 
     state.currentWindow = { id: 'replacement', isDestroyed: () => false, webContents: {} }
     state.monitorCallback?.([{ id: 'agent-1' }])
@@ -58,7 +49,7 @@ describe('registerAgentIpc', () => {
     ])
   })
 
-  it('sends pty monitor states directly (no librarian merge)', () => {
+  it('sends pty monitor states directly', () => {
     registerAgentIpc()
 
     const mockMonitor = {
@@ -69,7 +60,7 @@ describe('registerAgentIpc', () => {
       getAgentStates: vi.fn().mockReturnValue([])
     }
 
-    setAgentServices(mockMonitor as never, createMockSpawner())
+    setAgentServices(mockMonitor as never)
 
     // Simulate a pty monitor callback
     state.monitorCallback?.([{ id: 'pty-1' }])
@@ -82,14 +73,11 @@ describe('registerAgentIpc', () => {
   it('stopAgentServices does not throw', () => {
     registerAgentIpc()
 
-    setAgentServices(
-      {
-        stop: vi.fn(),
-        start: vi.fn(),
-        getAgentStates: vi.fn().mockReturnValue([])
-      } as never,
-      createMockSpawner()
-    )
+    setAgentServices({
+      stop: vi.fn(),
+      start: vi.fn(),
+      getAgentStates: vi.fn().mockReturnValue([])
+    } as never)
 
     expect(() => stopAgentServices()).not.toThrow()
   })

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { type SessionId, sessionId } from '@shared/types'
-import { PtyService, type ReconnectResult, type DiscoveredSession } from './pty-service'
+import { PtyService, type ReconnectResult } from './pty-service'
 
 type DataCallback = (id: SessionId, data: string) => void
 type ExitCallback = (id: SessionId, code: number) => void
@@ -55,14 +55,6 @@ export class ShellService {
   }
 
   // -----------------------------------------------------------------------
-  // Discover
-  // -----------------------------------------------------------------------
-
-  discover(): DiscoveredSession[] {
-    return this.pty.discover()
-  }
-
-  // -----------------------------------------------------------------------
   // Write / Resize / Kill
   // -----------------------------------------------------------------------
 
@@ -71,7 +63,7 @@ export class ShellService {
   }
 
   sendRawKeys(id: SessionId, data: string): void {
-    this.pty.write(id, data)
+    this.pty.sendRawKeys(id, data)
   }
 
   resize(id: SessionId, cols: number, rows: number): void {

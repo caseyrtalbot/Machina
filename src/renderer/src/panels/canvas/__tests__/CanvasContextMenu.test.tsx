@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasNodeType, CanvasNode } from '@shared/canvas-types'
 
@@ -36,22 +36,6 @@ describe('CanvasContextMenu', () => {
     cleanup()
   })
 
-  it('renders "Spawn Claude Session" when onSpawnAgent is provided', async () => {
-    const mod = await import('../CanvasContextMenu')
-    CanvasContextMenu = mod.CanvasContextMenu
-    renderMenu({ onSpawnAgent: vi.fn() })
-
-    expect(screen.getByText('Spawn Claude Session')).toBeTruthy()
-  })
-
-  it('does not render "Spawn Claude Session" when onSpawnAgent is not provided', async () => {
-    const mod = await import('../CanvasContextMenu')
-    CanvasContextMenu = mod.CanvasContextMenu
-    renderMenu()
-
-    expect(screen.queryByText('Spawn Claude Session')).toBeNull()
-  })
-
   it('hides card types that are not creatable from the menu', async () => {
     const mod = await import('../CanvasContextMenu')
     CanvasContextMenu = mod.CanvasContextMenu
@@ -59,18 +43,5 @@ describe('CanvasContextMenu', () => {
 
     expect(screen.getByText('Text')).toBeTruthy()
     expect(screen.queryByText('Note')).toBeNull()
-  })
-
-  it('calls onSpawnAgent and onClose when "Spawn Claude Session" is clicked', async () => {
-    const mod = await import('../CanvasContextMenu')
-    CanvasContextMenu = mod.CanvasContextMenu
-    const onSpawnAgent = vi.fn()
-    const onClose = vi.fn()
-    renderMenu({ onSpawnAgent, onClose })
-
-    fireEvent.click(screen.getByText('Spawn Claude Session'))
-
-    expect(onSpawnAgent).toHaveBeenCalledOnce()
-    expect(onClose).toHaveBeenCalledOnce()
   })
 })

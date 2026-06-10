@@ -107,16 +107,6 @@ describe('ShellService', () => {
     expect(result).toBeNull()
   })
 
-  it('discover returns empty when all sessions are connected', () => {
-    const service = new ShellService()
-    service.setCallbacks(
-      () => {},
-      () => {}
-    )
-    service.create('/tmp')
-    expect(service.discover()).toEqual([])
-  })
-
   it('exposes PtyService for monitoring', () => {
     const service = new ShellService()
     expect(service.getPtyService()).toBeDefined()

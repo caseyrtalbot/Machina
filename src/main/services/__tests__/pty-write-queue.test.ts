@@ -7,7 +7,6 @@ describe('PtyWriteQueue', () => {
     const queue = new PtyWriteQueue()
     const seen: PtyWrite[] = []
 
-    queue.enqueue({ kind: 'command', text: 'ls' })
     queue.enqueue({ kind: 'agent-input', mode: 'batched', data: 'hi' })
     queue.enqueue({ kind: 'bytes', data: '\x03' })
 
@@ -15,7 +14,7 @@ describe('PtyWriteQueue', () => {
       seen.push(w)
     })
 
-    expect(seen.map((w) => w.kind)).toEqual(['command', 'agent-input', 'bytes'])
+    expect(seen.map((w) => w.kind)).toEqual(['agent-input', 'bytes'])
   })
 
   it('serializes concurrent drain calls (single flight)', async () => {

@@ -1,5 +1,4 @@
 import type { CanvasNode, CanvasEdge } from './canvas-types'
-import type { AgentArtifactDraft } from './agent-artifact-types'
 
 export type CanvasMutationOp =
   | { readonly type: 'add-node'; readonly node: CanvasNode }
@@ -28,17 +27,6 @@ export type CanvasMutationOp =
     }
   | { readonly type: 'remove-node'; readonly nodeId: string }
   | { readonly type: 'remove-edge'; readonly edgeId: string }
-  | {
-      readonly type: 'materialize-artifact'
-      readonly draft: AgentArtifactDraft
-      readonly placement: {
-        readonly x: number
-        readonly y: number
-        readonly width: number
-        readonly height: number
-      }
-      readonly tempNodeId: string
-    }
 
 export interface CanvasMutationPlan {
   readonly id: string
@@ -113,11 +101,6 @@ export function applyPlanOps(
 
       case 'remove-edge':
         currentEdges = currentEdges.filter((e) => e.id !== op.edgeId)
-        break
-
-      case 'materialize-artifact':
-        // Rewritten to add-node by applyAgentResult phase A before reaching here.
-        // If an unrewritten op leaks through, skip it safely.
         break
     }
   }

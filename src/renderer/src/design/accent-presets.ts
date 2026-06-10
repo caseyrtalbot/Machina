@@ -1,9 +1,8 @@
 /* Console-direction accent palette. Sourced from `Machina Console.html`
  * (Claude Design handoff bundle). Each preset is a coherent harmony chosen
- * for the cool blue-slate base — pick a vibe, not just a hex.
- *
- * Currently used as data only. The settings refactor (Phase 9.6) will wire
- * a picker that calls `applyAccentCssVars(hex)` from `design/Theme.tsx`. */
+ * for the cool blue-slate base — pick a vibe, not just a hex. The settings
+ * accent picker resolves a preset (or custom hex) and applies it via
+ * `applyAccentCssVars` (`design/apply-accent.ts`). */
 
 export const ACCENT_PRESETS = [
   {

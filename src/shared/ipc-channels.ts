@@ -1,17 +1,8 @@
 import type { FilesystemFileEntry, SessionId, VaultConfig, VaultState } from './types'
-import type { AgentArtifactDraft, MaterializeResult } from './agent-artifact-types'
-import type {
-  WorkbenchSessionEvent,
-  WorkbenchFileChangedEvent,
-  SessionMilestone,
-  SessionDetectedEvent
-} from './workbench-types'
 import type { SystemArtifactKind } from './system-artifacts'
-import type { AgentSidecarState, AgentSpawnRequest } from './agent-types'
-import type { ActionDefinition } from './action-types'
+import type { AgentSidecarState } from './agent-types'
 import type { CanvasMutationPlan } from './canvas-mutation-types'
 import type { ClaudeStatus } from './claude-status-types'
-import type { CLIAgentInstallation } from './cli-agents'
 import type { CLIAgentSessionStatus } from './cli-agent-session-types'
 import type { InfraHealth } from './engine/vault-health'
 import type { Block } from './engine/block-model'
@@ -25,12 +16,10 @@ export interface IpcChannels {
   'fs:write-file': { request: { path: string; content: string }; response: void }
   'fs:delete-file': { request: { path: string }; response: void }
   'fs:list-files': { request: { dir: string; pattern?: string }; response: string[] }
-  'fs:list-files-recursive': { request: { dir: string }; response: string[] }
   'fs:file-exists': { request: { path: string }; response: boolean }
   'fs:select-vault': { request: void; response: string | null }
   'fs:rename-file': { request: { oldPath: string; newPath: string }; response: void }
   'fs:copy-file': { request: { srcPath: string; destPath: string }; response: void }
-  'fs:create-folder': { request: { defaultPath: string }; response: string | null }
   'fs:mkdir': { request: { path: string }; response: void }
   'fs:read-binary': { request: { path: string }; response: string }
   'fs:list-all-files': { request: { dir: string }; response: FilesystemFileEntry[] }
@@ -42,31 +31,12 @@ export interface IpcChannels {
 
   // --- Vault ---
   'vault:read-config': { request: { vaultPath: string }; response: VaultConfig }
-  'vault:write-config': { request: { vaultPath: string; config: VaultConfig }; response: void }
   'vault:read-state': { request: { vaultPath: string }; response: VaultState }
   'vault:write-state': { request: { vaultPath: string; state: VaultState }; response: void }
   'vault:init': { request: { vaultPath: string }; response: void }
-  'vault:list-commands': { request: { dirPath: string }; response: string[] }
   'vault:list-system-artifacts': {
     request: { vaultPath: string; kind?: SystemArtifactKind }
     response: string[]
-  }
-  'vault:read-system-artifact': {
-    request: { vaultPath: string; path: string }
-    response: string
-  }
-  'vault:create-system-artifact': {
-    request: {
-      vaultPath: string
-      kind: SystemArtifactKind
-      filename: string
-      content: string
-    }
-    response: string
-  }
-  'vault:update-system-artifact': {
-    request: { vaultPath: string; path: string; content: string }
-    response: void
   }
   'vault:emerge-ghost': {
     request: {
@@ -83,18 +53,6 @@ export interface IpcChannels {
   }
   'vault:watch-start': { request: { vaultPath: string }; response: void }
   'vault:watch-stop': { request: void; response: void }
-
-  // --- Workbench ---
-  'workbench:watch-start': { request: { projectPath: string }; response: void }
-  'workbench:watch-stop': { request: void; response: void }
-  'workbench:parse-sessions': {
-    request: { projectPath: string }
-    response: WorkbenchSessionEvent[]
-  }
-
-  // --- Session Tailing ---
-  'session:tail-start': { request: { projectPath: string }; response: void }
-  'session:tail-stop': { request: void; response: void }
 
   // --- Shell ---
   'shell:show-in-folder': { request: { path: string }; response: void }
@@ -142,45 +100,17 @@ export interface IpcChannels {
   }
   'doc:save': { request: { path: string }; response: void }
   'doc:save-content': { request: { path: string; content: string }; response: void }
-  'doc:get-content': {
-    request: { path: string }
-    response: { content: string; version: number; dirty: boolean } | null
-  }
 
   // --- App Lifecycle ---
   'app:quit-ready': { request: void; response: void }
   'app:path-exists': { request: { path: string }; response: boolean }
 
-  // --- Window ---
-  'window:minimize': { request: void; response: void }
-  'window:maximize': { request: void; response: void }
-  'window:close': { request: void; response: void }
-
   // --- Config ---
   'config:read': { request: { scope: string; key: string }; response: unknown }
   'config:write': { request: { scope: string; key: string; value: unknown }; response: void }
 
-  // --- MCP ---
-  'mcp:status': {
-    request: void
-    response: { running: boolean; toolCount: number }
-  }
-
-  // --- Actions ---
-  'actions:list': { request: void; response: readonly ActionDefinition[] }
-  'actions:read': {
-    request: { id: string }
-    response: { definition: ActionDefinition; body: string } | { error: string }
-  }
-
   // --- Agents ---
   'agent:get-states': { request: void; response: AgentSidecarState[] }
-  'agent:spawn': {
-    request: AgentSpawnRequest
-    response: { sessionId: string } | { error: string }
-  }
-  'agent:kill': { request: { sessionId: string }; response: void }
-  'agent:list-installed': { request: void; response: readonly CLIAgentInstallation[] }
 
   // --- Claude Status ---
   'claude:get-status': { request: void; response: ClaudeStatus }
@@ -215,16 +145,6 @@ export interface IpcChannels {
     response: void
   }
 
-  // --- Artifact ---
-  'artifact:materialize': {
-    request: { draft: AgentArtifactDraft; vaultPath: string }
-    response: MaterializeResult
-  }
-  'artifact:unmaterialize': {
-    request: { paths: readonly string[]; vaultPath: string }
-    response: void
-  }
-
   // --- Health ---
   'health:heartbeat': { request: { at: number }; response: void }
   'health:request-tick': { request: void; response: void }
@@ -237,10 +157,6 @@ export interface IpcChannels {
   'thread:list-archived': {
     request: { vaultPath: string }
     response: import('./thread-types').Thread[]
-  }
-  'thread:read': {
-    request: { vaultPath: string; id: string }
-    response: import('./thread-types').Thread
   }
   'thread:save': {
     request: { vaultPath: string; thread: import('./thread-types').Thread }
@@ -343,10 +259,6 @@ export interface IpcEvents {
   'vault:files-changed-batch': {
     events: readonly { path: string; event: 'add' | 'change' | 'unlink' }[]
   }
-
-  'workbench:file-changed': WorkbenchFileChangedEvent
-  'session:milestone': SessionMilestone
-  'session:detected': SessionDetectedEvent
 
   // Document Manager events (main -> renderer)
   // App Lifecycle events (main -> renderer)

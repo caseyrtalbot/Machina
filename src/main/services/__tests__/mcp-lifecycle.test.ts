@@ -69,7 +69,7 @@ describe('McpLifecycle', () => {
     const server = lifecycle.createForVault(vaultRoot, { searchEngine, vaultIndex })
 
     expect(server).toBeDefined()
-    // Built but no transport connected — mcp:status must not advertise it.
+    // Built but no transport connected — status must not advertise it.
     expect(lifecycle.isRunning()).toBe(false)
     expect(lifecycle.toolCount()).toBe(0)
   })

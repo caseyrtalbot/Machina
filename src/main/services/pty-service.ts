@@ -2,16 +2,7 @@ import { spawn, type IPty } from 'node-pty'
 import { execFileSync } from 'child_process'
 import { RingBuffer, DEFAULT_RING_BUFFER_BYTES } from './ring-buffer'
 import { PtyWriteQueue, type PtyWrite } from './pty-write-queue'
-import {
-  getTerminfoDir,
-  writeSessionMeta,
-  readSessionMeta,
-  deleteSessionMeta,
-  ensureSessionDir,
-  getSessionDir,
-  type SessionMeta
-} from './session-paths'
-import { readdirSync } from 'fs'
+import { getTerminfoDir, writeSessionMeta, deleteSessionMeta } from './session-paths'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,11 +14,6 @@ type ExitCallback = (sessionId: string, code: number) => void
 export interface ReconnectResult {
   readonly scrollback: string
   readonly meta: { shell: string; cwd: string; label?: string }
-}
-
-export interface DiscoveredSession {
-  readonly sessionId: string
-  readonly meta: SessionMeta
 }
 
 /** Cap reconnect queue to prevent unbounded memory growth while disconnected. */
@@ -132,7 +118,7 @@ export class PtyService {
       }
     })
 
-    // Persist metadata for discover-on-startup
+    // Persist metadata for PtyMonitor (agent badging reads session meta)
     writeSessionMeta(sessionId, {
       shell: defaultShell,
       cwd,
@@ -187,47 +173,12 @@ export class PtyService {
   }
 
   // -----------------------------------------------------------------------
-  // Discover: find sessions with no active webview client
-  // -----------------------------------------------------------------------
-
-  discover(): DiscoveredSession[] {
-    ensureSessionDir()
-    const discovered: DiscoveredSession[] = []
-
-    for (const [sessionId, session] of this.sessions) {
-      if (session.connected) continue
-
-      const meta = readSessionMeta(sessionId)
-      if (!meta) continue
-
-      discovered.push({ sessionId, meta })
-    }
-
-    // Clean up metadata for sessions that no longer exist in-process
-    try {
-      const metaFiles = readdirSync(getSessionDir())
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => f.replace('.json', ''))
-
-      for (const id of metaFiles) {
-        if (!this.sessions.has(id)) {
-          deleteSessionMeta(id)
-        }
-      }
-    } catch {
-      // Directory might not exist
-    }
-
-    return discovered
-  }
-
-  // -----------------------------------------------------------------------
   // Write / Resize / Kill
   // -----------------------------------------------------------------------
 
   /**
-   * Enqueue a user command (typed in the prompt). Appends a carriage return
-   * so the shell executes it. Drained through the per-session write queue.
+   * Enqueue user keystrokes for raw byte write (no carriage return is
+   * appended). Drained through the per-session write queue.
    */
   write(sessionId: string, data: string): void {
     this.enqueueWrite(sessionId, { kind: 'bytes', data })
@@ -262,9 +213,6 @@ export class PtyService {
   /** Apply one queued write to the underlying node-pty handle. */
   private flushOne(session: ManagedSession, write: PtyWrite): void {
     switch (write.kind) {
-      case 'command':
-        session.pty.write(`${write.text}\r`)
-        return
       case 'bytes':
       case 'agent-input':
         session.pty.write(write.data)
@@ -338,16 +286,6 @@ export class PtyService {
   shutdown(): void {
     for (const id of [...this.sessions.keys()]) {
       this.kill(id, false)
-    }
-  }
-
-  /**
-   * Mark all sessions as disconnected without killing them.
-   * Used by reconnect/discovery flows.
-   */
-  detachAll(): void {
-    for (const session of this.sessions.values()) {
-      session.connected = false
     }
   }
 

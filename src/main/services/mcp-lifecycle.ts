@@ -3,7 +3,6 @@
  *
  * Handles lazy creation, startup, and shutdown of the MCP server.
  * The server is created only when a vault is opened (vault root is known).
- * Implements McpStatusProvider for the MCP IPC status channel.
  */
 import { join } from 'node:path'
 import { app } from 'electron'
@@ -16,9 +15,8 @@ import { ElectronHitlGate, WriteRateLimiter, TimeoutHitlGate } from './hitl-gate
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
-import type { McpStatusProvider } from '../ipc/mcp'
 
-export class McpLifecycle implements McpStatusProvider {
+export class McpLifecycle {
   private server: McpServer | null = null
   private _toolCount = 0
 
@@ -26,8 +24,8 @@ export class McpLifecycle implements McpStatusProvider {
    * Whether the in-process MCP server is connected to a transport and actually
    * serving requests. createForVault builds the server with tools registered but
    * deliberately does NOT connect a transport — the only production transport is
-   * the headless stdio path in mcp-cli.ts. So this stays false in production, and
-   * mcp:status must not advertise a server the renderer can't actually reach.
+   * the headless stdio path in mcp-cli.ts. So this stays false in production.
+   * The connect-or-delete decision for this in-process server is Wave 2 item 2.3.
    */
   isRunning(): boolean {
     return this.server?.isConnected() ?? false
