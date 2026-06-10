@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, type Ref } from 'react'
 import type { Editor, Range } from '@tiptap/core'
 import { typography, colors, transitions, borderRadius } from '../../../design/tokens'
 
@@ -9,12 +9,18 @@ export interface SlashCommandItem {
   readonly command: (props: { editor: Editor; range: Range }) => void
 }
 
+/** Imperative handle for the suggestion plugin to forward keyboard events. */
+export interface SlashCommandListHandle {
+  readonly onKeyDown: (e: KeyboardEvent) => boolean
+}
+
 interface SlashCommandListProps {
   readonly items: readonly SlashCommandItem[]
   readonly command: (item: SlashCommandItem) => void
+  readonly ref?: Ref<SlashCommandListHandle>
 }
 
-export function SlashCommandList({ items, command }: SlashCommandListProps) {
+export function SlashCommandList({ items, command, ref }: SlashCommandListProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
   const [prevItems, setPrevItems] = useState(items)
@@ -55,14 +61,8 @@ export function SlashCommandList({ items, command }: SlashCommandListProps) {
     [items, selectedIndex, command]
   )
 
-  // Expose onKeyDown to parent via ref-like pattern
-  useEffect(() => {
-    ;(SlashCommandList as unknown as { onKeyDown?: (e: KeyboardEvent) => boolean }).onKeyDown =
-      onKeyDown
-    return () => {
-      ;(SlashCommandList as unknown as { onKeyDown?: undefined }).onKeyDown = undefined
-    }
-  }, [onKeyDown])
+  // Expose onKeyDown to the suggestion plugin via an imperative handle
+  useImperativeHandle(ref, () => ({ onKeyDown }), [onKeyDown])
 
   if (items.length === 0) {
     return (

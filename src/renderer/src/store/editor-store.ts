@@ -318,3 +318,25 @@ export function flushPendingSave(): Promise<void> {
   const state = useEditorStore.getState()
   return persistDirtyDocument(state, { markSavedOnSuccess: true })
 }
+
+/**
+ * Create a new untitled note on disk, counter-suffixing on collision
+ * (Untitled.md → Untitled 1.md → …) instead of reusing an existing file.
+ * Callers decide how to open the returned path (editor tab, dock tab).
+ */
+export async function createUntitledNote(
+  vaultPath: string
+): Promise<{ readonly path: string; readonly title: string }> {
+  let filename = 'Untitled.md'
+  let counter = 1
+  while (await window.api.fs.fileExists(`${vaultPath}/${filename}`)) {
+    filename = `Untitled ${counter}.md`
+    counter += 1
+  }
+  const path = `${vaultPath}/${filename}`
+  const title = filename.replace(/\.md$/, '')
+  const created = new Date().toISOString().slice(0, 10)
+  const content = `---\ntitle: ${title}\ncreated: ${created}\ntags: []\n---\n\n`
+  await window.api.fs.writeFile(path, content)
+  return { path, title }
+}

@@ -2,13 +2,33 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useAgentShellKeybindings } from '../keybindings'
 import { useThreadStore } from '../../../store/thread-store'
+import { useVaultStore } from '../../../store/vault-store'
+import { useEditorStore } from '../../../store/editor-store'
+import { useUiStore } from '../../../store/ui-store'
 
 function fireKey(init: KeyboardEventInit): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { ...init, bubbles: true }))
 }
 
+function defaultOpts() {
+  return { toggleDock: vi.fn(), openPalette: vi.fn(), closePalette: vi.fn() }
+}
+
+const mockFs = {
+  fileExists: vi.fn().mockResolvedValue(false),
+  writeFile: vi.fn().mockResolvedValue(undefined)
+}
+
 beforeEach(() => {
+  vi.clearAllMocks()
+  mockFs.fileExists.mockResolvedValue(false)
+  mockFs.writeFile.mockResolvedValue(undefined)
+  // @ts-expect-error test stub
+  window.api = { fs: mockFs }
   useThreadStore.setState(useThreadStore.getInitialState())
+  useVaultStore.setState({ vaultPath: null })
+  useEditorStore.setState(useEditorStore.getInitialState())
+  useUiStore.setState(useUiStore.getInitialState())
 })
 
 describe('useAgentShellKeybindings — Cmd+. abort', () => {
@@ -63,5 +83,104 @@ describe('useAgentShellKeybindings — Cmd+. abort', () => {
     } finally {
       textarea.remove()
     }
+  })
+})
+
+describe('useAgentShellKeybindings — Cmd+N / Cmd+Shift+N', () => {
+  it('Cmd+N creates an untitled note and opens it', async () => {
+    useVaultStore.setState({ vaultPath: '/vault' })
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: 'n', metaKey: true })
+
+    await vi.waitFor(() => {
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        '/vault/Untitled.md',
+        expect.stringContaining('title: Untitled\n')
+      )
+      expect(useEditorStore.getState().activeNotePath).toBe('/vault/Untitled.md')
+    })
+  })
+
+  it('Cmd+N is a no-op without a vault', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: 'n', metaKey: true })
+
+    expect(mockFs.writeFile).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+Shift+N creates a thread instead of a note', () => {
+    const createThread = vi.fn().mockResolvedValue(undefined)
+    useVaultStore.setState({ vaultPath: '/vault' })
+    useThreadStore.setState({ createThread })
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: 'N', metaKey: true, shiftKey: true })
+
+    expect(createThread).toHaveBeenCalledWith('machina-native', 'claude-sonnet-4-6')
+    expect(mockFs.writeFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('useAgentShellKeybindings — editor history (Cmd+Opt+Left/Right)', () => {
+  beforeEach(() => {
+    useEditorStore.setState({
+      historyStack: ['/vault/a.md', '/vault/b.md'],
+      historyIndex: 1,
+      activeNotePath: '/vault/b.md'
+    })
+  })
+
+  it('Cmd+Opt+Left goes back', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: 'ArrowLeft', metaKey: true, altKey: true })
+
+    expect(useEditorStore.getState().activeNotePath).toBe('/vault/a.md')
+    expect(useEditorStore.getState().historyIndex).toBe(0)
+  })
+
+  it('Cmd+Opt+Right goes forward', () => {
+    useEditorStore.setState({ historyIndex: 0, activeNotePath: '/vault/a.md' })
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: 'ArrowRight', metaKey: true, altKey: true })
+
+    expect(useEditorStore.getState().activeNotePath).toBe('/vault/b.md')
+    expect(useEditorStore.getState().historyIndex).toBe(1)
+  })
+
+  it('works from inside an editable target (the editor is contentEditable)', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    const textarea = document.createElement('textarea')
+    document.body.appendChild(textarea)
+    try {
+      textarea.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ArrowLeft',
+          metaKey: true,
+          altKey: true,
+          bubbles: true
+        })
+      )
+      expect(useEditorStore.getState().historyIndex).toBe(0)
+    } finally {
+      textarea.remove()
+    }
+  })
+})
+
+describe('useAgentShellKeybindings — Cmd+Shift+O outline toggle', () => {
+  it('toggles outline visibility', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+    expect(useUiStore.getState().outlineVisible).toBe(false)
+
+    fireKey({ key: 'O', metaKey: true, shiftKey: true })
+    expect(useUiStore.getState().outlineVisible).toBe(true)
+
+    fireKey({ key: 'O', metaKey: true, shiftKey: true })
+    expect(useUiStore.getState().outlineVisible).toBe(false)
   })
 })

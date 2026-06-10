@@ -44,6 +44,14 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const setDirty = useEditorStore((s) => s.setDirty)
 
   const outlineVisible = useUiStore((s) => s.outlineVisible)
+  const toggleOutline = useUiStore((s) => s.toggleOutline)
+
+  const historyIndex = useEditorStore((s) => s.historyIndex)
+  const historyLength = useEditorStore((s) => s.historyStack.length)
+  const goBack = useEditorStore((s) => s.goBack)
+  const goForward = useEditorStore((s) => s.goForward)
+  const canGoBack = historyIndex > 0
+  const canGoForward = historyIndex < historyLength - 1
 
   const fileToId = useVaultStore((s) => s.fileToId)
   const activeNoteId = activeNotePath ? (fileToId[activeNotePath] ?? null) : null
@@ -423,24 +431,62 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           </span>
         </div>
       )}
-      <div className="editor-mode-bar" role="tablist" aria-label="Editor mode">
+      <div className="editor-mode-bar">
+        {/* Back/forward chrome: the history stack already exists in
+            editor-store; this is the visible way out of a wikilink rabbit-hole. */}
+        <div className="flex items-center" style={{ marginRight: 'auto' }}>
+          <button
+            type="button"
+            className="editor-mode-toggle__btn"
+            onClick={goBack}
+            disabled={!canGoBack}
+            aria-label="Back"
+            title="Back (⌘⌥←)"
+            style={!canGoBack ? { opacity: 0.35, cursor: 'default' } : undefined}
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            className="editor-mode-toggle__btn"
+            onClick={goForward}
+            disabled={!canGoForward}
+            aria-label="Forward"
+            title="Forward (⌘⌥→)"
+            style={!canGoForward ? { opacity: 0.35, cursor: 'default' } : undefined}
+          >
+            →
+          </button>
+        </div>
+        <div role="tablist" aria-label="Editor mode" className="flex items-center">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'rich'}
+            className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
+            onClick={() => handleModeChange('rich')}
+          >
+            Rich
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'source'}
+            className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
+            onClick={() => handleModeChange('source')}
+          >
+            Source
+          </button>
+        </div>
         <button
           type="button"
-          role="tab"
-          aria-selected={mode === 'rich'}
-          className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
-          onClick={() => handleModeChange('rich')}
+          className={`editor-mode-toggle__btn${outlineVisible ? ' editor-mode-toggle__btn--active' : ''}`}
+          aria-pressed={outlineVisible}
+          onClick={toggleOutline}
+          title="Toggle outline (⌘⇧O)"
+          style={{ marginLeft: 8 }}
         >
-          Rich
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'source'}
-          className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
-          onClick={() => handleModeChange('source')}
-        >
-          Source
+          Outline
         </button>
       </div>
       <div className="flex-1 flex min-h-0 min-w-0">

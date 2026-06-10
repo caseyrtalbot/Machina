@@ -1,4 +1,4 @@
-import { useEditorStore } from '../../store/editor-store'
+import { useEditorStore, createUntitledNote } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
 import { EditorPanel } from './EditorPanel'
 
@@ -16,19 +16,14 @@ export function EditorSplitView({ onNavigate }: EditorSplitViewProps) {
   const pinPreviewTab = useEditorStore((s) => s.pinPreviewTab)
   const vaultPath = useVaultStore((s) => s.vaultPath)
 
-  const showTabBar = openTabs.length > 1
+  // Keep the bar (and its new-file affordance) visible with 0-1 tabs too —
+  // hiding it left new-file unreachable until a second tab existed.
+  const showTabBar = openTabs.length > 0 || Boolean(vaultPath)
 
   const handleNewFile = async () => {
     if (!vaultPath) return
-    const now = new Date().toISOString().slice(0, 10)
-    const title = `Untitled ${now}`
-    const filePath = `${vaultPath}/${title}.md`
-    const exists = await window.api.fs.fileExists(filePath)
-    if (!exists) {
-      const content = `---\ntitle: ${title}\ncreated: ${now}\ntags: []\n---\n\n`
-      await window.api.fs.writeFile(filePath, content)
-    }
-    useEditorStore.getState().openTab(filePath, title)
+    const { path, title } = await createUntitledNote(vaultPath)
+    useEditorStore.getState().openTab(path, title)
   }
 
   const handleCloseAll = () => {

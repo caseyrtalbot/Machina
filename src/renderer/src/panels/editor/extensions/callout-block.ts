@@ -66,6 +66,21 @@ export const CalloutBlock = Node.create({
         default: 'note',
         parseHTML: (element) => element.getAttribute('data-callout-type') || 'note',
         renderHTML: (attributes) => ({ 'data-callout-type': attributes.calloutType })
+      },
+      // Optional Obsidian title text after the marker: > [!tip] Custom title
+      calloutTitle: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-callout-title') ?? '',
+        renderHTML: (attributes) =>
+          attributes.calloutTitle ? { 'data-callout-title': attributes.calloutTitle } : {}
+      },
+      // Obsidian fold marker: '+' (expanded) or '-' (collapsed). Preserved
+      // for round-tripping; no folding UI yet.
+      calloutFold: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-callout-fold') ?? '',
+        renderHTML: (attributes) =>
+          attributes.calloutFold ? { 'data-callout-fold': attributes.calloutFold } : {}
       }
     }
   },
@@ -76,6 +91,7 @@ export const CalloutBlock = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     const type = (HTMLAttributes['data-callout-type'] as string) || 'note'
+    const title = (HTMLAttributes['data-callout-title'] as string) || type
     const style = getCalloutStyle(type)
 
     return [
@@ -102,7 +118,7 @@ export const CalloutBlock = Node.create({
             'margin-bottom: 6px'
           ].join('; ')
         },
-        type
+        title
       ],
       ['div', {}, 0]
     ]
@@ -138,14 +154,16 @@ export const CalloutBlock = Node.create({
       _tokens: MarkdownToken[],
       lexer: { blockTokens: (src: string) => MarkdownToken[] }
     ) {
-      // Match > [!TYPE] followed by continuation lines starting with >
-      const match = src.match(/^> \[!(\w+)\]\n?((?:> ?[^\n]*(?:\n|$))*)/)
+      // Match > [!TYPE][+-]? optional title, then continuation lines starting with >
+      const match = src.match(/^> \[!(\w+)\]([+-]?) ?([^\n]*)(?:\n((?:> ?[^\n]*(?:\n|$))*))?/)
       if (!match) return undefined
 
       const rawType = match[1].toLowerCase()
+      const fold = match[2]
+      const title = match[3].trim()
 
       // Strip the > prefix from each content line
-      const contentLines = match[2]
+      const contentLines = (match[4] ?? '')
         .split('\n')
         .filter((line) => line.startsWith('>'))
         .map((line) => line.replace(/^> ?/, ''))
@@ -159,6 +177,8 @@ export const CalloutBlock = Node.create({
         type: 'callout',
         raw: match[0],
         calloutType: rawType,
+        calloutTitle: title,
+        calloutFold: fold,
         tokens
       }
     }
@@ -166,18 +186,31 @@ export const CalloutBlock = Node.create({
 
   parseMarkdown(token: MarkdownToken, helpers) {
     const parseBlockChildren = helpers.parseBlockChildren ?? helpers.parseChildren
+    const calloutToken = token as MarkdownToken & {
+      calloutType?: string
+      calloutTitle?: string
+      calloutFold?: string
+    }
     return helpers.createNode(
       'callout',
-      { calloutType: (token as MarkdownToken & { calloutType?: string }).calloutType || 'note' },
+      {
+        calloutType: calloutToken.calloutType || 'note',
+        calloutTitle: calloutToken.calloutTitle ?? '',
+        calloutFold: calloutToken.calloutFold ?? ''
+      },
       parseBlockChildren(token.tokens || [])
     )
   },
 
   renderMarkdown(node, h) {
-    const type = (node.attrs as Record<string, string> | undefined)?.calloutType || 'note'
+    const attrs = (node.attrs ?? {}) as Record<string, string>
+    const type = attrs.calloutType || 'note'
+    const fold = attrs.calloutFold || ''
+    const title = attrs.calloutTitle ? ` ${attrs.calloutTitle}` : ''
+    const header = `> [!${type}]${fold}${title}`
 
     if (!node.content) {
-      return `> [!${type}]\n>`
+      return `${header}\n>`
     }
 
     const prefix = '>'
@@ -192,6 +225,6 @@ export const CalloutBlock = Node.create({
       result.push(linesWithPrefix.join('\n'))
     })
 
-    return `> [!${type}]\n${result.join(`\n${prefix}\n`)}`
+    return `${header}\n${result.join(`\n${prefix}\n`)}`
   }
 })

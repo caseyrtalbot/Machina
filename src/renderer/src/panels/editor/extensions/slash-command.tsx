@@ -1,8 +1,13 @@
+import { createRef } from 'react'
 import { Extension, type Editor, type Range } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
-import { Suggestion } from '@tiptap/suggestion'
+import { Suggestion, type SuggestionProps } from '@tiptap/suggestion'
 import { createRoot } from 'react-dom/client'
-import { SlashCommandList, type SlashCommandItem } from './slash-command-list'
+import {
+  SlashCommandList,
+  type SlashCommandItem,
+  type SlashCommandListHandle
+} from './slash-command-list'
 import { floatingPanel } from '../../../design/tokens'
 
 const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
@@ -129,9 +134,51 @@ export const SlashCommand = Extension.create({
         render: () => {
           let container: HTMLDivElement | null = null
           let root: ReturnType<typeof createRoot> | null = null
+          let dismissed = false
+          const listRef = createRef<SlashCommandListHandle>()
+
+          const position = (props: SuggestionProps) => {
+            const rect = props.clientRect?.()
+            if (rect && container) {
+              container.style.left = `${rect.left}px`
+              container.style.top = `${rect.bottom + 4}px`
+            }
+          }
+
+          const renderPanel = (props: SuggestionProps) => (
+            <div
+              style={{
+                width: 280,
+                backgroundColor: floatingPanel.glass.bg,
+                backdropFilter: floatingPanel.glass.blur,
+                borderRadius: floatingPanel.borderRadius,
+                boxShadow: floatingPanel.shadow,
+                overflow: 'hidden'
+              }}
+            >
+              <SlashCommandList
+                ref={listRef}
+                items={props.items as SlashCommandItem[]}
+                command={(item) => {
+                  item.command({
+                    editor: props.editor,
+                    range: props.range
+                  })
+                }}
+              />
+            </div>
+          )
+
+          const teardown = () => {
+            root?.unmount()
+            container?.remove()
+            root = null
+            container = null
+          }
 
           return {
             onStart: (props) => {
+              dismissed = false
               container = document.createElement('div')
               container.style.position = 'fixed'
               container.style.zIndex = '999'
@@ -139,84 +186,29 @@ export const SlashCommand = Extension.create({
               document.body.appendChild(container)
 
               root = createRoot(container)
-
-              const rect = props.clientRect?.()
-              if (rect) {
-                container.style.left = `${rect.left}px`
-                container.style.top = `${rect.bottom + 4}px`
-              }
-
-              root.render(
-                <div
-                  style={{
-                    width: 280,
-                    backgroundColor: floatingPanel.glass.bg,
-                    backdropFilter: floatingPanel.glass.blur,
-                    borderRadius: floatingPanel.borderRadius,
-                    boxShadow: floatingPanel.shadow,
-                    overflow: 'hidden'
-                  }}
-                >
-                  <SlashCommandList
-                    items={props.items as SlashCommandItem[]}
-                    command={(item) => {
-                      item.command({
-                        editor: props.editor,
-                        range: props.range
-                      })
-                    }}
-                  />
-                </div>
-              )
+              position(props)
+              root.render(renderPanel(props))
             },
 
             onUpdate: (props) => {
-              const rect = props.clientRect?.()
-              if (rect && container) {
-                container.style.left = `${rect.left}px`
-                container.style.top = `${rect.bottom + 4}px`
-              }
-
-              root?.render(
-                <div
-                  style={{
-                    width: 280,
-                    backgroundColor: floatingPanel.glass.bg,
-                    backdropFilter: floatingPanel.glass.blur,
-                    borderRadius: floatingPanel.borderRadius,
-                    boxShadow: floatingPanel.shadow,
-                    overflow: 'hidden'
-                  }}
-                >
-                  <SlashCommandList
-                    items={props.items as SlashCommandItem[]}
-                    command={(item) => {
-                      item.command({
-                        editor: props.editor,
-                        range: props.range
-                      })
-                    }}
-                  />
-                </div>
-              )
+              if (dismissed || !root) return
+              position(props)
+              root.render(renderPanel(props))
             },
 
             onKeyDown: (props) => {
               if (props.event.key === 'Escape') {
+                // Genuinely exit: tear the popup down and stop intercepting
+                // keys so Enter/arrows go back to the editor.
+                dismissed = true
+                teardown()
                 return true
               }
-              const handler = (
-                SlashCommandList as unknown as { onKeyDown?: (e: KeyboardEvent) => boolean }
-              ).onKeyDown
-              return handler?.(props.event) ?? false
+              if (dismissed) return false
+              return listRef.current?.onKeyDown(props.event) ?? false
             },
 
-            onExit: () => {
-              root?.unmount()
-              container?.remove()
-              root = null
-              container = null
-            }
+            onExit: teardown
           }
         }
       })
