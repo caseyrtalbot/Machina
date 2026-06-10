@@ -18,6 +18,20 @@ export function detectLanguage(filePath: string): SupportedLanguage {
   return inferLanguage(filePath) as SupportedLanguage
 }
 
+/** True when a window-level canvas hotkey should be ignored: the event
+ *  carries modifier keys (Cmd+R must reach Electron untouched) or
+ *  originated inside an editing surface (CodeMirror, input, textarea,
+ *  contentEditable). */
+export function shouldIgnoreCanvasHotkey(e: KeyboardEvent): boolean {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return true
+  const target = e.target
+  if (!(target instanceof Element)) return false
+  if (target.closest('.cm-editor')) return true
+  const tag = target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return true
+  return target instanceof HTMLElement && target.isContentEditable
+}
+
 /** Build the common extension set for a CodeMirror editor.
  *  Async because language extensions are lazy-loaded. */
 export async function createEditorExtensions(
@@ -37,6 +51,12 @@ export async function createEditorExtensions(
         overflow: 'auto'
       },
       '.cm-content': { padding: contentPadding }
+    }),
+    // Prevent canvas/window shortcuts while typing (same as CodeCard)
+    EditorView.domEventHandlers({
+      keydown: (e) => {
+        e.stopPropagation()
+      }
     })
   ]
 

@@ -8,7 +8,11 @@ import { useThreadStore } from '../../store/thread-store'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
-import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
+import {
+  createEditorExtensions,
+  detectLanguage,
+  shouldIgnoreCanvasHotkey
+} from './shared/codemirror-setup'
 import { extractSection } from '@shared/engine/section-rewriter'
 import { rematchSections } from '@shared/engine/section-rematch'
 import { commitSectionEdit } from './section-projection'
@@ -232,15 +236,17 @@ export function FileViewCard({ node }: FileViewCardProps) {
       })
   }, [filePath, sectionId])
 
-  // Keyboard: press R while card is focused to refresh
+  // Keyboard: press R while card is focused to refresh. Ignored when any
+  // modifier is held (Cmd+R must not refresh) or while typing in an
+  // editing surface (would clobber debounced section edits).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const focusedId = useCanvasStore.getState().focusedCardId
       if (focusedId !== node.id) return
-      if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault()
-        handleRefresh()
-      }
+      if (e.key !== 'r' && e.key !== 'R') return
+      if (shouldIgnoreCanvasHotkey(e)) return
+      e.preventDefault()
+      handleRefresh()
     }
 
     window.addEventListener('keydown', handleKeyDown)
