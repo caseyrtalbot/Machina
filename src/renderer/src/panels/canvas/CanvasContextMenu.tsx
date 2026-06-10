@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import {
   Code2,
   FileBox,
@@ -13,7 +12,7 @@ import {
   Type,
   type LucideIcon
 } from 'lucide-react'
-import { colors, borderRadius, floatingPanel } from '../../design/tokens'
+import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { CARD_TYPE_INFO, type CanvasNodeType, type CanvasNode } from '@shared/canvas-types'
 
 interface CanvasContextMenuProps {
@@ -53,7 +52,25 @@ const TYPE_SHORTCUT: Partial<Record<CanvasNodeType, string>> = {
   note: 'N'
 }
 
-const ICON_PX = 14
+function pickFileAndAdd(
+  accept: string,
+  type: CanvasNodeType,
+  onAddCard: CanvasContextMenuProps['onAddCard'],
+  buildMeta: (path: string, name: string) => Record<string, unknown>
+): void {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = accept
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const filePath = window.api.getFilePath(file)
+    if (filePath) {
+      onAddCard(type, { metadata: buildMeta(filePath, file.name) })
+    }
+  }
+  input.click()
+}
 
 export function CanvasContextMenu({
   x,
@@ -61,132 +78,57 @@ export function CanvasContextMenu({
   onAddCard,
   onClose
 }: CanvasContextMenuProps): React.ReactElement {
-  const ref = useRef<HTMLDivElement>(null)
+  const entries: readonly ContextMenuEntry[] = MENU_SECTIONS.flatMap(
+    (section): readonly ContextMenuEntry[] => {
+      const types = (
+        Object.entries(CARD_TYPE_INFO) as [
+          CanvasNodeType,
+          (typeof CARD_TYPE_INFO)[CanvasNodeType]
+        ][]
+      ).filter(([, info]) => info.category === section.category && info.creatableFromMenu)
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
+      if (types.length === 0) return []
+
+      const header: ContextMenuEntry = {
+        kind: 'header',
+        id: `header-${section.category}`,
+        label: section.label
       }
+      const items = types.map(
+        ([type, info]): ContextMenuEntry => ({
+          id: type,
+          label: info.label,
+          icon: TYPE_ICON[type],
+          shortcut: TYPE_SHORTCUT[type],
+          onSelect: () => {
+            if (type === 'image') {
+              pickFileAndAdd('image/*', 'image', onAddCard, (path, name) => ({
+                src: path,
+                alt: name
+              }))
+            } else if (type === 'pdf') {
+              pickFileAndAdd('.pdf,application/pdf', 'pdf', onAddCard, (path) => ({
+                src: path,
+                pageCount: 0,
+                currentPage: 1
+              }))
+            } else {
+              onAddCard(type)
+            }
+          }
+        })
+      )
+      return [header, ...items]
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
-
-  const handleFilePickerAdd = (
-    accept: string,
-    type: CanvasNodeType,
-    buildMeta: (path: string, name: string) => Record<string, unknown>
-  ): void => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = accept
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      const filePath = window.api.getFilePath(file)
-      if (filePath) {
-        onAddCard(type, { metadata: buildMeta(filePath, file.name) })
-      }
-    }
-    input.click()
-  }
-
-  const renderRow = (
-    Icon: LucideIcon,
-    label: string,
-    shortcut: string | undefined,
-    onClick: () => void,
-    key: string
-  ): React.ReactElement => (
-    <button
-      key={key}
-      onClick={onClick}
-      className="w-full text-left px-3 py-1 text-xs grid items-center gap-2 transition-colors"
-      style={{
-        color: colors.text.primary,
-        gridTemplateColumns: `${ICON_PX + 4}px 1fr auto`
-      }}
-      onMouseEnter={(e) => {
-        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-tint-text)'
-      }}
-      onMouseLeave={(e) => {
-        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
-      }}
-    >
-      <Icon size={ICON_PX} strokeWidth={1.75} style={{ color: colors.text.secondary }} />
-      <span>{label}</span>
-      <span
-        className="font-mono"
-        style={{
-          color: colors.text.muted,
-          fontSize: 10,
-          letterSpacing: 0.3,
-          minWidth: 16,
-          textAlign: 'right'
-        }}
-      >
-        {shortcut ?? ''}
-      </span>
-    </button>
   )
 
   return (
-    <div
-      ref={ref}
-      data-testid="canvas-context-menu"
-      className="fixed border py-1 z-50"
-      style={{
-        left: x,
-        top: y,
-        backgroundColor: floatingPanel.glass.popoverBg,
-        borderColor: colors.border.default,
-        borderRadius: borderRadius.card,
-        minWidth: 220,
-        boxShadow: floatingPanel.shadowCompact,
-        backdropFilter: floatingPanel.glass.popoverBlur,
-        WebkitBackdropFilter: floatingPanel.glass.popoverBlur
-      }}
-    >
-      {MENU_SECTIONS.map((section) => {
-        const types = (
-          Object.entries(CARD_TYPE_INFO) as [
-            CanvasNodeType,
-            (typeof CARD_TYPE_INFO)[CanvasNodeType]
-          ][]
-        ).filter(([, info]) => info.category === section.category && info.creatableFromMenu)
-
-        if (types.length === 0) return null
-
-        return (
-          <div key={section.category}>
-            <div className="px-3 py-0.5 text-xs font-medium" style={{ color: colors.text.muted }}>
-              {section.label}
-            </div>
-            {types.map(([type, info]) => {
-              const Icon = TYPE_ICON[type]
-              const shortcut = TYPE_SHORTCUT[type]
-              const handle = (): void => {
-                if (type === 'image') {
-                  handleFilePickerAdd('image/*', 'image', (path, name) => ({
-                    src: path,
-                    alt: name
-                  }))
-                } else if (type === 'pdf') {
-                  handleFilePickerAdd('.pdf,application/pdf', 'pdf', (path) => ({
-                    src: path,
-                    pageCount: 0,
-                    currentPage: 1
-                  }))
-                } else {
-                  onAddCard(type)
-                }
-              }
-              return renderRow(Icon, info.label, shortcut, handle, type)
-            })}
-          </div>
-        )
-      })}
-    </div>
+    <ContextMenu
+      position={{ x, y }}
+      items={entries}
+      onClose={onClose}
+      minWidth={220}
+      testId="canvas-context-menu"
+    />
   )
 }

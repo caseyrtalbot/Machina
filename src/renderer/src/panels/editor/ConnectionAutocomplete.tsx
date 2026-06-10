@@ -125,7 +125,7 @@ export function ConnectionAutocomplete({
               ? `connection-autocomplete-option-${clampedHighlight}`
               : undefined
           }
-          className="w-full bg-transparent border-0 outline-none text-xs px-1.5 py-1"
+          className="w-full bg-transparent border-0 text-xs px-1.5 py-1"
           style={{ color: colors.text.primary, fontFamily: 'var(--font-mono)' }}
         />
       </div>
@@ -157,7 +157,7 @@ export function ConnectionAutocomplete({
               aria-selected={index === clampedHighlight}
               onClick={() => onSelect(s.artifact.title)}
               onMouseEnter={() => setHighlight(index)}
-              className="w-full text-left px-3 py-1.5 text-xs transition-colors focus:outline-none"
+              className="w-full text-left px-3 py-1.5 text-xs transition-colors"
               style={{
                 color: colors.text.secondary,
                 fontFamily: 'var(--font-mono)',

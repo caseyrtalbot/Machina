@@ -161,7 +161,7 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
           setIsOpen(!isOpen)
           setTimeout(() => inputRef.current?.focus(), 50)
         }}
-        className="transition-colors hover:opacity-80 focus:outline-none"
+        className="transition-colors hover:opacity-80"
         style={{ color: colors.text.muted, fontSize: '11px', fontFamily: 'var(--font-mono)' }}
       >
         + add property
@@ -188,7 +188,7 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
                 if (e.key === 'Escape') setIsOpen(false)
               }}
               placeholder="Property name..."
-              className="w-full bg-transparent border-0 outline-none text-xs px-1.5 py-1"
+              className="w-full bg-transparent border-0 text-xs px-1.5 py-1"
               style={{ color: colors.text.primary, fontFamily: 'var(--font-mono)' }}
             />
           </div>
@@ -199,7 +199,7 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
                   key={prop}
                   type="button"
                   onClick={() => handleAdd(prop)}
-                  className="w-full text-left px-3 py-1.5 text-xs transition-colors hover:opacity-80 focus:outline-none"
+                  className="w-full text-left px-3 py-1.5 text-xs transition-colors hover:opacity-80"
                   style={{ color: colors.text.secondary, fontFamily: 'var(--font-mono)' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = colors.bg.surface
@@ -289,7 +289,7 @@ function PropertyRow({
           <button
             type="button"
             onClick={onDelete}
-            className="focus:outline-none transition-opacity"
+            className="transition-opacity"
             style={{
               color: colors.text.muted,
               fontSize: '9px',
@@ -661,7 +661,7 @@ function RelationshipRow({
             <button
               type="button"
               onClick={() => setAddOpen((v) => !v)}
-              className="transition-colors hover:opacity-80 focus:outline-none"
+              className="transition-colors hover:opacity-80"
               style={{
                 color: colors.text.muted,
                 fontSize: '11px',

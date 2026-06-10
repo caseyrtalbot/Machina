@@ -256,7 +256,7 @@ export function ListInput({ value, onChange }: ListInputProps) {
           <button
             type="button"
             onClick={() => onChange(value.filter((v) => v !== item))}
-            className="ml-1 focus:outline-none"
+            className="ml-1"
             style={{ color: colors.text.muted, fontSize: '9px', lineHeight: 1, opacity: 0.6 }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '1'
@@ -282,7 +282,7 @@ export function ListInput({ value, onChange }: ListInputProps) {
             if (inputValue.trim()) addItem(inputValue)
             setAdding(false)
           }}
-          className="bg-transparent border-0 outline-none"
+          className="bg-transparent border-0"
           style={{
             ...inputStyle,
             fontSize: '10px',
@@ -436,7 +436,7 @@ export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps
                 onTypeChange(t)
                 setOpen(false)
               }}
-              className="w-full text-left px-2 py-1 transition-colors hover:opacity-80 focus:outline-none"
+              className="w-full text-left px-2 py-1 transition-colors hover:opacity-80"
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '9px',

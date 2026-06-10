@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
+import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { logError } from '../../utils/error-logger'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useThreadStore } from '../../store/thread-store'
@@ -82,7 +83,6 @@ export function VaultSelector({
   const [open, setOpen] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const ctxMenuRef = useRef<HTMLDivElement>(null)
 
   const toggle = useCallback(() => setOpen((prev) => !prev), [])
 
@@ -108,27 +108,43 @@ export function VaultSelector({
     }
   }, [open])
 
-  // Close right-click context menu on outside click or escape
-  useEffect(() => {
-    if (!ctxMenu) return
-    const handleClick = (e: MouseEvent) => {
-      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
-        setCtxMenu(null)
-      }
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCtxMenu(null)
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [ctxMenu])
-
   // Recent vaults, excluding the currently loaded vault by path (not name)
   const recentVaults = history.filter((p) => p !== currentPath)
+
+  const ctxEntries = useMemo<readonly ContextMenuEntry[]>(() => {
+    if (!ctxMenu) return []
+    const base: readonly ContextMenuEntry[] = [
+      {
+        id: 'reveal-finder',
+        label: 'Reveal in Finder',
+        onSelect: () => {
+          window.api.shell.showInFolder(ctxMenu.path).catch((err) => {
+            logError('reveal-in-finder', err)
+          })
+        }
+      },
+      {
+        id: 'copy-path',
+        label: 'Copy Path',
+        onSelect: () => {
+          navigator.clipboard.writeText(ctxMenu.path)
+        }
+      }
+    ]
+    if (ctxMenu.path !== currentPath && onRemoveFromHistory) {
+      return [
+        ...base,
+        { kind: 'separator', id: 'sep-remove' },
+        {
+          id: 'remove-history',
+          label: 'Remove from History',
+          destructive: true,
+          onSelect: () => onRemoveFromHistory(ctxMenu.path)
+        }
+      ]
+    }
+    return base
+  }, [ctxMenu, currentPath, onRemoveFromHistory])
 
   return (
     <div className="relative" ref={menuRef}>
@@ -309,52 +325,11 @@ export function VaultSelector({
 
       {/* Right-click context menu for vault path actions */}
       {ctxMenu && (
-        <div
-          ref={ctxMenuRef}
-          className="sidebar-popover fixed z-[100] py-1"
-          style={{
-            left: ctxMenu.x,
-            top: ctxMenu.y
-          }}
-        >
-          <button
-            onClick={() => {
-              window.api.shell.showInFolder(ctxMenu.path).catch((err) => {
-                logError('reveal-in-finder', err)
-              })
-              setCtxMenu(null)
-            }}
-            className="sidebar-popover-item"
-            style={{ color: colors.text.secondary }}
-          >
-            Reveal in Finder
-          </button>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(ctxMenu.path)
-              setCtxMenu(null)
-            }}
-            className="sidebar-popover-item"
-            style={{ color: colors.text.secondary }}
-          >
-            Copy Path
-          </button>
-          {ctxMenu.path !== currentPath && onRemoveFromHistory && (
-            <>
-              <div className="sidebar-popover-divider mx-3 my-1" />
-              <button
-                onClick={() => {
-                  onRemoveFromHistory(ctxMenu.path)
-                  setCtxMenu(null)
-                }}
-                className="sidebar-popover-item"
-                style={{ color: 'var(--signal-danger)' }}
-              >
-                Remove from History
-              </button>
-            </>
-          )}
-        </div>
+        <ContextMenu
+          position={{ x: ctxMenu.x, y: ctxMenu.y }}
+          items={ctxEntries}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )

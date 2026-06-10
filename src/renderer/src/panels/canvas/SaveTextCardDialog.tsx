@@ -61,7 +61,7 @@ export function SaveTextCardDialog({
       aria-modal="true"
       aria-labelledby="save-text-card-title"
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+      style={{ backgroundColor: colors.scrim.modal }}
       onClick={onClose}
     >
       <div
@@ -132,7 +132,7 @@ export function SaveTextCardDialog({
               type="text"
               value={filename}
               onChange={(e) => setFilename(e.target.value)}
-              className="px-2 py-1 text-sm bg-transparent border outline-none"
+              className="px-2 py-1 text-sm bg-transparent border"
               style={{ borderColor: colors.border.default, borderRadius: 0 }}
             />
             {collisionWarning && (
@@ -148,7 +148,7 @@ export function SaveTextCardDialog({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search vault files..."
-              className="px-2 py-1 text-sm bg-transparent border outline-none"
+              className="px-2 py-1 text-sm bg-transparent border"
               style={{ borderColor: colors.border.default, borderRadius: 0 }}
             />
             <div

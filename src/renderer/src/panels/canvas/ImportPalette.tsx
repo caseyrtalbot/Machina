@@ -139,7 +139,7 @@ export function ImportPalette({
         alignItems: 'flex-start',
         justifyContent: 'center',
         paddingTop: 80,
-        background: 'rgba(0, 0, 0, 0.4)'
+        background: colors.scrim.modal
       }}
       onClick={onClose}
     >

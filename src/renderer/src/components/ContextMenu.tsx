@@ -1,14 +1,32 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { borderRadius, colors, floatingPanel } from '../design/tokens'
+import type { LucideIcon } from 'lucide-react'
+import { borderRadius, colors, floatingPanel, iconSize, iconStroke } from '../design/tokens'
 
 export interface ContextMenuItem {
+  /** Omitted kind means 'item' — keeps plain action arrays terse. */
+  readonly kind?: 'item'
   readonly id: string
   readonly label: string
   readonly onSelect: () => void
   readonly disabled?: boolean
   readonly destructive?: boolean
+  readonly shortcut?: string
+  readonly icon?: LucideIcon
 }
+
+export interface ContextMenuSeparator {
+  readonly kind: 'separator'
+  readonly id: string
+}
+
+export interface ContextMenuHeader {
+  readonly kind: 'header'
+  readonly id: string
+  readonly label: string
+}
+
+export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuHeader
 
 export interface ContextMenuPosition {
   readonly x: number
@@ -17,18 +35,51 @@ export interface ContextMenuPosition {
 
 interface ContextMenuProps {
   readonly position: ContextMenuPosition
-  readonly items: readonly ContextMenuItem[]
+  readonly items: readonly ContextMenuEntry[]
   readonly onClose: () => void
+  /** Anchor the menu's bottom edge at the cursor so it grows upward. */
+  readonly openUpward?: boolean
+  readonly minWidth?: number
+  readonly testId?: string
 }
 
-const MENU_MIN_WIDTH = 160
 const MENU_PADDING = 4
-const ITEM_HEIGHT = 28
 const VIEWPORT_MARGIN = 8
 
-export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
+function isItem(entry: ContextMenuEntry): entry is ContextMenuItem {
+  return entry.kind === undefined || entry.kind === 'item'
+}
+
+function isSelectable(entry: ContextMenuEntry): boolean {
+  return isItem(entry) && !entry.disabled
+}
+
+export function ContextMenu({
+  position,
+  items,
+  onClose,
+  openUpward = false,
+  minWidth = 160,
+  testId
+}: ContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [active, setActive] = useState<number>(() => firstEnabled(items))
+  // Render offscreen first, then measure and clamp — header/separator rows make
+  // height estimates unreliable, so real geometry is the only honest clamp.
+  const [coords, setCoords] = useState<ContextMenuPosition>({ x: position.x, y: -9999 })
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const rawY = openUpward ? position.y - rect.height : position.y
+    const maxX = window.innerWidth - rect.width - VIEWPORT_MARGIN
+    const maxY = window.innerHeight - rect.height - VIEWPORT_MARGIN
+    setCoords({
+      x: Math.max(VIEWPORT_MARGIN, Math.min(position.x, maxX)),
+      y: Math.max(VIEWPORT_MARGIN, Math.min(rawY, maxY))
+    })
+  }, [position.x, position.y, openUpward, items.length])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -49,9 +100,9 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
       }
       if (e.key === 'Enter') {
         e.preventDefault()
-        const item = items[active]
-        if (item && !item.disabled) {
-          item.onSelect()
+        const entry = items[active]
+        if (entry && isItem(entry) && !entry.disabled) {
+          entry.onSelect()
           onClose()
         }
       }
@@ -69,17 +120,24 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
     }
   }, [items, active, onClose])
 
-  const clamped = clampPosition(position, items.length)
-
   return createPortal(
     <div
       ref={ref}
       role="menu"
+      data-testid={testId}
+      // Portaled menus still bubble React events to the tree that rendered
+      // them (e.g. canvas cards) — keep menu interaction out of that tree.
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
       style={{
         position: 'fixed',
-        top: clamped.y,
-        left: clamped.x,
-        minWidth: MENU_MIN_WIDTH,
+        top: coords.y,
+        left: coords.x,
+        minWidth,
         padding: MENU_PADDING,
         background: floatingPanel.glass.popoverBg,
         backdropFilter: floatingPanel.glass.popoverBlur,
@@ -91,66 +149,99 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
         fontSize: 12
       }}
     >
-      {items.map((item, i) => (
-        <button
-          key={item.id}
-          type="button"
-          role="menuitem"
-          disabled={item.disabled}
-          onMouseEnter={() => !item.disabled && setActive(i)}
-          onClick={() => {
-            if (item.disabled) return
-            item.onSelect()
-            onClose()
-          }}
-          style={{
-            display: 'block',
-            width: '100%',
-            textAlign: 'left',
-            padding: '6px 10px',
-            border: 'none',
-            background: active === i && !item.disabled ? 'var(--bg-tint-text)' : 'transparent',
-            color: item.disabled
-              ? colors.text.muted
-              : item.destructive
-                ? colors.claude.error
-                : colors.text.primary,
-            cursor: item.disabled ? 'not-allowed' : 'pointer',
-            borderRadius: borderRadius.inline,
-            fontFamily: 'inherit',
-            fontSize: 'inherit'
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((entry, i) => {
+        if (entry.kind === 'separator') {
+          return (
+            <div
+              key={entry.id}
+              role="separator"
+              style={{ height: 1, background: colors.border.subtle, margin: '4px 6px' }}
+            />
+          )
+        }
+        if (entry.kind === 'header') {
+          return (
+            <div
+              key={entry.id}
+              style={{
+                padding: '4px 10px 2px',
+                color: colors.text.muted,
+                fontSize: 11,
+                fontWeight: 500
+              }}
+            >
+              {entry.label}
+            </div>
+          )
+        }
+        const Icon = entry.icon
+        return (
+          <button
+            key={entry.id}
+            type="button"
+            role="menuitem"
+            disabled={entry.disabled}
+            onMouseEnter={() => !entry.disabled && setActive(i)}
+            onClick={() => {
+              if (entry.disabled) return
+              entry.onSelect()
+              onClose()
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              textAlign: 'left',
+              padding: '6px 10px',
+              border: 'none',
+              background: active === i && !entry.disabled ? 'var(--bg-tint-text)' : 'transparent',
+              color: entry.disabled
+                ? colors.text.muted
+                : entry.destructive
+                  ? colors.claude.error
+                  : colors.text.primary,
+              cursor: entry.disabled ? 'not-allowed' : 'pointer',
+              borderRadius: borderRadius.inline,
+              fontFamily: 'inherit',
+              fontSize: 'inherit'
+            }}
+          >
+            {Icon && (
+              <Icon
+                size={iconSize.sm}
+                strokeWidth={iconStroke}
+                style={{ color: colors.text.secondary, flexShrink: 0 }}
+              />
+            )}
+            <span style={{ flex: 1, minWidth: 0 }}>{entry.label}</span>
+            {entry.shortcut && (
+              <span
+                className="font-mono"
+                style={{ color: colors.text.muted, fontSize: 10, letterSpacing: 0.3 }}
+              >
+                {entry.shortcut}
+              </span>
+            )}
+          </button>
+        )
+      })}
     </div>,
     document.body
   )
 }
 
-function firstEnabled(items: readonly ContextMenuItem[]): number {
-  const idx = items.findIndex((i) => !i.disabled)
+function firstEnabled(items: readonly ContextMenuEntry[]): number {
+  const idx = items.findIndex(isSelectable)
   return idx === -1 ? 0 : idx
 }
 
-function nextEnabled(items: readonly ContextMenuItem[], from: number, dir: 1 | -1): number {
+function nextEnabled(items: readonly ContextMenuEntry[], from: number, dir: 1 | -1): number {
   if (items.length === 0) return 0
   let i = from
   for (let step = 0; step < items.length; step += 1) {
     i = (i + dir + items.length) % items.length
-    if (!items[i].disabled) return i
+    if (isSelectable(items[i])) return i
   }
   return from
-}
-
-function clampPosition(pos: ContextMenuPosition, itemCount: number): ContextMenuPosition {
-  const height = itemCount * ITEM_HEIGHT + MENU_PADDING * 2
-  const width = MENU_MIN_WIDTH
-  const maxX = window.innerWidth - width - VIEWPORT_MARGIN
-  const maxY = window.innerHeight - height - VIEWPORT_MARGIN
-  return {
-    x: Math.max(VIEWPORT_MARGIN, Math.min(pos.x, maxX)),
-    y: Math.max(VIEWPORT_MARGIN, Math.min(pos.y, maxY))
-  }
 }

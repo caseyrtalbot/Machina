@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
-import { colors, transitions, floatingPanel } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
+import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { useUiStore } from '../../store/ui-store'
 
@@ -57,8 +57,6 @@ interface FileContextMenuProps {
 }
 
 export function FileContextMenu({ state, onClose, onAction }: FileContextMenuProps) {
-  const [focusedIndex, setFocusedIndex] = useState(-1)
-  const menuRef = useRef<HTMLDivElement>(null)
   const agentModifiedPaths = useSidebarSelectionStore((s) => s.agentModifiedPaths)
 
   const isBookmarked = useUiStore((s) => (state ? s.bookmarkedPaths.includes(state.path) : false))
@@ -86,142 +84,31 @@ export function FileContextMenu({ state, onClose, onAction }: FileContextMenuPro
     ]
   }, [state, agentModifiedPaths, isBookmarked, isMultiSelect, selectedPaths.size])
 
-  // Close on click outside or Escape
-  useEffect(() => {
-    if (!state) return
-
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
+  const entries = useMemo<readonly ContextMenuEntry[]>(() => {
+    if (!state) return []
+    return actions.flatMap((action): readonly ContextMenuEntry[] => {
+      const item: ContextMenuEntry = {
+        id: action.id,
+        label: action.label,
+        shortcut: action.shortcut,
+        destructive: action.danger,
+        onSelect: () => onAction(action.id, state.path)
       }
-    }
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-        return
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setFocusedIndex((prev) => (prev + 1) % actions.length)
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setFocusedIndex((prev) => (prev - 1 + actions.length) % actions.length)
-      }
-      if (e.key === 'Enter' && focusedIndex >= 0) {
-        e.preventDefault()
-        onAction(actions[focusedIndex].id, state.path)
-        onClose()
-      }
-    }
-
-    // Small delay to avoid the opening right-click from immediately closing
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClick)
-    }, 0)
-    document.addEventListener('keydown', handleKey)
-
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [state, onClose, onAction, actions, focusedIndex])
-
-  // Reset focus when menu opens
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on open
-    setFocusedIndex(-1)
-  }, [state])
-
-  // Adjust position to stay within viewport
-  const adjustedPosition = useAdjustedPosition(state, menuRef)
+      return action.separator ? [item, { kind: 'separator', id: `${action.id}-sep` }] : [item]
+    })
+  }, [actions, onAction, state])
 
   if (!state) return null
 
-  // Portal to document.body so the menu escapes the sidebar's stacking context.
-  // The sidebar uses backdropFilter + overflow-hidden, which traps fixed-positioned
-  // children inside its own stacking context and clips them.
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[180px] py-1 shadow-xl"
-      style={{
-        left: adjustedPosition.x,
-        top: adjustedPosition.y,
-        backgroundColor: floatingPanel.glass.popoverBg,
-        backdropFilter: floatingPanel.glass.popoverBlur,
-        WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
-        border: '1px solid var(--color-border-subtle)',
-        boxShadow: floatingPanel.shadow,
-        transition: `opacity ${transitions.tooltip}`,
-        fontSize: '13px'
-      }}
-    >
-      {actions.map((action, idx) => (
-        <div key={action.id}>
-          <button
-            className="w-full text-left px-3 py-1.5 flex items-center justify-between transition-colors cursor-default"
-            style={{
-              color: action.danger ? 'var(--signal-danger)' : colors.text.primary,
-              backgroundColor: focusedIndex === idx ? 'var(--bg-tint-text)' : undefined
-            }}
-            onMouseEnter={() => setFocusedIndex(idx)}
-            onMouseLeave={() => setFocusedIndex(-1)}
-            onClick={() => {
-              onAction(action.id, state.path)
-              onClose()
-            }}
-          >
-            <span>{action.label}</span>
-            {action.shortcut && (
-              <span style={{ color: colors.text.muted, fontSize: '11px' }}>{action.shortcut}</span>
-            )}
-          </button>
-          {action.separator && (
-            <div className="my-1" style={{ borderTop: '1px solid var(--color-border-subtle)' }} />
-          )}
-        </div>
-      ))}
-    </div>,
-    document.body
+  return (
+    <ContextMenu
+      position={{ x: state.x, y: state.y }}
+      items={entries}
+      onClose={onClose}
+      openUpward
+      minWidth={180}
+    />
   )
-}
-
-/** Keep the menu within the visible viewport */
-function useAdjustedPosition(
-  state: FileContextMenuState | null,
-  menuRef: React.RefObject<HTMLDivElement | null>
-) {
-  const [pos, setPos] = useState({ x: 0, y: 0 })
-
-  useEffect(() => {
-    if (!state) return
-    const { x } = state
-
-    // Position with bottom-left corner at the cursor (menu grows upward).
-    // Use rAF so the menu has rendered and we can measure its height.
-    requestAnimationFrame(() => {
-      const el = menuRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      let finalX = x
-      let finalY = state.y - rect.height
-
-      // Keep within viewport
-      if (finalX + rect.width > window.innerWidth) finalX = window.innerWidth - rect.width - 8
-      if (finalX < 0) finalX = 8
-      if (finalY < 0) finalY = 8
-      setPos({ x: finalX, y: finalY })
-    })
-
-    // Place offscreen initially to avoid flash at wrong position
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial position before rAF adjusts
-    setPos({ x, y: -9999 })
-  }, [state, menuRef])
-
-  return pos
 }
 
 interface RenameInputProps {
@@ -268,8 +155,9 @@ export function RenameInput({ initialValue, onConfirm, onCancel }: RenameInputPr
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
       onBlur={onCancel}
-      className="w-full bg-transparent outline-none text-sm px-1 py-0.5 rounded"
+      className="w-full bg-transparent text-sm px-1 py-0.5"
       style={{
+        borderRadius: borderRadius.inline,
         color: colors.text.primary,
         border: `1px solid ${colors.accent.default}`,
         backgroundColor: colors.bg.base

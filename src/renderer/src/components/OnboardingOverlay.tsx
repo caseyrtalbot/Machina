@@ -2,7 +2,7 @@ import { useEffect, useCallback, useRef } from 'react'
 import { Terminal, CircleUser, CircleCheck, Copy, SquareArrowOutUpRight } from 'lucide-react'
 import { useClaudeStatus } from '../hooks/use-claude-status'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors, floatingPanel } from '../design/tokens'
+import { colors, floatingPanel, zIndex } from '../design/tokens'
 
 const RECHECK_INTERVAL_MS = 5_000
 const AUTO_DISMISS_MS = 2_000
@@ -34,16 +34,10 @@ function CodeSnippet({ code }: { code: string }) {
       <code style={{ color: colors.text.primary }}>{code}</code>
       <button
         onClick={handleCopy}
-        className="ml-3 p-1 transition-colors"
+        className="ml-3 p-1 transition-colors te-onboarding-icon-btn"
         title="Copy to clipboard"
         aria-label="Copy to clipboard"
         style={{ color: colors.text.muted }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-tint-text)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent'
-        }}
       >
         <Copy size={14} />
       </button>
@@ -67,17 +61,10 @@ function InstallStep() {
       </p>
       <button
         onClick={handleOpenDocs}
-        className="mt-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
+        className="mt-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors te-onboarding-cta"
         style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.06)',
           border: `1px solid ${colors.border.subtle}`,
           color: colors.text.primary
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'
         }}
       >
         Open Install Guide
@@ -183,7 +170,7 @@ export function OnboardingOverlay() {
   return (
     <div
       className="fixed inset-0 flex items-center justify-center"
-      style={{ zIndex: 45, backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+      style={{ zIndex: zIndex.modal, backgroundColor: colors.scrim.modal }}
       onClick={handleBackdropClick}
     >
       <div
@@ -191,7 +178,7 @@ export function OnboardingOverlay() {
         className="te-popover-enter overflow-hidden"
         style={{
           width: 340,
-          backgroundColor: 'rgba(8, 8, 12, 0.88)',
+          backgroundColor: floatingPanel.glass.bg,
           backdropFilter: floatingPanel.glass.blur,
           WebkitBackdropFilter: floatingPanel.glass.blur,
           border: `1px solid ${colors.border.subtle}`,
@@ -212,17 +199,7 @@ export function OnboardingOverlay() {
               color: colors.text.muted
             }}
           >
-            <button
-              onClick={dismissOnboarding}
-              className="transition-colors"
-              style={{ color: colors.text.muted }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = colors.text.secondary
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = colors.text.muted
-              }}
-            >
+            <button onClick={dismissOnboarding} className="transition-colors te-onboarding-skip">
               Skip for now
             </button>
           </div>
