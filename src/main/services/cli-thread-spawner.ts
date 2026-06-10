@@ -3,9 +3,10 @@
  *
  * Owns the per-thread shell PTY for `cli-claude` / `cli-codex` / `cli-gemini`
  * threads. Each user message becomes a one-shot non-interactive invocation
- * (`<binary> --print "<prompt>"`-style) written to the PTY, so the existing
+ * (`claude --print …` / `codex exec …`) written to the PTY, so the existing
  * shell-hook block protocol captures one Block per turn — which the
- * CliAgentThreadBridge converts into one ThreadMessage.
+ * CliAgentThreadBridge converts into one ThreadMessage. Subsequent turns
+ * resume the agent's own session (see `CliInvocationOptions`).
  *
  * The detector is injected so the spawner stays trivially testable without
  * shelling out. Pure helpers (`formatCliInvocation`, `isCliAgentIdentity`)
@@ -32,21 +33,64 @@ export function specIdForIdentity(identity: AgentIdentity): string {
   return identity.startsWith('cli-') ? identity.slice(4) : identity
 }
 
+export interface CliInvocationOptions {
+  /**
+   * Agent-native session id captured from a previous turn's structured
+   * output (claude `session_id` / codex `thread_id`). When set, the
+   * invocation resumes that exact conversation — immune to other CLI runs
+   * in the same cwd (ghost emerge, parallel threads).
+   */
+  readonly resumeSessionId?: string
+  /**
+   * True when a prior turn was already sent for this thread. Degraded
+   * fallback when no session id was captured: claude `--continue` / codex
+   * `resume --last` pick the most recent conversation in the cwd.
+   */
+  readonly continueConversation?: boolean
+}
+
+/** Conservative shape for an id that is safe to interpolate into a shell line. */
+const SAFE_AGENT_SESSION_ID_RE = /^[0-9a-zA-Z-]{8,64}$/
+
 /**
  * Pure: build the shell command that runs the agent CLI in non-interactive
  * one-shot mode for a given prompt. The result is appended with `\r` by the
  * caller before being enqueued through the PTY write queue.
+ *
+ * claude and codex run with machine-readable output (`stream-json` / `--json`)
+ * so the thread bridge can extract assistant text and stream interim deltas;
+ * gemini has no structured mode and stays a plain one-shot.
  */
-export function formatCliInvocation(identity: AgentIdentity, prompt: string): string {
+export function formatCliInvocation(
+  identity: AgentIdentity,
+  prompt: string,
+  opts: CliInvocationOptions = {}
+): string {
   if (!isCliAgentIdentity(identity)) {
     throw new Error(`formatCliInvocation: not a CLI agent identity: ${identity}`)
   }
   const quoted = singleQuote(prompt)
+  const resumeId =
+    opts.resumeSessionId !== undefined && SAFE_AGENT_SESSION_ID_RE.test(opts.resumeSessionId)
+      ? opts.resumeSessionId
+      : null
   switch (identity) {
-    case 'cli-claude':
-      return `claude --print ${quoted}`
-    case 'cli-codex':
-      return `codex exec ${quoted}`
+    case 'cli-claude': {
+      // --verbose is mandatory: `claude --print --output-format stream-json`
+      // exits with an error without it.
+      const base = 'claude --print --verbose --output-format stream-json'
+      if (resumeId !== null) return `${base} --resume ${resumeId} ${quoted}`
+      if (opts.continueConversation === true) return `${base} --continue ${quoted}`
+      return `${base} ${quoted}`
+    }
+    case 'cli-codex': {
+      // --skip-git-repo-check: vaults are not guaranteed to be git repos and
+      // codex exec refuses to run outside one otherwise.
+      const flags = '--json --skip-git-repo-check'
+      if (resumeId !== null) return `codex exec resume ${flags} ${resumeId} ${quoted}`
+      if (opts.continueConversation === true) return `codex exec resume ${flags} --last ${quoted}`
+      return `codex exec ${flags} ${quoted}`
+    }
     case 'cli-gemini':
       return `gemini -p ${quoted}`
   }
@@ -70,6 +114,14 @@ interface CliThreadSpawnerOptions {
 export class CliThreadSpawner {
   /** threadId → sessionId of the bound PTY. */
   private readonly sessionByThread = new Map<string, string>()
+  /**
+   * Threads that already received at least one turn in this app run.
+   * Deliberately not cleared on close(): conversation continuity outlives
+   * the PTY (the next turn resumes the agent session in a fresh shell).
+   * In-memory only — after an app relaunch the first turn starts a fresh
+   * agent conversation even though the thread UI shows history.
+   */
+  private readonly turnsSent = new Set<string>()
 
   constructor(private readonly opts: CliThreadSpawnerOptions) {}
 
@@ -126,8 +178,15 @@ export class CliThreadSpawner {
   sendUserMessage(threadId: string, identity: AgentIdentity, text: string): boolean {
     const sessionId = this.sessionByThread.get(threadId)
     if (!sessionId) return false
-    const command = formatCliInvocation(identity, text)
+    // Per-thread continuity: resume the agent's own session when the bridge
+    // captured its id from structured output; fall back to most-recent-in-cwd
+    // continuation when a turn was sent but no id is known.
+    const command = formatCliInvocation(identity, text, {
+      resumeSessionId: this.opts.bridge.getAgentSessionId(threadId),
+      continueConversation: this.turnsSent.has(threadId)
+    })
     this.opts.shellService.getPtyService().writeAgentInput(sessionId, `${command}\r`, 'batched')
+    this.turnsSent.add(threadId)
     return true
   }
 

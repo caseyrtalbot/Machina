@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
-import type { ToolCall } from '@shared/thread-types'
+import type { ThreadMessage, ToolCall } from '@shared/thread-types'
 import { useThreadStore } from '../store/thread-store'
+import { AUTH_ERROR_BODY } from '../panels/agent-shell/ThreadMessage'
 
 export function useThreadStreaming(): void {
   const append = useThreadStore((s) => s.appendAssistantStreamChunk)
@@ -9,6 +10,7 @@ export function useThreadStreaming(): void {
   const appendToolCall = useThreadStore((s) => s.appendPendingToolCall)
   const finalize = useThreadStore((s) => s.finalizeAssistantMessage)
   const appendCliMessage = useThreadStore((s) => s.appendCliMessage)
+  const setRunId = useThreadStore((s) => s.setRunId)
   const addDockTab = useThreadStore((s) => s.addDockTab)
   const removeDockTab = useThreadStore((s) => s.removeDockTab)
 
@@ -36,19 +38,73 @@ export function useThreadStreaming(): void {
       } else if (evt.kind === 'message_end') {
         void finalize(evt.threadId)
       } else if (evt.kind === 'error') {
-        append(evt.threadId, evt.runId, `\n\n[error: ${evt.code}] ${evt.message}\n`)
-        void finalize(evt.threadId)
+        if (evt.code === 'AUTH') {
+          // Auth failures get a real system message with a Settings action
+          // (rendered by ThreadMessage) instead of a raw [error: AUTH] dump.
+          const sysMsg: ThreadMessage = {
+            role: 'system',
+            body: AUTH_ERROR_BODY,
+            sentAt: new Date().toISOString()
+          }
+          const st = useThreadStore.getState()
+          const hasPartial =
+            (st.streamingByThreadId[evt.threadId] ?? '').length > 0 ||
+            (st.pendingToolCallsByThreadId[evt.threadId] ?? []).length > 0
+          void (async () => {
+            // Materialize any partial turn first so its text isn't dropped;
+            // otherwise just clear the run id (finalize would append an
+            // empty assistant message).
+            if (hasPartial) await finalize(evt.threadId)
+            else setRunId(evt.threadId, null)
+            await appendCliMessage(evt.threadId, sysMsg)
+          })()
+        } else {
+          append(evt.threadId, evt.runId, `\n\n[error: ${evt.code}] ${evt.message}\n`)
+          void finalize(evt.threadId)
+        }
       }
     })
     return off
-  }, [append, startToolCall, appendToolCall, finalize])
+  }, [append, startToolCall, appendToolCall, finalize, appendCliMessage, setRunId])
 
   useEffect(() => {
     const off = window.api.on.threadCliMessage((evt) => {
-      void appendCliMessage(evt.threadId, evt.message)
+      const m = evt.message
+      // Wire contract with CliAgentThreadBridge: interim streaming deltas are
+      // assistant messages WITHOUT toolCalls; the final message always carries
+      // toolCalls (the cli_command entry at minimum) and its body extends the
+      // concatenation of the deltas.
+      if (m.role === 'assistant' && m.toolCalls === undefined) {
+        // Deltas arrive with the '\n\n' segment joiner already embedded, so a
+        // plain append keeps the buffer an exact prefix of the final body.
+        const key = cliRunKey(evt.threadId, m)
+        if (useThreadStore.getState().runIdByThreadId[evt.threadId] !== key) {
+          setRunId(evt.threadId, key)
+        }
+        append(evt.threadId, key, m.body)
+        return
+      }
+      const st = useThreadStore.getState()
+      const buffered = st.streamingByThreadId[evt.threadId] ?? ''
+      if (m.role === 'assistant' && buffered.length > 0 && m.body.startsWith(buffered)) {
+        // A streamed turn: route through the native finalize path so the
+        // streaming buffer and run id are cleared atomically with the append.
+        const key = st.runIdByThreadId[evt.threadId]
+        const remainder = m.body.slice(buffered.length)
+        if (remainder.length > 0 && key !== undefined) append(evt.threadId, key, remainder)
+        for (const tc of m.toolCalls ?? []) {
+          if (tc.result) appendToolCall(evt.threadId, tc.call, tc.result)
+          else startToolCall(evt.threadId, tc.call)
+        }
+        void finalize(evt.threadId)
+        return
+      }
+      // No interim deltas were streamed (plain-text agents, or the whole
+      // reply arrived in the completion pass): append the message as-is.
+      void appendCliMessage(evt.threadId, m)
     })
     return off
-  }, [appendCliMessage])
+  }, [append, setRunId, startToolCall, appendToolCall, finalize, appendCliMessage])
 
   useEffect(() => {
     const off = window.api.on.agentNativeDockAction((evt) => {
@@ -59,6 +115,12 @@ export function useThreadStreaming(): void {
     })
     return off
   }, [addDockTab, removeDockTab])
+}
+
+/** Stable per-turn streaming key for a CLI thread (one PTY block = one turn). */
+function cliRunKey(threadId: string, m: ThreadMessage): string {
+  const meta = m.role === 'assistant' ? m.metadata : undefined
+  return `cli:${meta?.sessionId ?? threadId}:${meta?.startedAt ?? ''}`
 }
 
 function pendingPreviewToCall(

@@ -34,6 +34,51 @@ function completed(block: Block, exit: number): Block {
 }
 
 const claudeSpec = getAgentSpec('claude')!
+const codexSpec = getAgentSpec('codex')!
+
+// Realistic stream-json / JSONL fixtures (shapes verified against
+// claude 2.1.170 and codex CLI on 2026-06-10).
+const CLAUDE_SESSION = '206caf50-df65-4a64-adf2-0749f4637bf7'
+const claudeInit = JSON.stringify({
+  type: 'system',
+  subtype: 'init',
+  cwd: '/v',
+  session_id: CLAUDE_SESSION
+})
+const claudeText = (text: string) =>
+  JSON.stringify({
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'text', text }] },
+    session_id: CLAUDE_SESSION
+  })
+const claudeToolUse = JSON.stringify({
+  type: 'assistant',
+  message: {
+    role: 'assistant',
+    content: [{ type: 'tool_use', id: 'toolu_1', name: 'Read', input: { file_path: '/a.ts' } }]
+  },
+  session_id: CLAUDE_SESSION
+})
+const claudeResult = (result: string) =>
+  JSON.stringify({ type: 'result', subtype: 'success', result, session_id: CLAUDE_SESSION })
+
+const CODEX_THREAD = '019eb1da-decb-7052-a145-1ac71e4bc80b'
+const codexLines = [
+  'Reading additional input from stdin...',
+  JSON.stringify({ type: 'thread.started', thread_id: CODEX_THREAD }),
+  JSON.stringify({ type: 'turn.started' }),
+  '2026-06-10T14:08:01.334563Z ERROR codex_memories_write::phase2: Phase 2 no changes',
+  JSON.stringify({
+    type: 'item.completed',
+    item: { id: 'item_0', type: 'command_execution', command: 'ls -la' }
+  }),
+  JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'reasoning' } }),
+  JSON.stringify({
+    type: 'item.completed',
+    item: { id: 'item_2', type: 'agent_message', text: 'ok' }
+  }),
+  JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1 } })
+]
 
 describe('blockToMessage (pure mapping)', () => {
   it('maps a successful completed block to assistant + cli_command ok result', () => {
@@ -108,6 +153,191 @@ describe('blockToMessage (pure mapping)', () => {
     expect(msg.toolCalls![1].call.args).toMatchObject({ preview: expect.stringContaining('/a.ts') })
     expect(msg.toolCalls![2].call.kind).toBe('cli_claude_bash')
     expect(msg.toolCalls![2].call.args).toMatchObject({ preview: expect.stringContaining('ls') })
+  })
+})
+
+describe('blockToMessage (structured claude stream-json)', () => {
+  it('extracts assistant text into body and keeps the raw output on cli_command', () => {
+    const out =
+      [
+        claudeInit,
+        claudeText('Hello'),
+        claudeToolUse,
+        claudeText('Done.'),
+        claudeResult('Hello\n\nDone.')
+      ].join('\n') + '\n'
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, out)
+    block = completed(block, 0)
+
+    const msg = blockToMessage(block, claudeSpec)
+
+    expect(msg.body).toBe('Hello\n\nDone.')
+    expect(msg.toolCalls?.[0].call.kind).toBe('cli_command')
+    if (msg.toolCalls?.[0].result?.ok) {
+      expect(msg.toolCalls[0].result.output).toEqual({ output: out, exitCode: 0 })
+    } else {
+      throw new Error('expected ok cli_command result')
+    }
+    expect(msg.toolCalls?.[1].call.kind).toBe('cli_claude_read')
+    expect(msg.toolCalls?.[1].call.args).toMatchObject({
+      preview: expect.stringContaining('/a.ts')
+    })
+    // The result line repeats the final text — it must not be double-counted.
+    expect(msg.body.match(/Hello/g)?.length).toBe(1)
+  })
+
+  it('falls back to the result line when no assistant event produced text', () => {
+    const out = [claudeInit, claudeResult('only result text')].join('\n') + '\n'
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'x'`)
+    block = appendOutput(block, out)
+    block = completed(block, 0)
+
+    expect(blockToMessage(block, claudeSpec).body).toBe('only result text')
+  })
+
+  it('strips terminal controls from the stored raw output', () => {
+    const out = '\x1b[31mFAIL\x1b[0m plain tail\n'
+    let block = startedBlock('s1', `claude --print 'x'`)
+    block = appendOutput(block, out)
+    block = completed(block, 0)
+
+    const msg = blockToMessage(block, claudeSpec)
+    if (msg.toolCalls?.[0].result?.ok) {
+      expect(msg.toolCalls[0].result.output).toEqual({ output: 'FAIL plain tail\n', exitCode: 0 })
+    } else {
+      throw new Error('expected ok cli_command result')
+    }
+  })
+})
+
+describe('blockToMessage (structured codex --json)', () => {
+  it('extracts agent_message text, maps tool items, skips junk and reasoning', () => {
+    let block = startedBlock('s1', `codex exec --json --skip-git-repo-check 'hi'`)
+    block = appendOutput(block, codexLines.join('\n') + '\n')
+    block = completed(block, 0)
+
+    const msg = blockToMessage(block, codexSpec)
+
+    expect(msg.body).toBe('ok')
+    expect(msg.toolCalls?.map((tc) => tc.call.kind)).toEqual([
+      'cli_command',
+      'cli_codex_command_execution'
+    ])
+    expect(msg.toolCalls?.[1].call.args).toMatchObject({
+      preview: expect.stringContaining('ls -la')
+    })
+  })
+
+  it('accepts the item_type field variant', () => {
+    const line = JSON.stringify({
+      type: 'item.completed',
+      item: { id: 'item_0', item_type: 'agent_message', text: 'variant ok' }
+    })
+    let block = startedBlock('s1', `codex exec --json 'hi'`)
+    block = appendOutput(block, line + '\n')
+    block = completed(block, 0)
+
+    expect(blockToMessage(block, codexSpec).body).toBe('variant ok')
+  })
+})
+
+describe('CliAgentThreadBridge interim streaming', () => {
+  function recording(): {
+    bridge: CliAgentThreadBridge
+    emitted: CliAgentThreadMessageEvent[]
+  } {
+    const emitted: CliAgentThreadMessageEvent[] = []
+    const bridge = new CliAgentThreadBridge({ onMessage: (e) => emitted.push(e) })
+    return { bridge, emitted }
+  }
+
+  it('streams text deltas while running; the final body extends their concatenation', () => {
+    const { bridge, emitted } = recording()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+
+    // Init line complete, text line still partial: nothing to stream yet.
+    const textLine = claudeText('Hello')
+    block = appendOutput(block, claudeInit + '\n' + textLine.slice(0, 12))
+    bridge.observe('s1', block)
+    expect(emitted).toEqual([])
+
+    // Text line completes: one interim delta, no toolCalls (wire contract).
+    block = appendOutput(block, textLine.slice(12) + '\n')
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(1)
+    expect(emitted[0].message.body).toBe('Hello')
+    expect(emitted[0].message.toolCalls).toBeUndefined()
+    expect(emitted[0].message.metadata?.endedAt).toBeUndefined()
+
+    // Second segment arrives with the joiner embedded in the delta.
+    block = appendOutput(block, claudeText('More text.') + '\n')
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(2)
+    expect(emitted[1].message.body).toBe('\n\nMore text.')
+
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(3)
+    const final = emitted[2].message
+    expect(final.toolCalls?.[0].call.kind).toBe('cli_command')
+    expect(final.body).toBe('Hello\n\nMore text.')
+    expect(final.body.startsWith(emitted[0].message.body + emitted[1].message.body)).toBe(true)
+  })
+
+  it('captures the agent session id for thread continuity, surviving closeSession', () => {
+    const { bridge } = recording()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeInit + '\n')
+    bridge.observe('s1', block)
+    expect(bridge.getAgentSessionId('thread-A')).toBe(CLAUDE_SESSION)
+    bridge.closeSession('s1')
+    expect(bridge.getAgentSessionId('thread-A')).toBe(CLAUDE_SESSION)
+  })
+
+  it('captures the codex thread id from thread.started', () => {
+    const { bridge } = recording()
+    bridge.bind('s1', 'thread-B')
+    let block = startedBlock('s1', `codex exec --json 'hi'`)
+    block = appendOutput(block, codexLines.slice(0, 2).join('\n') + '\n')
+    bridge.observe('s1', block)
+    expect(bridge.getAgentSessionId('thread-B')).toBe(CODEX_THREAD)
+  })
+
+  it('stops interim parsing when the output is truncated, keeping earlier text', () => {
+    const { bridge, emitted } = recording()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeText('First') + '\n')
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(1)
+
+    // Blow past the output cap: the block model inserts a truncation marker.
+    block = appendOutput(block, 'y'.repeat(400_000))
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(1)
+
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(2)
+    expect(emitted[1].message.body).toBe('First')
+  })
+
+  it('keeps extracted text on a cancelled block alongside the error result', () => {
+    const { bridge, emitted } = recording()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeText('Partial answer') + '\n')
+    bridge.observe('s1', block)
+    const r = cancelBlock(block, 5000)
+    if (!r.ok) throw new Error(r.error)
+    bridge.observe('s1', r.value)
+
+    const final = emitted[emitted.length - 1].message
+    expect(final.body).toBe('Partial answer')
+    expect(final.toolCalls?.[0].result?.ok).toBe(false)
   })
 })
 

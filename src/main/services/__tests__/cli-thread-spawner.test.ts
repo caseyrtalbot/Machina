@@ -48,26 +48,79 @@ function installed(id: string, installed = true) {
   }
 }
 
+const CLAUDE_BASE = 'claude --print --verbose --output-format stream-json'
+const CODEX_FLAGS = '--json --skip-git-repo-check'
+
 describe('formatCliInvocation', () => {
-  it('formats a claude one-shot invocation with single-quoted prompt', () => {
-    expect(formatCliInvocation('cli-claude', 'list files')).toBe(`claude --print 'list files'`)
+  it('formats a first-turn claude invocation with structured output flags', () => {
+    expect(formatCliInvocation('cli-claude', 'list files')).toBe(`${CLAUDE_BASE} 'list files'`)
   })
 
-  it('formats a codex one-shot invocation', () => {
-    expect(formatCliInvocation('cli-codex', 'list files')).toBe(`codex exec 'list files'`)
+  it('formats a first-turn codex invocation with JSONL output', () => {
+    expect(formatCliInvocation('cli-codex', 'list files')).toBe(
+      `codex exec ${CODEX_FLAGS} 'list files'`
+    )
   })
 
-  it('formats a gemini one-shot invocation', () => {
+  it('formats a gemini one-shot invocation (no structured mode)', () => {
     expect(formatCliInvocation('cli-gemini', 'list files')).toBe(`gemini -p 'list files'`)
   })
 
+  it('resumes claude by captured session id on later turns', () => {
+    expect(
+      formatCliInvocation('cli-claude', 'go on', {
+        resumeSessionId: '206caf50-df65-4a64-adf2-0749f4637bf7',
+        continueConversation: true
+      })
+    ).toBe(`${CLAUDE_BASE} --resume 206caf50-df65-4a64-adf2-0749f4637bf7 'go on'`)
+  })
+
+  it('falls back to claude --continue when no session id was captured', () => {
+    expect(formatCliInvocation('cli-claude', 'go on', { continueConversation: true })).toBe(
+      `${CLAUDE_BASE} --continue 'go on'`
+    )
+  })
+
+  it('resumes codex by captured thread id on later turns', () => {
+    expect(
+      formatCliInvocation('cli-codex', 'go on', {
+        resumeSessionId: '019eb1da-decb-7052-a145-1ac71e4bc80b',
+        continueConversation: true
+      })
+    ).toBe(`codex exec resume ${CODEX_FLAGS} 019eb1da-decb-7052-a145-1ac71e4bc80b 'go on'`)
+  })
+
+  it('falls back to codex resume --last when no thread id was captured', () => {
+    expect(formatCliInvocation('cli-codex', 'go on', { continueConversation: true })).toBe(
+      `codex exec resume ${CODEX_FLAGS} --last 'go on'`
+    )
+  })
+
+  it('gemini ignores continuity options (gated per agent)', () => {
+    expect(
+      formatCliInvocation('cli-gemini', 'go on', {
+        resumeSessionId: '019eb1da-decb-7052-a145-1ac71e4bc80b',
+        continueConversation: true
+      })
+    ).toBe(`gemini -p 'go on'`)
+  })
+
+  it('rejects a shell-unsafe resume id and falls back to --continue', () => {
+    expect(
+      formatCliInvocation('cli-claude', 'x', {
+        resumeSessionId: `abc; rm -rf /'`,
+        continueConversation: true
+      })
+    ).toBe(`${CLAUDE_BASE} --continue 'x'`)
+  })
+
   it('escapes embedded single quotes safely', () => {
-    expect(formatCliInvocation('cli-claude', "what's up")).toBe(`claude --print 'what'\\''s up'`)
+    expect(formatCliInvocation('cli-claude', "what's up")).toBe(`${CLAUDE_BASE} 'what'\\''s up'`)
   })
 
   it('preserves multi-line prompts inside the quoted argument', () => {
     expect(formatCliInvocation('cli-claude', 'line 1\nline 2')).toBe(
-      `claude --print 'line 1\nline 2'`
+      `${CLAUDE_BASE} 'line 1\nline 2'`
     )
   })
 
@@ -133,7 +186,7 @@ describe('CliThreadSpawner', () => {
     expect(ok).toBe(true)
     expect(pty.writeAgentInput).toHaveBeenCalledWith(
       'sess-xyz',
-      `claude --print 'list files'\r`,
+      `${CLAUDE_BASE} 'list files'\r`,
       'batched'
     )
   })
@@ -161,7 +214,10 @@ describe('CliThreadSpawner', () => {
   it('input respawns on demand when no session is bound (post-relaunch dead thread)', async () => {
     const { shell, pty } = fakeServices()
     const bindSpy = vi.fn()
-    const bridge = { bind: bindSpy } as unknown as CliAgentThreadBridge
+    const bridge = {
+      bind: bindSpy,
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
     const spawner = new CliThreadSpawner({
       shellService: shell as never,
       bridge,
@@ -174,14 +230,17 @@ describe('CliThreadSpawner', () => {
     expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A')
     expect(pty.writeAgentInput).toHaveBeenCalledWith(
       'sess-xyz',
-      `claude --print 'list files'\r`,
+      `${CLAUDE_BASE} 'list files'\r`,
       'batched'
     )
   })
 
   it('input respawns when the bound PTY has exited (stale session)', async () => {
     const { shell, pty } = fakeServices()
-    const bridge = { bind: vi.fn() } as unknown as CliAgentThreadBridge
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
     const spawner = new CliThreadSpawner({
       shellService: shell as never,
       bridge,
@@ -196,14 +255,17 @@ describe('CliThreadSpawner', () => {
     expect(shell.create).toHaveBeenCalledTimes(2)
     expect(pty.writeAgentInput).toHaveBeenCalledWith(
       'sess-new',
-      `claude --print 'retry'\r`,
+      `${CLAUDE_BASE} 'retry'\r`,
       'batched'
     )
   })
 
   it('input reuses the live session without respawning', async () => {
     const { shell, pty } = fakeServices()
-    const bridge = { bind: vi.fn() } as unknown as CliAgentThreadBridge
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
     const spawner = new CliThreadSpawner({
       shellService: shell as never,
       bridge,
@@ -213,7 +275,7 @@ describe('CliThreadSpawner', () => {
     const res = await spawner.input('thread-A', 'cli-claude', 'hi', '/v')
     expect(res.ok).toBe(true)
     expect(shell.create).toHaveBeenCalledTimes(1)
-    expect(pty.writeAgentInput).toHaveBeenCalledWith('sess-xyz', `claude --print 'hi'\r`, 'batched')
+    expect(pty.writeAgentInput).toHaveBeenCalledWith('sess-xyz', `${CLAUDE_BASE} 'hi'\r`, 'batched')
   })
 
   it('input returns ok=false when the respawn fails (CLI not installed)', async () => {
