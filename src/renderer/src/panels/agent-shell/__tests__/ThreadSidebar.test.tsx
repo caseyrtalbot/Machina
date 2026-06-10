@@ -37,6 +37,7 @@ beforeEach(() => {
     thread: {
       save: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
+      listArchived: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       archive: vi.fn().mockResolvedValue(undefined),
       unarchive: vi.fn().mockResolvedValue(undefined),
@@ -85,6 +86,65 @@ describe('ThreadSidebar', () => {
     await vi.waitFor(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((window as any).api.thread.archive).toHaveBeenCalled()
+    })
+  })
+
+  it('expanding the Archived section lazily fetches the archived list', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.listArchived = vi
+      .fn()
+      .mockResolvedValue([thread('z', 'Old Thread', 'machina-native', '2026-04-01T10:00:00Z')])
+    render(<ThreadSidebar />)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.listArchived).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId('archived-section-toggle'))
+
+    await vi.waitFor(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((window as any).api.thread.listArchived).toHaveBeenCalledWith('/v')
+      expect(screen.getByText('Old Thread')).toBeTruthy()
+    })
+  })
+
+  it('archived row context menu offers Unarchive and Delete', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.listArchived = vi
+      .fn()
+      .mockResolvedValue([thread('z', 'Old Thread', 'machina-native', '2026-04-01T10:00:00Z')])
+    render(<ThreadSidebar />)
+    fireEvent.click(screen.getByTestId('archived-section-toggle'))
+
+    const row = await screen.findByTestId('archived-thread-row')
+    fireEvent.contextMenu(row, { clientX: 50, clientY: 50 })
+    expect(screen.getByText('Unarchive')).toBeTruthy()
+    expect(screen.getByText('Delete')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Unarchive'))
+    await vi.waitFor(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((window as any).api.thread.unarchive).toHaveBeenCalledWith('/v', 'z')
+    })
+  })
+
+  it('Delete on an archived row unarchives then deletes', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.listArchived = vi
+      .fn()
+      .mockResolvedValue([thread('z', 'Old Thread', 'machina-native', '2026-04-01T10:00:00Z')])
+    render(<ThreadSidebar />)
+    fireEvent.click(screen.getByTestId('archived-section-toggle'))
+
+    const row = await screen.findByTestId('archived-thread-row')
+    fireEvent.contextMenu(row, { clientX: 50, clientY: 50 })
+    fireEvent.click(screen.getByText('Delete'))
+
+    await vi.waitFor(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((window as any).api.thread.unarchive).toHaveBeenCalledWith('/v', 'z')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((window as any).api.thread.delete).toHaveBeenCalledWith('/v', 'z')
+      expect(useThreadStore.getState().archivedThreads).toEqual([])
     })
   })
 

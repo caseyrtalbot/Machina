@@ -21,8 +21,9 @@ vi.mock('@renderer/store/canvas-autosave', () => ({
   flushCanvasSave: vi.fn().mockResolvedValue(undefined)
 }))
 
-// Mock error-logger (vault-persist imports notifyError)
+// Mock error-logger (vault-persist imports logError + notifyError)
 vi.mock('@renderer/utils/error-logger', () => ({
+  logError: vi.fn(),
   notifyError: vi.fn()
 }))
 
@@ -33,10 +34,8 @@ vi.mock('@shared/system-artifacts', () => ({
 
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useEditorStore } from '@renderer/store/editor-store'
+import { useUiStore } from '@renderer/store/ui-store'
 import {
-  getUiState,
-  setUiState,
-  updateUiState,
   rehydrateUiState,
   flushVaultState,
   subscribeVaultPersist
@@ -71,20 +70,14 @@ function resetStores(): void {
     historyStack: [],
     historyIndex: -1
   })
-}
 
-function resetUiState(): void {
-  setUiState({ backlinkCollapsed: {} })
-  // Drain any scheduled persist from setUiState itself
-  vi.runAllTimers()
-  writeStateMock.mockClear()
+  useUiStore.setState(useUiStore.getInitialState())
 }
 
 describe('vault-persist integration', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     resetStores()
-    resetUiState()
     writeStateMock.mockClear()
   })
 
@@ -95,25 +88,21 @@ describe('vault-persist integration', () => {
   // ─── 1. gatherVaultState round-trip ───────────────────────────────────────
 
   describe('gatherVaultState round-trip', () => {
-    it('collects state from all stores and uiState into VaultState', () => {
+    it('collects state from the editor and ui stores into VaultState', () => {
       useVaultStore.setState({
         vaultPath: '/test/vault',
         state: {
           version: 2,
           lastOpenNote: null,
-          panelLayout: { sidebarWidth: 300 },
-          fileTreeCollapseState: { '/docs': true },
-          selectedNodeId: 'node-42',
-          recentFiles: ['a.md', 'b.md']
+          fileTreeCollapseState: { '/stale': true }
         }
       })
 
       useEditorStore.setState({ activeNotePath: '/test/vault/notes/hello.md' })
-      setUiState({ backlinkCollapsed: { 'note-1': true } })
-
-      // Drain debounce from setUiState and clear mocks
-      vi.runAllTimers()
-      writeStateMock.mockClear()
+      useUiStore.setState({
+        backlinkCollapsed: { 'note-1': true },
+        fileTreeCollapseState: { '/docs': true }
+      })
 
       // Trigger a flush to capture the gathered state
       flushVaultState()
@@ -125,11 +114,14 @@ describe('vault-persist integration', () => {
       expect(state).toEqual({
         version: 2,
         lastOpenNote: '/test/vault/notes/hello.md',
-        panelLayout: { sidebarWidth: 300 },
         fileTreeCollapseState: { '/docs': true },
-        selectedNodeId: 'node-42',
-        recentFiles: ['a.md', 'b.md'],
-        ui: { backlinkCollapsed: { 'note-1': true } }
+        ui: {
+          backlinkCollapsed: { 'note-1': true },
+          dismissedGhosts: [],
+          outlineVisible: false,
+          bookmarkedPaths: [],
+          graphTutorialDismissed: false
+        }
       })
     })
 
@@ -144,10 +136,7 @@ describe('vault-persist integration', () => {
 
       expect(state.version).toBe(1)
       expect(state.lastOpenNote).toBeNull()
-      expect(state.panelLayout).toEqual({ sidebarWidth: 280 })
       expect(state.fileTreeCollapseState).toEqual({})
-      expect(state.selectedNodeId).toBeNull()
-      expect(state.recentFiles).toEqual([])
     })
   })
 
@@ -251,23 +240,16 @@ describe('vault-persist integration', () => {
       useEditorStore.setState({ activeNotePath: '/v/first.md' })
       vi.advanceTimersByTime(500)
 
-      // Flush immediately (should cancel the pending timer)
+      // Flush immediately (cancels the pending timer)
       useEditorStore.setState({ activeNotePath: '/v/flushed.md' })
       flushVaultState()
 
       expect(writeStateMock).toHaveBeenCalledOnce()
       expect(writeStateMock.mock.calls[0][1].lastOpenNote).toBe('/v/flushed.md')
 
-      // Advance past the original debounce -- no second write
+      // Advance past the original debounce -- the flush already wrote
       vi.advanceTimersByTime(1500)
-
-      // The debounced write from the second setState may fire, but the flush
-      // already wrote. The subscription's debounce is separate from flush's cancel.
-      // Flush only cancels its own pending timer (from setUiState/updateUiState calls).
-      // The subscription schedules independently. So we check total calls.
-      // The important thing: flush fired immediately.
-      const callCount = writeStateMock.mock.calls.length
-      expect(callCount).toBeGreaterThanOrEqual(1)
+      expect(writeStateMock.mock.calls.length).toBeGreaterThanOrEqual(1)
 
       unsub()
     })
@@ -281,106 +263,88 @@ describe('vault-persist integration', () => {
     })
   })
 
-  // ─── 5. rehydrateUiState populates from vault store ─────────────────────
+  // ─── 5. rehydrateUiState populates the ui-store from vault state ─────────
 
   describe('rehydrateUiState', () => {
-    it('populates uiState from vault store state.ui', () => {
+    it('populates the ui-store from vault state', () => {
       useVaultStore.setState({
         state: {
           version: 1,
           lastOpenNote: null,
-          panelLayout: { sidebarWidth: 280 },
-          fileTreeCollapseState: {},
-          selectedNodeId: null,
-          recentFiles: [],
-          ui: { backlinkCollapsed: { 'note-A': true, 'note-B': false } }
+          fileTreeCollapseState: { '/v/docs': true },
+          ui: {
+            backlinkCollapsed: { 'note-A': true, 'note-B': false },
+            dismissedGhosts: ['g1'],
+            outlineVisible: true,
+            bookmarkedPaths: ['/v/pin.md']
+          }
         }
       })
 
       rehydrateUiState()
 
-      expect(getUiState()).toEqual({
-        backlinkCollapsed: { 'note-A': true, 'note-B': false },
-        dismissedGhosts: [],
-        outlineVisible: false,
-        bookmarkedPaths: []
-      })
+      const ui = useUiStore.getState()
+      expect(ui.backlinkCollapsed).toEqual({ 'note-A': true, 'note-B': false })
+      expect(ui.dismissedGhosts).toEqual(['g1'])
+      expect(ui.outlineVisible).toBe(true)
+      expect(ui.bookmarkedPaths).toEqual(['/v/pin.md'])
+      expect(ui.fileTreeCollapseState).toEqual({ '/v/docs': true })
     })
 
     it('resets to defaults when vault state has no ui field', () => {
-      setUiState({
+      useUiStore.setState({
         backlinkCollapsed: { stale: true },
-        dismissedGhosts: [],
-        outlineVisible: false,
-        bookmarkedPaths: []
+        fileTreeCollapseState: { '/stale': true }
       })
-      vi.runAllTimers()
-      writeStateMock.mockClear()
 
       useVaultStore.setState({
         state: {
           version: 1,
           lastOpenNote: null,
-          panelLayout: { sidebarWidth: 280 },
-          fileTreeCollapseState: {},
-          selectedNodeId: null,
-          recentFiles: []
+          fileTreeCollapseState: {}
           // no ui field
         }
       })
 
       rehydrateUiState()
 
-      expect(getUiState()).toEqual({
-        backlinkCollapsed: {},
-        dismissedGhosts: [],
-        outlineVisible: false,
-        bookmarkedPaths: []
-      })
+      const ui = useUiStore.getState()
+      expect(ui.backlinkCollapsed).toEqual({})
+      expect(ui.dismissedGhosts).toEqual([])
+      expect(ui.outlineVisible).toBe(false)
+      expect(ui.bookmarkedPaths).toEqual([])
+      expect(ui.fileTreeCollapseState).toEqual({})
     })
 
     it('resets to defaults when vault state is null', () => {
-      setUiState({
-        backlinkCollapsed: { stale: true },
-        dismissedGhosts: [],
-        outlineVisible: false,
-        bookmarkedPaths: []
-      })
-      vi.runAllTimers()
-      writeStateMock.mockClear()
-
+      useUiStore.setState({ backlinkCollapsed: { stale: true } })
       useVaultStore.setState({ state: null })
 
       rehydrateUiState()
 
-      expect(getUiState()).toEqual({
-        backlinkCollapsed: {},
-        dismissedGhosts: [],
-        outlineVisible: false,
-        bookmarkedPaths: []
-      })
+      expect(useUiStore.getState().backlinkCollapsed).toEqual({})
     })
 
-    it('merges with defaults (fills missing keys)', () => {
+    it('copies into fresh objects (no shared references with vault state)', () => {
       useVaultStore.setState({
         state: {
           version: 1,
           lastOpenNote: null,
-          panelLayout: { sidebarWidth: 280 },
           fileTreeCollapseState: {},
-          selectedNodeId: null,
-          recentFiles: [],
-          ui: { backlinkCollapsed: { x: true } }
+          ui: {
+            backlinkCollapsed: { x: true },
+            dismissedGhosts: [],
+            outlineVisible: false,
+            bookmarkedPaths: []
+          }
         }
       })
 
       rehydrateUiState()
 
-      const ui = getUiState()
-      // Should have backlinkCollapsed from vault state
+      const ui = useUiStore.getState()
       expect(ui.backlinkCollapsed).toEqual({ x: true })
-      // And it should be a fresh object (not a reference to vault state)
-      expect(ui).not.toBe(useVaultStore.getState().state?.ui)
+      expect(ui.backlinkCollapsed).not.toBe(useVaultStore.getState().state?.ui?.backlinkCollapsed)
     })
   })
 
@@ -400,43 +364,49 @@ describe('vault-persist integration', () => {
       // Unsubscribe
       unsub()
 
-      // Further changes should not trigger writes
+      // Further changes (editor and ui) should not trigger writes
       useEditorStore.setState({ activeNotePath: '/v/after.md' })
+      useUiStore.getState().toggleBookmark('/v/after.md')
       vi.advanceTimersByTime(2000)
 
       expect(writeStateMock).not.toHaveBeenCalled()
     })
   })
 
-  // ─── uiState management ──────────────────────────────────────────────────
+  // ─── 7. ui-store is the single persisted-UI owner ────────────────────────
 
-  describe('uiState management', () => {
-    it('setUiState replaces entire uiState and schedules persist', () => {
+  describe('ui-store persistence', () => {
+    it('ui-store mutations schedule a persist carrying the new ui state', () => {
       useVaultStore.setState({ vaultPath: '/v' })
+      const unsub = subscribeVaultPersist()
 
-      setUiState({ backlinkCollapsed: { a: true, b: false } })
+      useUiStore.getState().toggleBacklinkCollapsed('/v/a.md')
+      useUiStore.getState().toggleBookmark('/v/a.md')
       vi.advanceTimersByTime(1000)
 
-      expect(getUiState()).toEqual({ backlinkCollapsed: { a: true, b: false } })
       expect(writeStateMock).toHaveBeenCalledOnce()
       expect(writeStateMock.mock.calls[0][1].ui).toEqual({
-        backlinkCollapsed: { a: true, b: false }
+        backlinkCollapsed: { '/v/a.md': false },
+        dismissedGhosts: [],
+        outlineVisible: false,
+        bookmarkedPaths: ['/v/a.md'],
+        graphTutorialDismissed: false
       })
+
+      unsub()
     })
 
-    it('updateUiState merges partial and schedules persist', () => {
-      setUiState({ backlinkCollapsed: { existing: true } })
-      vi.runAllTimers()
-      writeStateMock.mockClear()
-
+    it('file tree collapse toggles persist into fileTreeCollapseState', () => {
       useVaultStore.setState({ vaultPath: '/v' })
+      const unsub = subscribeVaultPersist()
 
-      updateUiState({ backlinkCollapsed: { new: false } })
+      useUiStore.getState().toggleFileTreeCollapsed('/v/docs')
       vi.advanceTimersByTime(1000)
 
-      // updateUiState does a shallow merge, so backlinkCollapsed is replaced
-      expect(getUiState()).toEqual({ backlinkCollapsed: { new: false } })
       expect(writeStateMock).toHaveBeenCalledOnce()
+      expect(writeStateMock.mock.calls[0][1].fileTreeCollapseState).toEqual({ '/v/docs': true })
+
+      unsub()
     })
   })
 })

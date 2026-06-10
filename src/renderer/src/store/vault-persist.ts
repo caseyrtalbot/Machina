@@ -1,86 +1,45 @@
-import type { VaultState, UiPersistedState } from '@shared/types'
-import { notifyError } from '../utils/error-logger'
+import type { VaultState } from '@shared/types'
+import { logError, notifyError } from '../utils/error-logger'
 import { flushCanvasSave } from './canvas-autosave'
 import { useVaultStore } from './vault-store'
 import { flushPendingSave, useEditorStore } from './editor-store'
+import { rehydrateUiStore, useUiStore } from './ui-store'
+import { flushDockState, useThreadStore } from './thread-store'
 
-const DEFAULT_UI_STATE: UiPersistedState = {
-  backlinkCollapsed: {},
-  dismissedGhosts: [],
-  outlineVisible: false,
-  bookmarkedPaths: []
-}
-
-let uiState: UiPersistedState = { ...DEFAULT_UI_STATE }
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 
 const DEBOUNCE_MS = 1000
 
-export function getUiState(): UiPersistedState {
-  return uiState
-}
-
-export function setUiState(next: UiPersistedState): void {
-  uiState = next
-  schedulePersist()
-}
-
-export function updateUiState(partial: Partial<UiPersistedState>): void {
-  uiState = { ...uiState, ...partial }
-  schedulePersist()
-}
-
 /**
- * Rehydrate ui state from the loaded VaultState.
- * Call after orchestrateLoad completes.
+ * Rehydrate persisted UI state from the loaded VaultState.
+ * Deprecated alias for ui-store's rehydrateUiStore — ui-store is the single
+ * owner now. Kept so the remaining App.tsx caller compiles; drop both calls
+ * there in favor of rehydrateUiStore alone when App is next touched.
  */
 export function rehydrateUiState(): void {
-  const state = useVaultStore.getState().state
-  if (state?.ui) {
-    uiState = { ...DEFAULT_UI_STATE, ...state.ui }
-  } else {
-    uiState = { ...DEFAULT_UI_STATE }
-  }
+  rehydrateUiStore()
 }
 
 /**
  * Gather current state from all stores into a VaultState object.
+ * ui-store is the single owner of persisted UI state.
  */
-const MAX_RECENT_FILES = 50
-
-function buildRecentFiles(historyStack: readonly string[], existing: readonly string[]): string[] {
-  // Walk history newest-first, then append persisted entries not already seen
-  const seen = new Set<string>()
-  const result: string[] = []
-  for (let i = historyStack.length - 1; i >= 0; i--) {
-    const path = historyStack[i]
-    if (!seen.has(path)) {
-      seen.add(path)
-      result.push(path)
-    }
-  }
-  for (const path of existing) {
-    if (!seen.has(path)) {
-      seen.add(path)
-      result.push(path)
-    }
-  }
-  return result.slice(0, MAX_RECENT_FILES)
-}
-
 function gatherVaultState(): VaultState {
   const vault = useVaultStore.getState()
   const editor = useEditorStore.getState()
-  const existing = vault.state
+  const ui = useUiStore.getState()
 
   return {
-    version: existing?.version ?? 1,
+    version: vault.state?.version ?? 1,
     lastOpenNote: editor.activeNotePath,
-    panelLayout: { sidebarWidth: existing?.panelLayout?.sidebarWidth ?? 280 },
-    fileTreeCollapseState: existing?.fileTreeCollapseState ?? {},
-    selectedNodeId: existing?.selectedNodeId ?? null,
-    recentFiles: buildRecentFiles(editor.historyStack, existing?.recentFiles ?? []),
-    ui: uiState
+    fileTreeCollapseState: { ...ui.fileTreeCollapseState },
+    ui: {
+      backlinkCollapsed: { ...ui.backlinkCollapsed },
+      dismissedGhosts: [...ui.dismissedGhosts],
+      outlineVisible: ui.outlineVisible,
+      bookmarkedPaths: [...ui.bookmarkedPaths],
+      graphTutorialDismissed: ui.graphTutorialDismissed
+    }
   }
 }
 
@@ -117,7 +76,7 @@ export function flushVaultState(): void {
   if (!vaultPath) return
   const state = gatherVaultState()
   useVaultStore.getState().setState(state)
-  // Fire-and-forget: best-effort persist on close (Slice 2 will add coordinated quit)
+  // Fire-and-forget: best-effort persist on close (coordinated quit awaits properly)
   window.api.vault
     .writeState(vaultPath, state)
     .catch((err) =>
@@ -127,7 +86,10 @@ export function flushVaultState(): void {
 
 /**
  * Coordinated quit handler. Called by main process via `app:will-quit` event.
- * Awaits the vault state write, then signals main that it's safe to quit.
+ * Awaits every flush (vault state, canvas, dirty docs, active thread's dock
+ * tabs), then signals main that it's safe to quit. A failed flush must not
+ * block quit — main's budget times out regardless, but failing fast keeps the
+ * shutdown deterministic.
  */
 export function registerQuitHandler(): () => void {
   return window.api.on.appWillQuit(async () => {
@@ -135,25 +97,42 @@ export function registerQuitHandler(): () => void {
       clearTimeout(persistTimer)
       persistTimer = null
     }
-    await Promise.all([writePersist(), flushCanvasSave(), flushPendingSave()])
+    const activeThreadId = useThreadStore.getState().activeThreadId
+    try {
+      await Promise.all([
+        writePersist(),
+        flushCanvasSave(),
+        flushPendingSave(),
+        ...(activeThreadId ? [flushDockState(activeThreadId)] : [])
+      ])
+    } catch (err) {
+      logError('quit-flush', err)
+    }
     window.api.lifecycle.quitReady()
   })
 }
 
 /**
  * Subscribe to store changes and auto-persist.
- * Uses shallow comparison on the fields we care about to avoid redundant writes.
+ * Editor: persists when the active note changes. Ui-store: every change is
+ * persisted state (collapse maps, bookmarks, dismissals), so any change
+ * schedules a debounced write.
  * Returns an unsubscribe function.
  */
 export function subscribeVaultPersist(): () => void {
   let prevNotePath = useEditorStore.getState().activeNotePath
 
-  const unsub = useEditorStore.subscribe((state) => {
+  const unsubEditor = useEditorStore.subscribe((state) => {
     if (state.activeNotePath !== prevNotePath) {
       prevNotePath = state.activeNotePath
       schedulePersist()
     }
   })
 
-  return unsub
+  const unsubUi = useUiStore.subscribe(() => schedulePersist())
+
+  return () => {
+    unsubEditor()
+    unsubUi()
+  }
 }

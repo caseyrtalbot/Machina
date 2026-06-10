@@ -6,6 +6,8 @@ import { ContextMenu, type ContextMenuPosition } from '../../components/ContextM
 import { AgentPicker } from './AgentPicker'
 import { AgentBadge } from './agent-badge'
 import type { AgentIdentity } from '@shared/agent-identity'
+import type { Thread } from '@shared/thread-types'
+import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 
 interface ThreadSidebarProps {
   readonly width?: number
@@ -15,6 +17,8 @@ interface ThreadSidebarProps {
 interface MenuTarget {
   readonly threadId: string
   readonly position: ContextMenuPosition
+  /** True when the menu targets a row in the Archived section. */
+  readonly archived: boolean
 }
 
 export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps = {}) {
@@ -25,6 +29,10 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
   const archiveThread = useThreadStore((s) => s.archiveThread)
   const deleteThread = useThreadStore((s) => s.deleteThread)
   const renameThread = useThreadStore((s) => s.renameThread)
+  const archivedThreads = useThreadStore((s) => s.archivedThreads)
+  const loadArchivedThreads = useThreadStore((s) => s.loadArchivedThreads)
+  const unarchiveThread = useThreadStore((s) => s.unarchiveThread)
+  const deleteArchivedThread = useThreadStore((s) => s.deleteArchivedThread)
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const vaultName = vaultPath?.split('/').pop() || 'Vault'
 
@@ -36,9 +44,17 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
   const [pickerOpen, setPickerOpen] = useState(false)
   const [menu, setMenu] = useState<MenuTarget | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [archivedOpen, setArchivedOpen] = useState(false)
 
-  function openMenuAt(threadId: string, x: number, y: number) {
-    setMenu({ threadId, position: { x, y } })
+  function openMenuAt(threadId: string, x: number, y: number, archived = false) {
+    setMenu({ threadId, position: { x, y }, archived })
+  }
+
+  function toggleArchived() {
+    const next = !archivedOpen
+    setArchivedOpen(next)
+    // Lazy fetch: the archive can be large and is rarely opened.
+    if (next) void loadArchivedThreads()
   }
 
   function startRename(id: string) {
@@ -77,22 +93,30 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
           onClick={onChangeVault}
         />
       </header>
-      <ul style={{ flex: 1, overflowY: 'auto', listStyle: 'none', margin: 0, padding: 0 }}>
-        {sorted.map((t) => (
-          <ThreadRow
-            key={t.id}
-            id={t.id}
-            title={t.title}
-            agent={t.agent}
-            isActive={activeId === t.id}
-            isRenaming={renaming === t.id}
-            onSelect={() => void selectThread(t.id)}
-            onContextMenu={(x, y) => openMenuAt(t.id, x, y)}
-            onCommitRename={(value) => commitRename(t.id, value)}
-            onCancelRename={() => setRenaming(null)}
-          />
-        ))}
-      </ul>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {sorted.map((t) => (
+            <ThreadRow
+              key={t.id}
+              id={t.id}
+              title={t.title}
+              agent={t.agent}
+              isActive={activeId === t.id}
+              isRenaming={renaming === t.id}
+              onSelect={() => void selectThread(t.id)}
+              onContextMenu={(x, y) => openMenuAt(t.id, x, y)}
+              onCommitRename={(value) => commitRename(t.id, value)}
+              onCancelRename={() => setRenaming(null)}
+            />
+          ))}
+        </ul>
+        <ArchivedSection
+          open={archivedOpen}
+          threads={archivedThreads}
+          onToggle={toggleArchived}
+          onContextMenu={(id, x, y) => openMenuAt(id, x, y, true)}
+        />
+      </div>
       <footer
         style={{
           padding: '12px 8px 16px',
@@ -103,7 +127,7 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
           <AgentPicker
             onPick={(a) => {
               setPickerOpen(false)
-              void createThread(a, 'claude-sonnet-4-6')
+              void createThread(a, DEFAULT_NATIVE_MODEL)
             }}
             onCancel={() => setPickerOpen(false)}
           />
@@ -115,27 +139,210 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
         <ContextMenu
           position={menu.position}
           onClose={() => setMenu(null)}
-          items={[
-            {
-              id: 'rename',
-              label: 'Rename',
-              onSelect: () => startRename(menu.threadId)
-            },
-            {
-              id: 'archive',
-              label: 'Archive',
-              onSelect: () => void archiveThread(menu.threadId)
-            },
-            {
-              id: 'delete',
-              label: 'Delete',
-              destructive: true,
-              onSelect: () => void deleteThread(menu.threadId)
-            }
-          ]}
+          items={
+            menu.archived
+              ? [
+                  {
+                    id: 'unarchive',
+                    label: 'Unarchive',
+                    onSelect: () => void unarchiveThread(menu.threadId)
+                  },
+                  {
+                    id: 'delete',
+                    label: 'Delete',
+                    destructive: true,
+                    onSelect: () => void deleteArchivedThread(menu.threadId)
+                  }
+                ]
+              : [
+                  {
+                    id: 'rename',
+                    label: 'Rename',
+                    onSelect: () => startRename(menu.threadId)
+                  },
+                  {
+                    id: 'archive',
+                    label: 'Archive',
+                    onSelect: () => void archiveThread(menu.threadId)
+                  },
+                  {
+                    id: 'delete',
+                    label: 'Delete',
+                    destructive: true,
+                    onSelect: () => void deleteThread(menu.threadId)
+                  }
+                ]
+          }
         />
       )}
     </aside>
+  )
+}
+
+function ArchivedSection({
+  open,
+  threads,
+  onToggle,
+  onContextMenu
+}: {
+  readonly open: boolean
+  readonly threads: readonly Thread[]
+  readonly onToggle: () => void
+  readonly onContextMenu: (threadId: string, x: number, y: number) => void
+}) {
+  return (
+    <section style={{ borderTop: `1px solid ${colors.border.subtle}` }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        data-testid="archived-section-toggle"
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 12px',
+          background: 'transparent',
+          border: 'none',
+          color: colors.text.muted,
+          cursor: 'pointer',
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 11,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          textAlign: 'left'
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            display: 'inline-block',
+            transform: open ? 'rotate(90deg)' : 'none',
+            transition: `transform ${transitions.micro}`,
+            fontSize: 9
+          }}
+        >
+          ▶
+        </span>
+        Archived{open ? ` (${threads.length})` : ''}
+      </button>
+      {open && (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {threads.length === 0 ? (
+            <li
+              style={{
+                padding: '4px 12px 10px',
+                color: colors.text.muted,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 11
+              }}
+            >
+              No archived threads
+            </li>
+          ) : (
+            threads.map((t) => (
+              <ArchivedRow
+                key={t.id}
+                id={t.id}
+                title={t.title}
+                agent={t.agent}
+                onContextMenu={(x, y) => onContextMenu(t.id, x, y)}
+              />
+            ))
+          )}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function ArchivedRow({
+  id,
+  title,
+  agent,
+  onContextMenu
+}: {
+  readonly id: string
+  readonly title: string
+  readonly agent: AgentIdentity
+  readonly onContextMenu: (x: number, y: number) => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const kebabRef = useRef<HTMLButtonElement | null>(null)
+
+  function handleKebab(e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation()
+    const rect = kebabRef.current?.getBoundingClientRect()
+    if (rect) onContextMenu(rect.left, rect.bottom + 2)
+    else onContextMenu(e.clientX, e.clientY)
+  }
+
+  return (
+    <li
+      data-testid="archived-thread-row"
+      data-thread-id={id}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu(e.clientX, e.clientY)
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '6px 12px',
+        background: hovered
+          ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
+          : 'transparent',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        transition: `background ${transitions.focusRing}`
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span
+          style={{
+            flex: 1,
+            color: colors.text.muted,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: 12,
+            letterSpacing: '0.01em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {title}
+        </span>
+        <button
+          ref={kebabRef}
+          type="button"
+          aria-label="Archived thread actions"
+          title="More"
+          onClick={handleKebab}
+          style={{
+            flexShrink: 0,
+            width: 18,
+            height: 18,
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            color: colors.text.muted,
+            cursor: 'pointer',
+            opacity: hovered ? 1 : 0,
+            transition: `opacity ${transitions.micro}`,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 14,
+            lineHeight: 1
+          }}
+        >
+          ⋯
+        </button>
+      </div>
+      <AgentBadge agent={agent} />
+    </li>
   )
 }
 

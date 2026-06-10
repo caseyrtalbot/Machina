@@ -9,6 +9,7 @@ import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useSidebarSelectionStore } from '../../../store/sidebar-selection-store'
 import { useThreadStore } from '../../../store/thread-store'
+import { useUiStore } from '../../../store/ui-store'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from '../../../hooks/useCanvasAwareness'
 import { useAgentStates } from '../../../hooks/use-agent-states'
 import { openArtifactInEditor } from '../../../system-artifacts/system-artifact-runtime'
@@ -42,7 +43,13 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
   const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const selectedPaths = useSidebarSelectionStore((s) => s.selectedPaths)
 
-  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
+  // Collapse state lives in ui-store so it persists into VaultState
+  // (restored on mount via rehydrateUiStore, written on every toggle).
+  const fileTreeCollapseState = useUiStore((s) => s.fileTreeCollapseState)
+  const collapsedPaths = useMemo(
+    () => new Set(Object.keys(fileTreeCollapseState).filter((p) => fileTreeCollapseState[p])),
+    [fileTreeCollapseState]
+  )
   const [sortMode, setSortMode] = useState<SortMode>('name')
   const [searchQuery, setSearchQuery] = useState('')
   const [vaultHistory, setVaultHistory] = useState<string[]>([])
@@ -228,12 +235,7 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
   )
 
   const handleToggleDirectory = useCallback((path: string) => {
-    setCollapsedPaths((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
+    useUiStore.getState().toggleFileTreeCollapsed(path)
   }, [])
 
   const handleNewFile = useCallback(async () => {
