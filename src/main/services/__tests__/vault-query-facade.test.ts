@@ -186,6 +186,51 @@ describe('VaultQueryFacade', () => {
     })
   })
 
+  describe('read-your-writes index refresh', () => {
+    function depsFacade(): {
+      facade: VaultQueryFacade
+      searchEngine: SearchEngine
+      index: VaultIndex
+    } {
+      const guard = new PathGuard(vaultRoot)
+      const logger = new AuditLogger(join(vaultRoot, '.te', 'audit'))
+      const searchEngine = new SearchEngine()
+      const index = new VaultIndex()
+      return {
+        facade: new VaultQueryFacade(guard, logger, vaultRoot, { searchEngine, vaultIndex: index }),
+        searchEngine,
+        index
+      }
+    }
+
+    it('writeFile makes the new content immediately searchable', async () => {
+      const { facade: f, searchEngine, index } = depsFacade()
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+      const content =
+        '---\nid: hello\ntitle: Hello\ntype: note\ntags: []\n---\n\nFreshly rewritten xylophone body\n'
+
+      expect(searchEngine.search('xylophone')).toHaveLength(0)
+      await f.writeFile(filePath, content, { agentId: 'test-agent' })
+
+      const hits = searchEngine.search('xylophone')
+      expect(hits).toHaveLength(1)
+      expect(hits[0].path).toBe(filePath)
+      expect(index.getArtifact('hello')?.body).toContain('xylophone')
+    })
+
+    it('createFile makes the new note immediately visible to search and graph', async () => {
+      const { facade: f, searchEngine, index } = depsFacade()
+      const filePath = join(vaultRoot, 'notes', 'fresh.md')
+      const content =
+        '---\nid: fresh\ntitle: Fresh\ntype: note\ntags: []\n---\n\nA brand new quokka note\n'
+
+      await f.createFile(filePath, content, { agentId: 'test-agent' })
+
+      expect(searchEngine.search('quokka')).toHaveLength(1)
+      expect(index.getArtifact('fresh')).toBeDefined()
+    })
+  })
+
   describe('getGhosts', () => {
     it('returns empty array when no vaultIndex', () => {
       // Default facade has no vaultIndex

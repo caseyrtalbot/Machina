@@ -338,6 +338,27 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
     useClaudeStatusStore.getState().setNativeKeyConfigured(false)
   }
 
+  type McpStatus = Awaited<ReturnType<typeof window.api.mcp.status>>
+  const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null)
+  const [mcpUrlCopied, setMcpUrlCopied] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    void window.api.mcp
+      .status()
+      .then((s) => {
+        setMcpStatus(s)
+        setMcpUrlCopied(false)
+      })
+      .catch(() => setMcpStatus(null))
+  }, [isOpen])
+
+  const copyMcpUrl = async (): Promise<void> => {
+    if (!mcpStatus?.url) return
+    await navigator.clipboard.writeText(mcpStatus.url)
+    setMcpUrlCopied(true)
+  }
+
   return (
     <div
       className="fixed inset-0 flex items-center justify-center"
@@ -712,8 +733,84 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             </div>
           </div>
 
+          {/* ── MCP server ── */}
+          <SectionHeading>MCP Server</SectionHeading>
+          <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
+            <div className="flex flex-col min-w-0 gap-2 w-full">
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  style={{
+                    color: colors.text.primary,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 12
+                  }}
+                >
+                  Local MCP endpoint
+                </span>
+                <span
+                  style={{
+                    color: mcpStatus?.running ? colors.accent.default : colors.text.muted,
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: typography.metadata.size,
+                    letterSpacing: typography.metadata.letterSpacing,
+                    textTransform: typography.metadata.textTransform
+                  }}
+                >
+                  {mcpStatus === null
+                    ? 'checking...'
+                    : mcpStatus.running
+                      ? `Running · ${mcpStatus.toolCount} tools`
+                      : 'Not running'}
+                </span>
+              </div>
+              {mcpStatus?.running && mcpStatus.url ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className="truncate"
+                    title={mcpStatus.url}
+                    style={{
+                      color: colors.text.secondary,
+                      fontFamily: typography.fontFamily.mono,
+                      fontSize: 11
+                    }}
+                  >
+                    {mcpStatus.url}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void copyMcpUrl()}
+                    className="settings-button transition-colors flex-shrink-0"
+                    style={{ color: colors.text.secondary }}
+                  >
+                    {mcpUrlCopied ? 'Copied' : 'Copy URL'}
+                  </button>
+                </div>
+              ) : null}
+              <span
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 10,
+                  lineHeight: 1.5
+                }}
+              >
+                {mcpStatus?.running
+                  ? 'Connect external agents: claude mcp add --transport http machina <URL>. Writes require in-app approval.'
+                  : 'Starts when a vault is open. Serves vault search, graph, and gated writes to external MCP clients.'}
+              </span>
+            </div>
+          </div>
+
           {/* ── Reset ── */}
-          <div className="settings-footer">
+          <div className="settings-footer gap-2">
+            <button
+              type="button"
+              onClick={() => void window.api.app.revealLogs()}
+              className="settings-button transition-colors"
+              style={{ color: colors.text.muted }}
+            >
+              Reveal Logs
+            </button>
             <button
               type="button"
               onClick={resetEnv}

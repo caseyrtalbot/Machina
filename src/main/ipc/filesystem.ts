@@ -4,7 +4,7 @@ import { createVaultIgnoreFilter } from '../services/vault-watcher'
 import { isExternalHttpNavigation } from '../services/external-navigation'
 import { PathGuard } from '../services/path-guard'
 import { getDocumentManager } from './documents'
-import { teConfigPath, teStatePath, assertWithinVault } from '../utils/paths'
+import { teConfigPath, teStatePath, assertWithinVault, canonicalizePath } from '../utils/paths'
 import { getIgnorePatterns } from '../utils/vault-config'
 import { TE_DIR } from '@shared/constants'
 import { typedHandle } from '../typed-ipc'
@@ -164,11 +164,18 @@ export function registerFilesystemIpc(): void {
   // --- Vault data ---
 
   typedHandle('vault:init', async (args) => {
-    setActiveVault(args.vaultPath)
-    await fileService.initVault(args.vaultPath)
+    // Canonicalize once (symlinks resolved, NFC) and return the result so
+    // PathGuard, the watcher root, the vault index, and the renderer all share
+    // one path namespace. Otherwise on symlinked vault paths agent writes
+    // index under the canonical path while the watcher echo refreshes the
+    // raw-path entry, leaving duplicate notes in MCP search/graph.
+    const vaultPath = canonicalizePath(args.vaultPath)
+    setActiveVault(vaultPath)
+    await fileService.initVault(vaultPath)
     // Await so index/MCP/health wiring completes before vault:init resolves and
     // any rejection propagates to the renderer instead of going unhandled.
-    await vaultReadyCallback?.(args.vaultPath)
+    await vaultReadyCallback?.(vaultPath)
+    return vaultPath
   })
 
   typedHandle('vault:read-config', async (args) => {

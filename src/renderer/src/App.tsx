@@ -182,9 +182,11 @@ export default function App() {
   const { loadFiles, appendFiles, updateMany } = useVaultWorker(onWorkerResult)
 
   const orchestrateLoad = useCallback(
-    async (path: string) => {
+    async (requestedPath: string) => {
       perfMark('vault-load-start')
-      await window.api.vault.init(path)
+      // vault:init returns the canonicalized root (symlinks resolved, NFC);
+      // use it everywhere so renderer keys match watcher event paths.
+      const path = await window.api.vault.init(requestedPath)
       await loadVault(path)
       const state = useVaultStore.getState().state
       if (state?.lastOpenNote) {

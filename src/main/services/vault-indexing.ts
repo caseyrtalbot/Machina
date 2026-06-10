@@ -1,6 +1,7 @@
 /**
  * Main-process vault indexing: builds VaultIndex + SearchEngine
- * from a list of file entries for MCP query support.
+ * from a list of file entries for MCP query support, and keeps them
+ * live as vault files change (watcher batches + agent writes).
  */
 import { readdir, readFile } from 'node:fs/promises'
 import { join, extname } from 'node:path'
@@ -13,33 +14,99 @@ interface FileEntry {
   readonly content: string
 }
 
+export interface LiveIndexDeps {
+  readonly vaultIndex: VaultIndex
+  readonly searchEngine: SearchEngine
+}
+
+export interface IndexFileEvent {
+  readonly path: string
+  readonly event: 'add' | 'change' | 'unlink'
+}
+
+/**
+ * Parse one file into the VaultIndex and mirror the result into the
+ * SearchEngine, replacing any prior entry for the same path. If the file's
+ * artifact id changed (frontmatter id edit), the stale search doc keyed by
+ * the old id is removed; if the new content fails to parse, the file drops
+ * out of both structures.
+ */
+export function applyFileToIndex(deps: LiveIndexDeps, path: string, content: string): void {
+  const oldId = deps.vaultIndex.getIdForFile(path)
+  deps.vaultIndex.updateFile(path, content)
+  const newId = deps.vaultIndex.getIdForFile(path)
+
+  if (oldId && oldId !== newId) {
+    deps.searchEngine.remove(oldId)
+  }
+  if (!newId) return
+
+  const artifact = deps.vaultIndex.getArtifact(newId)
+  if (!artifact) return
+  deps.searchEngine.upsert({
+    id: artifact.id,
+    title: artifact.title,
+    tags: [...artifact.tags],
+    body: artifact.body,
+    path
+  })
+}
+
+/** Remove a file from both the VaultIndex and the SearchEngine. */
+export function removeFileFromIndex(deps: LiveIndexDeps, path: string): void {
+  const id = deps.vaultIndex.getIdForFile(path)
+  deps.vaultIndex.removeFile(path)
+  if (id) deps.searchEngine.remove(id)
+}
+
+/**
+ * Apply a watcher batch to the index. Reads changed .md files from disk;
+ * a read failure (e.g. deleted between batch and read) drops the file from
+ * the index. Non-markdown paths are ignored.
+ */
+export async function applyIndexEvents(
+  deps: LiveIndexDeps,
+  events: readonly IndexFileEvent[]
+): Promise<void> {
+  for (const { path, event } of events) {
+    if (extname(path).toLowerCase() !== '.md') continue
+    if (event === 'unlink') {
+      removeFileFromIndex(deps, path)
+      continue
+    }
+    try {
+      const content = await readFile(path, 'utf-8')
+      applyFileToIndex(deps, path, content)
+    } catch {
+      removeFileFromIndex(deps, path)
+    }
+  }
+}
+
+/**
+ * Fire-and-forget watcher subscriber that keeps the main-process index live.
+ * Batches are serialized through an internal promise chain so two overlapping
+ * batches cannot interleave reads against the same path.
+ */
+export function createLiveIndexUpdater(
+  deps: LiveIndexDeps
+): (events: readonly IndexFileEvent[]) => void {
+  let queue: Promise<void> = Promise.resolve()
+  return (events) => {
+    queue = queue.then(() => applyIndexEvents(deps, events)).catch(() => {})
+  }
+}
+
 /**
  * Build a VaultIndex and SearchEngine from file contents.
  * Files that fail to parse are silently skipped (errors recorded in VaultIndex).
  */
-export function buildVaultDeps(files: readonly FileEntry[]): VaultQueryDeps & {
-  readonly vaultIndex: VaultIndex
-  readonly searchEngine: SearchEngine
-} {
-  const vaultIndex = new VaultIndex()
-
+export function buildVaultDeps(files: readonly FileEntry[]): VaultQueryDeps & LiveIndexDeps {
+  const deps: LiveIndexDeps = { vaultIndex: new VaultIndex(), searchEngine: new SearchEngine() }
   for (const file of files) {
-    vaultIndex.addFile(file.path, file.content)
+    applyFileToIndex(deps, file.path, file.content)
   }
-
-  const searchEngine = new SearchEngine()
-  for (const artifact of vaultIndex.getArtifacts()) {
-    const sourcePath = vaultIndex.getPathForArtifact(artifact.id)
-    searchEngine.upsert({
-      id: artifact.id,
-      title: artifact.title,
-      tags: [...artifact.tags],
-      body: artifact.body,
-      path: sourcePath ?? artifact.id
-    })
-  }
-
-  return { vaultIndex, searchEngine }
+  return deps
 }
 
 /**
@@ -73,12 +140,7 @@ const READ_CONCURRENCY = 12
  * Read all .md files from a vault directory and build a VaultIndex + SearchEngine.
  * Uses bounded concurrency to avoid overwhelming IPC/disk on large vaults.
  */
-export async function initVaultIndex(vaultRoot: string): Promise<
-  VaultQueryDeps & {
-    readonly vaultIndex: VaultIndex
-    readonly searchEngine: SearchEngine
-  }
-> {
+export async function initVaultIndex(vaultRoot: string): Promise<VaultQueryDeps & LiveIndexDeps> {
   const mdPaths = await listMdFiles(vaultRoot)
 
   // Bounded concurrency file reads

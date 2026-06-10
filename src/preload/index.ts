@@ -75,6 +75,9 @@ const api = {
     getStatus: () => typedInvoke('claude:get-status'),
     recheck: () => typedInvoke('claude:recheck')
   },
+  mcp: {
+    status: () => typedInvoke('mcp:status')
+  },
   agent: {
     getStates: () => typedInvoke('agent:get-states')
   },

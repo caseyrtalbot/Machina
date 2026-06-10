@@ -1,8 +1,11 @@
+// @vitest-environment node
 /**
- * Tests for McpLifecycle: lazy MCP server creation with optional vault deps.
+ * Tests for McpLifecycle: vault-scoped MCP server factory + localhost
+ * Streamable HTTP transport (external clients connect over HTTP).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs'
+import { request } from 'node:http'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -15,108 +18,176 @@ vi.mock('electron', () => ({
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { McpLifecycle } from '../mcp-lifecycle'
-import { VaultIndex } from '@shared/engine/indexer'
-import { SearchEngine } from '@shared/engine/search-engine'
-import { buildVaultDeps } from '../vault-indexing'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { McpLifecycle, MCP_TOOL_COUNT } from '../mcp-lifecycle'
+import { buildVaultDeps, applyFileToIndex } from '../vault-indexing'
+
+const HELLO_MD =
+  '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - greeting\nconnections:\n  - world\n---\n\n# Hello World\n\nA greeting note.\n'
+const WORLD_MD =
+  '---\nid: world\ntitle: World\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - place\n---\n\n# World\n\nThe world is vast.\n'
 
 function createTestVault(): string {
   const base = join(tmpdir(), `mcp-lc-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   mkdirSync(join(base, 'notes'), { recursive: true })
-  writeFileSync(
-    join(base, 'notes', 'hello.md'),
-    '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - greeting\nconnections:\n  - world\n---\n\n# Hello World\n\nA greeting note.\n'
-  )
-  writeFileSync(
-    join(base, 'notes', 'world.md'),
-    '---\nid: world\ntitle: World\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - place\n---\n\n# World\n\nThe world is vast.\n'
-  )
+  writeFileSync(join(base, 'notes', 'hello.md'), HELLO_MD)
+  writeFileSync(join(base, 'notes', 'world.md'), WORLD_MD)
   return realpathSync(base)
 }
 
 describe('McpLifecycle', () => {
   let vaultRoot: string
+  let lifecycle: McpLifecycle
 
   beforeEach(() => {
     vaultRoot = createTestVault()
+    lifecycle = new McpLifecycle()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await lifecycle.stop()
     rmSync(vaultRoot, { recursive: true, force: true })
   })
 
-  it('createForVault builds a server but does NOT report it as running until a transport connects', () => {
-    const lifecycle = new McpLifecycle()
-    const vaultIndex = new VaultIndex()
-    const searchEngine = new SearchEngine()
+  it('createForVault prepares the factory but does not report running until the transport starts', () => {
+    lifecycle.createForVault(vaultRoot, buildVaultDeps([]))
 
-    vaultIndex.addFile(
-      'hello.md',
-      '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags: []\nconnections:\n  - world\n---\n\nHello body\n'
-    )
-    vaultIndex.addFile(
-      'world.md',
-      '---\nid: world\ntitle: World\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags: []\n---\n\nWorld body\n'
-    )
-    searchEngine.upsert({
-      id: 'hello',
-      title: 'Hello',
-      tags: [],
-      body: 'Hello body',
-      path: join(vaultRoot, 'notes', 'hello.md')
-    })
-
-    const server = lifecycle.createForVault(vaultRoot, { searchEngine, vaultIndex })
-
-    expect(server).toBeDefined()
-    // Built but no transport connected — status must not advertise it.
     expect(lifecycle.isRunning()).toBe(false)
     expect(lifecycle.toolCount()).toBe(0)
+    expect(lifecycle.status()).toEqual({
+      running: false,
+      toolCount: 0,
+      url: null,
+      vaultRoot
+    })
   })
 
-  it('createForVault still works without deps (backward compatible)', () => {
-    const lifecycle = new McpLifecycle()
-    const server = lifecycle.createForVault(vaultRoot)
-
-    expect(server).toBeDefined()
-    expect(lifecycle.isRunning()).toBe(false)
+  it('startTransport before createForVault throws', async () => {
+    await expect(lifecycle.startTransport({ port: 0 })).rejects.toThrow(/createForVault/)
   })
 
-  it('reports running/toolCount only while a transport is connected', async () => {
-    const lifecycle = new McpLifecycle()
-    const server = lifecycle.createForVault(vaultRoot)
+  it('startTransport serves a localhost URL and status reflects it; stop tears it down', async () => {
+    lifecycle.createForVault(vaultRoot, buildVaultDeps([]))
+    await lifecycle.startTransport({ port: 0 })
+
+    expect(lifecycle.isRunning()).toBe(true)
+    expect(lifecycle.toolCount()).toBe(MCP_TOOL_COUNT)
+    const status = lifecycle.status()
+    expect(status.running).toBe(true)
+    expect(status.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/)
+    expect(status.vaultRoot).toBe(vaultRoot)
+
+    await lifecycle.stop()
     expect(lifecycle.isRunning()).toBe(false)
+    expect(lifecycle.toolCount()).toBe(0)
+    expect(lifecycle.status().url).toBeNull()
+  })
+
+  it('an external HTTP client can connect, list all gated tools, and query the vault', async () => {
+    const deps = buildVaultDeps([
+      { path: join(vaultRoot, 'notes', 'hello.md'), content: HELLO_MD },
+      { path: join(vaultRoot, 'notes', 'world.md'), content: WORLD_MD }
+    ])
+    lifecycle.createForVault(vaultRoot, deps)
+    await lifecycle.startTransport({ port: 0 })
+
+    const url = lifecycle.status().url
+    expect(url).not.toBeNull()
 
     const client = new Client({ name: 'test-client', version: '1.0.0' })
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
-    await server.connect(serverTransport)
-    await client.connect(clientTransport)
+    const transport = new StreamableHTTPClientTransport(new URL(url as string))
+    await client.connect(transport)
 
-    // Now genuinely connected and serving.
-    expect(lifecycle.isRunning()).toBe(true)
-    expect(lifecycle.toolCount()).toBe(6)
+    // Guards the MCP_TOOL_COUNT constant against going stale.
+    const tools = await client.listTools()
+    expect(tools.tools).toHaveLength(MCP_TOOL_COUNT)
+
+    const result = await client.callTool({
+      name: 'search.query',
+      arguments: { query: 'greeting' }
+    })
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text
+    const hits = JSON.parse(text) as Array<{ title: string; path: string }>
+    expect(hits.length).toBeGreaterThanOrEqual(1)
+    expect(hits[0].title).toBe('Hello')
+
+    const readResult = await client.callTool({
+      name: 'vault.read_file',
+      arguments: { path: hits[0].path }
+    })
+    const readText = (readResult.content as Array<{ type: string; text: string }>)[0].text
+    expect(readText).toContain('A greeting note.')
 
     await client.close()
-    await server.close()
-
-    // Disconnected again — status falls back to not-running.
-    expect(lifecycle.isRunning()).toBe(false)
-    expect(lifecycle.toolCount()).toBe(0)
   })
 
-  describe('MCP data flow with buildVaultDeps', () => {
-    const HELLO_MD =
-      '---\nid: hello\ntitle: Hello\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - greeting\nconnections:\n  - world\n---\n\n# Hello World\n\nA greeting note.\n'
-    const WORLD_MD =
-      '---\nid: world\ntitle: World\ntype: note\ncreated: 2026-01-01\nmodified: 2026-01-01\ntags:\n  - place\n---\n\n# World\n\nThe world is vast.\n'
+  it('search over HTTP sees live index updates made after vault open', async () => {
+    const deps = buildVaultDeps([])
+    lifecycle.createForVault(vaultRoot, deps)
+    await lifecycle.startTransport({ port: 0 })
 
+    const client = new Client({ name: 'test-client', version: '1.0.0' })
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(lifecycle.status().url as string))
+    )
+
+    const before = await client.callTool({
+      name: 'search.query',
+      arguments: { query: 'greeting' }
+    })
+    expect(JSON.parse((before.content as Array<{ text: string }>)[0].text)).toHaveLength(0)
+
+    // Simulate a watcher-driven index update landing while the server runs.
+    applyFileToIndex(deps, join(vaultRoot, 'notes', 'hello.md'), HELLO_MD)
+
+    const after = await client.callTool({
+      name: 'search.query',
+      arguments: { query: 'greeting' }
+    })
+    const hits = JSON.parse((after.content as Array<{ text: string }>)[0].text)
+    expect(hits.length).toBeGreaterThanOrEqual(1)
+
+    await client.close()
+  })
+
+  it('rejects requests with a non-local Host header', async () => {
+    lifecycle.createForVault(vaultRoot, buildVaultDeps([]))
+    await lifecycle.startTransport({ port: 0 })
+
+    // fetch/undici strips a custom Host header, so use raw http.request.
+    const url = new URL(lifecycle.status().url as string)
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(
+        {
+          host: '127.0.0.1',
+          port: url.port,
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            Host: 'evil.example.com',
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream'
+          }
+        },
+        (res) => {
+          res.resume()
+          resolve(res.statusCode ?? 0)
+        }
+      )
+      req.on('error', reject)
+      req.end(JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }))
+    })
+    expect(status).toBe(403)
+  })
+
+  describe('MCP data flow with buildVaultDeps (in-memory transport via buildServer)', () => {
     it('search.query returns results through MCP transport', async () => {
       const deps = buildVaultDeps([
         { path: 'notes/hello.md', content: HELLO_MD },
         { path: 'notes/world.md', content: WORLD_MD }
       ])
-      const lifecycle = new McpLifecycle()
-      const server = lifecycle.createForVault(vaultRoot, deps)
+      lifecycle.createForVault(vaultRoot, deps)
+      const server = lifecycle.buildServer()
 
       const client = new Client({ name: 'test-client', version: '1.0.0' })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -138,47 +209,13 @@ describe('McpLifecycle', () => {
       await server.close()
     })
 
-    it('search.query paths can be fed back into vault.read_file', async () => {
-      const deps = buildVaultDeps([
-        { path: join(vaultRoot, 'notes', 'hello.md'), content: HELLO_MD },
-        { path: join(vaultRoot, 'notes', 'world.md'), content: WORLD_MD }
-      ])
-      const lifecycle = new McpLifecycle()
-      const server = lifecycle.createForVault(vaultRoot, deps)
-
-      const client = new Client({ name: 'test-client', version: '1.0.0' })
-      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
-      await server.connect(serverTransport)
-      await client.connect(clientTransport)
-
-      const searchResult = await client.callTool({
-        name: 'search.query',
-        arguments: { query: 'greeting' }
-      })
-
-      const searchText = (searchResult.content as Array<{ type: string; text: string }>)[0].text
-      const hits = JSON.parse(searchText) as Array<{ path: string }>
-      expect(hits[0]?.path).toBe(join(vaultRoot, 'notes', 'hello.md'))
-
-      const readResult = await client.callTool({
-        name: 'vault.read_file',
-        arguments: { path: hits[0].path }
-      })
-
-      const readText = (readResult.content as Array<{ type: string; text: string }>)[0].text
-      expect(readText).toContain('A greeting note.')
-
-      await client.close()
-      await server.close()
-    })
-
     it('graph.get_neighbors returns edges through MCP transport', async () => {
       const deps = buildVaultDeps([
         { path: 'notes/hello.md', content: HELLO_MD },
         { path: 'notes/world.md', content: WORLD_MD }
       ])
-      const lifecycle = new McpLifecycle()
-      const server = lifecycle.createForVault(vaultRoot, deps)
+      lifecycle.createForVault(vaultRoot, deps)
+      const server = lifecycle.buildServer()
 
       const client = new Client({ name: 'test-client', version: '1.0.0' })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -202,8 +239,8 @@ describe('McpLifecycle', () => {
     })
 
     it('search.query returns empty without deps (the original bug)', async () => {
-      const lifecycle = new McpLifecycle()
-      const server = lifecycle.createForVault(vaultRoot) // No deps!
+      lifecycle.createForVault(vaultRoot) // No deps!
+      const server = lifecycle.buildServer()
 
       const client = new Client({ name: 'test-client', version: '1.0.0' })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -216,8 +253,7 @@ describe('McpLifecycle', () => {
       })
 
       const text = (result.content as Array<{ type: string; text: string }>)[0].text
-      const hits = JSON.parse(text)
-      expect(hits).toHaveLength(0) // Bug: no deps = no results
+      expect(JSON.parse(text)).toHaveLength(0)
 
       await client.close()
       await server.close()

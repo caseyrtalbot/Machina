@@ -4,7 +4,7 @@ import { join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerFilesystemIpc, onVaultReady } from './ipc/filesystem'
-import { registerWatcherIpc, getVaultWatcher } from './ipc/watcher'
+import { registerWatcherIpc, getVaultWatcher, setVaultBatchListener } from './ipc/watcher'
 import { registerShellIpc, getShellService } from './ipc/shell'
 import { registerConfigIpc, readAppConfigValue, writeAppConfigValue } from './ipc/config'
 
@@ -20,7 +20,7 @@ import { registerCliThreadIpc } from './ipc/cli-thread'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { initAutoUpdates } from './services/auto-update'
 import { PtyMonitor } from './services/pty-monitor'
-import { initVaultIndex } from './services/vault-indexing'
+import { initVaultIndex, createLiveIndexUpdater } from './services/vault-indexing'
 import { VaultHealthMonitor } from './services/vault-health-monitor'
 import { FsErrorLog } from './services/fs-error-log'
 import { ClaudeStatusService } from './services/claude-status-service'
@@ -44,13 +44,17 @@ import {
 // codegen) is isolated via the 'pixi.js/unsafe-eval' shim imported by
 // graph-renderer.ts. js-yaml's and pdfjs's eval paths are feature-detected or
 // dead (gray-matter runs with JS types disabled).
+// Fonts: defaults are bundled woff2 (renderer assets/fonts), so style-src and
+// font-src stay local-only. User-chosen Google Fonts load via fetch() +
+// FontFace (design/google-fonts.ts), confined to connect-src.
 const PROD_CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
   "img-src 'self' data: blob:",
-  "worker-src 'self' blob:"
+  "worker-src 'self' blob:",
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com"
 ].join('; ')
 
 const APP_ID = 'com.machina.app'
@@ -170,9 +174,20 @@ async function reconfigureForVault(vaultPath: string): Promise<void> {
   getDocumentManager().clearPendingWrites()
 
   const deps = await initVaultIndex(vaultPath)
+
+  // Keep the index live: watcher batches re-parse changed .md files into the
+  // same VaultIndex/SearchEngine the MCP facade queries (frozen-at-open bug).
+  setVaultBatchListener(createLiveIndexUpdater(deps))
+
   mcpLifecycle.createForVault(vaultPath, {
     ...deps,
     documentManager: getDocumentManager()
+  })
+
+  // Serve the gated tools to external MCP clients on localhost. A listen
+  // failure must not fail vault init — status just reports not-running.
+  void mcpLifecycle.startTransport().catch((err) => {
+    console.error('[mcp] failed to start HTTP transport', err)
   })
 
   const monitor = new PtyMonitor(vaultPath, getShellService().getPtyService())
@@ -367,6 +382,9 @@ app.whenReady().then(() => {
   typedHandle('app:reveal-logs', () => {
     shell.showItemInFolder(resolveMainLogFilePath())
   })
+
+  // MCP endpoint status for the Settings surface (running, URL, tool count).
+  typedHandle('mcp:status', () => mcpLifecycle.status())
 
   registerConfigIpc()
   registerFilesystemIpc()

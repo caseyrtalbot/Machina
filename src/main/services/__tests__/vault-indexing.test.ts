@@ -4,11 +4,18 @@
  *
  * This is the main-process indexing pipeline that feeds MCP queries.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { buildVaultDeps, initVaultIndex } from '../vault-indexing'
+import {
+  buildVaultDeps,
+  initVaultIndex,
+  applyFileToIndex,
+  removeFileFromIndex,
+  applyIndexEvents,
+  createLiveIndexUpdater
+} from '../vault-indexing'
 
 const HELLO_MD = [
   '---',
@@ -111,6 +118,118 @@ describe('buildVaultDeps', () => {
 
     // Should have at least the valid file
     expect(deps.vaultIndex.getArtifacts().length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('live index updates', () => {
+  it('applyFileToIndex adds a new file to both index and search', () => {
+    const deps = buildVaultDeps([])
+
+    applyFileToIndex(deps, 'notes/hello.md', HELLO_MD)
+
+    expect(deps.vaultIndex.getArtifact('hello')).toBeDefined()
+    expect(deps.searchEngine.search('greeting')[0]?.title).toBe('Hello')
+  })
+
+  it('applyFileToIndex replaces prior content for the same path', () => {
+    const deps = buildVaultDeps([{ path: 'notes/hello.md', content: HELLO_MD }])
+
+    const updated = HELLO_MD.replace('A note about greetings.', 'Now about farewells.')
+    applyFileToIndex(deps, 'notes/hello.md', updated)
+
+    expect(deps.vaultIndex.getArtifacts()).toHaveLength(1)
+    expect(deps.searchEngine.search('farewells')).toHaveLength(1)
+    expect(deps.vaultIndex.getArtifact('hello')?.body).toContain('farewells')
+  })
+
+  it('applyFileToIndex removes the stale search doc when the artifact id changes', () => {
+    const deps = buildVaultDeps([{ path: 'notes/hello.md', content: HELLO_MD }])
+
+    const renamed = HELLO_MD.replace('id: hello', 'id: hola')
+    applyFileToIndex(deps, 'notes/hello.md', renamed)
+
+    expect(deps.vaultIndex.getArtifact('hello')).toBeUndefined()
+    expect(deps.vaultIndex.getArtifact('hola')).toBeDefined()
+    const hits = deps.searchEngine.search('greeting')
+    expect(hits).toHaveLength(1)
+    expect(hits[0].id).toBe('hola')
+  })
+
+  it('removeFileFromIndex drops a file from both index and search', () => {
+    const deps = buildVaultDeps([
+      { path: 'notes/hello.md', content: HELLO_MD },
+      { path: 'notes/world.md', content: WORLD_MD }
+    ])
+
+    removeFileFromIndex(deps, 'notes/hello.md')
+
+    expect(deps.vaultIndex.getArtifact('hello')).toBeUndefined()
+    expect(deps.searchEngine.search('greeting')).toHaveLength(0)
+    expect(deps.vaultIndex.getArtifact('world')).toBeDefined()
+  })
+
+  describe('applyIndexEvents (watcher batches)', () => {
+    let vaultRoot: string
+
+    beforeEach(() => {
+      const base = join(tmpdir(), `vi-live-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      mkdirSync(join(base, 'notes'), { recursive: true })
+      writeFileSync(join(base, 'notes', 'hello.md'), HELLO_MD)
+      vaultRoot = realpathSync(base)
+    })
+
+    afterEach(() => {
+      rmSync(vaultRoot, { recursive: true, force: true })
+    })
+
+    it('add and change events read from disk into the index', async () => {
+      const deps = buildVaultDeps([])
+      const helloPath = join(vaultRoot, 'notes', 'hello.md')
+
+      await applyIndexEvents(deps, [{ path: helloPath, event: 'add' }])
+      expect(deps.searchEngine.search('greeting')[0]?.path).toBe(helloPath)
+
+      writeFileSync(helloPath, HELLO_MD.replace('A note about greetings.', 'Changed on disk.'))
+      await applyIndexEvents(deps, [{ path: helloPath, event: 'change' }])
+      expect(deps.searchEngine.search('changed')).toHaveLength(1)
+    })
+
+    it('unlink events remove the file; non-md and unreadable paths are handled', async () => {
+      const helloPath = join(vaultRoot, 'notes', 'hello.md')
+      const deps = buildVaultDeps([{ path: helloPath, content: HELLO_MD }])
+
+      await applyIndexEvents(deps, [
+        { path: join(vaultRoot, 'notes', 'image.png'), event: 'add' },
+        { path: join(vaultRoot, 'notes', 'gone-already.md'), event: 'change' },
+        { path: helloPath, event: 'unlink' }
+      ])
+
+      expect(deps.vaultIndex.getArtifacts()).toHaveLength(0)
+      expect(deps.searchEngine.search('greeting')).toHaveLength(0)
+    })
+
+    it('a change event for a file deleted before the read drops it from the index', async () => {
+      const helloPath = join(vaultRoot, 'notes', 'hello.md')
+      const deps = buildVaultDeps([{ path: helloPath, content: HELLO_MD }])
+
+      rmSync(helloPath)
+      await applyIndexEvents(deps, [{ path: helloPath, event: 'change' }])
+
+      expect(deps.vaultIndex.getArtifact('hello')).toBeUndefined()
+      expect(deps.searchEngine.search('greeting')).toHaveLength(0)
+    })
+
+    it('createLiveIndexUpdater applies batches fire-and-forget', async () => {
+      const deps = buildVaultDeps([])
+      const updater = createLiveIndexUpdater(deps)
+      const helloPath = join(vaultRoot, 'notes', 'hello.md')
+
+      updater([{ path: helloPath, event: 'add' }])
+
+      await vi.waitFor(() => {
+        expect(deps.searchEngine.search('greeting')).toHaveLength(1)
+      })
+    })
   })
 })
 

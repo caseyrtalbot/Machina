@@ -1,4 +1,5 @@
 import { VaultWatcher } from '../services/vault-watcher'
+import type { BatchedEvent } from '../services/event-batcher'
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getIgnorePatterns } from '../utils/vault-config'
 import { getDocumentManager } from './documents'
@@ -6,6 +7,16 @@ import { getMainWindow } from '../window-registry'
 import { recordFileChange } from './health'
 
 const watcher = new VaultWatcher()
+
+type BatchListener = (events: readonly BatchedEvent[]) => void
+
+// Optional main-process subscriber for watcher batches (live MCP vault index).
+// Module-level so it survives watcher restarts; set from reconfigureForVault.
+let batchListener: BatchListener | null = null
+
+export function setVaultBatchListener(listener: BatchListener | null): void {
+  batchListener = listener
+}
 
 export function registerWatcherIpc(): void {
   typedHandle('vault:watch-start', async (args) => {
@@ -30,6 +41,9 @@ export function registerWatcherIpc(): void {
         }
 
         recordFileChange()
+
+        // Keep the main-process MCP index live (search/graph/ghosts).
+        batchListener?.(events)
       },
       customPatterns
     )

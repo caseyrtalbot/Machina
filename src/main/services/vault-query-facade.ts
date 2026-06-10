@@ -8,6 +8,7 @@ import { readFile, stat, open } from 'node:fs/promises'
 import matter from 'gray-matter'
 import { PathGuardError } from '@shared/agent-types'
 import { writeStampedNote } from '../utils/note-write'
+import { applyFileToIndex } from './vault-indexing'
 import type { PathGuard } from './path-guard'
 import type { AuditLogger } from './audit-logger'
 import type { SearchEngine, SearchHit } from '@shared/engine/search-engine'
@@ -165,6 +166,10 @@ export class VaultQueryFacade {
     // with the native agent tools so both write paths use one implementation.
     await writeStampedNote(resolved, content, opts.agentId, this.documentManager)
 
+    // Read-your-writes: refresh the live index immediately so a follow-up
+    // search/graph query sees this write before the watcher echo lands.
+    this.refreshIndex(resolved, content)
+
     this.logger.log({
       ts: new Date().toISOString(),
       tool: 'vault.write_file',
@@ -223,6 +228,10 @@ export class VaultQueryFacade {
       await fh.close()
     }
 
+    // Read-your-writes: refresh the live index immediately so a follow-up
+    // search/graph query sees this create before the watcher echo lands.
+    this.refreshIndex(resolved, stamped)
+
     this.logger.log({
       ts: new Date().toISOString(),
       tool: 'vault.create_file',
@@ -231,6 +240,24 @@ export class VaultQueryFacade {
       decision: 'allowed',
       durationMs: Date.now() - start
     })
+  }
+
+  /**
+   * Mirror a successful write into the live VaultIndex + SearchEngine.
+   * The watcher echo re-indexes the on-disk content ~350ms later; this
+   * inline update closes the gap so agents see their own writes.
+   */
+  private refreshIndex(resolved: string, content: string): void {
+    if (!this.vaultIndex) return
+    if (this.searchEngine) {
+      applyFileToIndex(
+        { vaultIndex: this.vaultIndex, searchEngine: this.searchEngine },
+        resolved,
+        content
+      )
+    } else {
+      this.vaultIndex.updateFile(resolved, content)
+    }
   }
 
   search(query: string, limit?: number): readonly SearchHit[] {

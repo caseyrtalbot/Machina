@@ -33,7 +33,9 @@ export interface IpcChannels {
   'vault:read-config': { request: { vaultPath: string }; response: VaultConfig }
   'vault:read-state': { request: { vaultPath: string }; response: VaultState }
   'vault:write-state': { request: { vaultPath: string; state: VaultState }; response: void }
-  'vault:init': { request: { vaultPath: string }; response: void }
+  // Response is the canonicalized vault root (symlinks resolved, NFC) so the
+  // renderer, watcher, and main-process index share one path namespace.
+  'vault:init': { request: { vaultPath: string }; response: string }
   'vault:list-system-artifacts': {
     request: { vaultPath: string; kind?: SystemArtifactKind }
     response: string[]
@@ -134,6 +136,19 @@ export interface IpcChannels {
   // --- Claude Status ---
   'claude:get-status': { request: void; response: ClaudeStatus }
   'claude:recheck': { request: void; response: ClaudeStatus }
+
+  // --- MCP server ---
+  // Status of the in-process MCP endpoint (Streamable HTTP on localhost).
+  // url is the address external clients connect to; null while not running.
+  'mcp:status': {
+    request: void
+    response: {
+      running: boolean
+      toolCount: number
+      url: string | null
+      vaultRoot: string | null
+    }
+  }
 
   // --- Canvas ---
   'canvas:get-snapshot': {
