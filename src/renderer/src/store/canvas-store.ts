@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CanvasNode, CanvasEdge, CanvasViewport, CanvasFile } from '@shared/canvas-types'
 import { getDefaultMetadata } from '@shared/canvas-types'
+import { sessionId } from '@shared/types'
 import { applyPlanOps } from '@shared/canvas-mutation-types'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import type { OntologySnapshot, OntologyLayoutResult, GroupId } from '@shared/engine/ontology-types'
@@ -251,7 +252,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   addNode: (node) => set((s) => ({ nodes: [...s.nodes, node], isDirty: true })),
 
-  removeNode: (id) =>
+  removeNode: (id) => {
+    const removed = get().nodes.find((n) => n.id === id)
+    // Canvas-level delete must not orphan the live PTY behind a terminal card.
+    if (removed?.type === 'terminal' && removed.content) {
+      window.api?.terminal?.kill(sessionId(removed.content))
+    }
     set((s) => {
       const selectedNodeIds = new Set(s.selectedNodeIds)
       selectedNodeIds.delete(id)
@@ -259,9 +265,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         nodes: s.nodes.filter((n) => n.id !== id),
         edges: s.edges.filter((e) => e.fromNode !== id && e.toNode !== id),
         selectedNodeIds,
+        focusedCardId: s.focusedCardId === id ? null : s.focusedCardId,
+        lockedCardId: s.lockedCardId === id ? null : s.lockedCardId,
+        focusedTerminalId: s.focusedTerminalId === id ? null : s.focusedTerminalId,
         isDirty: true
       }
-    }),
+    })
+  },
 
   moveNode: (id, position) =>
     set((s) => ({
@@ -306,9 +316,18 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   updateNodeType: (id, type) =>
     set((s) => ({
-      nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, type, content: '', metadata: getDefaultMetadata(type) } : n
-      ),
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id) return n
+        // Preserve content across conversions; a terminal's content is a
+        // session id, meaningless on either side of a conversion.
+        const wipeContent = type === 'terminal' || n.type === 'terminal'
+        return {
+          ...n,
+          type,
+          content: wipeContent ? '' : n.content,
+          metadata: getDefaultMetadata(type)
+        }
+      }),
       isDirty: true
     })),
 

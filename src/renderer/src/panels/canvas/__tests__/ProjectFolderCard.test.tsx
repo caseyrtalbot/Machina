@@ -92,20 +92,12 @@ describe('ProjectFolderCard', () => {
     expect(screen.queryByTestId('folder-path')).toBeNull()
   })
 
-  it('shows open folder icon when not collapsed', async () => {
+  it('shows the folder icon', async () => {
     const mod = await import('../ProjectFolderCard')
     const ProjectFolderCard = mod.default
-    render(<ProjectFolderCard node={makeFolderNode({ collapsed: false })} />)
+    render(<ProjectFolderCard node={makeFolderNode()} />)
 
     expect(screen.getByTestId('folder-icon').textContent).toBe('\u{1F4C2}')
-  })
-
-  it('shows closed folder icon when collapsed', async () => {
-    const mod = await import('../ProjectFolderCard')
-    const ProjectFolderCard = mod.default
-    render(<ProjectFolderCard node={makeFolderNode({ collapsed: true })} />)
-
-    expect(screen.getByTestId('folder-icon').textContent).toBe('\u{1F4C1}')
   })
 
   it('renders without crashing when metadata is empty', async () => {

@@ -1,7 +1,12 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
-import type { CommandStack } from './canvas-commands'
+import {
+  layoutCommand,
+  removeEdgeCommand,
+  removeNodesCommand,
+  type CommandStack
+} from './canvas-commands'
 import { createNoteAtCursor } from './create-note-at-cursor'
 
 interface CanvasKeyboardShortcutOptions {
@@ -82,13 +87,16 @@ export function useCanvasKeyboardShortcuts({
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const { selectedEdgeId, removeEdge, selectedNodeIds, removeNode } =
-          useCanvasStore.getState()
+        const { selectedEdgeId, selectedNodeIds } = useCanvasStore.getState()
         if (isEditingSurfaceActive()) return
 
-        if (selectedEdgeId) removeEdge(selectedEdgeId)
+        if (selectedEdgeId) {
+          const cmd = removeEdgeCommand(selectedEdgeId)
+          if (cmd) commandStack.current.execute(cmd)
+        }
         if (selectedNodeIds.size > 0) {
-          for (const id of selectedNodeIds) removeNode(id)
+          const cmd = removeNodesCommand([...selectedNodeIds])
+          if (cmd) commandStack.current.execute(cmd)
         }
       }
 
@@ -121,7 +129,7 @@ export function useCanvasKeyboardShortcuts({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [containerRef])
+  }, [commandStack, containerRef])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -161,9 +169,15 @@ export function useCanvasKeyboardShortcuts({
           const { artifacts, graph, fileToId } = useVaultStore.getState()
           const fileToIdMap = new Map(Object.entries(fileToId))
           const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
-          useCanvasStore.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+          const cmd = layoutCommand(() =>
+            useCanvasStore.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+          )
+          if (cmd) commandStack.current.execute(cmd)
         } else {
-          useCanvasStore.getState().applyTileLayout('grid-2x2', center)
+          const cmd = layoutCommand(() =>
+            useCanvasStore.getState().applyTileLayout('grid-2x2', center)
+          )
+          if (cmd) commandStack.current.execute(cmd)
         }
       }
     }

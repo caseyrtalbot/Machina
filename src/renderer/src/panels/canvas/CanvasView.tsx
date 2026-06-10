@@ -17,7 +17,7 @@ import { CardShellSkeleton } from './CardShellSkeleton'
 import { CardLodPreview } from './CardLodPreview'
 import { EdgeLayer } from './EdgeLayer'
 import { ConnectionDragOverlay } from './ConnectionDragOverlay'
-import { CommandStack } from './canvas-commands'
+import { clearCanvasCommand, CommandStack, setActiveCommandStack } from './canvas-commands'
 import { CommandStackProvider } from './command-stack-context'
 import { CanvasToolbar } from './CanvasToolbar'
 import { CanvasMinimap } from './CanvasMinimap'
@@ -98,6 +98,14 @@ export function CanvasView({
   useCanvasCardAddedListener(canvasId)
   useCanvasFileLifecycle(canvasId)
   useCanvasKeyboardShortcuts({ commandStack, containerRef, setImportOpen })
+
+  // Register the stack so non-React call sites (drag-end, connection overlay,
+  // card shells, toolbar menus) can push undoable commands.
+  useEffect(() => {
+    const stack = commandStack.current
+    setActiveCommandStack(stack)
+    return () => setActiveCommandStack(null)
+  }, [])
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
@@ -472,18 +480,7 @@ export function CanvasView({
             onOrganize={ontology.startOrganize}
             organizePhase={ontology.phase}
             onClear={() => {
-              useCanvasStore.setState({
-                nodes: [],
-                edges: [],
-                selectedNodeIds: new Set(),
-                selectedEdgeId: null,
-                focusedCardId: null,
-                lockedCardId: null,
-                ontologySnapshot: null,
-                ontologyLayout: null,
-                ontologyIsStale: false,
-                isDirty: true
-              })
+              commandStack.current.execute(clearCanvasCommand())
             }}
           />
           <CanvasSurface

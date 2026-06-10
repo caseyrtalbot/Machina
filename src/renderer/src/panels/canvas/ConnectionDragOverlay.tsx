@@ -8,6 +8,7 @@ import {
   type CanvasNode
 } from '@shared/canvas-types'
 import { colors, EDGE_KIND_COLORS } from '../../design/tokens'
+import { addEdgeCommand, addNodeWithEdgeCommand, getActiveCommandStack } from './canvas-commands'
 
 interface DragState {
   fromNodeId: string
@@ -20,7 +21,6 @@ interface DragState {
 // Ref-based event bus avoids stale closures in callbacks
 const dragRef: { current: DragState | null } = { current: null }
 let setDragFn: ((state: DragState | null) => void) | null = null
-let addEdgeFn: ((edge: ReturnType<typeof createCanvasEdge>) => void) | null = null
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function isConnectionDragActive(): boolean {
@@ -50,7 +50,10 @@ export function endConnectionDrag(toNodeId: string, toSide: CanvasSide): void {
   const drag = dragRef.current
   if (!drag) return
   if (drag.fromNodeId !== toNodeId) {
-    addEdgeFn?.(createCanvasEdge(drag.fromNodeId, toNodeId, drag.fromSide, toSide, drag.edgeKind))
+    const edge = createCanvasEdge(drag.fromNodeId, toNodeId, drag.fromSide, toSide, drag.edgeKind)
+    const stack = getActiveCommandStack()
+    if (stack) stack.execute(addEdgeCommand(edge))
+    else useCanvasStore.getState().addEdge(edge)
   }
   dragRef.current = null
   setDragFn?.(null)
@@ -136,13 +139,10 @@ function DragPreviewLine({ drag }: { drag: DragState }) {
 
 export function ConnectionDragOverlay() {
   const [drag, setDrag] = useState<DragState | null>(null)
-  const addEdge = useCanvasStore((s) => s.addEdge)
 
-  // Keep the module-level refs in sync
+  // Keep the module-level ref in sync
   // eslint-disable-next-line react-hooks/globals -- module-level event bus pattern for cross-component drag
   setDragFn = setDrag
-  // eslint-disable-next-line react-hooks/globals
-  addEdgeFn = addEdge
 
   useEffect(() => {
     if (!drag) return
@@ -161,7 +161,7 @@ export function ConnectionDragOverlay() {
         const surface = document.querySelector('[data-canvas-surface]')
         if (surface) {
           const surfaceRect = surface.getBoundingClientRect()
-          const { viewport, addNode, addEdge } = useCanvasStore.getState()
+          const { viewport } = useCanvasStore.getState()
 
           // Screen coords → canvas coords
           const canvasX = (e.clientX - surfaceRect.left - viewport.x) / viewport.zoom
@@ -171,7 +171,6 @@ export function ConnectionDragOverlay() {
             x: canvasX - 130,
             y: canvasY - 70
           })
-          addNode(newNode)
 
           // Connect from source side to opposite side on new card
           const oppositeSide: Record<CanvasSide, CanvasSide> = {
@@ -180,15 +179,23 @@ export function ConnectionDragOverlay() {
             left: 'right',
             right: 'left'
           }
-          addEdge(
-            createCanvasEdge(
-              drag.fromNodeId,
-              newNode.id,
-              drag.fromSide,
-              oppositeSide[drag.fromSide],
-              drag.edgeKind
-            )
+          const edge = createCanvasEdge(
+            drag.fromNodeId,
+            newNode.id,
+            drag.fromSide,
+            oppositeSide[drag.fromSide],
+            drag.edgeKind
           )
+
+          // One gesture, one undo step: card + edge together
+          const stack = getActiveCommandStack()
+          if (stack) {
+            stack.execute(addNodeWithEdgeCommand(newNode, edge))
+          } else {
+            const s = useCanvasStore.getState()
+            s.addNode(newNode)
+            s.addEdge(edge)
+          }
         }
       }
       dragRef.current = null

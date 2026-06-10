@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../../store/canvas-store', () => ({
@@ -103,10 +103,37 @@ describe('CanvasToolbar clear button', () => {
     expect(screen.getByTestId('canvas-clear')).toBeTruthy()
   })
 
-  it('calls onClear when clear button is clicked and canvas has nodes', () => {
+  it('arms on first click without clearing, then calls onClear on confirm click', () => {
     const onClear = vi.fn()
     render(<CanvasToolbar {...baseProps} onClear={onClear} />)
-    fireEvent.click(screen.getByTestId('canvas-clear'))
+
+    const button = screen.getByTestId('canvas-clear')
+    fireEvent.click(button)
+    expect(onClear).not.toHaveBeenCalled()
+    expect(button.getAttribute('aria-label')).toBe('Confirm clear canvas')
+
+    fireEvent.click(button)
     expect(onClear).toHaveBeenCalledOnce()
+    expect(button.getAttribute('aria-label')).toBe('Clear canvas')
+  })
+
+  it('disarms after the confirm window times out', () => {
+    vi.useFakeTimers()
+    try {
+      const onClear = vi.fn()
+      render(<CanvasToolbar {...baseProps} onClear={onClear} />)
+
+      const button = screen.getByTestId('canvas-clear')
+      fireEvent.click(button)
+      expect(button.getAttribute('aria-label')).toBe('Confirm clear canvas')
+
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(button.getAttribute('aria-label')).toBe('Clear canvas')
+      expect(onClear).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

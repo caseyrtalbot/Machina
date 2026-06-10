@@ -17,10 +17,9 @@ function lastPathSegment(value: unknown): string | null {
 function ProjectFolderCard({ node }: ProjectFolderCardProps) {
   const removeNode = useCanvasStore((s) => s.removeNode)
 
-  const { relativePath, childCount, collapsed } = node.metadata as {
+  const { relativePath, childCount } = node.metadata as {
     relativePath?: string
     childCount?: number
-    collapsed?: boolean
   }
 
   const folderName =
@@ -44,7 +43,7 @@ function ProjectFolderCard({ node }: ProjectFolderCardProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span data-testid="folder-icon" style={{ fontSize: '16px', opacity: 0.7 }}>
-            {collapsed ? '\u{1F4C1}' : '\u{1F4C2}'}
+            {'\u{1F4C2}'}
           </span>
           <span
             data-testid="folder-name"

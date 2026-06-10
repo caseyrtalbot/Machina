@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { getMinSize, type CanvasNodeType } from '@shared/canvas-types'
 import { perfMark, perfMeasure } from '../../utils/perf-marks'
+import { getActiveCommandStack, moveNodesCommand, resizeNodeCommand } from './canvas-commands'
 
 /** Module-level interaction debounce to prevent timer stacking */
 let interactionTimer: ReturnType<typeof setTimeout> | null = null
@@ -137,9 +138,38 @@ export function useNodeDrag(nodeId: string) {
             mv(nodeId, { x: latestSingleX, y: latestSingleY })
           }
         }
+        const start = dragStart.current
         dragStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
+
+        // Push the completed move onto the command stack so ⌘Z undoes it.
+        // Execute re-applies the end positions already in the store (no-op).
+        const stack = getActiveCommandStack()
+        if (start && stack) {
+          const current = useCanvasStore.getState().nodes
+          const before = new Map<string, { x: number; y: number }>()
+          const after = new Map<string, { x: number; y: number }>()
+          if (start.groupPositions.size > 1) {
+            for (const [id, pos] of start.groupPositions) {
+              const n = current.find((cn) => cn.id === id)
+              if (!n) continue
+              before.set(id, pos)
+              after.set(id, { x: n.position.x, y: n.position.y })
+            }
+          } else {
+            const n = current.find((cn) => cn.id === nodeId)
+            if (n) {
+              before.set(nodeId, { x: start.nx, y: start.ny })
+              after.set(nodeId, { x: n.position.x, y: n.position.y })
+            }
+          }
+          const moved = [...after].some(([id, pos]) => {
+            const b = before.get(id)
+            return !b || b.x !== pos.x || b.y !== pos.y
+          })
+          if (moved) stack.execute(moveNodesCommand(before, after))
+        }
         perfMeasure('canvas-drag', 'drag-start')
       }
 
@@ -212,9 +242,25 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
             height: latestHeight
           })
         }
+        const start = resizeStart.current
         resizeStart.current = null
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
+
+        // Push the completed resize onto the command stack so ⌘Z undoes it.
+        const stack = getActiveCommandStack()
+        if (start && stack) {
+          const n = useCanvasStore.getState().nodes.find((cn) => cn.id === nodeId)
+          if (n && (n.size.width !== start.w || n.size.height !== start.h)) {
+            stack.execute(
+              resizeNodeCommand(
+                nodeId,
+                { width: start.w, height: start.h },
+                { width: n.size.width, height: n.size.height }
+              )
+            )
+          }
+        }
         for (const webview of webviews) {
           webview.style.pointerEvents = previousPointerEvents.get(webview) ?? ''
         }

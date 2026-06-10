@@ -16,6 +16,17 @@ interface NoteCardProps {
   node: CanvasNode
 }
 
+/**
+ * Strip YAML frontmatter for display. Only strips when the document begins
+ * with `---` on its own line and the closing `---` sits at the start of a
+ * line — a `---` horizontal rule mid-document is left alone.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, exported for tests
+export function stripFrontmatterForDisplay(content: string): string {
+  const match = /^---\r?\n(?:[\s\S]*?\r?\n)?---(?:\r?\n|$)/.exec(content)
+  return (match ? content.slice(match[0].length) : content).trim()
+}
+
 export function NoteCard({ node }: NoteCardProps) {
   const [body, setBody] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -58,6 +69,17 @@ export function NoteCard({ node }: NoteCardProps) {
     }
   }, [])
 
+  // Single loader shared by initial load and vault-change reloads
+  const loadBody = useCallback(async () => {
+    try {
+      const content = await window.api.fs.readFile(filePath)
+      setBody(stripFrontmatterForDisplay(content))
+    } catch (err) {
+      logError('note-card-load', err)
+      setBody('Failed to load note')
+    }
+  }, [filePath])
+
   // Load file content
   useEffect(() => {
     if (!filePath) {
@@ -65,39 +87,18 @@ export function NoteCard({ node }: NoteCardProps) {
       return
     }
     setLoading(true)
-    window.api.fs
-      .readFile(filePath)
-      .then((content: string) => {
-        // Strip frontmatter for display
-        const fmEnd = content.indexOf('---', content.indexOf('---') + 3)
-        const bodyStart = fmEnd > 0 ? fmEnd + 3 : 0
-        setBody(content.slice(bodyStart).trim())
-        setLoading(false)
-      })
-      .catch(() => {
-        setBody('Failed to load note')
-        setLoading(false)
-      })
-  }, [filePath])
+    void loadBody().finally(() => setLoading(false))
+  }, [filePath, loadBody])
 
   // Re-read on vault file changes (reactive)
   useEffect(() => {
     const unsub = vaultEvents.subscribePath(filePath, (data) => {
-      if (data.event === 'change') {
-        window.api.fs
-          .readFile(filePath)
-          .then((content: string) => {
-            const fmEnd = content.indexOf('---', content.indexOf('---') + 3)
-            const bodyStart = fmEnd > 0 ? fmEnd + 3 : 0
-            setBody(content.slice(bodyStart).trim())
-          })
-          .catch((err) => logError('note-card-reload', err))
-      }
+      if (data.event === 'change') void loadBody()
     })
     return () => {
       unsub()
     }
-  }, [filePath])
+  }, [filePath, loadBody])
 
   // Auto-scroll past badge + metadata to reveal the title on first load
   const scrollRef = useRef<HTMLDivElement>(null)

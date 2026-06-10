@@ -16,6 +16,7 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useSettingsStore } from '../../store/settings-store'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
+import { getActiveCommandStack, layoutCommand } from './canvas-commands'
 import { colors, zIndex } from '../../design/tokens'
 
 interface CanvasToolbarProps {
@@ -193,12 +194,20 @@ export function CanvasToolbar({
   const [tileMenuOpen, setTileMenuOpen] = useState(false)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
   const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
   const zoomMenuRef = useRef<HTMLDivElement>(null)
 
   const hasSelection = selectedNodeIds.size > 0
   const clearEnabled = hasNodes
+
+  // Two-click clear: first click arms, second confirms; disarm after 3s.
+  useEffect(() => {
+    if (!confirmClear) return
+    const timer = setTimeout(() => setConfirmClear(false), 3000)
+    return () => clearTimeout(timer)
+  }, [confirmClear])
 
   useEffect(() => {
     if (!tileMenuOpen && !envMenuOpen && !zoomMenuOpen) return
@@ -527,9 +536,16 @@ export function CanvasToolbar({
                 const { artifacts, graph, fileToId } = useVaultStore.getState()
                 const fileToIdMap = new Map(Object.entries(fileToId))
                 const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
-                useCanvasStore
-                  .getState()
-                  .applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+                const cmd = layoutCommand(() =>
+                  useCanvasStore
+                    .getState()
+                    .applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+                )
+                if (cmd) {
+                  const stack = getActiveCommandStack()
+                  if (stack) stack.execute(cmd)
+                  else void cmd.execute()
+                }
                 setTileMenuOpen(false)
               }}
             >
@@ -542,9 +558,16 @@ export function CanvasToolbar({
                 className="sidebar-popover-item"
                 style={{ color: colors.text.secondary }}
                 onClick={() => {
-                  useCanvasStore
-                    .getState()
-                    .applyTileLayout(p.id as TilePattern, getViewportCenter())
+                  const cmd = layoutCommand(() =>
+                    useCanvasStore
+                      .getState()
+                      .applyTileLayout(p.id as TilePattern, getViewportCenter())
+                  )
+                  if (cmd) {
+                    const stack = getActiveCommandStack()
+                    if (stack) stack.execute(cmd)
+                    else void cmd.execute()
+                  }
                   setTileMenuOpen(false)
                 }}
               >
@@ -608,26 +631,33 @@ export function CanvasToolbar({
 
       <div className="canvas-toolrail__divider" />
 
-      {/* DESTRUCTIVE: burn it down */}
+      {/* DESTRUCTIVE: burn it down (two-click confirm) */}
       <div className="canvas-toolbtn-wrap">
         <button
           onClick={() => {
-            if (clearEnabled) onClear()
+            if (!clearEnabled) return
+            if (confirmClear) {
+              setConfirmClear(false)
+              onClear()
+            } else {
+              setConfirmClear(true)
+            }
           }}
           className="canvas-toolbtn"
           disabled={!clearEnabled}
           data-testid="canvas-clear"
-          aria-label="Clear canvas"
+          aria-label={confirmClear ? 'Confirm clear canvas' : 'Clear canvas'}
+          style={confirmClear ? { color: colors.claude.error } : undefined}
           onMouseEnter={(e) => {
             if (clearEnabled) e.currentTarget.style.color = colors.claude.error
           }}
           onMouseLeave={(e) => {
-            if (clearEnabled) e.currentTarget.style.color = ''
+            if (clearEnabled && !confirmClear) e.currentTarget.style.color = ''
           }}
         >
           <ToolIcon icon={Trash2} />
         </button>
-        <Tip label="Clear canvas" />
+        <Tip label={confirmClear ? 'Clear? Click again to confirm' : 'Clear canvas'} />
       </div>
     </div>
   )

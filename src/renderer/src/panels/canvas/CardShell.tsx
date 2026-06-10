@@ -18,6 +18,11 @@ import {
   isConnectionDragActive
 } from './ConnectionDragOverlay'
 import {
+  convertNodeTypeCommand,
+  getActiveCommandStack,
+  removeNodeViaCallback
+} from './canvas-commands'
+import {
   CARD_TYPE_INFO,
   type CanvasNode,
   type CanvasNodeType,
@@ -122,7 +127,12 @@ function ConvertMenu({
             }}
             onClick={(e) => {
               e.stopPropagation()
-              useCanvasStore.getState().updateNodeType(nodeId, target)
+              const cmd = convertNodeTypeCommand(nodeId, target)
+              if (cmd) {
+                const stack = getActiveCommandStack()
+                if (stack) stack.execute(cmd)
+                else void cmd.execute()
+              }
               onClose()
             }}
           >
@@ -297,6 +307,15 @@ export function CardShell({
     },
     [node.id]
   )
+
+  // Route close through the command stack so ⌘Z restores the card (and its
+  // edges). The card's own onClose still runs — terminal cards kill their PTY.
+  const handleClose = useCallback(() => {
+    const stack = getActiveCommandStack()
+    const cmd = stack ? removeNodeViaCallback(node.id, onClose) : null
+    if (stack && cmd) stack.execute(cmd)
+    else onClose()
+  }, [node.id, onClose])
 
   return (
     <div
@@ -497,7 +516,7 @@ export function CardShell({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onClose()
+              handleClose()
             }}
             className="canvas-card__action-btn tile-close-btn flex items-center justify-center rounded"
             style={{
