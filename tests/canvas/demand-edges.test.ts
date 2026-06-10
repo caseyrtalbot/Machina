@@ -17,7 +17,7 @@ describe('showAllEdges', () => {
     expect(useCanvasStore.getState().showAllEdges).toBe(false)
   })
 
-  it('resets to false on loadCanvas', () => {
+  it('defaults to false on loadCanvas when the file has no showAllEdges', () => {
     useCanvasStore.getState().toggleShowAllEdges()
     expect(useCanvasStore.getState().showAllEdges).toBe(true)
 
@@ -29,10 +29,26 @@ describe('showAllEdges', () => {
     expect(useCanvasStore.getState().showAllEdges).toBe(false)
   })
 
-  it('is not included in toCanvasFile output', () => {
+  it('restores showAllEdges from the loaded file', () => {
+    useCanvasStore.getState().loadCanvas('test.canvas', {
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      showAllEdges: true
+    })
+    expect(useCanvasStore.getState().showAllEdges).toBe(true)
+  })
+
+  it('is persisted via toCanvasFile', () => {
     useCanvasStore.getState().toggleShowAllEdges()
     const file = useCanvasStore.getState().toCanvasFile()
-    expect(file).not.toHaveProperty('showAllEdges')
+    expect(file.showAllEdges).toBe(true)
+  })
+
+  it('toggling marks the canvas dirty so the toggle persists', () => {
+    expect(useCanvasStore.getState().isDirty).toBe(false)
+    useCanvasStore.getState().toggleShowAllEdges()
+    expect(useCanvasStore.getState().isDirty).toBe(true)
   })
 })
 

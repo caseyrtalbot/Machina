@@ -4,6 +4,8 @@ import { getDefaultMetadata } from '@shared/canvas-types'
 import { sessionId } from '@shared/types'
 import { applyPlanOps } from '@shared/canvas-mutation-types'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
+import { validateCanvasMutationOps } from '@shared/canvas-mutation-validation'
+import { notifyError } from '../utils/error-logger'
 import type { OntologySnapshot, OntologyLayoutResult, GroupId } from '@shared/engine/ontology-types'
 import { spatialSort, nextCard, prevCard } from '../panels/canvas/canvas-spatial-nav'
 import {
@@ -20,6 +22,12 @@ interface CanvasStore {
   readonly edges: readonly CanvasEdge[]
   readonly viewport: CanvasViewport
   readonly isDirty: boolean
+  // Monotonic mutation counter: markSaved(version) no-ops when a mutation
+  // landed while a save was in flight, so it is never flipped clean and lost.
+  readonly dirtyVersion: number
+  // Viewport as last loaded from / saved to disk. Pan/zoom never dirties the
+  // canvas; the autosaver compares against this on pan-end and quit instead.
+  readonly savedViewport: CanvasViewport | null
 
   // Focus Frames: named viewport positions (tmux-style CMD+1-5)
   readonly focusFrames: Readonly<Record<string, CanvasViewport>>
@@ -37,7 +45,7 @@ interface CanvasStore {
   // Interaction state
   readonly isInteracting: boolean
   readonly hoveredNodeId: string | null
-  // Edge visibility: session-only, not persisted
+  // Edge visibility: persisted per canvas file
   readonly showAllEdges: boolean
   readonly focusedTerminalId: string | null
   // Newly pinned nodes get a transient pulse animation; cleared after the
@@ -71,7 +79,7 @@ interface CanvasStore {
   // Document lifecycle
   loadCanvas: (filePath: string, data: CanvasFile) => void
   closeCanvas: () => void
-  markSaved: () => void
+  markSaved: (version: number, savedViewport: CanvasViewport) => void
 
   // Node mutations
   addNode: (node: CanvasNode) => void
@@ -162,12 +170,22 @@ interface CanvasStore {
 
 const INITIAL_VIEWPORT: CanvasViewport = { x: 0, y: 0, zoom: 1 }
 
+/** Marks the canvas dirty and advances the monotonic save version. */
+function dirty(s: { readonly dirtyVersion: number }): {
+  isDirty: true
+  dirtyVersion: number
+} {
+  return { isDirty: true, dirtyVersion: s.dirtyVersion + 1 }
+}
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   filePath: null,
   nodes: [],
   edges: [],
   viewport: INITIAL_VIEWPORT,
   isDirty: false,
+  dirtyVersion: 0,
+  savedViewport: null,
   focusFrames: {},
   selectedNodeIds: new Set(),
   selectedEdgeId: null,
@@ -189,35 +207,42 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setPendingFolderMap: (path) => set({ pendingFolderMap: path }),
 
   loadCanvas: (filePath, data) =>
-    set({
+    set((s) => ({
       filePath,
       nodes: data.nodes,
       edges: data.edges,
       viewport: data.viewport,
       focusFrames: data.focusFrames ?? {},
       isDirty: false,
+      // Advance the version so an in-flight save of the previous canvas
+      // cannot markSaved this one.
+      dirtyVersion: s.dirtyVersion + 1,
+      savedViewport: data.viewport,
       selectedNodeIds: new Set(),
       selectedEdgeId: null,
       focusedCardId: null,
       lockedCardId: null,
       hoveredNodeId: null,
-      showAllEdges: false,
+      showAllEdges: data.showAllEdges ?? false,
       focusedTerminalId: null,
       recentlyPinnedNodeIds: new Set(),
       cardContextMenu: null,
       ontologySnapshot: data.ontologySnapshot ?? null,
       ontologyLayout: data.ontologyLayout ?? null,
       ontologyIsStale: false
-    }),
+    })),
 
   closeCanvas: () =>
-    set({
+    set((s) => ({
       filePath: null,
       nodes: [],
       edges: [],
       viewport: INITIAL_VIEWPORT,
       focusFrames: {},
       isDirty: false,
+      dirtyVersion: s.dirtyVersion + 1,
+      savedViewport: null,
+      showAllEdges: false,
       selectedNodeIds: new Set(),
       selectedEdgeId: null,
       focusedCardId: null,
@@ -229,9 +254,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       ontologySnapshot: null,
       ontologyLayout: null,
       ontologyIsStale: false
-    }),
+    })),
 
-  markSaved: () => set({ isDirty: false }),
+  // No-ops when a mutation advanced the version mid-save: the canvas stays
+  // dirty so the autosaver retries instead of silently dropping the mutation.
+  markSaved: (version, savedViewport) =>
+    set((s) => (s.dirtyVersion === version ? { isDirty: false, savedViewport } : s)),
 
   markRecentlyPinned: (id) => {
     set((s) => {
@@ -250,7 +278,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }, 1400)
   },
 
-  addNode: (node) => set((s) => ({ nodes: [...s.nodes, node], isDirty: true })),
+  addNode: (node) => set((s) => ({ nodes: [...s.nodes, node], ...dirty(s) })),
 
   removeNode: (id) => {
     const removed = get().nodes.find((n) => n.id === id)
@@ -268,7 +296,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         focusedCardId: s.focusedCardId === id ? null : s.focusedCardId,
         lockedCardId: s.lockedCardId === id ? null : s.lockedCardId,
         focusedTerminalId: s.focusedTerminalId === id ? null : s.focusedTerminalId,
-        isDirty: true
+        ...dirty(s)
       }
     })
   },
@@ -277,7 +305,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, position } : n)),
       clusterLabels: [],
-      isDirty: true
+      ...dirty(s)
     })),
 
   moveNodes: (updates) =>
@@ -287,19 +315,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         return pos ? { ...n, position: pos } : n
       }),
       clusterLabels: [],
-      isDirty: true
+      ...dirty(s)
     })),
 
   resizeNode: (id, size) =>
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, size } : n)),
-      isDirty: true
+      ...dirty(s)
     })),
 
   updateNodeContent: (id, content) =>
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, content } : n)),
-      isDirty: true
+      ...dirty(s)
     })),
 
   updateNodeMetadata: (id, partial) => {
@@ -310,7 +338,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       nodes: s.nodes.map((n) =>
         n.id === id ? { ...n, metadata: { ...n.metadata, ...partial } } : n
       ),
-      isDirty: ephemeralOnly ? s.isDirty : true
+      ...(ephemeralOnly ? {} : dirty(s))
     }))
   },
 
@@ -328,29 +356,43 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           metadata: getDefaultMetadata(type)
         }
       }),
-      isDirty: true
+      ...dirty(s)
     })),
 
   addNodesAndEdges: (nodes, edges) =>
     set((s) => ({
       nodes: [...s.nodes, ...nodes],
       edges: [...s.edges, ...edges],
-      isDirty: true
+      ...dirty(s)
     })),
 
   applyAgentPlan: (plan) =>
     set((s) => {
+      // Re-validate against the LIVE store state (2.2): the main process
+      // validated against the on-disk canvas + mtime, but in-memory mutations
+      // since then (a deleted card, a duplicate id) can invalidate ops. The
+      // main mtime check stays the cross-process freshness gate; this is the
+      // in-process one.
+      const error = validateCanvasMutationOps(plan.ops, s.nodes, s.edges)
+      if (error) {
+        notifyError(
+          'canvas:applyAgentPlan',
+          error,
+          'Agent canvas changes were rejected: the canvas changed while the plan was in flight.'
+        )
+        return s
+      }
       const result = applyPlanOps(s.nodes, s.edges, plan.ops)
-      return { nodes: result.nodes, edges: result.edges, isDirty: true }
+      return { nodes: result.nodes, edges: result.edges, ...dirty(s) }
     }),
 
-  addEdge: (edge) => set((s) => ({ edges: [...s.edges, edge], isDirty: true })),
+  addEdge: (edge) => set((s) => ({ edges: [...s.edges, edge], ...dirty(s) })),
 
   removeEdge: (id) =>
     set((s) => ({
       edges: s.edges.filter((e) => e.id !== id),
       selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
-      isDirty: true
+      ...dirty(s)
     })),
 
   setSelection: (ids) => set({ selectedNodeIds: ids }),
@@ -366,13 +408,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setViewport: (viewport) => set({ viewport }),
 
-  saveFocusFrame: (slot) => {
-    const { viewport, focusFrames } = get()
-    set({
-      focusFrames: { ...focusFrames, [slot]: { ...viewport } },
-      isDirty: true
-    })
-  },
+  saveFocusFrame: (slot) =>
+    set((s) => ({
+      focusFrames: { ...s.focusFrames, [slot]: { ...s.viewport } },
+      ...dirty(s)
+    })),
 
   jumpToFocusFrame: (slot) => {
     const frame = get().focusFrames[slot]
@@ -384,13 +424,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const { focusFrames } = get()
     if (!(slot in focusFrames)) return
     const { [slot]: _removed, ...rest } = focusFrames
-    set({ focusFrames: rest, isDirty: true })
+    set((s) => ({ focusFrames: rest, ...dirty(s) }))
   },
 
   setInteracting: (v) => set({ isInteracting: v }),
   setHoveredNode: (id) => set({ hoveredNodeId: id }),
 
-  toggleShowAllEdges: () => set((s) => ({ showAllEdges: !s.showAllEdges })),
+  toggleShowAllEdges: () => set((s) => ({ showAllEdges: !s.showAllEdges, ...dirty(s) })),
 
   setFocusedTerminal: (id) => set({ focusedTerminalId: id }),
 
@@ -440,7 +480,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         const pos = positions.get(n.id)
         return pos ? { ...n, position: pos } : n
       }),
-      isDirty: true
+      ...dirty(s)
     }))
   },
 
@@ -461,7 +501,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         return pos ? { ...n, position: pos } : n
       }),
       clusterLabels: result.labels,
-      isDirty: true
+      ...dirty(s)
     }))
   },
 
@@ -607,7 +647,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   toCanvasFile: () => {
-    const { nodes, edges, viewport, focusFrames, ontologySnapshot, ontologyLayout } = get()
+    const { nodes, edges, viewport, focusFrames, showAllEdges, ontologySnapshot, ontologyLayout } =
+      get()
     // Only strip isActive (runtime-only). initialCwd and initialCommand
     // persist to disk so terminal cards restore with correct cwd and command.
     const EPHEMERAL_KEYS = new Set(['isActive'])
@@ -622,6 +663,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       edges: [...edges],
       viewport: { ...viewport },
       focusFrames: { ...focusFrames },
+      showAllEdges,
       ...(ontologySnapshot ? { ontologySnapshot } : {}),
       ...(ontologyLayout ? { ontologyLayout } : {})
     }

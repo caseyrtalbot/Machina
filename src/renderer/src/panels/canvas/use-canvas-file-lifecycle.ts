@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { TE_DIR } from '@shared/constants'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
-import { loadCanvasFromDisk, saveCanvas } from './canvas-io'
+import { loadCanvasFromDisk } from './canvas-io'
 
 export const DEFAULT_CANVAS_ID = 'default'
 
@@ -15,9 +15,7 @@ export function useCanvasFileLifecycle(canvasId: string): void {
   const nodes = useCanvasStore((s) => s.nodes)
   const edges = useCanvasStore((s) => s.edges)
   const filePath = useCanvasStore((s) => s.filePath)
-  const isDirty = useCanvasStore((s) => s.isDirty)
   const toCanvasFile = useCanvasStore((s) => s.toCanvasFile)
-  const markSaved = useCanvasStore((s) => s.markSaved)
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const didLoadCanvas = useRef(false)
@@ -66,12 +64,6 @@ export function useCanvasFileLifecycle(canvasId: string): void {
     })()
   }, [canvasId, filePath, vaultPath, hasContent, loadCanvas, toCanvasFile])
 
-  useEffect(() => {
-    if (!filePath || !isDirty) return
-    const timer = setTimeout(async () => {
-      await saveCanvas(filePath, toCanvasFile())
-      markSaved()
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [filePath, isDirty, toCanvasFile, markSaved])
+  // Saving is owned by the App-level canvas autosaver (subscribeCanvasAutosave),
+  // which has quit-flush integration — no competing save effect here.
 }

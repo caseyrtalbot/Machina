@@ -80,6 +80,7 @@ export interface CanvasFile {
   readonly edges: readonly CanvasEdge[]
   readonly viewport: CanvasViewport
   readonly focusFrames?: Readonly<Record<string, CanvasViewport>>
+  readonly showAllEdges?: boolean
   readonly ontologySnapshot?: OntologySnapshot
   readonly ontologyLayout?: OntologyLayoutResult
 }

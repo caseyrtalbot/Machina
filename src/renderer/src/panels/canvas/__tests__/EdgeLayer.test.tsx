@@ -48,13 +48,19 @@ function makeNode(id: string, x = 0, y = 0): CanvasNode {
   }
 }
 
-function makeEdge(id: string, fromNode: string, toNode: string): CanvasEdge {
+function makeEdge(
+  id: string,
+  fromNode: string,
+  toNode: string,
+  kind?: CanvasEdge['kind']
+): CanvasEdge {
   return {
     id,
     fromNode,
     toNode,
     fromSide: 'right',
-    toSide: 'left'
+    toSide: 'left',
+    kind
   }
 }
 
@@ -97,25 +103,47 @@ describe('EdgeLayer', () => {
   it('uses nodeMap for O(1) lookup (no Array.find on nodes)', async () => {
     // Behavioral regression: with 2 nodes and 1 edge, the Map-based lookup
     // resolves both endpoints and renders the edge correctly
+    mockEdges = [makeEdge('e1', 'a', 'b', 'connection')]
     const EdgeLayer = await loadEdgeLayer()
     const { container } = render(<EdgeLayer />)
     const groups = container.querySelectorAll('[data-canvas-edge]')
     expect(groups.length).toBe(1)
   })
 
-  it('hides visible stroke but keeps hit area when not revealed', async () => {
-    mockEdges = [makeEdge('e1', 'a', 'b')]
+  it('renders user-created edges at low opacity when not revealed', async () => {
+    mockEdges = [makeEdge('e1', 'a', 'b', 'connection')]
     mockHoveredNodeId = null
 
     const EdgeLayer = await loadEdgeLayer()
     const { container } = render(<EdgeLayer />)
-    // Hit area always renders, so the group exists
-    const groups = container.querySelectorAll('[data-canvas-edge]')
-    expect(groups.length).toBe(1)
-    // Only the hit-area path renders (transparent stroke), no visible stroke
+    // Hit path + visible path both mount for baseline-visible user edges
     const paths = container.querySelectorAll('path')
-    expect(paths.length).toBe(1)
-    expect(paths[0].getAttribute('stroke')).toBe('transparent')
+    expect(paths.length).toBe(2)
+    expect(paths[1].getAttribute('opacity')).toBe('0.25')
+  })
+
+  it('mounts no paths at all for unrevealed structural edges', async () => {
+    // Previously the 12px invisible hit path always mounted, so unseen
+    // edges could be selected and deleted. Now nothing mounts.
+    mockEdges = [makeEdge('e1', 'a', 'b', 'imports')]
+    mockZoom = 0.5
+
+    const EdgeLayer = await loadEdgeLayer()
+    const { container } = render(<EdgeLayer />)
+    expect(container.querySelectorAll('[data-canvas-edge]').length).toBe(0)
+    expect(container.querySelectorAll('path').length).toBe(0)
+  })
+
+  it('reveals structural edges on endpoint hover with full demand opacity', async () => {
+    mockEdges = [makeEdge('e1', 'a', 'b', 'imports')]
+    mockZoom = 0.5
+    mockHoveredNodeId = 'a'
+
+    const EdgeLayer = await loadEdgeLayer()
+    const { container } = render(<EdgeLayer />)
+    const paths = container.querySelectorAll('path')
+    expect(paths.length).toBe(2)
+    expect(paths[1].getAttribute('opacity')).toBe('0.6')
   })
 
   it('shows hidden edges when endpoint is hovered', async () => {

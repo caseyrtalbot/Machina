@@ -35,6 +35,12 @@ function getControlOffset(side: CanvasSide, distance: number): { dx: number; dy:
 
 import { getEdgeStrokeDasharray, getEdgeStrokeWidth } from './edge-styling'
 
+/** User-drawn edge kinds (ConnectionDragOverlay): always faintly visible.
+ *  Structural kinds (imports/references/contains/ontology/cluster) stay
+ *  demand-revealed to keep dense canvases readable. */
+const USER_EDGE_KINDS = new Set(['connection', 'tension', 'causal'])
+const BASELINE_EDGE_OPACITY = 0.25
+
 interface EdgePathProps {
   readonly edge: CanvasEdge
   readonly nodeMap: ReadonlyMap<string, CanvasNode>
@@ -57,6 +63,13 @@ function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
   const zoomRevealed = zoom > 0.8 && (edge.kind === 'imports' || edge.kind === 'references')
   const isRevealed =
     showAllEdges || isSelected || endpointHovered || endpointSelected || zoomRevealed
+  // User-created edges are always visible at low opacity ("see connections"
+  // is pillar 1); only the noisy structural kinds are demand-revealed.
+  const baselineVisible = edge.kind !== undefined && USER_EDGE_KINDS.has(edge.kind)
+  const isShown = isRevealed || baselineVisible
+  // No invisible-but-clickable edges: the hit path mounts only when shown,
+  // so a hidden edge can never be selected and deleted unseen.
+  if (!isShown) return null
 
   const kindColor = edge.kind ? EDGE_KIND_COLORS[edge.kind] : undefined
   const strokeDasharray = getEdgeStrokeDasharray(edge.kind)
@@ -75,7 +88,7 @@ function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
 
   return (
     <g data-canvas-edge>
-      {/* Hit area: always rendered for click-to-select */}
+      {/* Hit area: rendered only while the edge is visibly shown */}
       <path
         d={d}
         fill="none"
@@ -87,23 +100,22 @@ function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
           useCanvasStore.getState().setSelectedEdge(edge.id)
         }}
       />
-      {/* Visible edge: only when revealed */}
-      {isRevealed && (
-        <path
-          d={d}
-          fill="none"
-          stroke={isSelected ? colors.accent.default : (kindColor ?? colors.text.secondary)}
-          strokeWidth={isSelected ? 2.5 : strokeWidthBase}
-          markerEnd="url(#arrowhead)"
-          opacity={endpointActive ? 1 : isSelected ? 1 : 0.6}
-          strokeDasharray={endpointActive ? '8 4' : strokeDasharray}
-          style={
-            endpointActive
-              ? { animation: 'te-edge-flow 0.8s linear infinite' }
-              : { animation: 'te-edge-reveal 150ms ease forwards' }
-          }
-        />
-      )}
+      <path
+        d={d}
+        fill="none"
+        stroke={isSelected ? colors.accent.default : (kindColor ?? colors.text.secondary)}
+        strokeWidth={isSelected ? 2.5 : strokeWidthBase}
+        markerEnd="url(#arrowhead)"
+        opacity={endpointActive || isSelected ? 1 : isRevealed ? 0.6 : BASELINE_EDGE_OPACITY}
+        strokeDasharray={endpointActive ? '8 4' : strokeDasharray}
+        style={
+          endpointActive
+            ? { animation: 'te-edge-flow 0.8s linear infinite' }
+            : isRevealed
+              ? { animation: 'te-edge-reveal 150ms ease forwards' }
+              : undefined
+        }
+      />
     </g>
   )
 }
