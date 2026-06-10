@@ -1,7 +1,8 @@
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
-import { readFile, readdir, stat, writeFile } from 'fs/promises'
+import { readFile, readdir, stat } from 'fs/promises'
 import { TE_DIR } from '@shared/constants'
+import { atomicWrite } from '../utils/atomic-write'
 import type { CanvasFile } from '@shared/canvas-types'
 import { validateCanvasMutationOps } from '@shared/canvas-mutation-validation'
 import { enqueueCanvasWrite } from '../services/canvas-write-queue'
@@ -50,7 +51,8 @@ export function registerCanvasIpc(): void {
 
   typedHandle('canvas:save', async (args) => {
     await enqueueCanvasWrite(args.canvasPath, async () => {
-      await writeFile(args.canvasPath, args.content, 'utf-8')
+      // Crash-safe: stage to tmp + rename so canvas.json is never half-written.
+      await atomicWrite(args.canvasPath, args.content)
     })
   })
 

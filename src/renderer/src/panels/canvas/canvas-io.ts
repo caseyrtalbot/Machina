@@ -1,5 +1,6 @@
 import type { CanvasFile } from '@shared/canvas-types'
-import { createCanvasFile } from '@shared/canvas-types'
+import type { Result } from '@shared/engine/types'
+import { notifyError } from '../../utils/error-logger'
 
 export function serializeCanvas(file: CanvasFile): string {
   const output: Record<string, unknown> = {
@@ -18,7 +19,9 @@ export function serializeCanvas(file: CanvasFile): string {
   return JSON.stringify(output, null, 2)
 }
 
-export function deserializeCanvas(json: string): CanvasFile {
+/** Parse a serialized canvas. Returns `{ ok: false }` on corrupt JSON instead of
+ * silently substituting an empty canvas — callers decide how to surface it. */
+export function deserializeCanvas(json: string): Result<CanvasFile> {
   try {
     const parsed = JSON.parse(json)
     const result: CanvasFile = {
@@ -39,10 +42,36 @@ export function deserializeCanvas(json: string): CanvasFile {
       ...(parsed.ontologySnapshot ? { ontologySnapshot: parsed.ontologySnapshot } : {}),
       ...(parsed.ontologyLayout ? { ontologyLayout: parsed.ontologyLayout } : {})
     }
-    return result
-  } catch {
-    return createCanvasFile()
+    return { ok: true, value: result }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+/** Load a canvas file from disk. On corrupt JSON: back the file up to `<path>.bak`,
+ * surface the error to the user, and return null so the spatial arrangement is
+ * never silently replaced with an empty canvas (and later autosaved over). */
+export async function loadCanvasFromDisk(path: string): Promise<CanvasFile | null> {
+  const raw = await window.api.fs.readFile(path)
+  const parsed = deserializeCanvas(raw)
+  if (parsed.ok) return parsed.value
+
+  const bakPath = `${path}.bak`
+  try {
+    await window.api.fs.copyFile(path, bakPath)
+    notifyError(
+      'canvas-load',
+      new Error(parsed.error),
+      `Canvas file is corrupt — backed up to ${bakPath}. Restore it manually or remove canvas.json to start fresh.`
+    )
+  } catch (copyErr) {
+    notifyError(
+      'canvas-load',
+      copyErr,
+      `Canvas file is corrupt and the backup to ${bakPath} failed — ${path} left untouched.`
+    )
+  }
+  return null
 }
 
 export function defaultCanvasFilename(existingNames: readonly string[]): string {

@@ -1,10 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   serializeCanvas,
   deserializeCanvas,
+  loadCanvasFromDisk,
   defaultCanvasFilename
 } from '../../src/renderer/src/panels/canvas/canvas-io'
 import { createCanvasFile, createCanvasNode, createCanvasEdge } from '../../src/shared/canvas-types'
+import { setErrorNotifier } from '../../src/renderer/src/utils/error-logger'
+
+function expectOk(result: ReturnType<typeof deserializeCanvas>) {
+  if (!result.ok) throw new Error(`expected ok result, got error: ${result.error}`)
+  return result.value
+}
 
 describe('canvas-io', () => {
   describe('serializeCanvas', () => {
@@ -24,7 +31,7 @@ describe('canvas-io', () => {
       const file = { nodes: [node1, node2], edges: [edge], viewport: { x: 0, y: 0, zoom: 1 } }
 
       const json = serializeCanvas(file)
-      const restored = deserializeCanvas(json)
+      const restored = expectOk(deserializeCanvas(json))
 
       expect(restored.nodes).toHaveLength(2)
       expect(restored.nodes[0].content).toBe('Hello')
@@ -34,15 +41,67 @@ describe('canvas-io', () => {
   })
 
   describe('deserializeCanvas', () => {
-    it('returns default canvas for empty/invalid input', () => {
-      expect(deserializeCanvas('')).toEqual(createCanvasFile())
-      expect(deserializeCanvas('not json')).toEqual(createCanvasFile())
+    it('returns an error for empty/invalid input instead of an empty canvas', () => {
+      expect(deserializeCanvas('')).toMatchObject({ ok: false })
+      expect(deserializeCanvas('not json')).toMatchObject({ ok: false })
+      expect(deserializeCanvas('{"nodes": [truncated')).toMatchObject({ ok: false })
     })
 
     it('fills missing viewport with defaults', () => {
       const json = JSON.stringify({ nodes: [], edges: [] })
-      const result = deserializeCanvas(json)
+      const result = expectOk(deserializeCanvas(json))
       expect(result.viewport).toEqual({ x: 0, y: 0, zoom: 1 })
+    })
+  })
+
+  describe('loadCanvasFromDisk', () => {
+    const canvasPath = '/vault/.machina/canvas.json'
+    const readFile = vi.fn<(path: string) => Promise<string>>()
+    const copyFile = vi.fn<(src: string, dest: string) => Promise<void>>()
+    const notify = vi.fn<(message: string) => void>()
+
+    beforeEach(() => {
+      readFile.mockReset()
+      copyFile.mockReset().mockResolvedValue(undefined)
+      notify.mockReset()
+      setErrorNotifier(notify)
+      vi.stubGlobal('window', {
+        api: { fs: { readFile, copyFile } }
+      } as unknown as Window & typeof globalThis)
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      setErrorNotifier(() => {})
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
+
+    it('returns the parsed canvas for valid JSON', async () => {
+      readFile.mockResolvedValue(serializeCanvas(createCanvasFile()))
+      const file = await loadCanvasFromDisk(canvasPath)
+      expect(file).not.toBeNull()
+      expect(file?.nodes).toEqual([])
+      expect(copyFile).not.toHaveBeenCalled()
+      expect(notify).not.toHaveBeenCalled()
+    })
+
+    it('corrupt canvas.json: creates .bak, surfaces error, returns null (no empty canvas)', async () => {
+      readFile.mockResolvedValue('{"nodes": [{"id": "half-writ')
+      const file = await loadCanvasFromDisk(canvasPath)
+      expect(file).toBeNull()
+      expect(copyFile).toHaveBeenCalledWith(canvasPath, `${canvasPath}.bak`)
+      expect(notify).toHaveBeenCalledTimes(1)
+      expect(notify.mock.calls[0][0]).toContain(`${canvasPath}.bak`)
+    })
+
+    it('still surfaces an error when the .bak copy itself fails', async () => {
+      readFile.mockResolvedValue('not json')
+      copyFile.mockRejectedValue(new Error('EACCES'))
+      const file = await loadCanvasFromDisk(canvasPath)
+      expect(file).toBeNull()
+      expect(notify).toHaveBeenCalledTimes(1)
+      expect(notify.mock.calls[0][0]).toContain('backup')
     })
   })
 

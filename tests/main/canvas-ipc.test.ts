@@ -20,6 +20,14 @@ vi.mock('fs/promises', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock atomic-write so canvas:save assertions don't hit disk
+// ---------------------------------------------------------------------------
+const mockAtomicWrite = vi.fn()
+vi.mock('../../src/main/utils/atomic-write', () => ({
+  atomicWrite: (...args: unknown[]) => mockAtomicWrite(...args)
+}))
+
+// ---------------------------------------------------------------------------
 // Mock window-registry
 // ---------------------------------------------------------------------------
 const mockGetMainWindow = vi.fn()
@@ -253,6 +261,22 @@ describe('canvas:apply-plan IPC handler', () => {
 
     expect(result).toHaveProperty('error', 'stale')
     expect(mockSend).not.toHaveBeenCalled()
+  })
+})
+
+describe('canvas:save IPC handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAtomicWrite.mockResolvedValue(undefined)
+  })
+
+  it('writes via atomicWrite (tmp+rename), never a direct writeFile', async () => {
+    registerCanvasIpc()
+
+    const handler = getHandler('canvas:save')
+    await handler({}, { canvasPath: '/test/canvas.json', content: '{"nodes":[]}' })
+
+    expect(mockAtomicWrite).toHaveBeenCalledWith('/test/canvas.json', '{"nodes":[]}')
   })
 })
 

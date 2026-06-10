@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { TE_DIR } from '@shared/constants'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
-import { deserializeCanvas, saveCanvas } from './canvas-io'
+import { loadCanvasFromDisk, saveCanvas } from './canvas-io'
 
 export const DEFAULT_CANVAS_ID = 'default'
 
@@ -33,8 +33,10 @@ export function useCanvasFileLifecycle(canvasId: string): void {
       try {
         const exists = await window.api.fs.fileExists(defaultPath)
         if (exists) {
-          const raw = await window.api.fs.readFile(defaultPath)
-          loadCanvas(defaultPath, deserializeCanvas(raw))
+          // Returns null (after .bak + user notification) on corrupt JSON —
+          // never load an empty canvas over a corrupt file.
+          const file = await loadCanvasFromDisk(defaultPath)
+          if (file) loadCanvas(defaultPath, file)
         }
       } catch {
         // Non-fatal: canvas works without persistence.
