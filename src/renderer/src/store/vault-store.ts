@@ -7,6 +7,8 @@ import type {
   KnowledgeGraph
 } from '@shared/types'
 import type { ParseError, WorkerResult } from '@engine/types'
+import { TE_DIR } from '@shared/constants'
+import { notifyError } from '../utils/error-logger'
 
 interface VaultFile {
   readonly path: string
@@ -46,6 +48,8 @@ interface VaultStore {
   readonly discoveredTypes: readonly string[]
   readonly activeWorkspace: string | null
   readonly isLoading: boolean
+  /** Set when loadVault fails; the shell renders first-run with this notice. */
+  readonly loadError: string | null
   readonly canvasIds: readonly string[]
 
   setVaultPath: (path: string) => void
@@ -77,6 +81,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   discoveredTypes: [],
   activeWorkspace: null,
   isLoading: false,
+  loadError: null,
   canvasIds: ['default'],
 
   setVaultPath: (path) => set({ vaultPath: path }),
@@ -101,7 +106,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
 
   loadVault: async (vaultPath: string) => {
-    set({ isLoading: true })
+    set({ isLoading: true, loadError: null })
     try {
       const [config, state, fileEntries, systemPaths] = await Promise.all([
         window.api.vault.readConfig(vaultPath),
@@ -113,11 +118,19 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       const systemFiles = systemPaths.map((filePath: string) =>
         toVaultFile({ path: filePath, mtime: '' }, 'system')
       )
-      set({ vaultPath, config, state, files, systemFiles, isLoading: false })
+      set({ vaultPath, config, state, files, systemFiles, isLoading: false, loadError: null })
       void get().refreshCanvasIds()
     } catch (err) {
-      console.error('Failed to load vault:', err)
-      set({ vaultPath, isLoading: false })
+      // Don't proceed with vaultPath set over a half-loaded vault: surface the
+      // failure and let the shell render first-run with this notice instead of
+      // a silently empty workspace.
+      const detail = err instanceof Error ? err.message : String(err)
+      const guidance = detail.includes('config.json')
+        ? ''
+        : ` If this persists, delete ${TE_DIR}/config.json inside the vault to reset.`
+      const loadError = `Failed to load vault at ${vaultPath}: ${detail}${guidance}`
+      notifyError('vault-load', err, loadError)
+      set({ vaultPath: null, isLoading: false, loadError })
     }
   },
 

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useThreadStore } from '../../store/thread-store'
+import { useVaultStore } from '../../store/vault-store'
 
 interface AgentShellKeybindingOptions {
   readonly toggleDock: () => void
@@ -66,6 +67,9 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
         opts.openPalette()
       } else if (key === 'n') {
         e.preventDefault()
+        // No vault open: createThread would reject silently with "vault not
+        // set", so Cmd+N is a guarded no-op until Open Folder runs.
+        if (!useVaultStore.getState().vaultPath) return
         void useThreadStore.getState().createThread('machina-native', 'claude-sonnet-4-6')
       } else if (key === 'w') {
         e.preventDefault()

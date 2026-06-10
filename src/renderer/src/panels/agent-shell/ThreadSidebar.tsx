@@ -99,7 +99,7 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
           borderTop: `1px solid ${colors.border.subtle}`
         }}
       >
-        {pickerOpen ? (
+        {pickerOpen && vaultPath ? (
           <AgentPicker
             onPick={(a) => {
               setPickerOpen(false)
@@ -108,7 +108,7 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
             onCancel={() => setPickerOpen(false)}
           />
         ) : (
-          <NewThreadButton onClick={() => setPickerOpen(true)} />
+          <NewThreadButton disabled={!vaultPath} onClick={() => setPickerOpen(true)} />
         )}
       </footer>
       {menu && (
@@ -349,9 +349,23 @@ function ThreadRow({
   )
 }
 
-function NewThreadButton({ onClick }: { readonly onClick: () => void }) {
+function NewThreadButton({
+  onClick,
+  disabled = false
+}: {
+  readonly onClick: () => void
+  readonly disabled?: boolean
+}) {
+  // Without a vault, createThread rejects silently ("vault not set"), so the
+  // affordance is disabled with a pointer at the Open Folder flow instead.
   return (
-    <button onClick={onClick} title="New thread" className="te-new-thread-button">
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? 'Open a vault first (use Open Folder)' : 'New thread'}
+      className="te-new-thread-button"
+      style={disabled ? { opacity: 0.45, cursor: 'default' } : undefined}
+    >
       <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden style={{ flexShrink: 0 }}>
         <path
           d="M5.5 1V10 M1 5.5H10"

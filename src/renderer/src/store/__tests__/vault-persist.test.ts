@@ -71,8 +71,6 @@ describe('registerQuitHandler', () => {
       mode: 'rich',
       isDirty: false,
       content: '# Hello',
-      cursorLine: 1,
-      cursorCol: 1,
       openTabs: [],
       historyStack: [],
       historyIndex: -1
@@ -139,8 +137,6 @@ describe('writePersist updates vault store', () => {
       mode: 'rich',
       isDirty: false,
       content: '# Hello',
-      cursorLine: 1,
-      cursorCol: 1,
       openTabs: [],
       historyStack: ['/vault/notes/first.md', '/vault/notes/second.md', '/vault/notes/hello.md'],
       historyIndex: 2

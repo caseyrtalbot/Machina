@@ -33,8 +33,6 @@ describe('useGhostEmerge', () => {
       mode: 'rich',
       isDirty: false,
       content: '',
-      cursorLine: 1,
-      cursorCol: 1,
       openTabs: [],
       historyStack: [],
       historyIndex: -1

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { logError } from './utils/error-logger'
+import { logError, notifyError, setErrorNotifier } from './utils/error-logger'
 import { withTimeout } from './utils/ipc-timeout'
 import { perfMark, perfMeasure } from './utils/perf-marks'
 import { chunkArray, readChunk, yieldToEventLoop } from './utils/chunk-loader'
@@ -14,6 +14,9 @@ import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
+import { ToastHost, showToast } from './components/Toast'
+import { FirstRunScreen, checkSavedVault } from './components/FirstRunScreen'
+import { useClaudeStatusStore } from './store/claude-status-store'
 import pLimit from 'p-limit'
 import { vaultEvents } from './engine/vault-event-hub'
 import {
@@ -101,6 +104,10 @@ export default function App() {
   const isLoading = useVaultStore((s) => s.isLoading)
   const loadVault = useVaultStore((s) => s.loadVault)
   const setFiles = useVaultStore((s) => s.setFiles)
+  const vaultPath = useVaultStore((s) => s.vaultPath)
+  const loadError = useVaultStore((s) => s.loadError)
+  const [booting, setBooting] = useState(true)
+  const [firstRunNotice, setFirstRunNotice] = useState<string | null>(null)
 
   const onWorkerResult = useCallback((result: WorkerResult) => {
     // Merge worker result + file updates into a single Zustand set() to avoid two render cycles
@@ -208,15 +215,60 @@ export default function App() {
     [appendFiles, loadVault, loadFiles]
   )
 
+  // Wire notifyError into the toast stack so DATA-path failures (canvas save,
+  // workspace persist, autosave) reach the user instead of only the console.
   useEffect(() => {
-    window.api.config
-      .read('app', 'lastVaultPath')
-      // Return the load chain so its rejections (vault.init, watchStart, chunk
-      // reads with timeout) route to the .catch instead of going unhandled.
-      .then((savedPath) =>
-        typeof savedPath === 'string' && savedPath ? orchestrateLoad(savedPath) : undefined
+    setErrorNotifier(showToast)
+  }, [])
+
+  // Claude status boot hook: seed the store once and keep it live. The native
+  // key state must land before the first setStatus so the onboarding overlay's
+  // suppress gate works from launch, not only after Settings is opened.
+  useEffect(() => {
+    let cancelled = false
+    let unsubscribe: (() => void) | undefined
+    void (async () => {
+      try {
+        const hasKey = await window.api.agentNative.hasKey()
+        if (!cancelled) useClaudeStatusStore.getState().setNativeKeyConfigured(hasKey)
+      } catch (err) {
+        logError('native-key-check', err)
+      }
+      if (cancelled) return
+      unsubscribe = window.api.on.claudeStatusChanged((status) =>
+        useClaudeStatusStore.getState().setStatus(status)
       )
-      .catch((err) => logError('load-last-vault', err))
+      try {
+        const status = await window.api.claude.getStatus()
+        if (!cancelled) useClaudeStatusStore.getState().setStatus(status)
+      } catch (err) {
+        logError('claude-status-seed', err)
+      }
+    })()
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        // checkSavedVault verifies the path still exists before loading; a
+        // missing vault clears lastVaultPath and shows first-run instead of
+        // letting vault:init mkdir a ghost vault.
+        const check = await checkSavedVault()
+        if (check.kind === 'load') {
+          await orchestrateLoad(check.path)
+        } else if (check.missingPath) {
+          setFirstRunNotice(`Previous vault not found at ${check.missingPath}`)
+        }
+      } catch (err) {
+        logError('load-last-vault', err)
+      } finally {
+        setBooting(false)
+      }
+    })()
   }, [orchestrateLoad])
 
   useEffect(() => {
@@ -311,8 +363,45 @@ export default function App() {
     return unsub
   }, [updateFile, removeFile, setFiles])
 
+  const handleOpenFolder = useCallback(async () => {
+    try {
+      const path = await window.api.fs.selectVault()
+      if (path) {
+        setFirstRunNotice(null)
+        await orchestrateLoad(path)
+      }
+    } catch (err) {
+      notifyError('open-vault', err, 'Failed to open vault')
+    }
+  }, [orchestrateLoad])
+
+  const handleOpenHistoryPath = useCallback(
+    async (path: string) => {
+      try {
+        if (!(await window.api.app.pathExists(path))) {
+          setFirstRunNotice(`Vault not found at ${path}`)
+          return
+        }
+        setFirstRunNotice(null)
+        await orchestrateLoad(path)
+      } catch (err) {
+        notifyError('open-vault', err, 'Failed to open vault')
+      }
+    },
+    [orchestrateLoad]
+  )
+
   function renderContent() {
-    if (isLoading) return <LoadingSkeleton />
+    if (booting || isLoading) return <LoadingSkeleton />
+    if (!vaultPath) {
+      return (
+        <FirstRunScreen
+          notice={loadError ?? firstRunNotice}
+          onOpenFolder={() => void handleOpenFolder()}
+          onOpenPath={(path) => void handleOpenHistoryPath(path)}
+        />
+      )
+    }
     return <WorkspaceShell onLoadVault={orchestrateLoad} />
   }
 
@@ -320,6 +409,7 @@ export default function App() {
     <ThemeProvider>
       <GoogleFontLoader />
       {renderContent()}
+      <ToastHost />
     </ThemeProvider>
   )
 }
