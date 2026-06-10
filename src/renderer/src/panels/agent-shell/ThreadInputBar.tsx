@@ -37,6 +37,8 @@ export function ThreadInputBar() {
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
+      // One run per thread: ignore sends while a turn is in flight (Stop first).
+      if (inFlight) return
       if (text.trim().length === 0) return
       void appendUser(text)
       setText('')

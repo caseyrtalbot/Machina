@@ -42,10 +42,21 @@ describe('thread-store', () => {
   })
 
   it('appendAssistantStreamChunk concatenates into the streaming buffer', () => {
-    useThreadStore.setState({ activeThreadId: 'a' })
-    useThreadStore.getState().appendAssistantStreamChunk('a', 'Hel')
-    useThreadStore.getState().appendAssistantStreamChunk('a', 'lo')
+    useThreadStore.setState({ activeThreadId: 'a', runIdByThreadId: { a: 'r-1' } })
+    useThreadStore.getState().appendAssistantStreamChunk('a', 'r-1', 'Hel')
+    useThreadStore.getState().appendAssistantStreamChunk('a', 'r-1', 'lo')
     expect(useThreadStore.getState().streamingByThreadId['a']).toBe('Hello')
+  })
+
+  it('appendAssistantStreamChunk drops chunks whose runId does not match the active run', () => {
+    useThreadStore.setState({ activeThreadId: 'a', runIdByThreadId: { a: 'r-2' } })
+    useThreadStore.getState().appendAssistantStreamChunk('a', 'r-2', 'keep')
+    // Stale chunk from an aborted/superseded run must not bleed into the buffer.
+    useThreadStore.getState().appendAssistantStreamChunk('a', 'r-1', 'stale')
+    // No active run at all (already finalized) → also dropped.
+    useThreadStore.setState({ runIdByThreadId: {} })
+    useThreadStore.getState().appendAssistantStreamChunk('a', 'r-2', 'late')
+    expect(useThreadStore.getState().streamingByThreadId['a']).toBe('keep')
   })
 
   it('finalizeAssistantMessage moves streaming buffer into messages', async () => {
@@ -147,6 +158,65 @@ describe('thread-store', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('filters empty/whitespace-body messages out of the native history', async () => {
+    const run = vi.fn().mockResolvedValue({ runId: 'r-9' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.agentNative = { run }
+    const t: Thread = {
+      ...sampleThread('a'),
+      messages: [
+        { role: 'user', body: 'first question', sentAt: '2026-05-01T13:00:00Z' },
+        // Tool-only turn persisted with an empty body — must not reach the API.
+        { role: 'assistant', body: '', sentAt: '2026-05-01T13:00:01Z' },
+        { role: 'assistant', body: '   \n', sentAt: '2026-05-01T13:00:02Z' },
+        { role: 'assistant', body: 'real answer', sentAt: '2026-05-01T13:00:03Z' },
+        { role: 'system', body: 'noise', sentAt: '2026-05-01T13:00:04Z' }
+      ]
+    }
+    useThreadStore.setState({ vaultPath: '/v', activeThreadId: 'a', threadsById: { a: t } })
+    await useThreadStore.getState().appendUserMessage('next question')
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run.mock.calls[0][0].userMessage).toBe('next question')
+    expect(run.mock.calls[0][0].historyMessages).toEqual([
+      { role: 'user', content: 'first question' },
+      { role: 'assistant', content: 'real answer' }
+    ])
+  })
+
+  it('clears in-flight and appends a system message when CLI input delivery fails', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: false }) }
+    const cliThread = { ...sampleThread('a'), agent: 'cli-claude' as const }
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: cliThread }
+    })
+    await useThreadStore.getState().appendUserMessage('hello')
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+    const msgs = useThreadStore.getState().threadsById['a'].messages
+    const sys = msgs.find((m) => m.role === 'system')
+    expect(sys?.body).toContain('not delivered')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalled()
+  })
+
+  it('keeps in-flight set when CLI input delivery succeeds', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: true }) }
+    const cliThread = { ...sampleThread('a'), agent: 'cli-claude' as const }
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: cliThread }
+    })
+    await useThreadStore.getState().appendUserMessage('hello')
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+    expect(
+      useThreadStore.getState().threadsById['a'].messages.some((m) => m.role === 'system')
+    ).toBe(false)
   })
 
   it('toggleAutoAccept flips the per-thread autoAcceptSession flag in memory only (no disk write)', () => {

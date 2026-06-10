@@ -48,7 +48,7 @@ interface ThreadState {
   renameThread: (id: string, title: string) => Promise<void>
 
   appendUserMessage: (text: string) => Promise<void>
-  appendAssistantStreamChunk: (threadId: string, chunk: string) => void
+  appendAssistantStreamChunk: (threadId: string, runId: string, chunk: string) => void
   startPendingToolCall: (threadId: string, call: ToolCall) => void
   appendPendingToolCall: (threadId: string, call: ToolCall, result: ToolResult) => void
   finalizeAssistantMessage: (threadId: string) => Promise<void>
@@ -298,16 +298,37 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     set((s) => ({ inFlightByThreadId: { ...s.inFlightByThreadId, [id]: true } }))
 
     if (t.agent !== 'machina-native') {
-      await window.api.cliThread.input({ threadId: id, identity: t.agent, text })
+      const res = await window.api.cliThread.input({ threadId: id, identity: t.agent, text })
+      if (!res.ok) {
+        // Delivery failed (CLI missing, or the PTY could not respawn).
+        // Unwedge the input bar and tell the user instead of silently
+        // dropping the turn.
+        set((s) => {
+          const flight = { ...s.inFlightByThreadId }
+          delete flight[id]
+          return { inFlightByThreadId: flight }
+        })
+        const cur = get().threadsById[id]
+        if (cur) {
+          const sys: ThreadMessage = {
+            role: 'system',
+            body: 'Message not delivered: the CLI session could not be started. Check that the agent CLI is installed, then try again.',
+            sentAt: new Date().toISOString()
+          }
+          const next: Thread = { ...cur, messages: [...cur.messages, sys] }
+          set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
+          await window.api.thread.save(v, next)
+        }
+      }
       return
     }
-    const history = t.messages
-      .slice(0, -1)
-      .flatMap((m) =>
-        m.role === 'user' || m.role === 'assistant'
-          ? [{ role: m.role, content: m.body } as const]
-          : []
-      )
+    const history = t.messages.slice(0, -1).flatMap((m) =>
+      // Tool-only turns persist body: '' — the Anthropic API rejects empty
+      // content, so one empty body would poison every later turn.
+      (m.role === 'user' || m.role === 'assistant') && m.body.trim().length > 0
+        ? [{ role: m.role, content: m.body } as const]
+        : []
+    )
     const dockTabsSnapshot = get().dockTabsByThreadId[id] ?? []
     try {
       const { runId } = await withTimeout(
@@ -353,13 +374,19 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     }
   },
 
-  appendAssistantStreamChunk: (threadId, chunk) =>
-    set((s) => ({
-      streamingByThreadId: {
-        ...s.streamingByThreadId,
-        [threadId]: (s.streamingByThreadId[threadId] ?? '') + chunk
+  appendAssistantStreamChunk: (threadId, runId, chunk) =>
+    set((s) => {
+      // Drop chunks whose runId doesn't match the thread's active run —
+      // events from an aborted or already-finalized run must not bleed
+      // into the next turn's streaming buffer.
+      if (s.runIdByThreadId[threadId] !== runId) return s
+      return {
+        streamingByThreadId: {
+          ...s.streamingByThreadId,
+          [threadId]: (s.streamingByThreadId[threadId] ?? '') + chunk
+        }
       }
-    })),
+    }),
 
   startPendingToolCall: (threadId, call) =>
     set((s) => {

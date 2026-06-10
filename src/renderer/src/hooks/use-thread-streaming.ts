@@ -15,7 +15,7 @@ export function useThreadStreaming(): void {
   useEffect(() => {
     const off = window.api.on.agentNativeEvent((evt) => {
       if (evt.kind === 'text') {
-        append(evt.threadId, evt.text)
+        append(evt.threadId, evt.runId, evt.text)
       } else if (evt.kind === 'tool_pending_approval') {
         const call = pendingPreviewToCall(evt.toolUseId, evt)
         if (call) startToolCall(evt.threadId, call)
@@ -36,7 +36,7 @@ export function useThreadStreaming(): void {
       } else if (evt.kind === 'message_end') {
         void finalize(evt.threadId)
       } else if (evt.kind === 'error') {
-        append(evt.threadId, `\n\n[error: ${evt.code}] ${evt.message}\n`)
+        append(evt.threadId, evt.runId, `\n\n[error: ${evt.code}] ${evt.message}\n`)
         void finalize(evt.threadId)
       }
     })

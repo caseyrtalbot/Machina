@@ -18,6 +18,7 @@ import { sessionId as brandSessionId } from '@shared/types'
 import type { ShellService } from './shell-service'
 import type { CliAgentThreadBridge } from './cli-agent-thread-bridge'
 import { detectInstalledAgents } from './cli-agent-detector'
+import { commitPreAgentSnapshot } from './vault-git'
 
 const CLI_AGENT_IDENTITIES = ['cli-claude', 'cli-codex', 'cli-gemini'] as const
 type CliAgentIdentity = (typeof CLI_AGENT_IDENTITIES)[number]
@@ -76,6 +77,10 @@ export class CliThreadSpawner {
     if (!isCliAgentIdentity(identity)) {
       return { ok: false, error: `not a CLI agent: ${identity}` }
     }
+    // Rollback safety: snapshot the vault before the agent can touch it.
+    // Never blocks the spawn — returns a structured no-op on non-repo,
+    // opt-out, nothing-to-commit, or git failure.
+    commitPreAgentSnapshot(cwd, threadId)
     const detect = this.opts.detect ?? detectInstalledAgents
     const installations = await detect()
     const specId = specIdForIdentity(identity)
@@ -91,6 +96,31 @@ export class CliThreadSpawner {
     this.opts.bridge.bind(sessionId, threadId)
     this.sessionByThread.set(threadId, sessionId)
     return { ok: true, sessionId }
+  }
+
+  /**
+   * Deliver a user message, respawning the PTY first when no live session is
+   * bound. `sessionByThread` is in-memory only, so every persisted CLI thread
+   * arrives here dead after an app relaunch.
+   */
+  async input(
+    threadId: string,
+    identity: AgentIdentity,
+    text: string,
+    cwd: string
+  ): Promise<{ ok: boolean }> {
+    if (!this.hasLiveSession(threadId)) {
+      const spawned = await this.spawn(threadId, identity, cwd)
+      if (!spawned.ok) return { ok: false }
+    }
+    return { ok: this.sendUserMessage(threadId, identity, text) }
+  }
+
+  /** True when a session is bound for `threadId` and its PTY is still alive. */
+  private hasLiveSession(threadId: string): boolean {
+    const sid = this.sessionByThread.get(threadId)
+    if (!sid) return false
+    return this.opts.shellService.getPtyService().getActiveSessions().includes(sid)
   }
 
   sendUserMessage(threadId: string, identity: AgentIdentity, text: string): boolean {

@@ -7,9 +7,15 @@ import {
   specIdForIdentity
 } from '../cli-thread-spawner'
 import { CliAgentThreadBridge } from '../cli-agent-thread-bridge'
+import { commitPreAgentSnapshot } from '../vault-git'
+
+vi.mock('../vault-git', () => ({
+  commitPreAgentSnapshot: vi.fn().mockReturnValue({ committed: false, reason: 'not-a-git-repo' })
+}))
 
 interface FakePtyService {
   writeAgentInput: ReturnType<typeof vi.fn>
+  getActiveSessions: ReturnType<typeof vi.fn>
 }
 
 interface FakeShellService {
@@ -19,7 +25,10 @@ interface FakeShellService {
 }
 
 function fakeServices(): { shell: FakeShellService; pty: FakePtyService } {
-  const pty: FakePtyService = { writeAgentInput: vi.fn() }
+  const pty: FakePtyService = {
+    writeAgentInput: vi.fn(),
+    getActiveSessions: vi.fn().mockReturnValue(['sess-xyz'])
+  }
   const shell: FakeShellService = {
     create: vi.fn().mockReturnValue('sess-xyz'),
     kill: vi.fn(),
@@ -134,6 +143,91 @@ describe('CliThreadSpawner', () => {
     const bridge = new CliAgentThreadBridge({ onMessage: () => {} })
     const spawner = new CliThreadSpawner({ shellService: shell as never, bridge })
     expect(spawner.sendUserMessage('absent', 'cli-claude', 'x')).toBe(false)
+  })
+
+  it('snapshots the vault at the top of spawn for agent rollback', async () => {
+    const { shell } = fakeServices()
+    const bridge = new CliAgentThreadBridge({ onMessage: () => {} })
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    vi.mocked(commitPreAgentSnapshot).mockClear()
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    expect(commitPreAgentSnapshot).toHaveBeenCalledWith('/v', 'thread-A')
+  })
+
+  it('input respawns on demand when no session is bound (post-relaunch dead thread)', async () => {
+    const { shell, pty } = fakeServices()
+    const bindSpy = vi.fn()
+    const bridge = { bind: bindSpy } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    // No prior spawn: simulates a persisted thread after app relaunch.
+    const res = await spawner.input('thread-A', 'cli-claude', 'list files', '/v')
+    expect(res.ok).toBe(true)
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A')
+    expect(pty.writeAgentInput).toHaveBeenCalledWith(
+      'sess-xyz',
+      `claude --print 'list files'\r`,
+      'batched'
+    )
+  })
+
+  it('input respawns when the bound PTY has exited (stale session)', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = { bind: vi.fn() } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    // The PTY died: it no longer appears in the active session list.
+    pty.getActiveSessions.mockReturnValue([])
+    shell.create.mockReturnValue('sess-new')
+    const res = await spawner.input('thread-A', 'cli-claude', 'retry', '/v')
+    expect(res.ok).toBe(true)
+    expect(shell.create).toHaveBeenCalledTimes(2)
+    expect(pty.writeAgentInput).toHaveBeenCalledWith(
+      'sess-new',
+      `claude --print 'retry'\r`,
+      'batched'
+    )
+  })
+
+  it('input reuses the live session without respawning', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = { bind: vi.fn() } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    const res = await spawner.input('thread-A', 'cli-claude', 'hi', '/v')
+    expect(res.ok).toBe(true)
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(pty.writeAgentInput).toHaveBeenCalledWith('sess-xyz', `claude --print 'hi'\r`, 'batched')
+  })
+
+  it('input returns ok=false when the respawn fails (CLI not installed)', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = new CliAgentThreadBridge({ onMessage: () => {} })
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude', false)]
+    })
+    const res = await spawner.input('thread-A', 'cli-claude', 'hello', '/v')
+    expect(res.ok).toBe(false)
+    expect(shell.create).not.toHaveBeenCalled()
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
   })
 
   it('kills the PTY and forgets the binding on close', async () => {

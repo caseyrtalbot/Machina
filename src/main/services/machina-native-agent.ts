@@ -28,7 +28,14 @@ interface RunOptions {
   readonly dockTabsSnapshot?: ReadonlyArray<DockTab>
 }
 
-const inflight = new Map<string, AbortController>()
+interface InflightRun {
+  readonly controller: AbortController
+  /** Set by abortMachinaNative so a user Stop settles quietly (message_end)
+   *  instead of rendering as an SDK_TIMEOUT error. */
+  userAborted: boolean
+}
+
+const inflight = new Map<string, InflightRun>()
 
 function emit(runId: string, threadId: string, body: AgentNativeEventBody): void {
   const window = getMainWindow()
@@ -183,7 +190,8 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
 
   const runId = newRunId()
   const abort = new AbortController()
-  inflight.set(runId, abort)
+  const run: InflightRun = { controller: abort, userAborted: false }
+  inflight.set(runId, run)
   let timeout: NodeJS.Timeout = setTimeout(() => abort.abort(), DEFAULT_TIMEOUT_MS)
   function resetTimeout(): void {
     clearTimeout(timeout)
@@ -244,6 +252,9 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
         )
 
         for await (const event of stream) {
+          // Each delta proves liveness — reset the inactivity timer so a
+          // response that streams for >60s isn't killed mid-generation.
+          resetTimeout()
           if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
             emit(runId, opts.threadId, { kind: 'text', text: event.delta.text })
           }
@@ -312,7 +323,12 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
       }
       emit(runId, opts.threadId, { kind: 'message_end' })
     } catch (err) {
-      emit(runId, opts.threadId, classifyError(err, abort.signal.aborted))
+      if (run.userAborted) {
+        // User pressed Stop: finalize the partial text quietly.
+        emit(runId, opts.threadId, { kind: 'message_end' })
+      } else {
+        emit(runId, opts.threadId, classifyError(err, abort.signal.aborted))
+      }
     } finally {
       clearTimeout(timeout)
       inflight.delete(runId)
@@ -328,5 +344,8 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
 }
 
 export function abortMachinaNative(runId: string): void {
-  inflight.get(runId)?.abort()
+  const run = inflight.get(runId)
+  if (!run) return
+  run.userAborted = true
+  run.controller.abort()
 }
