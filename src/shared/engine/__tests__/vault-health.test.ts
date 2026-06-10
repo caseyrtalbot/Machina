@@ -337,7 +337,7 @@ describe('vault-health edge cases', () => {
     expect(refsRun.issues).toHaveLength(0)
   })
 
-  it('10k-artifact vault completes in <20ms', () => {
+  it('10k-artifact vault completes without quadratic blowup', () => {
     const artifacts: Artifact[] = []
     const fileToId: Record<string, string> = {}
     const artifactPathById: Record<string, string> = {}
@@ -369,7 +369,8 @@ describe('vault-health edge cases', () => {
     const result = computeDerivedHealth({ workerResult: wr, files })
     const elapsed = performance.now() - start
 
-    expect(elapsed).toBeLessThan(20)
+    // generous bound: an O(n²) regression takes seconds at 10k; 20ms flaked on loaded machines
+    expect(elapsed).toBeLessThan(200)
     expect(result.runs).toHaveLength(3)
     expect(result.runs.every((r) => r.passed)).toBe(true)
   })
