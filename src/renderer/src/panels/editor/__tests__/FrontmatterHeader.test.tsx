@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FrontmatterHeader } from '../FrontmatterHeader'
+import { useEditorStore } from '../../../store/editor-store'
+import { parseFrontmatter } from '../markdown-utils'
 import type { Artifact } from '@shared/types'
 
 // Mock vault-store with artifact fixtures used by the autocomplete (Task 4).
@@ -187,5 +189,56 @@ describe('FrontmatterHeader — connection add', () => {
       />
     )
     expect(screen.queryByText('+ add connection')).toBeNull()
+  })
+})
+
+describe('FrontmatterHeader — lossless raw patching (item 1.2)', () => {
+  const content =
+    '---\n# pinned comment\nstatus: draft\nmeta:\n  author: casey\nnotes: |\n  block text\n---\nBody.'
+
+  beforeEach(() => {
+    useEditorStore.setState(useEditorStore.getInitialState())
+    useEditorStore.setState({ content })
+  })
+
+  it('deleting a property preserves comments, nested maps, and block scalars', () => {
+    const onFrontmatterChange = vi.fn()
+    render(
+      <FrontmatterHeader
+        artifact={makeArtifact()}
+        frontmatter={parseFrontmatter(content).data}
+        mode="rich"
+        onFrontmatterChange={onFrontmatterChange}
+      />
+    )
+
+    fireEvent.click(screen.getByLabelText('Delete property status'))
+
+    expect(onFrontmatterChange).toHaveBeenCalledTimes(1)
+    const raw = onFrontmatterChange.mock.calls[0][0] as string
+    expect(raw).toBe('---\n# pinned comment\nmeta:\n  author: casey\nnotes: |\n  block text\n---\n')
+  })
+
+  it('adding a property appends to the raw block without re-serializing it', () => {
+    const onFrontmatterChange = vi.fn()
+    render(
+      <FrontmatterHeader
+        artifact={makeArtifact()}
+        frontmatter={parseFrontmatter(content).data}
+        mode="rich"
+        onFrontmatterChange={onFrontmatterChange}
+      />
+    )
+
+    fireEvent.click(screen.getByText('+ add property'))
+    const input = screen.getByPlaceholderText('Property name...')
+    fireEvent.change(input, { target: { value: 'author' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onFrontmatterChange).toHaveBeenCalledTimes(1)
+    const raw = onFrontmatterChange.mock.calls[0][0] as string
+    expect(raw).toBe(
+      '---\n# pinned comment\nstatus: draft\nmeta:\n  author: casey\nnotes: |\n  block text\nauthor: ""\n---\n'
+    )
   })
 })

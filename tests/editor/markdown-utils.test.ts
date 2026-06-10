@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseFrontmatter,
-  migrateLegacyWikilinks,
   serializeFrontmatter
 } from '../../src/renderer/src/panels/editor/markdown-utils'
 
@@ -73,44 +72,32 @@ describe('parseFrontmatter', () => {
   })
 })
 
-// --- migrateLegacyWikilinks ---
+// --- Mode-switch round-trip (rich↔source seam) ---
+//
+// EditorPanel switches modes by recomposing frontmatterRaw + body:
+// rich→source emits `parsed.raw + serializedBody`, source→rich re-parses the
+// full text via parseFrontmatter. The seam is lossless iff raw + body === text.
 
-describe('migrateLegacyWikilinks', () => {
-  it('converts simple wikilinks to concept nodes', () => {
-    const result = migrateLegacyWikilinks('See [[My Note]] for details.')
-    expect(result).toBe('See <node>My Note</node> for details.')
+describe('mode-switch round-trip', () => {
+  it.each([
+    ['frontmatter + body', '---\ntitle: Note\ntags:\n  - a\n---\n\n# Heading\n\nBody text.\n'],
+    ['no frontmatter', '# Just a heading\n\nParagraph.\n'],
+    ['body containing a --- hr line', '---\ntitle: X\n---\n\nAbove\n\n---\n\nBelow\n'],
+    ['empty frontmatter block', '---\n---\n\nBody only.\n'],
+    ['frontmatter with no trailing blank line', '---\ntitle: Tight\n---\nBody starts here.\n']
+  ])('raw + body recomposes the original content (%s)', (_label, content) => {
+    const parsed = parseFrontmatter(content)
+    expect(parsed.raw + parsed.body).toBe(content)
   })
 
-  it('converts piped wikilinks using target (not display)', () => {
-    const result = migrateLegacyWikilinks('Check [[Target Page|display text]] here.')
-    expect(result).toBe('Check <node>Target Page</node> here.')
-  })
-
-  it('handles multiple wikilinks in one line', () => {
-    const result = migrateLegacyWikilinks('Links: [[A]], [[B]], and [[C]].')
-    expect(result).toBe('Links: <node>A</node>, <node>B</node>, and <node>C</node>.')
-  })
-
-  it('leaves text without wikilinks unchanged', () => {
-    const text = 'No wikilinks here, just [regular](link).'
-    expect(migrateLegacyWikilinks(text)).toBe(text)
-  })
-
-  it('leaves existing concept nodes unchanged', () => {
-    const text = 'Already <node>migrated</node> content.'
-    expect(migrateLegacyWikilinks(text)).toBe(text)
-  })
-
-  it('handles mixed legacy and new syntax', () => {
-    const text = 'Old [[legacy]] and new <node>modern</node>.'
-    expect(migrateLegacyWikilinks(text)).toBe(
-      'Old <node>legacy</node> and new <node>modern</node>.'
-    )
-  })
-
-  it('trims whitespace from targets', () => {
-    const result = migrateLegacyWikilinks('See [[ spaced target ]] here.')
-    expect(result).toBe('See <node>spaced target</node> here.')
+  it('is stable across repeated switches (parse → recompose → parse)', () => {
+    const content = '---\ntitle: Round Trip\n---\n\nSome **edits** made in source mode.\n'
+    const first = parseFrontmatter(content)
+    const recomposed = first.raw + first.body
+    const second = parseFrontmatter(recomposed)
+    expect(second.raw).toBe(first.raw)
+    expect(second.body).toBe(first.body)
+    expect(second.raw + second.body).toBe(content)
   })
 })
 

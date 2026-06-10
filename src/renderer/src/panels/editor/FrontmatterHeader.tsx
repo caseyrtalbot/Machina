@@ -9,7 +9,13 @@ import {
 } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useVaultStore } from '../../store/vault-store'
-import { serializeFrontmatter, type PropertyValue } from './markdown-utils'
+import { useEditorStore } from '../../store/editor-store'
+import {
+  deleteFrontmatterKey,
+  parseFrontmatter,
+  setFrontmatterValue,
+  type PropertyValue
+} from './markdown-utils'
 import { ConnectionAutocomplete } from './ConnectionAutocomplete'
 import {
   inferPropertyType,
@@ -34,15 +40,27 @@ function formatPropertyLabel(key: string): string {
   return key.replace(/_/g, ' ')
 }
 
+/**
+ * Current raw frontmatter block of the live document. EditorPanel keeps
+ * editor-store content in sync on every edit and derives the body from the
+ * same store in its onFrontmatterChange handler, so patching against this raw
+ * preserves YAML the properties panel cannot represent (nested maps, block
+ * scalars, comments) instead of re-serializing a lossy parse.
+ */
+function currentRawFrontmatter(): string {
+  return parseFrontmatter(useEditorStore.getState().content).raw
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildMetadataEntries(artifact: Artifact): readonly MetadataEntry[] {
   const entries: MetadataEntry[] = [
     { label: 'ID', value: artifact.id },
     { label: 'Type', value: artifact.type },
-    { label: 'Signal', value: artifact.signal },
-    { label: 'Created', value: artifact.created },
-    { label: 'Modified', value: artifact.modified }
+    { label: 'Signal', value: artifact.signal }
   ]
+  // created/modified are optional (no fabricated dates) — omit the row when absent
+  if (artifact.created) entries.push({ label: 'Created', value: artifact.created })
+  if (artifact.modified) entries.push({ label: 'Modified', value: artifact.modified })
   if (artifact.frame) entries.push({ label: 'Frame', value: artifact.frame })
   if (artifact.source) entries.push({ label: 'Source', value: artifact.source })
   if (artifact.tags.length > 0) entries.push({ label: 'Tags', value: artifact.tags.join(', ') })
@@ -335,27 +353,22 @@ export function FrontmatterHeader({
 
   const editable = !!onFrontmatterChange
 
-  const dispatchChange = (updated: Record<string, PropertyValue>) => {
-    if (!onFrontmatterChange) return
-    const raw = serializeFrontmatter(updated)
-    onFrontmatterChange(raw)
-  }
-
   const handlePropertyChange = (key: string, value: PropertyValue) => {
-    dispatchChange({ ...properties, [key]: value })
+    if (!onFrontmatterChange) return
+    onFrontmatterChange(setFrontmatterValue(currentRawFrontmatter(), key, value))
   }
 
   const handleDeleteProperty = (key: string) => {
-    const updated = { ...properties }
-    delete updated[key]
-    dispatchChange(updated)
+    if (!onFrontmatterChange) return
+    onFrontmatterChange(deleteFrontmatterKey(currentRawFrontmatter(), key))
   }
 
   const handleAddProperty = (key: string) => {
+    if (!onFrontmatterChange) return
     const lower = key.toLowerCase()
     const defaultValue: PropertyValue =
       lower === 'tags' ? [] : lower === 'draft' ? false : lower === 'order' ? 0 : ''
-    dispatchChange({ ...properties, [key]: defaultValue })
+    onFrontmatterChange(setFrontmatterValue(currentRawFrontmatter(), key, defaultValue))
   }
 
   // Determine the artifact type for display
@@ -488,7 +501,6 @@ export function FrontmatterHeader({
           artifact={artifact}
           onNavigate={onNavigate}
           onFrontmatterChange={onFrontmatterChange}
-          currentProperties={properties}
         />
       )}
 
@@ -514,14 +526,12 @@ interface RelationshipSectionProps {
   artifact: Artifact
   onNavigate?: (id: string) => void
   onFrontmatterChange?: (newRaw: string) => void
-  currentProperties: Record<string, PropertyValue>
 }
 
 function RelationshipSection({
   artifact,
   onNavigate,
-  onFrontmatterChange,
-  currentProperties
+  onFrontmatterChange
 }: RelationshipSectionProps) {
   const editable = !!onFrontmatterChange
   const connectionsEditable = editable
@@ -537,8 +547,7 @@ function RelationshipSection({
 
   const handleConnectionsChange = (next: readonly string[]) => {
     if (!onFrontmatterChange) return
-    const updated = { ...currentProperties, connections: [...next] }
-    onFrontmatterChange(serializeFrontmatter(updated))
+    onFrontmatterChange(setFrontmatterValue(currentRawFrontmatter(), 'connections', [...next]))
   }
 
   return (
