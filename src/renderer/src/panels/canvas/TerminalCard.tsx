@@ -7,7 +7,7 @@ import { useClaudeStatus } from '../../hooks/use-claude-status'
 import { buildCanvasContext } from '../../engine/context-serializer'
 import { buildBlockProjection, pickPinnableBlock } from './block-pin'
 import { CardShell } from './CardShell'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { Block } from '@shared/engine/block-model'
 import { type SessionId, sessionId as toSessionId } from '@shared/types'
@@ -17,6 +17,35 @@ interface TerminalCardProps {
 }
 
 const EMPTY_BLOCKS: readonly Block[] = []
+
+// ── Resolved terminal theme ──────────────────────────────────────────────
+// The webview has no access to the app's CSS vars, so resolve accent/bg to
+// hexes once (vars are static at runtime) and pass them as URL params.
+
+let cachedTermTheme: { accent: string; bg: string } | null = null
+
+function getResolvedTermTheme(): { accent: string; bg: string } {
+  if (cachedTermTheme === null) {
+    const style = getComputedStyle(document.documentElement)
+    cachedTermTheme = {
+      accent: style.getPropertyValue('--color-accent-default').trim(),
+      bg: style.getPropertyValue('--color-bg-base').trim()
+    }
+  }
+  return cachedTermTheme
+}
+
+// ── Shell-hook nudge ─────────────────────────────────────────────────────
+// When a session produces no prompt-start block within 5s and the hooks are
+// not installed, the first terminal to notice offers one-click setup.
+
+const HOOK_BANNER_DISMISSED_KEY = 'te:hook-banner-dismissed'
+const HOOK_BANNER_DELAY_MS = 5000
+
+/** Only one terminal card per app run shows the banner. */
+let hookBannerClaimed = false
+
+type HookBannerState = 'hidden' | 'offer' | 'installing' | 'installed' | 'error'
 
 type TerminalWebviewElement = HTMLElement & {
   focus: () => void
@@ -65,6 +94,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const [launchSessionId, setLaunchSessionId] = useState(node.content)
   const [sessionDead, setSessionDead] = useState(false)
   const [webviewKey, setWebviewKey] = useState(0)
+  const [hookBanner, setHookBanner] = useState<HookBannerState>('hidden')
   const webviewRef = useRef<HTMLElement | null>(null)
 
   const isClaudeCard = node.metadata?.initialCommand === 'claude' || !!node.metadata?.actionId
@@ -115,6 +145,11 @@ export function TerminalCard({ node }: TerminalCardProps) {
     if (vaultPath) {
       params.set('vaultPath', vaultPath)
     }
+
+    // Resolved theme hexes so cursor/selection match the app accent.
+    const theme = getResolvedTermTheme()
+    if (theme.accent) params.set('accent', theme.accent)
+    if (theme.bg) params.set('bg', theme.bg)
 
     // For Claude cards, build context in the host (has access to canvas store)
     if (node.metadata?.initialCommand === 'claude') {
@@ -279,6 +314,59 @@ export function TerminalCard({ node }: TerminalCardProps) {
     }
   }, [isFocused, isLocked, node.id, setFocusedTerminal])
 
+  // ── Shell-hook banner ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    const sid = node.content
+    if (!sid || sessionDead || hookBannerClaimed) return
+    if (localStorage.getItem(HOOK_BANNER_DISMISSED_KEY)) return
+
+    let cancelled = false
+    const timer = setTimeout(() => {
+      if (cancelled || hookBannerClaimed) return
+      // A prompt-start within the window means the hooks are live.
+      const blocks = useBlockStore.getState().blocksBySession[sid]
+      if (blocks && blocks.length > 0) return
+      void window.api.shell
+        .hooksStatus()
+        .then((status) => {
+          if (cancelled || hookBannerClaimed || status.installed) return
+          hookBannerClaimed = true
+          setHookBanner('offer')
+        })
+        .catch(() => {
+          // Status unavailable — skip the nudge rather than mis-advise.
+        })
+    }, HOOK_BANNER_DELAY_MS)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [node.content, sessionDead])
+
+  // Hooks emitting after all (manual install under another name): retract.
+  useEffect(() => {
+    if (hookBanner === 'offer' && sessionBlocks.length > 0) {
+      setHookBanner('hidden')
+    }
+  }, [hookBanner, sessionBlocks.length])
+
+  const handleInstallHooks = useCallback(async () => {
+    setHookBanner('installing')
+    try {
+      const result = await window.api.shell.installHooks()
+      setHookBanner(result.ok ? 'installed' : 'error')
+    } catch {
+      setHookBanner('error')
+    }
+  }, [])
+
+  const handleDismissHookBanner = useCallback(() => {
+    localStorage.setItem(HOOK_BANNER_DISMISSED_KEY, '1')
+    setHookBanner('hidden')
+  }, [])
+
   // ── Close handler ───────────────────────────────────────────────────────
 
   const handleClose = useCallback(() => {
@@ -361,11 +449,12 @@ export function TerminalCard({ node }: TerminalCardProps) {
               handlePinLatestBlock()
             }}
             title="Pin latest block to canvas"
-            className="canvas-card__action-btn flex items-center justify-center rounded"
+            className="canvas-card__action-btn flex items-center justify-center"
             style={{
               width: 24,
               height: 24,
               fontSize: 11,
+              borderRadius: borderRadius.tool,
               color: colors.text.muted,
               background: 'transparent',
               border: 'none',
@@ -393,6 +482,63 @@ export function TerminalCard({ node }: TerminalCardProps) {
         )
       }
     >
+      {!sessionDead && hookBanner !== 'hidden' ? (
+        <div
+          data-testid="terminal-hook-banner"
+          className="absolute left-2 right-2 bottom-2 z-10 flex items-center gap-2 px-3 py-2 text-xs"
+          style={{
+            background: 'rgba(12, 14, 20, 0.92)',
+            border: `1px solid ${colors.border.default}`,
+            borderRadius: borderRadius.tool,
+            color: colors.text.muted
+          }}
+        >
+          <span className="flex-1 min-w-0">
+            {hookBanner === 'offer' &&
+              'Enable structured blocks: install the Machina shell hooks to capture commands on the canvas.'}
+            {hookBanner === 'installing' && 'Installing shell hooks…'}
+            {hookBanner === 'installed' &&
+              'Shell hooks installed. New terminals (or `exec $SHELL`) emit structured blocks.'}
+            {hookBanner === 'error' &&
+              'Hook install failed. See resources/shell-hooks for manual setup.'}
+          </span>
+          {hookBanner === 'offer' ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                void handleInstallHooks()
+              }}
+              className="shrink-0 cursor-pointer"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: colors.accent.default,
+                fontSize: 11
+              }}
+            >
+              Set up
+            </button>
+          ) : null}
+          <button
+            type="button"
+            title="Dismiss"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleDismissHookBanner()
+            }}
+            className="shrink-0 cursor-pointer"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: colors.text.muted,
+              fontSize: 12
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
       {sessionDead ? (
         <div
           className="absolute inset-0 flex items-center justify-center"

@@ -5,7 +5,8 @@
 # docs/architecture/block-protocol.md for the wire format.
 #
 # Install: append `[ -f ~/.te.zsh ] && source ~/.te.zsh` to ~/.zshrc.
-# Or run "Set up shell hooks" from the thought-engine canvas command palette.
+# Or click "Set up" on the "Enable structured blocks" banner that appears in
+# a Machina terminal when the hooks are missing.
 #
 # Safe to source unconditionally: if the host shell isn't connected to a
 # thought-engine PTY (i.e. TE_SESSION_ID is unset), the hooks no-op.

@@ -82,10 +82,16 @@ vi.mock('../../../engine/context-serializer', () => ({
 const mockKill = vi.fn().mockResolvedValue(undefined)
 const mockGetHomePath = vi.fn(() => '/Users/test')
 const mockGetTerminalPreloadPath = vi.fn(() => '/path/to/preload/terminal-webview.js')
+const mockHooksStatus = vi.fn()
+const mockInstallHooks = vi.fn()
 
 ;(window as unknown as Record<string, unknown>).api = {
   terminal: {
     kill: mockKill
+  },
+  shell: {
+    hooksStatus: mockHooksStatus,
+    installHooks: mockInstallHooks
   },
   getHomePath: mockGetHomePath,
   getTerminalPreloadPath: mockGetTerminalPreloadPath

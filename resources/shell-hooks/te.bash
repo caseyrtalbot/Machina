@@ -4,7 +4,8 @@
 # docs/architecture/block-protocol.md for the wire format.
 #
 # Install: append `[ -f ~/.te.bash ] && source ~/.te.bash` to ~/.bashrc.
-# Or run "Set up shell hooks" from the thought-engine canvas command palette.
+# Or click "Set up" on the "Enable structured blocks" banner that appears in
+# a Machina terminal when the hooks are missing.
 
 if [ -n "${__TE_HOOK_LOADED:-}" ]; then
   return 0 2>/dev/null || true

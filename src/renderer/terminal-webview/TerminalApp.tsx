@@ -1,5 +1,5 @@
 import type {} from './terminal-api'
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -29,6 +29,32 @@ function readUrlParams(): {
     label: params.get('label'),
     vaultPath: params.get('vaultPath')
   }
+}
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/
+
+/**
+ * Theme hexes resolved by the host (TerminalCard) from the app's CSS vars and
+ * passed as URL params so cursor/selection match the app accent instead of a
+ * hardcoded palette. Falls back to the legacy colors when absent/invalid.
+ */
+function readThemeParams(): { accent: string; bg: string } {
+  const params = new URLSearchParams(window.location.search)
+  const accent = params.get('accent')
+  const bg = params.get('bg')
+  return {
+    accent: accent && HEX_RE.test(accent) ? accent : '#00e5bf',
+    bg: bg && HEX_RE.test(bg) ? bg : '#0c0e14'
+  }
+}
+
+const THEME = readThemeParams()
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 function estimateTermSize(container: HTMLDivElement | null): { cols: number; rows: number } {
@@ -71,6 +97,11 @@ export function TerminalApp() {
   const initialCommandTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const firstDataRef = useRef(true)
   const reconnectRef = useRef(false)
+
+  // ── Find bar (SearchAddon) ─────────────────────────────────────────────
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const findInputRef = useRef<HTMLInputElement>(null)
 
   // Store listener references so we can unsubscribe on cleanup
   const dataListenerRef = useRef<((data: { sessionId: string; data: string }) => void) | null>(null)
@@ -139,11 +170,11 @@ export function TerminalApp() {
       drawBoldTextInBrightColors: true,
       minimumContrastRatio: 1,
       theme: {
-        background: '#0c0e14',
+        background: THEME.bg,
         foreground: '#cdd6f4',
-        cursor: '#00e5bf',
-        cursorAccent: '#0c0e14',
-        selectionBackground: 'rgba(0, 229, 191, 0.18)',
+        cursor: THEME.accent,
+        cursorAccent: THEME.bg,
+        selectionBackground: hexToRgba(THEME.accent, 0.18),
         selectionForeground: '#cdd6f4',
         black: '#45475a',
         red: '#f38ba8',
@@ -180,7 +211,7 @@ export function TerminalApp() {
     term.loadAddon(unicode11Addon)
     term.unicode.activeVersion = '11'
 
-    // Cmd+F / Ctrl+F to trigger search
+    // Cmd+F / Ctrl+F opens the find bar
     term.attachCustomKeyEventHandler((e) => {
       if (e.key === 'Enter' && e.shiftKey) {
         if (e.type === 'keydown') {
@@ -192,7 +223,9 @@ export function TerminalApp() {
         return false
       }
       if (e.metaKey && e.key === 'f') {
-        searchAddon.findNext('')
+        if (e.type === 'keydown') {
+          setFindOpen(true)
+        }
         return false
       }
       return true
@@ -460,16 +493,139 @@ export function TerminalApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Find bar handlers ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (findOpen) {
+      findInputRef.current?.select()
+    }
+  }, [findOpen])
+
+  const handleFindChange = useCallback((value: string) => {
+    setFindQuery(value)
+    if (value) {
+      searchRef.current?.findNext(value, { incremental: true })
+    }
+  }, [])
+
+  const handleFindNext = useCallback(() => {
+    if (findQuery) searchRef.current?.findNext(findQuery)
+  }, [findQuery])
+
+  const handleFindPrevious = useCallback(() => {
+    if (findQuery) searchRef.current?.findPrevious(findQuery)
+  }, [findQuery])
+
+  const handleFindClose = useCallback(() => {
+    setFindOpen(false)
+    setFindQuery('')
+    try {
+      searchRef.current?.clearDecorations()
+      termRef.current?.clearSelection()
+    } catch {
+      // Addon already disposed
+    }
+    termRef.current?.focus()
+  }, [])
+
+  const handleFindKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          handleFindPrevious()
+        } else {
+          handleFindNext()
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        handleFindClose()
+      }
+    },
+    [handleFindNext, handleFindPrevious, handleFindClose]
+  )
+
+  const findButtonStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    color: '#8e95a8',
+    cursor: 'pointer',
+    fontSize: 12,
+    padding: '2px 4px',
+    lineHeight: 1
+  }
+
   return (
     <div
-      ref={containerRef}
       style={{
+        position: 'relative',
         width: '100%',
         height: '100%',
         minHeight: 0,
-        background: '#0c0e14',
+        background: THEME.bg,
         overflow: 'hidden'
       }}
-    />
+    >
+      <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 0 }} />
+      {findOpen ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: 6,
+            right: 14,
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            padding: '3px 6px',
+            background: THEME.bg,
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: 6
+          }}
+        >
+          <input
+            ref={findInputRef}
+            value={findQuery}
+            onChange={(e) => handleFindChange(e.target.value)}
+            onKeyDown={handleFindKeyDown}
+            placeholder="Find"
+            spellCheck={false}
+            style={{
+              width: 150,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: '#cdd6f4',
+              fontSize: 12,
+              fontFamily: "'JetBrains Mono', monospace"
+            }}
+          />
+          <button
+            type="button"
+            title="Previous match (Shift+Enter)"
+            onClick={handleFindPrevious}
+            style={findButtonStyle}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            title="Next match (Enter)"
+            onClick={handleFindNext}
+            style={findButtonStyle}
+          >
+            ›
+          </button>
+          <button
+            type="button"
+            title="Close (Esc)"
+            onClick={handleFindClose}
+            style={findButtonStyle}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }

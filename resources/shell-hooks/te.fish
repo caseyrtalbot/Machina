@@ -3,8 +3,9 @@
 # Emits OSC 1337; te- markers around each prompt and command. See
 # docs/architecture/block-protocol.md for the wire format.
 #
-# Install: copy this file to ~/.config/fish/conf.d/te.fish, or run
-# "Set up shell hooks" from the thought-engine canvas command palette.
+# Install: copy this file to ~/.config/fish/conf.d/te.fish, or click "Set up"
+# on the "Enable structured blocks" banner that appears in a Machina terminal
+# when the hooks are missing.
 
 # Guard against double-sourcing without exiting: conf.d files are sourced in
 # the shell's own context, so a file-scope `exit` would kill the shell.

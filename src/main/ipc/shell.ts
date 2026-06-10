@@ -1,4 +1,14 @@
+import { app } from 'electron'
+import { readFile } from 'fs/promises'
+import { homedir } from 'os'
+import { join } from 'path'
 import { ShellService } from '../services/shell-service'
+import {
+  detectShell,
+  getShellHookStatus,
+  hookTarget,
+  installShellHooks
+} from '../services/shell-hook-installer'
 import { typedHandle, typedHandleWithEvent } from '../typed-ipc'
 import { register, unregister, getWebContents } from '../services/session-router'
 import { BlockWatcher } from '../services/block-watcher'
@@ -111,6 +121,33 @@ export function registerShellIpc(): void {
   typedHandle('terminal:process-name', async (args) => {
     assertValidSessionId(args.sessionId)
     return shellService.getProcessName(args.sessionId)
+  })
+
+  // ── Block-protocol shell hooks ────────────────────────────────────────
+  // resources/** ships inside the app bundle (asarUnpack), so the bundled
+  // hook is readable at app.getAppPath()/resources in both dev and prod.
+
+  typedHandle('shell:hooks-status', async () => {
+    const target = hookTarget(detectShell(process.env.SHELL), homedir())
+    return getShellHookStatus(target)
+  })
+
+  typedHandle('shell:install-hooks', async () => {
+    const target = hookTarget(detectShell(process.env.SHELL), homedir())
+    const sourcePath = join(app.getAppPath(), 'resources', 'shell-hooks', target.hookFileName)
+    try {
+      const content = await readFile(sourcePath, 'utf-8')
+      return await installShellHooks(target, content)
+    } catch (error) {
+      return {
+        ok: false,
+        shell: target.shell,
+        hookPath: target.hookPath,
+        rcPath: target.rcPath,
+        rcUpdated: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
   })
 
   typedHandleWithEvent('terminal:reconnect', (args, event) => {
