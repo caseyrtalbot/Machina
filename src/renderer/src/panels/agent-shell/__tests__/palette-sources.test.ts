@@ -92,25 +92,22 @@ describe('palette-sources', () => {
     expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/spark.md' })
   })
 
-  it('emits one canvas surface item per discovered canvas id', () => {
+  it('emits only the default canvas entry even when other canvas ids are discovered', () => {
+    // Per-id canvas stores are not implemented (Wave 3 item 3.8) — hide the affordance.
     useVaultStore.setState({ canvasIds: ['default', 'research', 'planning'] })
     const items = buildPaletteItems({ closePalette: () => {} })
     const canvasItems = items.filter((i) => i.id.startsWith('surface:canvas:'))
-    expect(canvasItems.map((i) => i.title)).toEqual([
-      'Open canvas',
-      'Open canvas: research',
-      'Open canvas: planning'
-    ])
+    expect(canvasItems.map((i) => i.title)).toEqual(['Open canvas'])
   })
 
-  it('opening a non-default canvas surface routes the dock tab to that canvas id', () => {
+  it('opening the canvas surface routes the dock tab to the default canvas', () => {
     useVaultStore.setState({ canvasIds: ['default', 'research'] })
     useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
     const items = buildPaletteItems({ closePalette: () => {} })
-    const research = items.find((i) => i.id === 'surface:canvas:research')
-    expect(research).toBeDefined()
-    research!.run()
+    const canvas = items.find((i) => i.id === 'surface:canvas:default')
+    expect(canvas).toBeDefined()
+    canvas!.run()
     const tabs = useThreadStore.getState().dockTabsByThreadId['a']
-    expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'research' })
+    expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'default' })
   })
 })

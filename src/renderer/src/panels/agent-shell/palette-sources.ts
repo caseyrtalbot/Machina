@@ -57,20 +57,19 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
     })
   }
 
-  const canvasIds = vaultStore.canvasIds.length > 0 ? vaultStore.canvasIds : ['default']
-  for (const canvasId of canvasIds) {
-    const title = canvasId === 'default' ? 'Open canvas' : `Open canvas: ${canvasId}`
-    items.push({
-      id: `surface:canvas:${canvasId}`,
-      kind: 'surface',
-      title,
-      subtitle: 'dock surface',
-      run: () => {
-        opts.closePalette()
-        useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
-      }
-    })
-  }
+  // Only the default canvas is real today: named canvas tabs all render the single global
+  // canvas store, so per-id entries would show the wrong data. Restore per-id entries once
+  // Wave 3 item 3.8 lands real per-canvasId stores.
+  items.push({
+    id: 'surface:canvas:default',
+    kind: 'surface',
+    title: 'Open canvas',
+    subtitle: 'dock surface',
+    run: () => {
+      opts.closePalette()
+      useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: 'default' })
+    }
+  })
 
   const otherSurfaces: ReadonlyArray<{ kind: DockTab['kind']; title: string; tab: DockTab }> = [
     { kind: 'graph', title: 'Open graph view', tab: { kind: 'graph' } },
