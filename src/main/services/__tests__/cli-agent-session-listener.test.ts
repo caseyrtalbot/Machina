@@ -108,7 +108,7 @@ describe('CLIAgentSessionListener', () => {
     let block = withCommand('s1', 'claude --print "x"')
     listener.observe('s1', block)
     const text = '⏺ Read(file_path: "/a.ts")\n⏺ Bash(command: "ls")\n'
-    block = appendOutput(block, new TextEncoder().encode(text), text)
+    block = appendOutput(block, text)
     listener.observe('s1', block)
     const last = emitted[emitted.length - 1]
     expect(last.context.toolName).toBe('Bash')
@@ -120,7 +120,7 @@ describe('CLIAgentSessionListener', () => {
     let block = withCommand('s1', 'codex chat')
     listener.observe('s1', block)
     const text = '[tool_call] read_file path=/a.ts\n'
-    block = appendOutput(block, new TextEncoder().encode(text), text)
+    block = appendOutput(block, text)
     listener.observe('s1', block)
     const last = emitted[emitted.length - 1]
     expect(last.agentId).toBe('codex')
@@ -132,7 +132,7 @@ describe('CLIAgentSessionListener', () => {
     let block = withCommand('s1', 'gemini chat')
     listener.observe('s1', block)
     const text = '▷ search(query="vercel")\n'
-    block = appendOutput(block, new TextEncoder().encode(text), text)
+    block = appendOutput(block, text)
     listener.observe('s1', block)
     const last = emitted[emitted.length - 1]
     expect(last.agentId).toBe('gemini')
@@ -144,7 +144,7 @@ describe('CLIAgentSessionListener', () => {
     let block = withCommand('s1', 'claude --print "x"')
     listener.observe('s1', block)
     const noisy = '\x1b[0m⏺ Read(file_path: "/a.ts")\x1b[?2004l\n'
-    block = appendOutput(block, new TextEncoder().encode(noisy), noisy)
+    block = appendOutput(block, noisy)
     listener.observe('s1', block)
     const last = emitted[emitted.length - 1]
     expect(last.context.toolName).toBe('Read')
@@ -164,7 +164,7 @@ describe('CLIAgentSessionListener', () => {
     let block = withCommand('s1', 'claude --print "x"')
     listener.observe('s1', block) // in-progress, fires onStatus
     const text1 = '⏺ Read(file_path: "/a.ts")\n'
-    block = appendOutput(block, new TextEncoder().encode(text1), text1)
+    block = appendOutput(block, text1)
     listener.observe('s1', block) // context change only, fires onContext
     const done = completeBlock(block, 0, 5)
     if (!done.ok) return

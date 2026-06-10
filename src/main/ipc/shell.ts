@@ -68,6 +68,9 @@ export function registerShellIpc(): void {
       cliAgentThreadBridge.closeSession(sessionId)
       const wc = getWebContents(sessionId)
       if (wc) wc.send('terminal:exit', { sessionId, code })
+      // Also notify the main renderer (like block:update) so terminal status
+      // hooks (useTerminalStatus.markSettled) and block-store cleanup fire.
+      sendToMainWindow('terminal:exit', { sessionId: sessionId as SessionId, code })
       unregister(sessionId)
     }
   )

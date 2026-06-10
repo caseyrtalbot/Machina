@@ -39,7 +39,7 @@ describe('blockToMessage (pure mapping)', () => {
   it('maps a successful completed block to assistant + cli_command ok result', () => {
     const out = 'hello world\n'
     let block = startedBlock('s1', 'claude --print "hi"')
-    block = appendOutput(block, new TextEncoder().encode(out), out)
+    block = appendOutput(block, out)
     block = completed(block, 0)
 
     const msg = blockToMessage(block, claudeSpec)
@@ -61,7 +61,7 @@ describe('blockToMessage (pure mapping)', () => {
   it('maps a non-zero exit to ok=false with IO_FATAL and a hint of the last 300 chars', () => {
     const out = 'a'.repeat(500) + 'TAIL'
     let block = startedBlock('s2', 'claude --print "x"')
-    block = appendOutput(block, new TextEncoder().encode(out), out)
+    block = appendOutput(block, out)
     block = completed(block, 1)
 
     const msg = blockToMessage(block, claudeSpec)
@@ -78,7 +78,7 @@ describe('blockToMessage (pure mapping)', () => {
 
   it('maps a cancelled block to ok=false with IO_FATAL and exit -1', () => {
     let block = startedBlock('s3', 'claude --print "x"')
-    block = appendOutput(block, new TextEncoder().encode('partial'), 'partial')
+    block = appendOutput(block, 'partial')
     const r = cancelBlock(block, 5000)
     if (!r.ok) throw new Error(r.error)
     block = r.value
@@ -97,7 +97,7 @@ describe('blockToMessage (pure mapping)', () => {
   it('folds parsed inline tool calls into the message after the cli_command entry', () => {
     const out = '⏺ Read(file_path: "/a.ts")\n⏺ Bash(command: "ls")\n'
     let block = startedBlock('s4', 'claude --print "x"')
-    block = appendOutput(block, new TextEncoder().encode(out), out)
+    block = appendOutput(block, out)
     block = completed(block, 0)
 
     const msg = blockToMessage(block, claudeSpec)

@@ -48,8 +48,17 @@ __te_debug_trap() {
   [ "${BASH_COMMAND}" = "__te_prompt_command" ] && return 0
   if [ -z "${__TE_COMMAND_RUNNING:-}" ]; then
     __TE_COMMAND_RUNNING=1
-    local cwd=${PWD//;/%3B}
-    __te_emit "te-command-start;cwd=${cwd};ts=$(__te_now_ms);shell=bash"
+    local cwd=${PWD//\%/%25}
+    cwd=${cwd//;/%3B}
+    # Percent-encode the command so it survives as a single kv segment.
+    local cmd=${BASH_COMMAND}
+    cmd=${cmd//\%/%25}
+    cmd=${cmd//;/%3B}
+    cmd=${cmd//$'\x1b'/%1B}
+    cmd=${cmd//$'\x07'/%07}
+    cmd=${cmd//$'\r'/%0D}
+    cmd=${cmd//$'\n'/%0A}
+    __te_emit "te-command-start;cwd=${cwd};ts=$(__te_now_ms);shell=bash;cmd=${cmd}"
   fi
 }
 

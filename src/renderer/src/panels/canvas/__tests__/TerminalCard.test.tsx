@@ -232,20 +232,36 @@ describe('TerminalCard (webview host)', () => {
     expect(src).toContain('sessionId=session-abc-123')
   })
 
-  it('shows crash overlay and restart button when sessionDead is true', async () => {
+  it('shows dead-session overlay and restart button when the renderer process goes away', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-dead' })
     const { container } = render(<TerminalCard node={node} />)
 
-    // Simulate crash by finding and triggering the crashed listener
     const { webview } = attachWebviewHarness(container)
 
-    // Fire the 'crashed' event
-    dispatchWebviewEvent(webview, 'crashed')
+    // Electron 39 crash event for <webview> (legacy 'crashed' no longer fires).
+    dispatchWebviewEvent(webview, 'render-process-gone')
 
-    // After crash, overlay should appear
     const restartBtn = await screen.findByText('Restart')
     expect(restartBtn).toBeTruthy()
+  })
+
+  it('shows the dead-session overlay on normal exit (session-exited ipc-message)', async () => {
+    const { TerminalCard } = await import('../TerminalCard')
+    const node = makeTerminalNode({ content: 'session-exited-normally' })
+    const { container } = render(<TerminalCard node={node} />)
+
+    const { webview } = attachWebviewHarness(container)
+
+    await act(async () => {
+      dispatchWebviewEvent(webview, 'ipc-message', {
+        channel: 'session-exited',
+        args: ['session-exited-normally', 0]
+      })
+    })
+
+    expect(await screen.findByText('Session ended')).toBeTruthy()
+    expect(await screen.findByText('Restart')).toBeTruthy()
   })
 
   it('kills session and removes node on close', async () => {
@@ -407,7 +423,7 @@ describe('TerminalCard (webview host)', () => {
     const { webview } = attachWebviewHarness(container)
 
     await act(async () => {
-      dispatchWebviewEvent(webview, 'crashed')
+      dispatchWebviewEvent(webview, 'render-process-gone')
     })
     const restartBtn = await screen.findByText('Restart')
     await act(async () => {

@@ -1,5 +1,6 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { CardShell } from './CardShell'
+import { maskSecrets } from './block-pin'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useBlockStore } from '../../store/block-store'
 import { borderRadius, colors, typography } from '../../design/tokens'
@@ -69,7 +70,8 @@ function resolveFromMetadata(meta: Readonly<Record<string, unknown>>): ResolvedB
   return {
     command: (meta.command as string | undefined) ?? '',
     cwd: (meta.cwd as string | null | undefined) ?? null,
-    outputText: '',
+    // Snapshot persisted at pin time (already secret-masked + truncated).
+    outputText: (meta.outputSnapshot as string | undefined) ?? '',
     secrets: [],
     state: {
       kind: 'archived',
@@ -174,7 +176,7 @@ function BlockCardInner({ node }: BlockCardProps) {
   })
 
   const [revealed, setRevealed] = useState(false)
-  const [now] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   const resolved = useMemo(
     () => (liveBlock ? resolveFromBlock(liveBlock) : resolveFromMetadata(node.metadata)),
@@ -182,13 +184,21 @@ function BlockCardInner({ node }: BlockCardProps) {
   )
 
   const stateKind = resolved.state.kind
+
+  // Tick the elapsed display once a second while the block is running.
+  useEffect(() => {
+    if (stateKind !== 'running') return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [stateKind])
+
   const statusColor = STATUS_COLOR[stateKind] ?? colors.text.muted
   const ok = exitOk(resolved.state)
   const elapsed = elapsedFor(resolved.state, now)
   const cwdShort = resolved.cwd
     ? (resolved.cwd.split('/').filter(Boolean).pop() ?? resolved.cwd)
     : null
-  const title = resolved.command.trim() || '(no command)'
+  const title = maskSecrets(resolved.command.trim()) || '(no command)'
 
   const titleExtra = (
     <span

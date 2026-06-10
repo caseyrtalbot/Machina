@@ -1,0 +1,8 @@
+{"kind": "pty-bytes", "data": "\u001b]1337;te-prompt-start\u0007"}
+{"kind": "pty-bytes", "data": "\u001b]1337;te-command-start;cwd=/tmp;ts=1000;shell=zsh;cmd=echo \"hi%3B there\" 100%25\u0007"}
+{"kind": "pty-bytes", "data": "echo \"hi; there\" 100%\r\nhi; there 100%\r\n"}
+{"kind": "pty-bytes", "data": "\u001b]1337;te-command-end;exit=0;ts=1100\u0007"}
+{"kind": "pty-bytes", "data": "\u001b]1337;te-prompt-start\u0007"}
+{"kind": "pty-bytes", "data": "\u001b]1337;te-command-start;cwd=/tmp/with%3Bsemi;ts=2000;shell=zsh;cmd=git status\u0007"}
+{"kind": "pty-bytes", "data": "git status\r\nOn branch main\r\n"}
+{"kind": "pty-bytes", "data": "\u001b]1337;te-command-end;exit=0;ts=2100\u0007"}

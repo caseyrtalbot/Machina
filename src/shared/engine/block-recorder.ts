@@ -21,6 +21,7 @@ import {
   type ShellType
 } from './block-model'
 import { type BlockDetector, type BlockEvent } from './block-detector'
+import { extractCommand, stripTerminalControls } from './terminal-text'
 
 export type RecordedEvent = { readonly kind: 'pty-bytes'; readonly data: string } | BlockEvent
 
@@ -119,20 +120,27 @@ export function replay(
         }
         const base = current ?? pendingBlock(nextId(), meta)
         const withMeta: Block = { ...base, metadata: meta }
-        const started = startBlock(withMeta, '', ev.ts)
+        const started = startBlock(withMeta, ev.command ?? '', ev.ts)
         if (started.ok) current = started.value
         break
       }
       case 'output-chunk': {
         if (current === null) break
-        const bytes = new TextEncoder().encode(ev.text)
-        current = appendOutput(current, bytes, ev.text)
+        current = appendOutput(current, ev.text)
         break
       }
       case 'command-end': {
         if (current === null) break
         const done = completeBlock(current, ev.exit, ev.ts)
-        if (done.ok) current = done.value
+        if (done.ok) {
+          current = done.value
+          // No cmd= from the hook (or pre-hook recording): fall back to the
+          // command echo in the output, mirroring the production BlockWatcher.
+          if (current.command === '') {
+            const derived = extractCommand(stripTerminalControls(current.outputText))
+            if (derived !== '') current = { ...current, command: derived }
+          }
+        }
         break
       }
     }

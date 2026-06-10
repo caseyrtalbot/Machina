@@ -21,10 +21,22 @@ export type BlockEvent =
       readonly kind: 'command-start'
       readonly cwd: string
       readonly ts: number
+      /** Percent-decoded `cmd=` value from the shell hook; null when absent. */
+      readonly command: string | null
       readonly meta: Readonly<Record<string, string>>
     }
   | { readonly kind: 'command-end'; readonly exit: number; readonly ts: number }
   | { readonly kind: 'output-chunk'; readonly text: string }
+
+/** Hooks percent-encode `;`, `%`, ESC, BEL, CR, LF; a malformed escape
+ * (e.g. a lone `%` from an older hook) falls back to the raw value. */
+function decodePercent(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
 
 export interface BlockDetector {
   consume(chunk: Uint8Array | string): readonly BlockEvent[]
@@ -62,8 +74,14 @@ export function createBlockDetector(): BlockDetector {
         if (cwd === undefined || tsRaw === undefined) return null
         const ts = Number(tsRaw)
         if (!Number.isFinite(ts)) return null
-        const { cwd: _cwd, ts: _ts, ...rest } = kv
-        return { kind: 'command-start', cwd, ts, meta: rest }
+        const { cwd: _cwd, ts: _ts, cmd: _cmd, ...rest } = kv
+        return {
+          kind: 'command-start',
+          cwd: decodePercent(cwd),
+          ts,
+          command: kv.cmd !== undefined ? decodePercent(kv.cmd) : null,
+          meta: rest
+        }
       }
       case 'command-end': {
         const exitRaw = kv.exit

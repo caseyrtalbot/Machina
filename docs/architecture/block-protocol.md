@@ -10,8 +10,8 @@
   (prompt + command + output + exit code + cwd). See `src/shared/engine/block-model.ts`.
 - Coexist with iTerm2's existing `OSC 1337;` integrations — same namespace,
   unique payload prefix.
-- Survive without the hook installed: the detector treats absence of markers
-  as **legacy mode** and emits no fake blocks.
+- Survive without the hook installed: no markers means no blocks — the
+  detector never emits fake blocks (see Degraded mode).
 
 ## Wire format
 
@@ -30,16 +30,20 @@ ESC ]  1337  ;  te-<verb>  [ ; key=value ]*  BEL
 | Verb               | Emitted on         | Required keys           | Optional keys |
 |--------------------|--------------------|-------------------------|---------------|
 | `te-prompt-start`  | Before each prompt | —                       | —             |
-| `te-command-start` | After Enter        | `cwd=<abs>` `ts=<ms>`   | `user`, `host`, `shell` |
+| `te-command-start` | After Enter        | `cwd=<abs>` `ts=<ms>`   | `cmd`, `user`, `host`, `shell` |
 | `te-command-end`   | After command      | `exit=<int>` `ts=<ms>`  | —             |
 
-`ts` is Unix epoch milliseconds. `cwd` is absolute, percent-decoded.
+`ts` is Unix epoch milliseconds. `cwd` is absolute. `cmd` is the typed
+command line; hooks percent-encode `%`, `;`, ESC, BEL, CR, and LF so values
+survive as a single kv segment, and the detector percent-decodes `cwd` and
+`cmd`. When `cmd` is absent (older hook), the watcher derives the command
+from the echoed first output line at command-end.
 
 ### Examples
 
 ```
 \x1b]1337;te-prompt-start\x07
-\x1b]1337;te-command-start;cwd=/Users/casey/Projects/thought-engine;ts=1714512345012;shell=zsh\x07
+\x1b]1337;te-command-start;cwd=/Users/casey/Projects/thought-engine;ts=1714512345012;shell=zsh;cmd=ls -la\x07
 \x1b]1337;te-command-end;exit=0;ts=1714512347820\x07
 ```
 
@@ -57,7 +61,13 @@ consume(bytes: Uint8Array | string): readonly BlockEvent[]
 ```ts
 type BlockEvent =
   | { kind: 'prompt-start' }
-  | { kind: 'command-start'; cwd: string; ts: number; meta: Readonly<Record<string, string>> }
+  | {
+      kind: 'command-start'
+      cwd: string
+      ts: number
+      command: string | null
+      meta: Readonly<Record<string, string>>
+    }
   | { kind: 'command-end'; exit: number; ts: number }
   | { kind: 'output-chunk'; text: string }
 ```
@@ -74,16 +84,29 @@ Required behavior:
 - **Resilient**: malformed markers (missing required keys, bad numbers) are
   logged once and dropped — they must not stall the byte stream.
 
+## Pipeline bounds
+
+The watcher (`src/main/services/block-watcher.ts`) bounds the stream in two
+ways:
+
+- **Output cap**: `appendOutput` keeps the first 64 KB and most recent
+  256 KB of a block's output; the middle is replaced with a
+  `…[output truncated]…` marker and secret offsets are remapped across the
+  cut (`src/shared/engine/block-model.ts`).
+- **Emit throttle**: output-chunk snapshots emit at most once per 100 ms per
+  session (~10 Hz) with a trailing emit for the latest snapshot; state
+  transitions (pending/running/completed) always emit immediately.
+
 ## Degraded mode
 
-If a session has been running for ≥ 5 seconds without a `te-prompt-start`,
-the watcher (`src/main/services/block-watcher.ts`) marks it `legacy` and
-stops emitting `block:event`. The terminal still works as a dumb pipe; the
-canvas simply has no block cards to project.
+Structured mode is purely marker-driven — there is no timer and no explicit
+legacy flag. Without the hook installed (or when `TE_SESSION_ID` is unset)
+no `te-` markers appear, the watcher never forms blocks, the terminal works
+as a dumb pipe, and the canvas simply has no block cards to project.
 
-To re-enter structured mode, the user runs the **Set up shell hooks**
-command from the canvas command palette (Move 2 follow-up), which appends
-the hook to the appropriate rc file.
+To enter structured mode, source the matching hook from
+`resources/shell-hooks/` (e.g. append `[ -f ~/.te.zsh ] && source ~/.te.zsh`
+to `~/.zshrc`).
 
 ## Reserved namespace
 

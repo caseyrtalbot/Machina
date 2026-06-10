@@ -1,4 +1,4 @@
-import { cleanup, render, screen, fireEvent } from '@testing-library/react'
+import { act, cleanup, render, screen, fireEvent } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { Block, BlockMetadata } from '@shared/engine/block-model'
@@ -59,7 +59,7 @@ function buildCompleted(
   output = ''
 ): Block {
   const r = buildRunning(id, sessionId, command)
-  const withOutput = output ? appendOutput(r, new TextEncoder().encode(output), output) : r
+  const withOutput = output ? appendOutput(r, output) : r
   const c = completeBlock(withOutput, exitCode, Date.now())
   if (!c.ok) throw new Error(c.error)
   return c.value
@@ -91,7 +91,7 @@ function makeBlockNode(
       startedAtMs: null,
       finishedAtMs: null,
       cwd: null,
-      agentContext: null,
+      outputSnapshot: '',
       ...metaOverrides
     }
   }
@@ -178,6 +178,49 @@ describe('BlockCard', () => {
     )
     expect(screen.getByTestId('card-title').textContent).toContain('archived-command')
     expect(screen.getByTestId('block-status').getAttribute('data-state')).toBe('archived')
+  })
+
+  it('renders the persisted output snapshot for archived pins', async () => {
+    const { default: BlockCard } = await import('../BlockCard')
+    render(
+      <BlockCard
+        node={makeBlockNode('s1', 'b-missing', {
+          command: 'ls -la',
+          exitCode: 0,
+          outputSnapshot: 'file1.txt\nfile2.txt\n'
+        })}
+      />
+    )
+    const output = screen.getByTestId('block-output')
+    expect(output.textContent).toContain('file1.txt')
+    expect(output.textContent).toContain('file2.txt')
+  })
+
+  it('masks secrets appearing in the card title (live block command)', async () => {
+    const fake = 'AKIA' + 'IOSFODNN7EXAMPLE'
+    useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', `export K=${fake}`, 0))
+    const { default: BlockCard } = await import('../BlockCard')
+    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    const title = screen.getByTestId('card-title').textContent ?? ''
+    expect(title).not.toContain(fake)
+    expect(title).toContain('export K=')
+  })
+
+  it('ticks the elapsed display each second while running', async () => {
+    vi.useFakeTimers()
+    try {
+      useBlockStore.getState().applyUpdate('s1', buildRunning('b1', 's1', 'sleep 100'))
+      const { default: BlockCard } = await import('../BlockCard')
+      render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+      const before = screen.getByTestId('block-elapsed').textContent
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      const after = screen.getByTestId('block-elapsed').textContent
+      expect(after).not.toBe(before)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('updates when the underlying block transitions running → completed', async () => {

@@ -176,6 +176,10 @@ export function TerminalCard({ node }: TerminalCardProps) {
         const newSessionId = String(ipcEvent.args[0])
         sessionIdRef.current = toSessionId(newSessionId)
         updateContent(node.id, newSessionId)
+      } else if (ipcEvent.channel === 'session-exited') {
+        // Normal PTY exit (user typed `exit`, process ended): show the
+        // dead-session overlay so the card offers a restart.
+        setSessionDead(true)
       }
     }
 
@@ -198,14 +202,16 @@ export function TerminalCard({ node }: TerminalCardProps) {
 
     wv.addEventListener('dom-ready', handleDomReady)
     wv.addEventListener('ipc-message', handleIpcMessage)
-    wv.addEventListener('crashed', handleCrash)
+    // Electron 39: renderer crashes surface as 'render-process-gone'
+    // (the legacy 'crashed' event no longer exists on <webview>).
+    wv.addEventListener('render-process-gone', handleCrash)
     wv.addEventListener('did-fail-load', handleCrash)
 
     return () => {
       webviewReadyRef.current = false
       wv.removeEventListener('dom-ready', handleDomReady)
       wv.removeEventListener('ipc-message', handleIpcMessage)
-      wv.removeEventListener('crashed', handleCrash)
+      wv.removeEventListener('render-process-gone', handleCrash)
       wv.removeEventListener('did-fail-load', handleCrash)
     }
   }, [node.id, updateContent, webviewKey])
@@ -394,7 +400,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
         >
           <div className="text-center">
             <p className="text-sm mb-2" style={{ color: colors.text.muted }}>
-              Terminal crashed
+              Session ended
             </p>
             <button
               onClick={handleRestart}

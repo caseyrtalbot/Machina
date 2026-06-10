@@ -89,6 +89,41 @@ describe('BlockDetector', () => {
     expect(e.ts).toBe(10)
   })
 
+  it('percent-decodes the cmd= key into command and excludes it from meta', () => {
+    const d = createBlockDetector()
+    const events = d.consume(commandStart('/tmp', 10, ';shell=zsh;cmd=echo "hi%3B there" 100%25'))
+    expect(events).toHaveLength(1)
+    const e = events[0]
+    if (e.kind !== 'command-start') throw new Error('precondition')
+    expect(e.command).toBe('echo "hi; there" 100%')
+    expect('cmd' in e.meta).toBe(false)
+    expect(e.meta.shell).toBe('zsh')
+  })
+
+  it('reports command as null when cmd= is absent (older hook)', () => {
+    const d = createBlockDetector()
+    const events = d.consume(commandStart('/tmp', 10, ';shell=zsh'))
+    const e = events[0]
+    if (e.kind !== 'command-start') throw new Error('precondition')
+    expect(e.command).toBeNull()
+  })
+
+  it('falls back to the raw cmd value on a malformed percent escape', () => {
+    const d = createBlockDetector()
+    const events = d.consume(commandStart('/tmp', 10, ';cmd=progress 50%'))
+    const e = events[0]
+    if (e.kind !== 'command-start') throw new Error('precondition')
+    expect(e.command).toBe('progress 50%')
+  })
+
+  it('percent-decodes cwd', () => {
+    const d = createBlockDetector()
+    const events = d.consume(commandStart('/tmp/with%3Bsemi', 10))
+    const e = events[0]
+    if (e.kind !== 'command-start') throw new Error('precondition')
+    expect(e.cwd).toBe('/tmp/with;semi')
+  })
+
   it('handles a full command lifecycle', () => {
     const d = createBlockDetector()
     const stream = [

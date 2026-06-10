@@ -36,23 +36,24 @@ export interface SecretRef {
   readonly kind: string
 }
 
-export interface AgentContext {
-  readonly agentId: string
-  readonly sessionId: string | null
-  readonly toolName: string | null
-}
-
 export interface Block {
   readonly id: BlockId
   readonly metadata: BlockMetadata
   readonly prompt: string
   readonly command: string
-  readonly outputBytes: Uint8Array
   readonly outputText: string
   readonly state: BlockState
-  readonly agentContext: AgentContext | null
   readonly secrets: readonly SecretRef[]
 }
+
+/**
+ * Output cap: keep the first OUTPUT_HEAD_LIMIT chars and the most recent
+ * OUTPUT_TAIL_LIMIT chars; the middle is replaced by TRUNCATION_MARKER so
+ * a runaway command can't grow a block (and its IPC snapshots) unboundedly.
+ */
+export const OUTPUT_HEAD_LIMIT = 64 * 1024
+export const OUTPUT_TAIL_LIMIT = 256 * 1024
+export const TRUNCATION_MARKER = '\n…[output truncated]…\n'
 
 type Result<T, E = string> =
   | { readonly ok: true; readonly value: T }
@@ -64,10 +65,8 @@ export function pendingBlock(id: string, metadata: BlockMetadata): Block {
     metadata,
     prompt: '',
     command: '',
-    outputBytes: new Uint8Array(),
     outputText: '',
     state: { kind: 'pending' },
-    agentContext: null,
     secrets: []
   }
 }
@@ -113,13 +112,10 @@ export function cancelBlock(block: Block, finishedAt: number): Result<Block> {
   }
 }
 
-export function appendOutput(block: Block, chunkBytes: Uint8Array, chunkText: string): Block {
-  if (chunkBytes.byteLength === 0 && chunkText.length === 0) {
+export function appendOutput(block: Block, chunkText: string): Block {
+  if (chunkText.length === 0) {
     return block
   }
-  const merged = new Uint8Array(block.outputBytes.byteLength + chunkBytes.byteLength)
-  merged.set(block.outputBytes, 0)
-  merged.set(chunkBytes, block.outputBytes.byteLength)
   const outputText = block.outputText + chunkText
 
   // Re-scan only the new chunk plus an overlap window so a secret split across
@@ -140,9 +136,20 @@ export function appendOutput(block: Block, chunkBytes: Uint8Array, chunkText: st
   const kept = block.secrets.filter((s) => s.end <= rescanStart)
   const secrets = [...kept, ...newRefs]
 
-  return { ...block, outputBytes: merged, outputText, secrets }
-}
+  if (outputText.length <= OUTPUT_HEAD_LIMIT + OUTPUT_TAIL_LIMIT + TRUNCATION_MARKER.length) {
+    return { ...block, outputText, secrets }
+  }
 
-export function setAgentContext(block: Block, ctx: AgentContext): Block {
-  return { ...block, agentContext: ctx }
+  // Over the cap: cut the middle (which always contains any previous marker)
+  // and remap secret offsets across the cut. Secrets straddling either cut
+  // edge lose their text and are dropped.
+  const cutStart = OUTPUT_HEAD_LIMIT
+  const cutEnd = outputText.length - OUTPUT_TAIL_LIMIT
+  const cappedText = outputText.slice(0, cutStart) + TRUNCATION_MARKER + outputText.slice(cutEnd)
+  const shift = cutStart + TRUNCATION_MARKER.length - cutEnd
+  const cappedSecrets = secrets
+    .filter((s) => s.end <= cutStart || s.start >= cutEnd)
+    .map((s) => (s.start >= cutEnd ? { ...s, start: s.start + shift, end: s.end + shift } : s))
+
+  return { ...block, outputText: cappedText, secrets: cappedSecrets }
 }

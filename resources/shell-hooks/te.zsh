@@ -47,12 +47,21 @@ __te_precmd() {
   __te_emit "te-prompt-start"
 }
 
-# Fired after the user hits Enter, before the command runs.
+# Fired after the user hits Enter, before the command runs. $1 is the typed
+# command; percent-encode the characters that would break the kv wire format.
 __te_preexec() {
   __TE_COMMAND_RUNNING=1
-  local cwd
-  cwd=${PWD//;/%3B}
-  __te_emit "te-command-start;cwd=${cwd};ts=$(__te_now_ms);shell=zsh"
+  local cwd cmd
+  cwd=${PWD//\%/%25}
+  cwd=${cwd//;/%3B}
+  cmd=$1
+  cmd=${cmd//\%/%25}
+  cmd=${cmd//;/%3B}
+  cmd=${cmd//$'\x1b'/%1B}
+  cmd=${cmd//$'\x07'/%07}
+  cmd=${cmd//$'\r'/%0D}
+  cmd=${cmd//$'\n'/%0A}
+  __te_emit "te-command-start;cwd=${cwd};ts=$(__te_now_ms);shell=zsh;cmd=${cmd}"
 }
 
 # zsh's hook arrays.

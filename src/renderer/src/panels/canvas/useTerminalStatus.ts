@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
+import type { Block } from '@shared/engine/block-model'
 import { withTimeout } from '@renderer/utils/ipc-timeout'
+import { useBlockStore } from '../../store/block-store'
 
 // --- Types ---
 
@@ -30,11 +32,19 @@ export function deriveLabel(metadata: Readonly<Record<string, unknown>>): string
   return 'Terminal'
 }
 
+/** `ps -o comm=` returns a full path on macOS (`/bin/zsh`) and login shells
+ * carry a `-` prefix (`-zsh`); reduce to the bare shell name for matching. */
+export function shellBaseName(processName: string): string {
+  const base = processName.slice(processName.lastIndexOf('/') + 1)
+  return base.startsWith('-') ? base.slice(1) : base
+}
+
 export function deriveStatus(
   sessionId: string,
   settled: ReadonlyMap<string, number>,
   processNames: ReadonlyMap<string, string>,
-  metadata: Readonly<Record<string, unknown>>
+  metadata: Readonly<Record<string, unknown>>,
+  blocks?: readonly Block[]
 ): TerminalStatus['status'] {
   if (settled.has(sessionId)) {
     return settled.get(sessionId) !== 0 ? 'error' : 'dead'
@@ -45,7 +55,12 @@ export function deriveStatus(
   if (metadata.initialCommand === 'claude' || metadata.actionId) {
     return 'claude'
   }
-  const processName = processNames.get(sessionId) ?? ''
+  // Once blocks flow (shell hooks installed), a running block is the ground
+  // truth for busy — ps on the shell pid can't see foreground commands.
+  if (blocks !== undefined && blocks.length > 0) {
+    return blocks.some((b) => b.state.kind === 'running') ? 'busy' : 'idle'
+  }
+  const processName = shellBaseName(processNames.get(sessionId) ?? '')
   if (SHELL_SET.has(processName)) {
     return 'idle'
   }
@@ -57,6 +72,7 @@ export function deriveStatus(
 export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonly TerminalStatus[] {
   const [settled, setSettled] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [processNames, setProcessNames] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const blocksBySession = useBlockStore((s) => s.blocksBySession)
 
   const nodeKey = terminalNodes.map((n) => `${n.id}:${n.content}`).join(',')
 
@@ -142,7 +158,13 @@ export function useTerminalStatus(terminalNodes: readonly CanvasNode[]): readonl
       status:
         sessionId === ''
           ? 'unknown'
-          : deriveStatus(sessionId, settled, processNames, node.metadata),
+          : deriveStatus(
+              sessionId,
+              settled,
+              processNames,
+              node.metadata,
+              blocksBySession[sessionId]
+            ),
       processName: processNames.get(sessionId) ?? ''
     }
   })

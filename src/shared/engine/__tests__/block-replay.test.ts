@@ -45,6 +45,7 @@ describe('createBlockRecorder', () => {
         kind: 'command-start',
         cwd: '/tmp',
         ts: 100,
+        command: 'ls',
         meta: { shell: 'zsh', user: 'casey' }
       },
       { kind: 'output-chunk', text: 'world' },
@@ -87,7 +88,8 @@ describe('replay', () => {
     expect(blocks.map(summarize)).toEqual([
       {
         id: 'te-block-1',
-        command: '',
+        // No cmd= key in this pre-hook fixture: derived from the output echo.
+        command: 'ls',
         state: { kind: 'completed', startedAt: 1000, finishedAt: 1100, exitCode: 0 },
         outputText: 'ls\r\nfile1.txt  file2.txt\r\n',
         cwd: '/tmp',
@@ -119,6 +121,23 @@ describe('replay', () => {
     if (state.kind !== 'completed') return
     expect(state.exitCode).toBe(130)
     expect(blocks[0].outputText).toContain('^C')
+  })
+
+  it('populates command from the percent-encoded cmd= key in a hooked session', () => {
+    const serialized = readFileSync(join(FIXTURES_DIR, 'hooked-cmd.jsonl'), 'utf-8')
+    const blocks = replay(serialized, createBlockDetector(), { idFactory: fakeIdFactory() })
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0].command).toBe('echo "hi; there" 100%')
+    expect(blocks[0].metadata.cwd).toBe('/tmp')
+    expect(blocks[1].command).toBe('git status')
+    // cwd percent-decodes too (hooks encode `;` in paths).
+    expect(blocks[1].metadata.cwd).toBe('/tmp/with;semi')
+    expect(blocks[1].state).toEqual({
+      kind: 'completed',
+      startedAt: 2000,
+      finishedAt: 2100,
+      exitCode: 0
+    })
   })
 
   it('feeding the same recording twice yields identical block lists', () => {

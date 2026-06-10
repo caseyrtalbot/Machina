@@ -38,3 +38,22 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
     return list.find((b) => b.id === blockId)
   }
 }))
+
+// ---------------------------------------------------------------------------
+// Module-level IPC subscriptions: BlockWatcher snapshots flow in via
+// block:update; terminal:exit clears the session's blocks (pinned cards fall
+// back to their archived metadata). Guarded so plain unit tests can import
+// this module without a preload bridge.
+// ---------------------------------------------------------------------------
+
+if (typeof window !== 'undefined' && window.api?.on?.blockUpdate) {
+  window.api.on.blockUpdate(({ sessionId, block }) => {
+    useBlockStore.getState().applyUpdate(sessionId, block)
+  })
+}
+
+if (typeof window !== 'undefined' && window.api?.on?.terminalExit) {
+  window.api.on.terminalExit(({ sessionId }) => {
+    useBlockStore.getState().clearSession(sessionId)
+  })
+}

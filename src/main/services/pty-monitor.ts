@@ -95,7 +95,10 @@ export class PtyMonitor {
 
   private deriveStatus(currentCommand?: string): AgentSidecarState['status'] {
     if (!currentCommand) return 'alive'
-    return KNOWN_SHELLS.has(currentCommand) ? 'idle' : 'alive'
+    // `ps -o comm=` returns a full path on macOS (`/bin/zsh`); match on the
+    // basename (KNOWN_SHELLS also covers login-shell `-zsh` variants).
+    const base = currentCommand.slice(currentCommand.lastIndexOf('/') + 1)
+    return KNOWN_SHELLS.has(base) ? 'idle' : 'alive'
   }
 
   /** Batch-resolve process names for multiple PIDs in a single ps call. */

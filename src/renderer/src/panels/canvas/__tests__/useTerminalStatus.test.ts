@@ -27,8 +27,27 @@ const {
   useTerminalStatus,
   deriveLabel,
   deriveStatus,
+  shellBaseName,
   SHELL_SET: _SHELL_SET
 } = await import('../useTerminalStatus')
+const { useBlockStore } = await import('../../../store/block-store')
+const { pendingBlock, startBlock, completeBlock } = await import('@shared/engine/block-model')
+
+function runningBlock(sessionId: string) {
+  const r = startBlock(
+    pendingBlock('b1', { sessionId, cwd: '/tmp', user: null, host: null, shellType: 'zsh' }),
+    'sleep 99',
+    1000
+  )
+  if (!r.ok) throw new Error(r.error)
+  return r.value
+}
+
+function completedBlock(sessionId: string) {
+  const c = completeBlock(runningBlock(sessionId), 0, 2000)
+  if (!c.ok) throw new Error(c.error)
+  return c.value
+}
 
 // --- Helpers ---
 
@@ -100,6 +119,49 @@ describe('deriveStatus', () => {
     const processNames = new Map([['session-1', 'npm']])
     expect(deriveStatus('session-1', settled, processNames, {})).toBe('busy')
   })
+
+  it('returns "idle" for full-path comm values (macOS ps returns /bin/zsh)', () => {
+    const settled = new Map<string, number>()
+    const processNames = new Map([['session-1', '/bin/zsh']])
+    expect(deriveStatus('session-1', settled, processNames, {})).toBe('idle')
+  })
+
+  it('returns "idle" for login-shell comm values (-zsh)', () => {
+    const settled = new Map<string, number>()
+    const processNames = new Map([['session-1', '-zsh']])
+    expect(deriveStatus('session-1', settled, processNames, {})).toBe('idle')
+  })
+
+  it('derives "busy" from a running block, overriding the shell process name', () => {
+    const settled = new Map<string, number>()
+    const processNames = new Map([['session-1', '/bin/zsh']])
+    expect(deriveStatus('session-1', settled, processNames, {}, [runningBlock('session-1')])).toBe(
+      'busy'
+    )
+  })
+
+  it('derives "idle" from settled blocks even when ps reports a non-shell', () => {
+    const settled = new Map<string, number>()
+    const processNames = new Map([['session-1', 'npm']])
+    expect(
+      deriveStatus('session-1', settled, processNames, {}, [completedBlock('session-1')])
+    ).toBe('idle')
+  })
+
+  it('falls back to process-name matching when the session has no blocks', () => {
+    const settled = new Map<string, number>()
+    const processNames = new Map([['session-1', 'npm']])
+    expect(deriveStatus('session-1', settled, processNames, {}, [])).toBe('busy')
+  })
+})
+
+describe('shellBaseName', () => {
+  it('strips path and login-shell dash', () => {
+    expect(shellBaseName('/bin/zsh')).toBe('zsh')
+    expect(shellBaseName('-zsh')).toBe('zsh')
+    expect(shellBaseName('zsh')).toBe('zsh')
+    expect(shellBaseName('/usr/local/bin/fish')).toBe('fish')
+  })
 })
 
 // --- Hook tests ---
@@ -107,6 +169,7 @@ describe('deriveStatus', () => {
 describe('useTerminalStatus', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    useBlockStore.setState(useBlockStore.getInitialState())
     mockGetProcessName.mockReset()
     mockTerminalExit.mockReset()
     exitCallback = null
@@ -163,6 +226,26 @@ describe('useTerminalStatus', () => {
     expect(result.current).toHaveLength(1)
     expect(result.current[0].status).toBe('busy')
     expect(result.current[0].processName).toBe('npm')
+  })
+
+  it('reports "busy" from a running block even when ps sees only the shell', async () => {
+    mockGetProcessName.mockResolvedValue('/bin/zsh')
+    useBlockStore.getState().applyUpdate('session-abc', runningBlock('session-abc'))
+
+    const nodes = [makeTerminalNode()]
+    const { result } = renderHook(() => useTerminalStatus(nodes))
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(result.current[0].status).toBe('busy')
+
+    // Block completes → back to idle.
+    act(() => {
+      useBlockStore.getState().applyUpdate('session-abc', completedBlock('session-abc'))
+    })
+    expect(result.current[0].status).toBe('idle')
   })
 
   it('returns "claude" when metadata.initialCommand === "claude"', async () => {
