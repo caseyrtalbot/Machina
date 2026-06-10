@@ -179,7 +179,7 @@ function TitleBarButton({
     <button
       ref={ref}
       onClick={onClick}
-      className="canvas-card__action-btn flex items-center justify-center rounded hover:opacity-80"
+      className="canvas-card__action-btn flex items-center justify-center hover:opacity-80"
       style={{
         width: 24,
         height: 24,
@@ -518,7 +518,7 @@ export function CardShell({
               e.stopPropagation()
               handleClose()
             }}
-            className="canvas-card__action-btn tile-close-btn flex items-center justify-center rounded"
+            className="canvas-card__action-btn tile-close-btn flex items-center justify-center"
             style={{
               width: 24,
               height: 24,

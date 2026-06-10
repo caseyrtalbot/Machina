@@ -609,7 +609,8 @@ body {
   --color-bg-elevated: #0a0a0d;
   --bg-card: #0a0a0d;
   --bg-card-hover: #0e0e12;
-  --bg-overlay: rgba(0, 0, 0, 0.72);
+  /* One scrim for every modal-class surface (tokens.ts colors.scrim.modal). */
+  --scrim-modal: rgba(0, 0, 0, 0.55);
 
   /* ── Hairlines: alpha ramp + back-compat aliases ── */
   --line-faint: rgba(255, 255, 255, 0.04);
@@ -675,7 +676,6 @@ body {
   --panel-gap: 0;
   --panel-radius: 0;
   --panel-padding: 12px 16px;
-  --neon-glow: 0 0 8px color-mix(in srgb, var(--color-accent-default) 15%, transparent);
   --color-accent-focus: color-mix(in srgb, var(--color-accent-default) 30%, transparent);
   --color-accent-subtle: color-mix(in srgb, var(--color-accent-default) 15%, transparent);
   --chrome-panel-bg: color-mix(in srgb, var(--color-bg-base) 86%, transparent);
@@ -1094,6 +1094,8 @@ body {
 }
 
 .tree-directory-row {
+  /* Density-aware row grid: 22px compact / 26px default / 32px comfy. */
+  min-height: var(--row-h);
   border-radius: var(--r-tool);
   transition: background 100ms ease, outline-color 100ms ease, color 120ms ease-out;
 }
@@ -1109,6 +1111,8 @@ body {
 .file-row-hover {
   position: relative;
   margin: 0;
+  /* Density-aware row grid: 22px compact / 26px default / 32px comfy. */
+  min-height: var(--row-h);
   border-radius: var(--r-tool);
   transition: color 150ms ease-out;
 }
@@ -1334,6 +1338,26 @@ body {
 }
 .interactive-hover:hover {
   background-color: var(--color-bg-elevated);
+}
+
+/* Onboarding overlay — CSS hover states (no JS style mutation). */
+.te-onboarding-icon-btn {
+  background-color: transparent;
+}
+.te-onboarding-icon-btn:hover {
+  background-color: var(--bg-tint-text);
+}
+.te-onboarding-cta {
+  background-color: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+}
+.te-onboarding-cta:hover {
+  background-color: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+}
+.te-onboarding-skip {
+  color: var(--color-text-muted);
+}
+.te-onboarding-skip:hover {
+  color: var(--color-text-secondary);
 }
 
 /* ─── Panels ─── */
@@ -2668,7 +2692,8 @@ body {
 }
 
 .settings-content {
-  padding: 8px 16px 24px;
+  /* Density-aware panel padding (16px at default density). */
+  padding: 8px var(--pad-panel-x) 24px;
 }
 
 .settings-section-heading {
@@ -2701,7 +2726,8 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 0;
+  /* Density-aware row padding: 4px compact / 8px default / 12px comfy. */
+  padding: calc(var(--pad-panel-y) - 4px) 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -2711,7 +2737,7 @@ body {
 
 .settings-label {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--ui-fs);
   line-height: 1.35;
   letter-spacing: 0;
   color: var(--color-text-primary);

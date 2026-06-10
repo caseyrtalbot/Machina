@@ -1,10 +1,12 @@
+import { SIGNAL_COLORS } from '../../design/themes'
 import type { FlatTreeNode } from './buildFileTree'
 
 export type ArtifactOrigin = 'human' | 'source' | 'agent'
 
+// Semantic signal palette so origin tints match status dots and diff lines.
 const ORIGIN_COLORS: Record<ArtifactOrigin, string | undefined> = {
-  source: '#60a5fa', // blue — raw ingested material
-  agent: '#4ade80', // green — LLM-produced content
+  source: SIGNAL_COLORS.info, // blue — raw ingested material
+  agent: SIGNAL_COLORS.success, // green — LLM-produced content
   human: undefined // default (no override)
 }
 

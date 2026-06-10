@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useSettingsStore } from '@renderer/store/settings-store'
+import { useUiStore } from '@renderer/store/ui-store'
 import { GraphRenderer } from './graph-renderer'
 import { LabelLayer } from './graph-label-layer'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
@@ -109,7 +110,7 @@ function GraphEmptyState({
       <div
         className="max-w-md px-5 py-4 text-center"
         style={{
-          backgroundColor: 'rgba(14, 14, 18, 0.94)',
+          backgroundColor: floatingPanel.glass.bg,
           backdropFilter: floatingPanel.glass.blur,
           border: '1px solid var(--color-border-default)',
           boxShadow: floatingPanel.shadow
@@ -139,12 +140,15 @@ function GraphStatusRail({
   readonly nodeCount: number
   readonly edgeCount: number
 }) {
+  const tutorialDismissed = useUiStore((s) => s.graphTutorialDismissed)
+  const dismissGraphTutorial = useUiStore((s) => s.dismissGraphTutorial)
+
   return (
     <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none">
       <div
-        className="px-3 py-1.5 rounded-full text-xs font-mono"
+        className="px-3 py-1.5 text-xs font-mono"
         style={{
-          backgroundColor: 'rgba(10, 10, 14, 0.86)',
+          backgroundColor: floatingPanel.glass.bg,
           backdropFilter: floatingPanel.glass.blur,
           border: '1px solid var(--line-subtle)',
           color: colors.text.secondary
@@ -154,17 +158,29 @@ function GraphStatusRail({
         <span style={{ opacity: 0.3, margin: '0 8px' }}>|</span>
         {edgeCount} edges
       </div>
-      <div
-        className="px-3 py-1.5 rounded-full text-xs"
-        style={{
-          backgroundColor: 'rgba(10, 10, 14, 0.72)',
-          backdropFilter: floatingPanel.glass.blur,
-          border: '1px solid var(--line-faint)',
-          color: colors.text.muted
-        }}
-      >
-        Hover to isolate neighborhoods. Drag to compare clusters.
-      </div>
+      {!tutorialDismissed && (
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 text-xs pointer-events-auto"
+          style={{
+            backgroundColor: floatingPanel.glass.bg,
+            backdropFilter: floatingPanel.glass.blur,
+            border: '1px solid var(--line-faint)',
+            color: colors.text.muted
+          }}
+        >
+          Hover to isolate neighborhoods. Drag to compare clusters.
+          <button
+            type="button"
+            onClick={dismissGraphTutorial}
+            className="cursor-pointer leading-none"
+            style={{ color: colors.text.muted, padding: '0 2px' }}
+            title="Dismiss tip"
+            aria-label="Dismiss tip"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -495,7 +511,7 @@ export function GraphPanel() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(circle at 50% 40%, rgba(152, 135, 232, 0.08), transparent 32%), linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28%, transparent 72%, rgba(255, 255, 255, 0.03))'
+            'radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-accent-default) 8%, transparent), transparent 32%), linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28%, transparent 72%, rgba(255, 255, 255, 0.03))'
         }}
       />
 
@@ -511,9 +527,9 @@ export function GraphPanel() {
       {rawFileCount > 0 && !isGraphEmpty && (
         <div className="absolute inset-0 flex items-end justify-center z-10 pointer-events-none pb-14">
           <div
-            className="text-center px-4 py-2 rounded-full"
+            className="text-center px-4 py-2"
             style={{
-              backgroundColor: 'rgba(10, 10, 14, 0.92)',
+              backgroundColor: floatingPanel.glass.bg,
               backdropFilter: floatingPanel.glass.blur,
               border: '1px solid color-mix(in srgb, var(--canvas-link-cyan) 18%, transparent)',
               boxShadow: floatingPanel.shadowCompact
@@ -550,7 +566,7 @@ export function GraphPanel() {
         style={{
           width: 32,
           height: 32,
-          backgroundColor: showSettings ? 'var(--color-accent-default)' : 'rgba(12, 12, 16, 0.86)',
+          backgroundColor: showSettings ? 'var(--color-accent-default)' : floatingPanel.glass.bg,
           border: '1px solid var(--line-subtle)',
           color: showSettings ? 'var(--color-accent-fg)' : 'var(--color-text-secondary)',
           backdropFilter: floatingPanel.glass.blur,
@@ -586,9 +602,9 @@ export function GraphPanel() {
           <button
             type="button"
             onClick={handleFitAll}
-            className="text-xs px-3 py-1.5 rounded-full transition-all cursor-pointer"
+            className="text-xs px-3 py-1.5 transition-all cursor-pointer"
             style={{
-              backgroundColor: 'rgba(12, 12, 16, 0.86)',
+              backgroundColor: floatingPanel.glass.bg,
               backdropFilter: floatingPanel.glass.blur,
               border: '1px solid var(--line-subtle)',
               color: 'var(--color-text-secondary)'
@@ -604,9 +620,9 @@ export function GraphPanel() {
             Fit All
           </button>
           <span
-            className="text-xs tabular-nums font-mono px-2 py-1.5 rounded-full"
+            className="text-xs tabular-nums font-mono px-2 py-1.5"
             style={{
-              backgroundColor: 'rgba(12, 12, 16, 0.86)',
+              backgroundColor: floatingPanel.glass.bg,
               backdropFilter: floatingPanel.glass.blur,
               border: '1px solid var(--line-subtle)',
               color: 'var(--color-text-muted)',

@@ -11,7 +11,6 @@ const ACCENT_VARS = [
   '--color-accent-default',
   '--color-accent-hover',
   '--color-accent-muted',
-  '--neon-glow',
   '--color-accent-focus',
   '--color-accent-subtle',
   '--color-accent-soft',
@@ -86,7 +85,11 @@ describe('applyAccentCssVars', () => {
     expect(style.getPropertyValue('--color-accent-subtle')).toBe('rgba(65, 224, 212, 0.15)')
     expect(style.getPropertyValue('--color-accent-soft')).toBe('rgba(65, 224, 212, 0.16)')
     expect(style.getPropertyValue('--color-accent-line')).toBe('rgba(65, 224, 212, 0.5)')
-    expect(style.getPropertyValue('--neon-glow')).toBe('0 0 8px rgba(65, 224, 212, 0.15)')
+  })
+
+  it('does not emit the retired --neon-glow var', () => {
+    applyAccentCssVars('#41e0d4')
+    expect(document.documentElement.style.getPropertyValue('--neon-glow')).toBe('')
   })
 
   it('never emits NaN-laced rgba values for invalid input (falls back to default)', () => {

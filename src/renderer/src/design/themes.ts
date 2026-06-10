@@ -112,21 +112,6 @@ export const SIGNAL_COLORS = {
   info: '#6dafff'
 } as const
 
-/** Per-artifact dot hues. Mirrors `ARTIFACT_COLORS` in `tokens.ts` so they
- * stay in sync if either is retuned; emitted as `--hue-*` CSS vars for
- * consumers that key off CSS rather than the typed map. */
-export const ARTIFACT_HUES = {
-  gene: '#00cca8',
-  constraint: '#ff847d',
-  research: '#ad9cff',
-  output: '#ec86cc',
-  note: '#a3afc1',
-  index: '#00befa',
-  session: '#4ec983',
-  pattern: '#dfa11a',
-  tension: '#fe838f'
-} as const
-
 /** Density → row height + UI font sizes + panel padding. Mirrors the
  * `[data-density="compact|default|comfy"]` blocks in `tokens.css`. */
 export const DENSITY_VARS: Record<Density, Record<string, string>> = {

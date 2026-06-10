@@ -26,20 +26,35 @@ export function CardShellSkeleton({ node }: CardShellSkeletonProps) {
         style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
       >
         <div
-          className="h-3 rounded"
-          style={{ width: '60%', backgroundColor: colors.border.subtle }}
+          className="h-3"
+          style={{
+            width: '60%',
+            borderRadius: borderRadius.inline,
+            backgroundColor: colors.border.subtle
+          }}
         />
       </div>
       {/* Body skeleton */}
       <div className="flex-1 p-3 space-y-2">
-        <div className="h-2 rounded" style={{ backgroundColor: colors.border.subtle }} />
         <div
-          className="h-2 rounded"
-          style={{ width: '80%', backgroundColor: colors.border.subtle }}
+          className="h-2"
+          style={{ borderRadius: borderRadius.inline, backgroundColor: colors.border.subtle }}
         />
         <div
-          className="h-2 rounded"
-          style={{ width: '60%', backgroundColor: colors.border.subtle }}
+          className="h-2"
+          style={{
+            width: '80%',
+            borderRadius: borderRadius.inline,
+            backgroundColor: colors.border.subtle
+          }}
+        />
+        <div
+          className="h-2"
+          style={{
+            width: '60%',
+            borderRadius: borderRadius.inline,
+            backgroundColor: colors.border.subtle
+          }}
         />
       </div>
     </div>

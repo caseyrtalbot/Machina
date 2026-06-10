@@ -6,6 +6,7 @@ import { useUiStore } from '@renderer/store/ui-store'
 import { useThreadStore } from '@renderer/store/thread-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import {
+  borderRadius,
   colors,
   floatingPanel,
   getArtifactColor,
@@ -67,8 +68,12 @@ function BacklinksList({
             key={a.id}
             type="button"
             onClick={() => onNavigate(a.id)}
-            className="text-left text-xs truncate px-2 py-1 rounded interactive-hover"
-            style={{ color: colors.text.secondary, transition: transitions.hover }}
+            className="text-left text-xs truncate px-2 py-1 interactive-hover"
+            style={{
+              borderRadius: borderRadius.inline,
+              color: colors.text.secondary,
+              transition: transitions.hover
+            }}
           >
             <span
               className="inline-block w-1.5 h-1.5 rounded-full mr-1.5"
@@ -162,8 +167,8 @@ export function GraphDetailDrawer() {
               <button
                 type="button"
                 onClick={() => setSelectedNode(null)}
-                className="shrink-0 text-xs rounded p-1 interactive-hover"
-                style={{ color: colors.text.muted }}
+                className="shrink-0 text-xs p-1 interactive-hover"
+                style={{ borderRadius: borderRadius.inline, color: colors.text.muted }}
                 title="Close drawer"
                 aria-label="Close drawer"
               >
@@ -187,8 +192,10 @@ export function GraphDetailDrawer() {
               {artifact.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[11px] px-2 py-0.5 rounded-full"
+                  className="text-[11px] px-2 py-0.5"
                   style={{
+                    borderRadius: borderRadius.inline,
+                    border: '1px solid var(--line-subtle)',
                     color: colors.text.muted,
                     backgroundColor: 'rgba(255, 255, 255, 0.04)'
                   }}
@@ -204,8 +211,9 @@ export function GraphDetailDrawer() {
             <button
               type="button"
               onClick={handleOpenInEditor}
-              className="text-xs self-start interactive-hover px-2 py-1 rounded"
+              className="text-xs self-start interactive-hover px-2 py-1"
               style={{
+                borderRadius: borderRadius.inline,
                 color: colors.accent.default,
                 transition: transitions.hover
               }}
@@ -266,8 +274,8 @@ function GhostDrawerContent({
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 text-xs rounded p-1 interactive-hover"
-            style={{ color: colors.text.muted }}
+            className="shrink-0 text-xs p-1 interactive-hover"
+            style={{ borderRadius: borderRadius.inline, color: colors.text.muted }}
             title="Close drawer"
             aria-label="Close drawer"
           >
@@ -296,8 +304,12 @@ function GhostDrawerContent({
             {ghostEntry.references.map((ref, i) => (
               <div
                 key={i}
-                className="text-xs rounded px-2 py-1.5"
-                style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', color: colors.text.secondary }}
+                className="text-xs px-2 py-1.5"
+                style={{
+                  borderRadius: borderRadius.inline,
+                  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                  color: colors.text.secondary
+                }}
               >
                 <div className="font-medium mb-0.5" style={{ color: colors.text.primary }}>
                   {ref.fileTitle}
@@ -314,8 +326,9 @@ function GhostDrawerContent({
           type="button"
           onClick={handleCreate}
           disabled={isEmerging}
-          className="text-xs px-2.5 py-1 rounded interactive-hover"
+          className="text-xs px-2.5 py-1 interactive-hover"
           style={{
+            borderRadius: borderRadius.inline,
             backgroundColor: 'rgba(255, 255, 255, 0.08)',
             color: colors.text.primary,
             opacity: isEmerging ? 0.5 : 1,
@@ -327,8 +340,12 @@ function GhostDrawerContent({
         <button
           type="button"
           onClick={() => dismissGhost(ghostId)}
-          className="text-xs px-2.5 py-1 rounded interactive-hover"
-          style={{ color: colors.text.muted, transition: transitions.hover }}
+          className="text-xs px-2.5 py-1 interactive-hover"
+          style={{
+            borderRadius: borderRadius.inline,
+            color: colors.text.muted,
+            transition: transitions.hover
+          }}
         >
           Dismiss
         </button>

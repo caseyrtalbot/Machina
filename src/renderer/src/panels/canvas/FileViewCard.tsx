@@ -6,7 +6,7 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useThreadStore } from '../../store/thread-store'
 import { CardShell } from './CardShell'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
 import {
   createEditorExtensions,
@@ -333,10 +333,11 @@ export function FileViewCard({ node }: FileViewCardProps) {
                 e.stopPropagation()
                 handleRefresh()
               }}
-              className="flex items-center justify-center rounded hover:opacity-80"
+              className="flex items-center justify-center hover:opacity-80"
               style={{
                 width: 22,
                 height: 22,
+                borderRadius: borderRadius.tool,
                 color: colors.accent.default,
                 cursor: 'pointer',
                 backgroundColor: 'transparent',

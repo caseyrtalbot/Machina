@@ -31,10 +31,11 @@ export const colors = {
     tension: '#ecaa0b'
   },
   // Single source of truth for the dim layer behind modal-class surfaces
-  // (command palette, quick switcher). Coachmark overlays keep their own
-  // lighter alpha — scrim is for surfaces that block interaction beneath them.
+  // (settings, command palette, import palette, save dialogs, onboarding).
+  // Emitted as --scrim-modal in index.css; scrim is for surfaces that block
+  // interaction beneath them.
   scrim: {
-    modal: 'rgba(0, 0, 0, 0.55)'
+    modal: 'var(--scrim-modal)'
   },
   claude: {
     ready: '#4ec983', // ARTIFACT_COLORS.session emerald
@@ -209,16 +210,17 @@ export const transitions = {
   commandPalette: '150ms ease-out'
 } as const
 
-// Console-direction radii: KNIFE-EDGE. Every rectangular surface sits flat at
-// 0 (cards, pills, chips, tabs, buttons, inputs, tool cards, toolbars,
-// containers). Only `pill` (toggle tracks) and `round` (dots / knobs / avatars)
-// stay curved. Wired to the `--r-*` CSS vars via RADII_VARS.square in themes.ts.
+// Console-direction radii. Emit the `--r-*` CSS vars (set per Soft/Square
+// preset via RADII_VARS in themes.ts) so every inline consumer tracks the
+// settings toggle. Knife-edge `square` resolves them all to 0; `soft` rounds
+// (6px / 4px / 8px). Only `pill` (toggle tracks) and `round` (dots / knobs /
+// avatars) stay curved in both presets.
 export const borderRadius = {
-  container: 0,
-  inline: 0,
-  tool: 0,
-  card: 0,
-  pill: 999,
+  container: 'var(--r-card)',
+  inline: 'var(--r-inline)',
+  tool: 'var(--r-tool)',
+  card: 'var(--r-card)',
+  pill: 'var(--r-pill)',
   round: '50%'
 } as const
 

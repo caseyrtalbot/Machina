@@ -6,7 +6,15 @@ import {
   type DragFileData,
   type DragMoveData
 } from '../canvas/file-drop-utils'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
+import {
+  ARTIFACT_COLORS,
+  borderRadius,
+  colors,
+  getArtifactColor,
+  transitions,
+  typography
+} from '../../design/tokens'
+import { SIGNAL_COLORS } from '../../design/themes'
 import { useSettingsStore } from '../../store/settings-store'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { RenameInput } from './FileContextMenu'
@@ -622,15 +630,16 @@ function DirectoryRow({
   )
 }
 
-/** Action-specific colors for the icon dot indicator */
+/** Action-specific colors for the icon dot indicator. Keyed off the artifact
+ * palette so action dots stay in sync with graph/badge colors. */
 const ACTION_ICON_COLORS: Record<string, string> = {
-  challenge: '#ff847d', // red — stress-testing
-  emerge: '#ad9cff', // purple — synthesis
-  organize: '#00befa', // sky — grouping
-  tidy: '#4ec983', // green — cleanup
-  compile: '#dfa11a', // amber — compilation
-  librarian: '#60b8d6', // cyan — indexing
-  curator: '#4ade80' // green — curation
+  challenge: ARTIFACT_COLORS.constraint, // red — stress-testing
+  emerge: ARTIFACT_COLORS.research, // purple — synthesis
+  organize: ARTIFACT_COLORS.index, // sky — grouping
+  tidy: ARTIFACT_COLORS.session, // green — cleanup
+  compile: ARTIFACT_COLORS.pattern, // amber — compilation
+  librarian: getArtifactColor('librarian'), // cyan — indexing
+  curator: ARTIFACT_COLORS.session // green — curation
 }
 
 function getActionColor(actionName: string | undefined): string | undefined {
@@ -767,7 +776,7 @@ function FileRow({
             color: actionColor
               ? actionColor
               : isAgentModified
-                ? '#4ade80'
+                ? SIGNAL_COLORS.success
                 : isActive
                   ? colors.text.primary
                   : colors.text.primary

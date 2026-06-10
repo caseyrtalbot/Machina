@@ -51,7 +51,6 @@ export function applyAccentCssVars(hex: string = ACCENT_HEX): void {
     parseInt(safe.slice(3, 5), 16),
     parseInt(safe.slice(5, 7), 16)
   ]
-  root.style.setProperty('--neon-glow', `0 0 8px rgba(${r}, ${g}, ${b}, 0.15)`)
   root.style.setProperty('--color-accent-focus', `rgba(${r}, ${g}, ${b}, 0.3)`)
   root.style.setProperty('--color-accent-subtle', `rgba(${r}, ${g}, ${b}, 0.15)`)
   root.style.setProperty('--color-accent-soft', `rgba(${r}, ${g}, ${b}, 0.16)`)

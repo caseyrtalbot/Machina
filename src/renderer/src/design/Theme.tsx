@@ -6,7 +6,6 @@ import {
   ENV_DEFAULTS,
   LINE_ALPHAS,
   SIGNAL_COLORS,
-  ARTIFACT_HUES,
   DENSITY_VARS,
   RADII_VARS,
   BACKGROUND_VARIANTS,
@@ -76,7 +75,6 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   root.style.setProperty('--color-bg-rail', bg.rail)
   root.style.setProperty('--bg-card', bg.card)
   root.style.setProperty('--bg-card-hover', bg.cardHover)
-  root.style.setProperty('--bg-overlay', 'rgba(0, 0, 0, 0.72)')
 
   // Accent-tinted surface fills (referenced by pills, vault card, palette).
   root.style.setProperty(
@@ -123,11 +121,6 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   root.style.setProperty('--signal-warn', SIGNAL_COLORS.warn)
   root.style.setProperty('--signal-danger', SIGNAL_COLORS.danger)
   root.style.setProperty('--signal-info', SIGNAL_COLORS.info)
-
-  // ── Artifact hues (graph nodes, dots, badges) ──
-  for (const [key, value] of Object.entries(ARTIFACT_HUES)) {
-    root.style.setProperty(`--hue-${key}`, value)
-  }
 
   // ── Density / radii (live-tweakable) ──
   root.dataset.density = env.density

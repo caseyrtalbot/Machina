@@ -7,6 +7,7 @@ import {
   type ArtifactOrigin
 } from '../../src/renderer/src/panels/sidebar/origin-utils'
 import { useSettingsStore } from '../../src/renderer/src/store/settings-store'
+import { SIGNAL_COLORS } from '../../src/renderer/src/design/themes'
 import type { FlatTreeNode } from '../../src/renderer/src/panels/sidebar/buildFileTree'
 
 function makeNode(overrides: Partial<FlatTreeNode> = {}): FlatTreeNode {
@@ -59,7 +60,7 @@ describe('getFolderOriginColor', () => {
       ['/vault/dir/a.md', 'agent'],
       ['/vault/dir/b.md', 'agent']
     ])
-    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe('#4ade80')
+    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe(SIGNAL_COLORS.success)
   })
 
   it('returns source color when all children are source origin', () => {
@@ -71,7 +72,7 @@ describe('getFolderOriginColor', () => {
       ['/vault/dir/a.md', 'source'],
       ['/vault/dir/b.md', 'source']
     ])
-    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe('#60a5fa')
+    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe(SIGNAL_COLORS.info)
   })
 
   it('returns undefined when children have mixed origins', () => {
@@ -119,7 +120,7 @@ describe('getFolderOriginColor', () => {
       makeNode({ path: '/vault/dir/a.md', parentPath: '/vault/dir', isDirectory: false })
     ]
     const origins = new Map<string, ArtifactOrigin>([['/vault/dir/a.md', 'agent']])
-    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe('#4ade80')
+    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe(SIGNAL_COLORS.success)
   })
 
   it('only considers direct children, not nested descendants', () => {
@@ -136,7 +137,7 @@ describe('getFolderOriginColor', () => {
       ['/vault/dir/sub/deep.md', 'agent']
     ])
     // Only /vault/dir/a.md is a direct child; deep.md belongs to /vault/dir/sub
-    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe('#4ade80')
+    expect(getFolderOriginColor('/vault/dir', origins, nodes)).toBe(SIGNAL_COLORS.success)
   })
 })
 

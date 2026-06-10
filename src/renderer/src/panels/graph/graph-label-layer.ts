@@ -7,6 +7,7 @@ export class LabelLayer {
   private ctx: CanvasRenderingContext2D
   private dpr: number
   private fontFamily: string | null = null
+  private labelColor: string | null = null
 
   constructor() {
     this.canvas = document.createElement('canvas')
@@ -66,6 +67,13 @@ export class LabelLayer {
         getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() ||
         'system-ui, sans-serif'
     }
+    // Theme vars are static at runtime; resolve once and reuse per frame.
+    if (this.labelColor === null) {
+      this.labelColor =
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--color-text-primary')
+          .trim() || '#e2e8f0'
+    }
     ctx.font = `500 ${fontSize}px ${this.fontFamily}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -100,7 +108,7 @@ export class LabelLayer {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)'
       ctx.lineWidth = 4
       ctx.strokeText(label, sx, sy + yOffset)
-      ctx.fillStyle = '#e2e8f0'
+      ctx.fillStyle = this.labelColor
       ctx.fillText(label, sx, sy + yOffset)
     }
 

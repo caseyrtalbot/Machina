@@ -6,7 +6,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { useCanvasStore } from '../../store/canvas-store'
 import { CardShell } from './CardShell'
-import { colors } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
 import type { CanvasNode, CodeNodeMeta } from '@shared/canvas-types'
 import {
   LANGUAGES,
@@ -136,8 +136,9 @@ export function CodeCard({ node }: CodeCardProps) {
                 e.stopPropagation()
                 setShowLangPicker(!showLangPicker)
               }}
-              className="text-xs px-2 py-0.5 rounded"
+              className="text-xs px-2 py-0.5"
               style={{
+                borderRadius: borderRadius.inline,
                 backgroundColor: colors.accent.muted,
                 color: colors.text.secondary
               }}

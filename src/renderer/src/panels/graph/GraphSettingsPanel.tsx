@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useSettingsStore } from '@renderer/store/settings-store'
-import { colors, floatingPanel, typography } from '@renderer/design/tokens'
+import { borderRadius, colors, floatingPanel, typography } from '@renderer/design/tokens'
 import type { ForceParams } from './graph-types'
 import { DEFAULT_FORCE_PARAMS } from './graph-types'
 
@@ -287,8 +287,9 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
       <div className="flex gap-2">
         <button
           onClick={onReheat}
-          className="flex-1 text-xs py-1.5 rounded transition-colors cursor-pointer"
+          className="flex-1 text-xs py-1.5 transition-colors cursor-pointer"
           style={{
+            borderRadius: borderRadius.inline,
             backgroundColor: 'var(--color-bg-elevated)',
             color: colors.text.secondary,
             border: '1px solid var(--color-border-default)'
@@ -304,8 +305,9 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
         </button>
         <button
           onClick={handleReset}
-          className="flex-1 text-xs py-1.5 rounded transition-colors cursor-pointer"
+          className="flex-1 text-xs py-1.5 transition-colors cursor-pointer"
           style={{
+            borderRadius: borderRadius.inline,
             backgroundColor: 'var(--color-bg-elevated)',
             color: colors.text.secondary,
             border: '1px solid var(--color-border-default)'

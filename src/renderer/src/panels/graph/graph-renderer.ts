@@ -1,3 +1,8 @@
+// Production CSP drops 'unsafe-eval' (main/index.ts PROD_CSP). This shim
+// replaces Pixi's `new Function` uniform-sync codegen with a non-eval path;
+// without it Renderer init throws under that CSP. Must load before any
+// Pixi renderer is created.
+import 'pixi.js/unsafe-eval'
 import { Application, Container, Graphics } from 'pixi.js'
 import { quadtree as d3Quadtree, type Quadtree } from 'd3-quadtree'
 import type { SimNode, GraphViewport, LodLevel } from './graph-types'

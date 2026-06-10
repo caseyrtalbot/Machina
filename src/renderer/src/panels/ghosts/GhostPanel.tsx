@@ -382,7 +382,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
       <span
         style={{
           fontSize: 11,
-          color: '#3e4550',
+          color: colors.text.muted,
           fontVariantNumeric: 'tabular-nums',
           minWidth: 18,
           textAlign: 'right' as const,

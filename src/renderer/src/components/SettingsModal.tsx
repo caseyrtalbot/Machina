@@ -353,7 +353,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         aria-hidden
         onClick={onClose}
         className="absolute inset-0"
-        style={{ background: 'var(--bg-overlay)' }}
+        style={{ background: colors.scrim.modal }}
       />
       <div
         role="dialog"

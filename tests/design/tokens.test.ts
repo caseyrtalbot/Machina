@@ -36,14 +36,14 @@ describe('design tokens', () => {
 })
 
 describe('extended design tokens', () => {
-  it('has border-radius constants', () => {
-    // Console-direction radii: KNIFE-EDGE (all rectangular surfaces 0). See `tokens.ts`.
-    expect(borderRadius.container).toBe(0)
-    expect(borderRadius.inline).toBe(0)
-    expect(borderRadius.tool).toBe(0)
-    expect(borderRadius.card).toBe(0)
-    // Exceptions that stay curved: pill (toggle tracks) + round (dots/knobs/avatars).
-    expect(borderRadius.pill).toBe(999)
+  it('emits border-radius as --r-* CSS vars so consumers track the Soft/Square toggle', () => {
+    // Radii resolve through RADII_VARS in themes.ts (square → 0, soft → 6/4/8px).
+    expect(borderRadius.container).toBe('var(--r-card)')
+    expect(borderRadius.inline).toBe('var(--r-inline)')
+    expect(borderRadius.tool).toBe('var(--r-tool)')
+    expect(borderRadius.card).toBe('var(--r-card)')
+    expect(borderRadius.pill).toBe('var(--r-pill)')
+    // Dots / knobs / avatars stay round in both presets.
     expect(borderRadius.round).toBe('50%')
   })
 
