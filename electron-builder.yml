@@ -22,10 +22,30 @@ mac:
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+  # --- Signing + notarization (enable when Apple Developer credentials exist) ---
+  # 1. Install the "Developer ID Application" certificate in the login keychain
+  #    (electron-builder auto-discovers it), or export a .p12 and set:
+  #      CSC_LINK=<base64 .p12 or file path>  CSC_KEY_PASSWORD=<p12 password>
+  # 2. Set notarization credentials in the build environment:
+  #      APPLE_ID=<apple id email>
+  #      APPLE_APP_SPECIFIC_PASSWORD=<app-specific password from appleid.apple.com>
+  #      APPLE_TEAM_ID=<10-char team id>
+  # 3. Flip `notarize` to true below and add `hardenedRuntime: true`
+  #    (hardened runtime is required for notarization; entitlements above stay).
+  # 4. Build with `npm run build:mac`; electron-builder signs, notarizes, and staples.
   notarize: false
 dmg:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
+# --- Auto-update publish feed (add when a real release channel exists) ---
+# electron-builder writes the feed into resources/app-update.yml at package time;
+# src/main/services/auto-update.ts only activates when that file (or the
+# MACHINA_UPDATE_FEED_URL env override) is present. Example providers:
+#   publish:
+#     provider: github
+#     owner: caseyrtalbot
+#     repo: Machina
+# or:
+#   publish:
+#     provider: generic
+#     url: https://updates.example.com/machina
