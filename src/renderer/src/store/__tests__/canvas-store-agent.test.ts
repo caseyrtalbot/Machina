@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useCanvasStore } from '../canvas-store'
+import { setErrorNotifier } from '../../utils/error-logger'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import type { CanvasNode, CanvasEdge } from '@shared/canvas-types'
 
@@ -73,6 +74,38 @@ describe('canvas-store applyAgentPlan', () => {
     expect(nodes).toHaveLength(1)
     expect(nodes[0].id).toBe('n2')
     expect(edges).toHaveLength(0)
+  })
+
+  it('rejects a plan whose ops no longer validate against live store state', () => {
+    const notify = vi.fn()
+    setErrorNotifier(notify)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      useCanvasStore.setState({ nodes: [makeNode('n1')], isDirty: false })
+      // n-gone was removed from the live canvas after the plan was built.
+      const plan = makePlan([{ type: 'move-node', nodeId: 'n-gone', position: { x: 1, y: 1 } }])
+      useCanvasStore.getState().applyAgentPlan(plan)
+      const { nodes, isDirty } = useCanvasStore.getState()
+      expect(nodes[0].position).toEqual({ x: 0, y: 0 })
+      expect(isDirty).toBe(false)
+      expect(notify).toHaveBeenCalledTimes(1)
+    } finally {
+      setErrorNotifier(() => {})
+      spy.mockRestore()
+    }
+  })
+
+  it('rejects a plan adding a node whose id now exists in the live store', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      useCanvasStore.setState({ nodes: [makeNode('n1')], isDirty: false })
+      const plan = makePlan([{ type: 'add-node', node: makeNode('n1') }])
+      useCanvasStore.getState().applyAgentPlan(plan)
+      expect(useCanvasStore.getState().nodes).toHaveLength(1)
+      expect(useCanvasStore.getState().isDirty).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('applies all ops in a single store update', () => {

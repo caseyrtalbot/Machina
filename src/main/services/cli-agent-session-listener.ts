@@ -15,6 +15,12 @@
  *
  * Pure side-effect-free except for the user-supplied emitters; all state
  * lives in this object so it's trivially mockable.
+ *
+ * Decision (refactor item 2.2): KEEP and wire, don't delete. The listener is
+ * instantiated in main/ipc/shell.ts and its events reach the renderer via the
+ * `cli-agent:session-status-changed` / `cli-agent:context-updated` channels
+ * (functional now that Block.command is populated, item 1.7). Renderer badge
+ * rendering on terminal cards / dock pills ships in item 3.12.
  */
 
 import { basename } from 'path'

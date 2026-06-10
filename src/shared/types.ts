@@ -152,14 +152,14 @@ export interface UiPersistedState {
   dismissedGhosts: readonly string[]
   outlineVisible: boolean
   bookmarkedPaths: readonly string[]
+  /** One-time "Hover to isolate" graph tutorial pill. Optional so state.json
+   * files written before this field existed rehydrate cleanly. */
+  graphTutorialDismissed?: boolean
 }
 
 export interface VaultState {
   version: number
   lastOpenNote: string | null
-  panelLayout: { sidebarWidth: number }
   fileTreeCollapseState: Record<string, boolean>
-  selectedNodeId: string | null
-  recentFiles: string[]
   ui?: UiPersistedState
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useThreadStore } from '../thread-store'
+import { useThreadStore, flushDockState } from '../thread-store'
 import type { Thread } from '@shared/thread-types'
 
 const sampleThread = (id: string): Thread => ({
@@ -185,6 +185,60 @@ describe('thread-store', () => {
     ])
   })
 
+  it('represents tool-only assistant turns in native history as a textual tool summary', async () => {
+    const run = vi.fn().mockResolvedValue({ runId: 'r-10' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.agentNative = { run }
+    const t: Thread = {
+      ...sampleThread('a'),
+      messages: [
+        { role: 'user', body: 'read my note', sentAt: '2026-05-01T13:00:00Z' },
+        {
+          role: 'assistant',
+          body: '',
+          sentAt: '2026-05-01T13:00:01Z',
+          toolCalls: [
+            {
+              call: { id: 't1', kind: 'read_note', args: { path: 'a.md' } },
+              result: { id: 't1', ok: true, output: { content: 'note body' } }
+            }
+          ]
+        },
+        { role: 'assistant', body: 'done reading', sentAt: '2026-05-01T13:00:02Z' }
+      ]
+    }
+    useThreadStore.setState({ vaultPath: '/v', activeThreadId: 'a', threadsById: { a: t } })
+    await useThreadStore.getState().appendUserMessage('and now?')
+    const history = run.mock.calls[0][0].historyMessages as Array<{
+      role: string
+      content: string
+    }>
+    expect(history).toHaveLength(3)
+    expect(history[1].role).toBe('assistant')
+    expect(history[1].content).toContain('[tool read_note')
+    expect(history[1].content).toContain('a.md')
+    expect(history[1].content).toContain('note body')
+    expect(history[2]).toEqual({ role: 'assistant', content: 'done reading' })
+  })
+
+  it('setThreadModel updates a native thread and persists; CLI threads are ignored', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: {
+        a: sampleThread('a'),
+        b: { ...sampleThread('b'), agent: 'cli-claude' as const }
+      }
+    })
+    await useThreadStore.getState().setThreadModel('a', 'claude-opus-4-8')
+    expect(useThreadStore.getState().threadsById['a'].model).toBe('claude-opus-4-8')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalledTimes(1)
+    await useThreadStore.getState().setThreadModel('b', 'claude-opus-4-8')
+    expect(useThreadStore.getState().threadsById['b'].model).toBe('claude-sonnet-4-6')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalledTimes(1)
+  })
+
   it('clears in-flight and appends a system message when CLI input delivery fails', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: false }) }
@@ -217,6 +271,73 @@ describe('thread-store', () => {
     expect(
       useThreadStore.getState().threadsById['a'].messages.some((m) => m.role === 'system')
     ).toBe(false)
+  })
+
+  it('archiveThread moves the thread out of threadsById and into archivedThreads', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: sampleThread('a') }
+    })
+    await useThreadStore.getState().archiveThread('a')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.archive).toHaveBeenCalledWith('/v', 'a')
+    expect(useThreadStore.getState().threadsById['a']).toBeUndefined()
+    expect(useThreadStore.getState().archivedThreads.map((t) => t.id)).toEqual(['a'])
+    expect(useThreadStore.getState().activeThreadId).toBeNull()
+  })
+
+  it('loadArchivedThreads populates archivedThreads from the IPC list', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.listArchived = vi
+      .fn()
+      .mockResolvedValue([sampleThread('x'), sampleThread('y')])
+    useThreadStore.setState({ vaultPath: '/v' })
+    await useThreadStore.getState().loadArchivedThreads()
+    expect(useThreadStore.getState().archivedThreads.map((t) => t.id)).toEqual(['x', 'y'])
+  })
+
+  it('unarchiveThread restores the thread and removes it from archivedThreads', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.list = vi.fn().mockResolvedValue([sampleThread('a')])
+    useThreadStore.setState({
+      vaultPath: '/v',
+      archivedThreads: [sampleThread('a'), sampleThread('b')]
+    })
+    await useThreadStore.getState().unarchiveThread('a')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.unarchive).toHaveBeenCalledWith('/v', 'a')
+    expect(useThreadStore.getState().archivedThreads.map((t) => t.id)).toEqual(['b'])
+    expect(useThreadStore.getState().threadsById['a']).toBeDefined()
+  })
+
+  it('deleteArchivedThread unarchives first (thread:delete targets live threads) then deletes', async () => {
+    const order: string[] = []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.unarchive = vi.fn(async () => {
+      order.push('unarchive')
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.delete = vi.fn(async () => {
+      order.push('delete')
+    })
+    useThreadStore.setState({ vaultPath: '/v', archivedThreads: [sampleThread('a')] })
+    await useThreadStore.getState().deleteArchivedThread('a')
+    expect(order).toEqual(['unarchive', 'delete'])
+    expect(useThreadStore.getState().archivedThreads).toEqual([])
+  })
+
+  it('flushDockState persists the thread with its current dock tabs', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: { a: sampleThread('a') },
+      dockTabsByThreadId: { a: [{ kind: 'graph' }] }
+    })
+    await flushDockState('a')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const save = (window as any).api.thread.save as ReturnType<typeof vi.fn>
+    expect(save).toHaveBeenCalledTimes(1)
+    expect((save.mock.calls[0][1] as Thread).dockState.tabs).toEqual([{ kind: 'graph' }])
   })
 
   it('toggleAutoAccept flips the per-thread autoAcceptSession flag in memory only (no disk write)', () => {

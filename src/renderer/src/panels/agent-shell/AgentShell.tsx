@@ -13,6 +13,7 @@ import { persistFilesPanelOpen, readPersistedFilesPanelOpen } from './files-side
 import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
+import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 import { TitlebarBreadcrumb } from '../../components/TitlebarBreadcrumb'
 import { Statusbar } from '../../components/Statusbar'
@@ -56,7 +57,7 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
         const sorted = [...threads].sort((a, b) => b.lastMessage.localeCompare(a.lastMessage))
         await store.selectThread(sorted[0].id)
       } else {
-        await store.createThread('machina-native', 'claude-sonnet-4-6', 'Welcome')
+        await store.createThread('machina-native', DEFAULT_NATIVE_MODEL, 'Welcome')
       }
     })()
   }, [vaultPath, setVaultPath, loadThreads, loadLayout])

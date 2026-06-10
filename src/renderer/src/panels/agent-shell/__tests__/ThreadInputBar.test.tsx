@@ -47,6 +47,31 @@ describe('ThreadInputBar', () => {
     expect(screen.getByText(/Cancel/i)).toBeTruthy()
   })
 
+  it('shows a model selector for native threads and updates the thread model', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: thread('a') }
+    })
+    render(<ThreadInputBar />)
+    const select = screen.getByTestId('thread-model-select') as HTMLSelectElement
+    expect(select.value).toBe('claude-sonnet-4-6')
+    fireEvent.change(select, { target: { value: 'claude-opus-4-8' } })
+    await vi.waitFor(() => {
+      expect(useThreadStore.getState().threadsById['a'].model).toBe('claude-opus-4-8')
+    })
+  })
+
+  it('hides the model selector for CLI threads', () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: thread('a', { agent: 'cli-claude' }) }
+    })
+    render(<ThreadInputBar />)
+    expect(screen.queryByTestId('thread-model-select')).toBeNull()
+  })
+
   it('Stop button is hidden when no run is in flight', () => {
     useThreadStore.setState({
       vaultPath: '/v',

@@ -1,3 +1,18 @@
+/**
+ * Single source of truth for the native agent's model id (2.2). Replaces the
+ * hardcoded 'claude-sonnet-4-6' literals previously spread across the
+ * agent-shell renderer surfaces. Exact ids per the current model catalog —
+ * never append date suffixes.
+ */
+export const DEFAULT_NATIVE_MODEL = 'claude-sonnet-4-6'
+
+/** Models offered by the native-thread model selector. Default first. */
+export const NATIVE_MODEL_OPTIONS = [
+  'claude-sonnet-4-6',
+  'claude-opus-4-8',
+  'claude-haiku-4-5'
+] as const
+
 interface NativeToolSpec {
   readonly name: string
   readonly description: string

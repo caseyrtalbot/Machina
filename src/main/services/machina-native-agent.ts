@@ -1,27 +1,55 @@
 import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { app } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
 import { resolveAnthropicKey } from './anthropic-key'
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { NATIVE_TOOLS } from '@shared/machina-native-tools'
+import { TE_DIR } from '@shared/constants'
 import { callTool, clearApproval } from './machina-native-tools'
 import { getDocumentManager } from '../ipc/documents'
 import { AuditLogger } from './audit-logger'
 import { WriteRateLimiter } from './hitl-gate'
 import type { AgentNativeEventBody, DockAction } from '@shared/ipc-channels'
 import type { DockTab } from '@shared/dock-types'
-import type { ToolCall, ToolResult } from '@shared/thread-types'
+import type { ToolResult } from '@shared/thread-types'
 
 const DEFAULT_TIMEOUT_MS = 60_000
-const MAX_TOKENS = 4096
+// Streaming throughout, so the SDK-HTTP-timeout ceiling doesn't apply; 64K is
+// the output ceiling of the Sonnet/Haiku options in NATIVE_MODEL_OPTIONS.
+// (Was 4096, which truncated long syntheses mid-note.)
+const MAX_TOKENS = 64_000
 const MAX_TOOL_ITERATIONS = 8
+
+/**
+ * Default system prompt for the in-app native agent. Owned by the main
+ * process (2.2); the renderer no longer ships a prompt over IPC. A vault can
+ * override it wholesale via `<vault>/${TE_DIR}/agent-prompt.md`.
+ */
+export const DEFAULT_SYSTEM_PROMPT = `You are Machina, the in-app agent for the user's Markdown vault in the Machina app (infinite canvas + terminal + knowledge graph).
+
+Vault structure:
+- The vault is a folder of Markdown notes. All paths you use are relative to the vault root (e.g. "ideas/spark.md").
+- Frontmatter (YAML between --- fences) may carry id, title, tags, created/modified, and relationship arrays (connections, cluster, tension). Preserve existing frontmatter when editing.
+- App-internal state lives under "${TE_DIR}/" — never write there with note tools.
+
+Conventions:
+- Wikilinks: [[Note Title]] links notes by title; prefer wikilinks over bare paths inside note bodies. Links and shared tags are how the knowledge graph forms — when you create a note, link it to the notes that motivated it.
+- Canvases: canvasId "default" is the user's visible canvas. To show an existing vault note on the canvas, pin it by path (card.path) — never retype its content. Use card.content only for free-form synthesis cards.
+
+Tool selection:
+- list_vault / search_vault to discover; read_note to inspect. search_vault is a literal, case-sensitive substring match — not regex.
+- read before write: read_note a file before write_note or edit_note so you never clobber content you have not seen. Prefer edit_note (surgical find/replace) over write_note for existing files; the find string must be unique.
+- Writes show the user a diff for approval unless the thread is in auto-accept mode. A rejected write is a signal to stop and ask, not retry.
+- Dock tools (open_dock_tab / close_dock_tab) drive the user's workspace — use them only when the user asks to see something.
+
+Style: concise and grounded. Cite the notes you used by wikilink. Never invent vault content — if a note doesn't exist, say so.`
 
 interface RunOptions {
   readonly vaultPath: string
   readonly threadId: string
   readonly model: string
-  readonly systemPrompt: string
   readonly userMessage: string
   readonly historyMessages: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>
   readonly autoAccept?: boolean
@@ -68,125 +96,25 @@ function classifyError(err: unknown, aborted: boolean): AgentNativeEventBody {
   return { kind: 'error', code: 'IO_FATAL', message }
 }
 
-function asToolCall(name: string, id: string, input: Record<string, unknown>): ToolCall | null {
-  if (name === 'read_note' && typeof input.path === 'string') {
-    return { id, kind: 'read_note', args: { path: input.path } }
+/**
+ * Resolve the system prompt for a vault: `${TE_DIR}/agent-prompt.md` wins when
+ * present and non-empty; otherwise the built-in default. Exported for tests.
+ */
+export async function resolveSystemPrompt(vaultPath: string): Promise<string> {
+  try {
+    const override = await readFile(join(vaultPath, TE_DIR, 'agent-prompt.md'), 'utf8')
+    if (override.trim().length > 0) return override
+  } catch {
+    // No override file — use the default.
   }
-  if (name === 'list_vault') {
-    const raw = input.globs
-    const globs =
-      Array.isArray(raw) && raw.every((g): g is string => typeof g === 'string')
-        ? (raw as string[])
-        : undefined
-    return { id, kind: 'list_vault', args: globs ? { globs } : {} }
-  }
-  if (
-    name === 'write_note' &&
-    typeof input.path === 'string' &&
-    typeof input.content === 'string'
-  ) {
-    return { id, kind: 'write_note', args: { path: input.path, content: input.content } }
-  }
-  if (
-    name === 'edit_note' &&
-    typeof input.path === 'string' &&
-    typeof input.find === 'string' &&
-    typeof input.replace === 'string'
-  ) {
-    return {
-      id,
-      kind: 'edit_note',
-      args: { path: input.path, find: input.find, replace: input.replace }
-    }
-  }
-  if (name === 'search_vault' && typeof input.query === 'string') {
-    const rawPaths = input.paths
-    const paths =
-      Array.isArray(rawPaths) && rawPaths.every((p): p is string => typeof p === 'string')
-        ? (rawPaths as string[])
-        : undefined
-    return {
-      id,
-      kind: 'search_vault',
-      args: paths ? { query: input.query, paths } : { query: input.query }
-    }
-  }
-  if (name === 'read_canvas' && typeof input.canvasId === 'string') {
-    return { id, kind: 'read_canvas', args: { canvasId: input.canvasId } }
-  }
-  if (
-    name === 'unpin_from_canvas' &&
-    typeof input.canvasId === 'string' &&
-    typeof input.cardId === 'string'
-  ) {
-    return {
-      id,
-      kind: 'unpin_from_canvas',
-      args: { canvasId: input.canvasId, cardId: input.cardId }
-    }
-  }
-  if (name === 'list_canvases') {
-    return { id, kind: 'list_canvases', args: {} }
-  }
-  if (name === 'focus_canvas' && typeof input.canvasId === 'string') {
-    const rawVp = input.viewport
-    if (rawVp && typeof rawVp === 'object') {
-      const vp = rawVp as Record<string, unknown>
-      if (typeof vp.x === 'number' && typeof vp.y === 'number' && typeof vp.zoom === 'number') {
-        return {
-          id,
-          kind: 'focus_canvas',
-          args: { canvasId: input.canvasId, viewport: { x: vp.x, y: vp.y, zoom: vp.zoom } }
-        }
-      }
-    }
-  }
-  if (
-    name === 'pin_to_canvas' &&
-    typeof input.canvasId === 'string' &&
-    input.card &&
-    typeof input.card === 'object'
-  ) {
-    const c = input.card as Record<string, unknown>
-    if (typeof c.title === 'string') {
-      const cardPath = typeof c.path === 'string' ? c.path : undefined
-      const content = typeof c.content === 'string' ? c.content : undefined
-      const rawPos = c.position
-      let position: { x: number; y: number } | undefined
-      if (rawPos && typeof rawPos === 'object') {
-        const pos = rawPos as Record<string, unknown>
-        if (typeof pos.x === 'number' && typeof pos.y === 'number') {
-          position = { x: pos.x, y: pos.y }
-        }
-      }
-      const rawRefs = c.refs
-      const refs =
-        Array.isArray(rawRefs) && rawRefs.every((r): r is string => typeof r === 'string')
-          ? (rawRefs as string[])
-          : undefined
-      return {
-        id,
-        kind: 'pin_to_canvas',
-        args: {
-          canvasId: input.canvasId,
-          card: {
-            title: c.title,
-            ...(cardPath !== undefined ? { path: cardPath } : {}),
-            ...(content !== undefined ? { content } : {}),
-            ...(position ? { position } : {}),
-            ...(refs ? { refs } : {})
-          }
-        }
-      }
-    }
-  }
-  return null
+  return DEFAULT_SYSTEM_PROMPT
 }
 
 export async function runMachinaNative(opts: RunOptions): Promise<string> {
   const key = await resolveAnthropicKey()
   if (!key) throw new Error('AUTH: no Anthropic API key configured')
   const client = new Anthropic({ apiKey: key })
+  const systemPrompt = await resolveSystemPrompt(opts.vaultPath)
 
   const runId = newRunId()
   const abort = new AbortController()
@@ -224,6 +152,9 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
 
   void (async () => {
     try {
+      // True when the loop exits by exhausting MAX_TOOL_ITERATIONS while the
+      // model still wanted tools — surfaced as a visible notice, not silence.
+      let iterationsExhausted = true
       for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
         resetTimeout()
         const stream = client.messages.stream(
@@ -233,7 +164,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
             system: [
               {
                 type: 'text',
-                text: opts.systemPrompt,
+                text: systemPrompt,
                 cache_control: { type: 'ephemeral' }
               }
             ],
@@ -266,19 +197,21 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
         const toolUses = final.content.filter(
           (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
         )
-        if (toolUses.length === 0) break
+        if (toolUses.length === 0) {
+          iterationsExhausted = false
+          break
+        }
 
         const toolResults: Anthropic.ToolResultBlockParam[] = []
         for (const tu of toolUses) {
           const input = (tu.input ?? {}) as Record<string, unknown>
-          const call = asToolCall(tu.name, tu.id, input)
 
           // Approval-gated tools: emit pending immediately so the renderer
           // can render the diff card *before* callTool blocks on the user.
           // Pause the SDK timeout while we wait on the human.
           clearTimeout(timeout)
           emittedToolUseIds.add(tu.id)
-          const res = await callTool(tu.name, input, {
+          const { result: res, call } = await callTool(tu.name, input, {
             vaultPath: opts.vaultPath,
             autoAccept: opts.autoAccept ?? false,
             toolUseId: tu.id,
@@ -320,6 +253,13 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
           })
         }
         messages = [...messages, { role: 'user', content: toolResults }]
+      }
+      if (iterationsExhausted) {
+        // Previously the run just stopped silently mid-task.
+        emit(runId, opts.threadId, {
+          kind: 'text',
+          text: `\n\n[Stopped: reached the ${MAX_TOOL_ITERATIONS}-tool-call limit for one turn. Send a follow-up message to continue.]`
+        })
       }
       emit(runId, opts.threadId, { kind: 'message_end' })
     } catch (err) {

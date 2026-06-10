@@ -13,12 +13,97 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
-  callTool,
+  callTool as callToolOutcome,
   clearApproval,
   decideApproval
 } from '../../../src/main/services/machina-native-tools'
 import { WriteRateLimiter } from '../../../src/main/services/hitl-gate'
 import type { AuditEntry } from '../../../src/shared/agent-types'
+
+// 2.2: callTool now returns { result, call } (the dispatcher derives the
+// persisted ToolCall from its already-validated input). These suites assert
+// on tool RESULTS, so unwrap once here; call derivation has its own suite.
+async function callTool(
+  name: string,
+  input: Record<string, unknown>,
+  ctx: Parameters<typeof callToolOutcome>[2]
+): Promise<Awaited<ReturnType<typeof callToolOutcome>>['result']> {
+  return (await callToolOutcome(name, input, ctx)).result
+}
+
+describe('machina-native-tools call derivation (asToolCall replacement)', () => {
+  it('returns a ToolCall built from validated input, keyed by ctx.toolUseId', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      writeFileSync(path.join(v, 'a.md'), 'hi\n')
+      const { result, call } = await callToolOutcome(
+        'read_note',
+        { path: 'a.md' },
+        { vaultPath: v, autoAccept: false, toolUseId: 'toolu_call_1' }
+      )
+      expect(result.ok).toBe(true)
+      expect(call).toEqual({ id: 'toolu_call_1', kind: 'read_note', args: { path: 'a.md' } })
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns call: null when input fails shape validation', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const { result, call } = await callToolOutcome(
+        'write_note',
+        { content: 'x' },
+        { vaultPath: v, autoAccept: true, toolUseId: 'toolu_call_2' }
+      )
+      expect(result.ok).toBe(false)
+      expect(call).toBeNull()
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('returns call: null for dock tools and unknown tools (not persisted)', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const dock = await callToolOutcome(
+        'open_dock_tab',
+        { kind: 'graph' },
+        { vaultPath: v, autoAccept: false, toolUseId: 'toolu_call_3' }
+      )
+      expect(dock.call).toBeNull()
+      const unknown = await callToolOutcome(
+        'not_a_tool',
+        {},
+        { vaultPath: v, autoAccept: false, toolUseId: 'toolu_call_4' }
+      )
+      expect(unknown.call).toBeNull()
+      expect(unknown.result.ok).toBe(false)
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+
+  it('still returns the call for a regex-rejected canvasId so the failed call persists', async () => {
+    const v = mkdtempSync(path.join(tmpdir(), 'mnt-'))
+    try {
+      const { result, call } = await callToolOutcome(
+        'read_canvas',
+        { canvasId: '../../evil' },
+        { vaultPath: v, autoAccept: false, toolUseId: 'toolu_call_5' }
+      )
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.error.code).toBe('PATH_OUT_OF_VAULT')
+      expect(call).toEqual({
+        id: 'toolu_call_5',
+        kind: 'read_canvas',
+        args: { canvasId: '../../evil' }
+      })
+    } finally {
+      rmSync(v, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('machina-native-tools read_note', () => {
   it('reads a vault note', async () => {

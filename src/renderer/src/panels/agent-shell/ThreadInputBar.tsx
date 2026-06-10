@@ -3,6 +3,8 @@ import type { KeyboardEvent } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { AgentPicker } from './AgentPicker'
 import type { AgentIdentity } from '@shared/agent-identity'
+import { DEFAULT_NATIVE_MODEL, NATIVE_MODEL_OPTIONS } from '@shared/machina-native-tools'
+import { formatModelLabel } from '@shared/format-model-label'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 const MIN_INPUT_HEIGHT = 22
@@ -13,6 +15,10 @@ export function ThreadInputBar() {
   const appendUser = useThreadStore((s) => s.appendUserMessage)
   const createThread = useThreadStore((s) => s.createThread)
   const cancelActive = useThreadStore((s) => s.cancelActive)
+  const setThreadModel = useThreadStore((s) => s.setThreadModel)
+  const activeThread = useThreadStore((s) =>
+    s.activeThreadId ? s.threadsById[s.activeThreadId] : undefined
+  )
   const inFlight = useThreadStore((s) =>
     activeId ? Boolean(s.inFlightByThreadId[activeId]) : false
   )
@@ -47,7 +53,7 @@ export function ThreadInputBar() {
 
   async function pickAgent(a: AgentIdentity) {
     setPickerOpen(false)
-    await createThread(a, 'claude-sonnet-4-6')
+    await createThread(a, DEFAULT_NATIVE_MODEL)
     ref.current?.focus()
   }
 
@@ -110,6 +116,40 @@ export function ThreadInputBar() {
             lineHeight: 1.55
           }}
         />
+        {activeThread?.agent === 'machina-native' && activeId && (
+          <select
+            data-testid="thread-model-select"
+            aria-label="Model"
+            title="Model for this thread's next turn"
+            value={activeThread.model}
+            disabled={inFlight}
+            onChange={(e) => void setThreadModel(activeId, e.target.value)}
+            style={{
+              flexShrink: 0,
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              padding: '3px 8px',
+              background: 'transparent',
+              border: `1px solid ${colors.border.subtle}`,
+              borderRadius: borderRadius.inline,
+              color: colors.text.muted,
+              cursor: inFlight ? 'default' : 'pointer',
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 10,
+              letterSpacing: '0.04em',
+              lineHeight: '16px'
+            }}
+          >
+            {(NATIVE_MODEL_OPTIONS as readonly string[]).includes(activeThread.model) ? null : (
+              <option value={activeThread.model}>{formatModelLabel(activeThread.model)}</option>
+            )}
+            {NATIVE_MODEL_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                {formatModelLabel(m)}
+              </option>
+            ))}
+          </select>
+        )}
         {inFlight && activeId ? (
           <button
             type="button"

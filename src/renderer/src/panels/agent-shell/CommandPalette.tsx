@@ -8,6 +8,7 @@ import {
   zIndex
 } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
+import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { buildIndex, buildPaletteItems, searchPalette, type PaletteItem } from './palette-sources'
 
 const KIND_LABEL: Record<PaletteItem['kind'], string> = {
@@ -85,7 +86,7 @@ export function CommandPalette({
       } else if (canCreateThread) {
         const title = trimmedQuery
         onClose()
-        void createThread('machina-native', 'claude-sonnet-4-6', title)
+        void createThread('machina-native', DEFAULT_NATIVE_MODEL, title)
       }
     }
   }

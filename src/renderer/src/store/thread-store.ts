@@ -1,17 +1,15 @@
 import { create } from 'zustand'
-import type { Thread, ThreadMessage, ToolCall, ToolResult } from '@shared/thread-types'
+import type {
+  AssistantMessage,
+  Thread,
+  ThreadMessage,
+  ToolCall,
+  ToolResult
+} from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { TE_DIR } from '@shared/constants'
-import { withTimeout } from '../utils/ipc-timeout'
-
-const MACHINA_NATIVE_SYSTEM_PROMPT =
-  'You are Machina, a thoughtful assistant for the user’s vault. Keep replies concise and grounded.'
-
-// run() resolves once the main process has accepted the request and produced a
-// runId; model output streams later over agent-native:event. Bound only that
-// call-to-runId latency so a stalled IPC can't leave the input bar wedged.
-const AGENT_RUN_START_TIMEOUT_MS = 15_000
+import { transportFor } from './agent-transport'
 
 interface ThreadState {
   vaultPath: string | null
@@ -45,7 +43,13 @@ interface ThreadState {
   archiveThread: (id: string) => Promise<void>
   unarchiveThread: (id: string) => Promise<void>
   deleteThread: (id: string) => Promise<void>
+  /** Lazily fetch the archived thread list (called when the sidebar section expands). */
+  loadArchivedThreads: () => Promise<void>
+  /** Permanently delete an archived thread (restore first — thread:delete targets live threads). */
+  deleteArchivedThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
+  /** Switch the model used by a native thread's next turn. No-op for CLI threads. */
+  setThreadModel: (id: string, model: string) => Promise<void>
 
   appendUserMessage: (text: string) => Promise<void>
   appendAssistantStreamChunk: (threadId: string, runId: string, chunk: string) => void
@@ -186,23 +190,21 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       dockTabsByThreadId: { ...s.dockTabsByThreadId, [t.id]: t.dockState.tabs.slice() },
       activeThreadId: t.id
     }))
-    if (agent !== 'machina-native') {
-      const result = await window.api.cliThread.spawn({ threadId: t.id, identity: agent, cwd: v })
-      if (!result.ok) {
-        const sysMsg: ThreadMessage = {
-          role: 'system',
-          body: result.error,
-          sentAt: new Date().toISOString()
-        }
-        set((s) => {
-          const cur = s.threadsById[t.id]
-          if (!cur) return s
-          const next: Thread = { ...cur, messages: [...cur.messages, sysMsg] }
-          return { threadsById: { ...s.threadsById, [t.id]: next } }
-        })
-        const cur = get().threadsById[t.id]
-        if (cur) await window.api.thread.save(v, cur)
+    const started = await transportFor(agent).start(t, v)
+    if (!started.ok) {
+      const sysMsg: ThreadMessage = {
+        role: 'system',
+        body: started.error,
+        sentAt: new Date().toISOString()
       }
+      set((s) => {
+        const cur = s.threadsById[t.id]
+        if (!cur) return s
+        const next: Thread = { ...cur, messages: [...cur.messages, sysMsg] }
+        return { threadsById: { ...s.threadsById, [t.id]: next } }
+      })
+      const cur = get().threadsById[t.id]
+      if (cur) await window.api.thread.save(v, cur)
     }
     return t
   },
@@ -213,9 +215,12 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     await window.api.thread.archive(v, id)
     set((s) => {
       const next = { ...s.threadsById }
+      const archived = next[id]
       delete next[id]
       return {
         threadsById: next,
+        // Keep the lazily loaded archive list coherent without a refetch.
+        archivedThreads: archived ? [archived, ...s.archivedThreads] : s.archivedThreads,
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
     })
@@ -225,16 +230,32 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const v = get().vaultPath
     if (!v) return
     await window.api.thread.unarchive(v, id)
+    set((s) => ({ archivedThreads: s.archivedThreads.filter((t) => t.id !== id) }))
     await get().loadThreads()
+  },
+
+  loadArchivedThreads: async () => {
+    const v = get().vaultPath
+    if (!v) return
+    const list = await window.api.thread.listArchived(v)
+    set({ archivedThreads: list })
+  },
+
+  deleteArchivedThread: async (id) => {
+    const v = get().vaultPath
+    if (!v) return
+    // ThreadStorage.deleteThread only removes live thread files, so restore
+    // the archived thread first and delete it from the live directory.
+    await window.api.thread.unarchive(v, id)
+    await window.api.thread.delete(v, id)
+    set((s) => ({ archivedThreads: s.archivedThreads.filter((t) => t.id !== id) }))
   },
 
   deleteThread: async (id) => {
     const v = get().vaultPath
     if (!v) return
     const t = get().threadsById[id]
-    if (t && t.agent !== 'machina-native') {
-      await window.api.cliThread.close(id)
-    }
+    if (t) await transportFor(t.agent).close(id)
     await window.api.thread.delete(v, id)
     set((s) => {
       const next = { ...s.threadsById }
@@ -279,6 +300,17 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     if (t) await window.api.thread.save(v, t)
   },
 
+  setThreadModel: async (id, model) => {
+    const v = get().vaultPath
+    if (!v) return
+    const t = get().threadsById[id]
+    // Model is meaningful (and persisted) only for native threads.
+    if (!t || t.agent !== 'machina-native' || t.model === model) return
+    const next: Thread = { ...t, model }
+    set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
+    await window.api.thread.save(v, next)
+  },
+
   appendUserMessage: async (text) => {
     const id = get().activeThreadId
     const v = get().vaultPath
@@ -297,64 +329,16 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
 
     set((s) => ({ inFlightByThreadId: { ...s.inFlightByThreadId, [id]: true } }))
 
-    if (t.agent !== 'machina-native') {
-      const res = await window.api.cliThread.input({ threadId: id, identity: t.agent, text })
-      if (!res.ok) {
-        // Delivery failed (CLI missing, or the PTY could not respawn).
-        // Unwedge the input bar and tell the user instead of silently
-        // dropping the turn.
-        set((s) => {
-          const flight = { ...s.inFlightByThreadId }
-          delete flight[id]
-          return { inFlightByThreadId: flight }
-        })
-        const cur = get().threadsById[id]
-        if (cur) {
-          const sys: ThreadMessage = {
-            role: 'system',
-            body: 'Message not delivered: the CLI session could not be started. Check that the agent CLI is installed, then try again.',
-            sentAt: new Date().toISOString()
-          }
-          const next: Thread = { ...cur, messages: [...cur.messages, sys] }
-          set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
-          await window.api.thread.save(v, next)
-        }
-      }
-      return
-    }
-    const history = t.messages.slice(0, -1).flatMap((m) =>
-      // Tool-only turns persist body: '' — the Anthropic API rejects empty
-      // content, so one empty body would poison every later turn.
-      (m.role === 'user' || m.role === 'assistant') && m.body.trim().length > 0
-        ? [{ role: m.role, content: m.body } as const]
-        : []
-    )
-    const dockTabsSnapshot = get().dockTabsByThreadId[id] ?? []
-    try {
-      const { runId } = await withTimeout(
-        window.api.agentNative.run({
-          vaultPath: v,
-          threadId: id,
-          model: t.model,
-          systemPrompt: MACHINA_NATIVE_SYSTEM_PROMPT,
-          userMessage: text,
-          historyMessages: history,
-          autoAccept: t.autoAcceptSession ?? false,
-          dockTabsSnapshot
-        }),
-        AGENT_RUN_START_TIMEOUT_MS,
-        `agent-native:run ${id}`
-      )
-      set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
-    } catch (err) {
-      // The turn never started (timeout or IPC failure). Clear the in-flight
-      // flag so the input bar unwedges, and surface why as a system message.
-      // Tradeoff: run() returns the runId synchronously today, so the only way
-      // to time out is a hung/contended main process. If run() were merely slow
-      // and resolved just after 15s, its late runId is dropped here — strictly
-      // better than the prior infinite wedge, but the rare orphaned run would
-      // not be Stop-abortable. Acceptable until run() can actually block.
-      const message = err instanceof Error ? err.message : String(err)
+    const result = await transportFor(t.agent).sendTurn(t, text, {
+      vaultPath: v,
+      historyMessages: buildNativeHistory(t.messages.slice(0, -1)),
+      dockTabsSnapshot: get().dockTabsByThreadId[id] ?? []
+    })
+
+    if (!result.ok) {
+      // The turn never started (CLI delivery failure, IPC timeout, …). Clear
+      // the in-flight flag so the input bar unwedges, and surface why as a
+      // system message instead of silently dropping the turn.
       set((s) => {
         const flight = { ...s.inFlightByThreadId }
         delete flight[id]
@@ -364,13 +348,18 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       if (failed) {
         const sys: ThreadMessage = {
           role: 'system',
-          body: `Agent run failed to start: ${message}`,
+          body: result.message,
           sentAt: new Date().toISOString()
         }
         const next: Thread = { ...failed, messages: [...failed.messages, sys] }
         set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
         await window.api.thread.save(v, next)
       }
+      return
+    }
+    if (result.runId !== undefined) {
+      const runId = result.runId
+      set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
     }
   },
 
@@ -483,12 +472,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   cancelActive: async (threadId) => {
     const t = get().threadsById[threadId]
     if (!t) return
-    if (t.agent === 'machina-native') {
-      const runId = get().runIdByThreadId[threadId]
-      if (runId) await window.api.agentNative.abort(runId)
-    } else {
-      await window.api.cliThread.cancel(threadId)
-    }
+    await transportFor(t.agent).cancel(t, get().runIdByThreadId[threadId])
     set((s) => {
       const flight = { ...s.inFlightByThreadId }
       delete flight[threadId]
@@ -626,6 +610,55 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   }
 }))
 
+/** Truncate a serialized payload so history summaries stay token-bounded. */
+function clip(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s
+}
+
+/**
+ * Compact textual record of an assistant turn's tool exchanges, appended to
+ * the message body in native history. Reconstructing real tool_use/tool_result
+ * blocks would require a structured history IPC shape; the summary keeps
+ * multi-turn tool context (which note was read, what a search returned) from
+ * vanishing between turns without it.
+ */
+function summarizeToolCalls(toolCalls: NonNullable<AssistantMessage['toolCalls']>): string {
+  return toolCalls
+    .map((tc) => {
+      const args = clip(JSON.stringify(tc.call.args), 200)
+      const outcome = !tc.result
+        ? 'no result'
+        : tc.result.ok
+          ? `ok: ${clip(JSON.stringify(tc.result.output), 400)}`
+          : `error ${tc.result.error.code}: ${clip(tc.result.error.message, 200)}`
+      return `[tool ${tc.call.kind} ${args} → ${outcome}]`
+    })
+    .join('\n')
+}
+
+/**
+ * Build the native run's history. Tool-only turns persist body: '' — the
+ * Anthropic API rejects empty content, so they're either represented by their
+ * tool-exchange summary or dropped entirely.
+ */
+function buildNativeHistory(
+  messages: readonly ThreadMessage[]
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  for (const m of messages) {
+    if (m.role !== 'user' && m.role !== 'assistant') continue
+    const body = m.body.trim()
+    const summary =
+      m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0
+        ? summarizeToolCalls(m.toolCalls)
+        : ''
+    const content = [body, summary].filter((part) => part.length > 0).join('\n\n')
+    if (content.length === 0) continue
+    history.push({ role: m.role, content })
+  }
+  return history
+}
+
 async function validateTabs(
   vault: string,
   tabs: readonly DockTab[]
@@ -653,7 +686,12 @@ async function validateTabs(
   return { valid, dropped }
 }
 
-async function flushDockState(id: string): Promise<void> {
+/**
+ * Persist a thread's current dock tabs into its thread file. Exported for the
+ * coordinated-quit flush in vault-persist (the active thread's tabs would
+ * otherwise be lost — flushing only happens on thread switch).
+ */
+export async function flushDockState(id: string): Promise<void> {
   const s = useThreadStore.getState()
   const t = s.threadsById[id]
   if (!s.vaultPath || !t) return
