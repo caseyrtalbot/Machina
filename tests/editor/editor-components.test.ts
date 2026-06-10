@@ -1,41 +1,5 @@
 import { describe, it, expect } from 'vitest'
 
-// ─── parseBreadcrumb ──────────────────────────────────────────────────────────
-
-describe('parseBreadcrumb', () => {
-  it('parses a file path into breadcrumb segments', async () => {
-    const { parseBreadcrumb } =
-      await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
-    const segments = parseBreadcrumb('/vault/folder/note.md', '/vault')
-    expect(segments).toHaveLength(2)
-    // Folder segment
-    expect(segments[0]).toMatchObject({ name: 'folder', isFile: false })
-    expect(segments[0].path).toContain('folder')
-    // File segment: parseBreadcrumb strips .md from the display name
-    expect(segments[1]).toMatchObject({ name: 'note', isFile: true })
-    expect(segments[1].path).toContain('note.md')
-  })
-
-  it('handles deeply nested paths', async () => {
-    const { parseBreadcrumb } =
-      await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
-    const segments = parseBreadcrumb('/vault/a/b/c/d.md', '/vault')
-    expect(segments).toHaveLength(4)
-    expect(segments[3].isFile).toBe(true)
-    expect(segments[0].isFile).toBe(false)
-  })
-
-  it('handles root-level file', async () => {
-    const { parseBreadcrumb } =
-      await import('../../src/renderer/src/panels/editor/EditorBreadcrumb')
-    const segments = parseBreadcrumb('/vault/root.md', '/vault')
-    expect(segments).toHaveLength(1)
-    expect(segments[0].isFile).toBe(true)
-    // .md is stripped from display name
-    expect(segments[0].name).toBe('root')
-  })
-})
-
 // ─── buildMetadataEntries ─────────────────────────────────────────────────────
 
 describe('buildMetadataEntries', () => {

@@ -12,6 +12,12 @@ interface Document {
   lastSavedVersion: number
   refCount: number
   saveTimeout: ReturnType<typeof setTimeout> | null
+  /**
+   * True between conflict detection and resolution. While set, close() skips
+   * the dirty flush so "reload from disk" (close → open) doesn't overwrite
+   * the external change with stale local content.
+   */
+  conflicted: boolean
 }
 
 interface DocumentOpenResult {
@@ -65,7 +71,8 @@ export class DocumentManager {
       version: 0,
       lastSavedVersion: 0,
       refCount: 1,
-      saveTimeout: null
+      saveTimeout: null,
+      conflicted: false
     }
 
     this.documents.set(path, doc)
@@ -79,13 +86,34 @@ export class DocumentManager {
     doc.refCount--
     if (doc.refCount > 0) return
 
-    // Flush if dirty before removing
-    if (this.isDirty(doc)) {
+    // Flush if dirty before removing — unless a conflict is unresolved, in
+    // which case flushing would overwrite the external change on disk.
+    if (this.isDirty(doc) && !doc.conflicted) {
       this.clearAutosave(doc)
       await this.saveToDisk(doc)
+    } else {
+      this.clearAutosave(doc)
     }
 
     this.documents.delete(path)
+  }
+
+  /**
+   * Re-key open documents after a file or folder rename/move so autosaves
+   * target the new path instead of resurrecting the old file. Handles both
+   * an exact file path and any open documents under a renamed folder.
+   */
+  rename(oldPath: string, newPath: string): void {
+    const prefix = `${oldPath}/`
+    for (const [path, doc] of Array.from(this.documents.entries())) {
+      if (path !== oldPath && !path.startsWith(prefix)) continue
+      const mapped = path === oldPath ? newPath : newPath + path.slice(oldPath.length)
+      this.clearAutosave(doc)
+      this.documents.delete(path)
+      const renamed: Document = { ...doc, path: mapped, saveTimeout: null }
+      this.documents.set(mapped, renamed)
+      if (this.isDirty(renamed)) this.scheduleAutosave(renamed)
+    }
   }
 
   update(path: string, content: string): number {
@@ -114,10 +142,17 @@ export class DocumentManager {
       return
     }
 
+    const replaced = content !== doc.content
     doc.content = content
     doc.version++
     this.clearAutosave(doc)
     await this.saveToDisk(doc)
+    // An out-of-band rewrite (e.g. backlink rename) replaced an open doc's
+    // content: notify renderer views so they re-parse instead of pushing
+    // their stale copy back on the next keystroke.
+    if (replaced) {
+      this._eventCallback?.({ type: 'external-change', path, content })
+    }
   }
 
   getContent(path: string): DocumentContentResult | null {
@@ -156,6 +191,7 @@ export class DocumentManager {
 
     if (this.isDirty(doc)) {
       // Conflict: disk differs from our unsaved content
+      doc.conflicted = true
       this._eventCallback?.({ type: 'conflict', path, diskContent })
     } else {
       // Clean: silently reload
@@ -253,6 +289,8 @@ export class DocumentManager {
     doc.mtime = newMtime
     doc.lastSavedContent = doc.content
     doc.lastSavedVersion = doc.version
+    // A successful save resolves any outstanding conflict (keep-mine path)
+    doc.conflicted = false
 
     this._eventCallback?.({ type: 'saved', path: doc.path })
   }

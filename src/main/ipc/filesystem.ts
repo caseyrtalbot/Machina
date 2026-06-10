@@ -1,10 +1,11 @@
 import { dialog, shell } from 'electron'
 import { FileService } from '../services/file-service'
 import { createVaultIgnoreFilter } from '../services/vault-watcher'
+import { isExternalHttpNavigation } from '../services/external-navigation'
 import { PathGuard } from '../services/path-guard'
-import { teConfigPath, teStatePath, teArtifactPath, assertWithinVault } from '../utils/paths'
+import { getDocumentManager } from './documents'
+import { teConfigPath, teStatePath, assertWithinVault } from '../utils/paths'
 import { getIgnorePatterns } from '../utils/vault-config'
-import { defaultSystemArtifactFilename } from '@shared/system-artifacts'
 import { TE_DIR } from '@shared/constants'
 import { typedHandle } from '../typed-ipc'
 import type { VaultConfig, VaultState } from '../../shared/types'
@@ -68,11 +69,6 @@ export function registerFilesystemIpc(): void {
     return fileService.listFiles(resolved, args.pattern)
   })
 
-  typedHandle('fs:list-files-recursive', async (args) => {
-    const resolved = guardPath(args.dir, 'fs:list-files-recursive')
-    return fileService.listFilesRecursive(resolved)
-  })
-
   typedHandle('fs:file-exists', async (args) => {
     const resolved = guardPath(args.path, 'fs:file-exists')
     const { existsSync } = await import('node:fs')
@@ -89,6 +85,9 @@ export function registerFilesystemIpc(): void {
     const resolvedNew = guardPath(args.newPath, 'fs:rename-file')
     const { rename } = await import('node:fs/promises')
     await rename(resolvedOld, resolvedNew)
+    // Re-key any open documents so the next autosave targets the new path
+    // instead of resurrecting the old file.
+    getDocumentManager().rename(args.oldPath, args.newPath)
   })
 
   typedHandle('fs:copy-file', async (args) => {
@@ -96,14 +95,6 @@ export function registerFilesystemIpc(): void {
     const resolvedDest = guardPath(args.destPath, 'fs:copy-file')
     const { copyFile } = await import('node:fs/promises')
     await copyFile(resolvedSrc, resolvedDest)
-  })
-
-  typedHandle('fs:create-folder', async (args) => {
-    const result = await dialog.showOpenDialog({
-      defaultPath: args.defaultPath,
-      properties: ['openDirectory', 'createDirectory']
-    })
-    return result.canceled ? null : result.filePaths[0]
   })
 
   typedHandle('fs:mkdir', async (args) => {
@@ -120,9 +111,10 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('fs:list-all-files', async (args) => {
-    const customPatterns = await getIgnorePatterns(args.dir)
-    const ignoreFilter = await createVaultIgnoreFilter(args.dir, customPatterns)
-    return fileService.listAllFilesRecursive(args.dir, ignoreFilter)
+    const resolved = guardPath(args.dir, 'fs:list-all-files')
+    const customPatterns = await getIgnorePatterns(resolved)
+    const ignoreFilter = await createVaultIgnoreFilter(resolved, customPatterns)
+    return fileService.listAllFilesRecursive(resolved, ignoreFilter)
   })
 
   typedHandle('fs:read-files-batch', async (args) => {
@@ -190,12 +182,6 @@ export function registerFilesystemIpc(): void {
     }
   })
 
-  typedHandle('vault:write-config', async (args) => {
-    const configPath = teConfigPath(args.vaultPath)
-    assertWithinVault(args.vaultPath, configPath)
-    await fileService.writeFile(configPath, JSON.stringify(args.config, null, 2))
-  })
-
   typedHandle('vault:read-state', async (args) => {
     const statePath = teStatePath(args.vaultPath)
     assertWithinVault(args.vaultPath, statePath)
@@ -213,60 +199,41 @@ export function registerFilesystemIpc(): void {
     await fileService.writeFile(statePath, JSON.stringify(args.state, null, 2))
   })
 
-  typedHandle('vault:list-commands', async (args) => {
-    // Validate-then-use: list and join against the guard-resolved path, never
-    // the raw arg, so a symlinked dirPath cannot read outside the vault.
-    const resolved = guardPath(args.dirPath, 'vault:list-commands')
-    const { readdir } = await import('node:fs/promises')
-    const { join } = await import('node:path')
-    try {
-      const entries = await readdir(resolved)
-      return entries.filter((f) => f.endsWith('.md')).map((f) => join(resolved, f))
-    } catch {
-      return []
-    }
-  })
-
   typedHandle('vault:list-system-artifacts', async (args) => {
     return fileService.listSystemArtifactFiles(args.vaultPath, args.kind)
-  })
-
-  typedHandle('vault:read-system-artifact', async (args) => {
-    assertWithinVault(args.vaultPath, args.path)
-    return fileService.readFile(args.path)
-  })
-
-  typedHandle('vault:create-system-artifact', async (args) => {
-    const expectedPath = teArtifactPath(
-      args.vaultPath,
-      args.kind,
-      defaultSystemArtifactFilename(args.filename)
-    )
-    assertWithinVault(args.vaultPath, expectedPath)
-    return fileService.createSystemArtifact(args.vaultPath, args.kind, args.filename, args.content)
-  })
-
-  typedHandle('vault:update-system-artifact', async (args) => {
-    assertWithinVault(args.vaultPath, args.path)
-    await fileService.updateSystemArtifact(args.path, args.content)
   })
 
   // --- Shell integration ---
 
   typedHandle('shell:show-in-folder', async (args) => {
-    shell.showItemInFolder(args.path)
+    try {
+      const resolved = guardPath(args.path, 'shell:show-in-folder')
+      shell.showItemInFolder(resolved)
+    } catch (err) {
+      // Recent-vault roots (VaultSelector "Reveal in Finder") are outside the
+      // active vault by definition. Allow exact matches against the persisted
+      // vault history; everything else stays guarded.
+      const { readAppConfigValue } = await import('./config')
+      const history = readAppConfigValue<readonly string[]>('vaultHistory') ?? []
+      if (!history.includes(args.path)) throw err
+      shell.showItemInFolder(args.path)
+    }
   })
 
   typedHandle('shell:open-path', async (args) => {
-    return shell.openPath(args.path)
+    const resolved = guardPath(args.path, 'shell:open-path')
+    return shell.openPath(resolved)
   })
 
   typedHandle('shell:open-external', async (args) => {
+    if (!isExternalHttpNavigation(args.url)) {
+      throw new Error('shell:open-external only accepts http(s) URLs')
+    }
     await shell.openExternal(args.url)
   })
 
   typedHandle('shell:trash-item', async (args) => {
-    const { rm } = await import('fs/promises')
-    await rm(args.path, { recursive: true })
+    const resolved = guardPath(args.path, 'shell:trash-item')
+    await shell.trashItem(resolved)
   })
 }

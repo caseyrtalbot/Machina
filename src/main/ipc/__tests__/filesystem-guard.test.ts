@@ -115,7 +115,10 @@ describe('fs:* IPC PathGuard enforcement', () => {
       'fs:file-mtime',
       'fs:file-exists',
       'fs:list-files',
-      'fs:list-files-recursive'
+      'fs:list-all-files',
+      'shell:trash-item',
+      'shell:open-path',
+      'shell:show-in-folder'
     ]
 
     for (const channel of channels) {

@@ -161,7 +161,7 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
         path: artifactPathById[artifact.id] ?? '',
         title: artifact.title,
         type: artifact.type,
-        modified: artifact.modified,
+        modified: artifact.modified ?? '',
         status:
           typeof artifact.frontmatter.status === 'string' ? artifact.frontmatter.status : undefined
       }))
@@ -364,6 +364,8 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
     const newPath = `${targetFolderPath}/${filename}`
     try {
       await window.api.fs.renameFile(sourcePath, newPath)
+      // Re-key open documents/tabs so autosaves track the new path
+      useEditorStore.getState().mapPaths(sourcePath, newPath)
     } catch {
       /* watcher will reconcile state */
     }

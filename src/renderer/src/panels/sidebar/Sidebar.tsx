@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 
 import { rewriteWikilinks } from '@engine/rename-links'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
+import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
 import {
   borderRadius,
@@ -435,27 +436,40 @@ export function Sidebar({
       const newPath = `${parentDir}/${newName}`
 
       // Capture backlinks before rename (index still has old stem)
+      const oldPath = renamingPath
       const oldBasename = renamingPath.split('/').pop() ?? ''
       const oldStem = oldBasename.replace(/\.md$/i, '')
       const newStem = newName.replace(/\.md$/i, '')
       const { fileToId, getBacklinks, artifactPathById } = useVaultStore.getState()
       const oldId = fileToId[renamingPath]
-      // Only rewrite if the id was derived from filename (no explicit id override)
-      const needsRewrite = !isDirectory && oldId === oldStem && oldStem !== newStem
-      const backlinks = needsRewrite ? getBacklinks(oldStem) : []
+      // Rewrite whenever the stem changes: wikilinks resolve by title/stem,
+      // independent of how the artifact id was derived.
+      const needsRewrite = !isDirectory && oldStem !== newStem
+      const backlinks = needsRewrite ? getBacklinks(oldId ?? oldStem) : []
       const pathMap = { ...artifactPathById }
 
       window.api.fs
-        .renameFile(renamingPath, newPath)
+        .renameFile(oldPath, newPath)
         .then(async () => {
+          // Re-key open documents/tabs so autosaves track the new path
+          useEditorStore.getState().mapPaths(oldPath, newPath)
           if (needsRewrite) {
             await Promise.all(
               backlinks.map(async (artifact) => {
                 const filePath = pathMap[artifact.id]
-                if (!filePath || filePath === renamingPath) return
-                const raw = await window.api.fs.readFile(filePath)
-                const updated = rewriteWikilinks(raw, oldStem, newStem)
-                if (updated !== raw) await window.api.fs.writeFile(filePath, updated)
+                if (!filePath || filePath === oldPath) return
+                // Read via DocumentManager (not raw disk) so an open note's
+                // unsaved edits are the rewrite input — a disk read inside the
+                // autosave debounce window would clobber them on save.
+                const { content: raw } = await window.api.document.open(filePath)
+                try {
+                  const updated = rewriteWikilinks(raw, oldStem, newStem)
+                  // Route through document IPC so an open document's in-memory
+                  // state updates instead of being clobbered on its next autosave.
+                  if (updated !== raw) await window.api.document.saveContent(filePath, updated)
+                } finally {
+                  await window.api.document.close(filePath)
+                }
               })
             )
           }

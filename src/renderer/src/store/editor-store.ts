@@ -14,11 +14,6 @@ interface EditorStore {
   readonly mode: EditorMode
   readonly isDirty: boolean
   readonly content: string
-  readonly cursorLine: number
-  readonly cursorCol: number
-
-  // Split pane
-  readonly splitNotePath: string | null
 
   // Tabs
   readonly openTabs: readonly Tab[]
@@ -36,14 +31,22 @@ interface EditorStore {
   setMode: (mode: EditorMode) => void
   setContent: (content: string) => void
   loadContent: (content: string) => void
+  /**
+   * Replace content without touching the dirty flag. For mode-switch
+   * re-serialization, where the text representation changes but the user
+   * edited nothing — DocumentManager stays the dirty source of truth.
+   */
+  syncContent: (content: string) => void
   setDirty: (dirty: boolean) => void
   markSaved: () => void
-  setCursorPosition: (line: number, col: number) => void
 
   setPendingScrollTarget: (heading: string | null) => void
 
-  openSplit: (path: string) => void
-  closeSplit: () => void
+  /**
+   * Re-key tab/history/active-note state after a file or folder rename/move
+   * so the open editor keeps tracking the file at its new path.
+   */
+  mapPaths: (oldPath: string, newPath: string) => void
 
   openTab: (path: string, title?: string) => void
   /** Open file in a transient preview tab. Replaced by the next preview open. */
@@ -125,9 +128,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   mode: 'rich',
   isDirty: false,
   content: '',
-  cursorLine: 1,
-  cursorCol: 1,
-  splitNotePath: null,
   openTabs: [],
   previewTabPath: null,
   historyStack: [],
@@ -160,14 +160,28 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setMode: (mode) => set({ mode }),
   setContent: (content) => set({ content, isDirty: true }),
   loadContent: (content) => set({ content, isDirty: false }),
+  syncContent: (content) => set({ content }),
   setDirty: (dirty) => set({ isDirty: dirty }),
   markSaved: () => set({ isDirty: false }),
-  setCursorPosition: (line, col) => set({ cursorLine: line, cursorCol: col }),
 
   setPendingScrollTarget: (heading) => set({ pendingScrollTarget: heading }),
 
-  openSplit: (path) => set({ splitNotePath: path }),
-  closeSplit: () => set({ splitNotePath: null }),
+  mapPaths: (oldPath, newPath) => {
+    const prefix = `${oldPath}/`
+    const remap = (p: string): string =>
+      p === oldPath ? newPath : p.startsWith(prefix) ? newPath + p.slice(oldPath.length) : p
+
+    const state = get()
+    set({
+      activeNotePath: state.activeNotePath ? remap(state.activeNotePath) : state.activeNotePath,
+      previewTabPath: state.previewTabPath ? remap(state.previewTabPath) : state.previewTabPath,
+      openTabs: state.openTabs.map((t) => {
+        const mapped = remap(t.path)
+        return mapped === t.path ? t : { path: mapped, title: titleFromPath(mapped) }
+      }),
+      historyStack: state.historyStack.map(remap)
+    })
+  },
 
   openTab: (path, title) => {
     const state = get()

@@ -58,3 +58,65 @@ describe('DocumentManager autosave failures', () => {
     expect(manager.getContent(path)?.dirty).toBe(false)
   })
 })
+
+describe('DocumentManager saveContent on open documents', () => {
+  const path = '/vault/note.md'
+
+  const createFs = () => ({
+    readFile: vi.fn().mockResolvedValue('# Note with [[Old Name]]'),
+    getFileMtime: vi.fn().mockResolvedValue('2026-03-30T00:00:00.000Z'),
+    writeFile: vi.fn().mockResolvedValue(undefined)
+  })
+
+  it('emits external-change when replacing an open doc with different content', async () => {
+    const fs = createFs()
+    const manager = new DocumentManager(fs as never)
+    const events: Array<{ type: string; content?: string }> = []
+    manager.onEvent((e) => events.push(e))
+
+    await manager.open(path)
+    await manager.saveContent(path, '# Note with [[New Name]]')
+
+    expect(fs.writeFile).toHaveBeenCalledWith(path, '# Note with [[New Name]]')
+    expect(events).toContainEqual({
+      type: 'external-change',
+      path,
+      content: '# Note with [[New Name]]'
+    })
+    expect(manager.getContent(path)?.dirty).toBe(false)
+  })
+
+  it('rewrites from unsaved in-memory content, not stale disk (backlink-rename flow)', async () => {
+    const fs = createFs()
+    const manager = new DocumentManager(fs as never)
+
+    await manager.open(path)
+    // User typed inside the autosave debounce window
+    manager.update(path, '# Edited body with [[Old Name]]')
+
+    // Sidebar flow: read current content via open(), compute rewrite, saveContent
+    const { content } = await manager.open(path)
+    expect(content).toBe('# Edited body with [[Old Name]]')
+    const rewritten = content.replace('[[Old Name]]', '[[New Name]]')
+    await manager.saveContent(path, rewritten)
+    await manager.close(path)
+
+    expect(fs.writeFile).toHaveBeenLastCalledWith(path, '# Edited body with [[New Name]]')
+    expect(manager.getContent(path)?.dirty).toBe(false)
+  })
+
+  it('does not emit external-change when saved content equals the doc content', async () => {
+    const fs = createFs()
+    const manager = new DocumentManager(fs as never)
+    const events: string[] = []
+    manager.onEvent((e) => events.push(e.type))
+
+    await manager.open(path)
+    manager.update(path, '# Same content')
+    await manager.saveContent(path, '# Same content')
+
+    // Editor flush path: re-pushing the renderer's own content must not
+    // trigger a re-parse (would reset the cursor) — only 'saved' fires.
+    expect(events).toEqual(['saved'])
+  })
+})

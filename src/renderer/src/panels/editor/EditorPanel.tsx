@@ -31,19 +31,17 @@ import { useUiStore } from '../../store/ui-store'
 
 interface EditorPanelProps {
   onNavigate: (id: string) => void
-  /** When provided, renders this file instead of the store's activeNotePath. */
-  filePath?: string | null
 }
 
-export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
-  const storeNotePath = useEditorStore((s) => s.activeNotePath)
-  const activeNotePath = filePath !== undefined ? filePath : storeNotePath
+export function EditorPanel({ onNavigate }: EditorPanelProps) {
+  const activeNotePath = useEditorStore((s) => s.activeNotePath)
   const mode = useEditorStore((s) => s.mode)
   const setMode = useEditorStore((s) => s.setMode)
   const content = useEditorStore((s) => s.content)
   const setContent = useEditorStore((s) => s.setContent)
+  const syncContent = useEditorStore((s) => s.syncContent)
   const loadContent = useEditorStore((s) => s.loadContent)
-  const setCursorPosition = useEditorStore((s) => s.setCursorPosition)
+  const setDirty = useEditorStore((s) => s.setDirty)
 
   const outlineVisible = useUiStore((s) => s.outlineVisible)
 
@@ -124,8 +122,6 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
   const resolvedPathRef = useRef(activeNotePath)
   resolvedPathRef.current = activeNotePath
 
-  const isSplitPane = filePath !== undefined
-
   const handleUpdate = useCallback(
     ({ editor: ed }: { editor: ReturnType<typeof useEditor> }) => {
       if (!ed) return
@@ -136,7 +132,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
         if (rawFm) {
           markdown = rawFm + markdown
         }
-        if (!isSplitPane) setContent(markdown)
+        setContent(markdown)
         // Push directly to DocumentManager from user action (not via effect)
         const path = resolvedPathRef.current
         if (path && prevLoadedPathRef.current === path) {
@@ -144,22 +140,20 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
         }
       }
     },
-    [setContent, doc, isSplitPane]
+    [setContent, doc]
   )
 
-  const handleSelectionUpdate = useCallback(
-    ({ editor: ed }: { editor: ReturnType<typeof useEditor> }) => {
-      if (!ed || isSplitPane) return
-      const { from } = ed.state.selection
-      const resolved = ed.state.doc.resolve(from)
-      const lineBlock = resolved.node(1)
-      const lineText = lineBlock ? lineBlock.textContent : ''
-      const offset = from - resolved.start(1)
-      const lineNumber = resolved.depth > 0 ? resolved.index(0) + 1 : 1
-      const colNumber = Math.max(1, offset + 1)
-      setCursorPosition(lineNumber, Math.min(colNumber, lineText.length + 1))
+  // Source mode routes through DocumentManager too, so both modes share
+  // the same autosave/conflict pipeline.
+  const handleSourceChange = useCallback(
+    (newContent: string) => {
+      setContent(newContent)
+      const path = resolvedPathRef.current
+      if (path && prevLoadedPathRef.current === path) {
+        doc.update(newContent)
+      }
     },
-    [setCursorPosition, isSplitPane]
+    [setContent, doc]
   )
 
   // Right-click handler: show context menu for concept node linking
@@ -204,7 +198,6 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
     extensions,
     content: '',
     onUpdate: handleUpdate,
-    onSelectionUpdate: handleSelectionUpdate,
     editorProps: {
       attributes: {
         class: 'focus:outline-none min-h-full px-8 py-12',
@@ -236,20 +229,30 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
     frontmatterRawRef.current = ''
   }
 
+  // DocumentManager is the single source of truth for dirty state: the store
+  // flag mirrors it so tab indicators and switch-away flushes stay accurate,
+  // and autosaves (doc:saved) clear it instead of leaving it stuck on.
+  useEffect(() => {
+    setDirty(doc.isDirty)
+  }, [doc.isDirty, setDirty])
+
+  // Latest dirty state readable inside the sync effect without retriggering
+  // it (re-parsing into Tiptap on every autosave would reset the cursor).
+  const docDirtyRef = useRef(doc.isDirty)
+  docDirtyRef.current = doc.isDirty
+
   // Load file content from DocumentManager and sync to Tiptap in one atomic step.
   // Collapsing these into one effect eliminates the race window where React can
   // interleave renders between content load and Tiptap sync.
+  // Runs again when doc.content changes while clean — i.e. an external/agent
+  // edit arrived — so the open note re-parses instead of going stale.
   useEffect(() => {
     if (!activeNotePath || !editor || doc.content === null || doc.loading) return
-    // Skip if already loaded for this path and user is editing
-    if (
-      activeNotePath === prevLoadedPathRef.current &&
-      (isSplitPane || useEditorStore.getState().isDirty)
-    )
-      return
+    // Skip if already loaded for this path and user has unsaved edits
+    if (activeNotePath === prevLoadedPathRef.current && docDirtyRef.current) return
 
     prevLoadedPathRef.current = activeNotePath
-    if (!isSplitPane) loadContent(doc.content)
+    loadContent(doc.content)
 
     // Parse frontmatter and sync to Tiptap immediately (same synchronous block)
     const parsed = parseFrontmatter(doc.content)
@@ -289,7 +292,38 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
         })
       }
     }
-  }, [activeNotePath, doc.content, doc.loading, loadContent, editor, isSplitPane])
+  }, [activeNotePath, doc.content, doc.loading, loadContent, editor])
+
+  // Mode switching round-trips through the markdown text so edits survive:
+  // rich→source seeds the source view from the freshly serialized Tiptap doc;
+  // source→rich re-parses the (possibly edited) source text into Tiptap.
+  const handleModeChange = useCallback(
+    (next: 'rich' | 'source') => {
+      if (next === mode) {
+        return
+      }
+      const ed = editorRef.current
+      const manager = ed?.storage.markdown?.manager
+      if (next === 'source') {
+        if (ed && manager) {
+          // syncContent (not setContent): re-serializing for display is not a
+          // user edit — marking the store dirty here would rewrite an
+          // untouched file on the next switch-away flush.
+          syncContent(frontmatterRawRef.current + manager.serialize(ed.getJSON()))
+        }
+      } else {
+        const parsed = parseFrontmatter(useEditorStore.getState().content)
+        frontmatterRawRef.current = parsed.raw
+        setFrontmatterData(parsed.data)
+        if (ed) {
+          ed.commands.setContent(manager ? manager.parse(parsed.body) : parsed.body)
+        }
+        prevLoadedPathRef.current = resolvedPathRef.current
+      }
+      setMode(next)
+    },
+    [mode, setMode, syncContent]
+  )
 
   // Note: content pushes to DocumentManager happen directly in handleUpdate
   // and onFrontmatterChange callbacks, NOT via a useEffect. This eliminates
@@ -395,7 +429,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
           role="tab"
           aria-selected={mode === 'rich'}
           className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
-          onClick={() => setMode('rich')}
+          onClick={() => handleModeChange('rich')}
         >
           Rich
         </button>
@@ -404,7 +438,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
           role="tab"
           aria-selected={mode === 'source'}
           className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
-          onClick={() => setMode('source')}
+          onClick={() => handleModeChange('source')}
         >
           Source
         </button>
@@ -420,9 +454,8 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
               frontmatterRawRef.current = newRaw
               const parsed = parseFrontmatter(newRaw)
               setFrontmatterData(parsed.data)
-              const currentParsed = parseFrontmatter(content ?? '')
-              const fullContent = newRaw + currentParsed.body
-              if (!isSplitPane) setContent(fullContent)
+              const fullContent = newRaw + parseFrontmatter(content).body
+              setContent(fullContent)
               // Push directly to DocumentManager from user action (not via effect)
               if (activeNotePath && prevLoadedPathRef.current === activeNotePath) {
                 doc.update(fullContent)
@@ -435,7 +468,7 @@ export function EditorPanel({ onNavigate, filePath }: EditorPanelProps) {
               {editor && <EditorBubbleMenu editor={editor} />}
             </>
           ) : (
-            <SourceEditor content={content} onChange={setContent} />
+            <SourceEditor content={content} onChange={handleSourceChange} />
           )}
         </div>
         {outlineVisible && editor && mode === 'rich' && (

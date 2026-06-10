@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
+import { logError } from '../../utils/error-logger'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useThreadStore } from '../../store/thread-store'
 
@@ -318,7 +319,9 @@ export function VaultSelector({
         >
           <button
             onClick={() => {
-              window.api.shell.showInFolder(ctxMenu.path)
+              window.api.shell.showInFolder(ctxMenu.path).catch((err) => {
+                logError('reveal-in-finder', err)
+              })
               setCtxMenu(null)
             }}
             className="sidebar-popover-item"
