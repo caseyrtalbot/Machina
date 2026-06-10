@@ -13,7 +13,6 @@ import {
   transitions,
   typography
 } from '../../design/tokens'
-import { buildGhostIndex } from '../../engine/ghost-index'
 import type { Artifact } from '@shared/types'
 
 const DRAWER_WIDTH = 340
@@ -242,15 +241,15 @@ function GhostDrawerContent({
   readonly ghostId: string
   readonly onClose: () => void
 }) {
-  const graph = useVaultStore((s) => s.graph)
-  const artifacts = useVaultStore((s) => s.artifacts)
+  // Memoized once per worker result in vault-store — no per-drawer rebuilds.
+  const ghostIndex = useVaultStore((s) => s.ghostIndex)
   const dismissGhost = useUiStore((s) => s.dismissGhost)
   const { emerge, isEmerging } = useGhostEmerge()
 
-  const ghostEntry = useMemo(() => {
-    const index = buildGhostIndex(graph, artifacts)
-    return index.find((g) => g.id === ghostId) ?? null
-  }, [graph, artifacts, ghostId])
+  const ghostEntry = useMemo(
+    () => ghostIndex.find((g) => g.id === ghostId) ?? null,
+    [ghostIndex, ghostId]
+  )
 
   const handleCreate = useCallback(async () => {
     const pathById = useVaultStore.getState().artifactPathById

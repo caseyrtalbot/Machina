@@ -7,6 +7,7 @@ import type {
   KnowledgeGraph
 } from '@shared/types'
 import type { ParseError, WorkerResult } from '@engine/types'
+import { buildGhostIndex, type GhostEntry } from '@engine/ghost-index'
 import { TE_DIR } from '@shared/constants'
 import { notifyError } from '../utils/error-logger'
 
@@ -45,6 +46,8 @@ interface VaultStore {
   readonly artifactById: Readonly<Record<string, Artifact>>
   readonly edgeCountByArtifactId: Readonly<Record<string, number>>
   readonly rawFileCount: number
+  /** Memoized ghost index, rebuilt once per worker result (not per panel render). */
+  readonly ghostIndex: readonly GhostEntry[]
   readonly discoveredTypes: readonly string[]
   readonly activeWorkspace: string | null
   readonly isLoading: boolean
@@ -61,7 +64,10 @@ interface VaultStore {
   setActiveWorkspace: (workspace: string | null) => void
   loadVault: (vaultPath: string) => Promise<void>
   setWorkerResult: (result: WorkerResult) => void
+  /** Artifacts that link TO the target ("linked mentions"). */
   getBacklinks: (targetId: string) => Artifact[]
+  /** Artifacts the source note links to ("links from this note"). */
+  getOutgoingLinks: (sourceId: string) => Artifact[]
 }
 
 export const useVaultStore = create<VaultStore>((set, get) => ({
@@ -78,6 +84,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   artifactById: {},
   edgeCountByArtifactId: {},
   rawFileCount: 0,
+  ghostIndex: [],
   discoveredTypes: [],
   activeWorkspace: null,
   isLoading: false,
@@ -166,7 +173,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       discoveredTypes,
       artifactById,
       edgeCountByArtifactId,
-      rawFileCount
+      rawFileCount,
+      ghostIndex: buildGhostIndex(result.graph, result.artifacts)
     })
   },
 
@@ -175,19 +183,26 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     const lowerTarget = targetId.toLowerCase()
     const sourceIds = new Set<string>()
     for (const edge of graph.edges) {
-      const edgeTargetLower = edge.target.toLowerCase()
-      const edgeSourceLower = edge.source.toLowerCase()
-      if (edgeTargetLower === lowerTarget && edgeSourceLower !== lowerTarget) {
+      if (edge.target.toLowerCase() === lowerTarget && edge.source.toLowerCase() !== lowerTarget) {
         sourceIds.add(edge.source)
-      }
-      if (
-        edgeSourceLower === lowerTarget &&
-        edgeTargetLower !== lowerTarget &&
-        edge.kind !== 'appears_in'
-      ) {
-        sourceIds.add(edge.target)
       }
     }
     return artifacts.filter((a) => sourceIds.has(a.id))
+  },
+
+  getOutgoingLinks: (sourceId: string): Artifact[] => {
+    const { graph, artifacts } = get()
+    const lowerSource = sourceId.toLowerCase()
+    const targetIds = new Set<string>()
+    for (const edge of graph.edges) {
+      if (
+        edge.source.toLowerCase() === lowerSource &&
+        edge.target.toLowerCase() !== lowerSource &&
+        edge.kind !== 'appears_in'
+      ) {
+        targetIds.add(edge.target)
+      }
+    }
+    return artifacts.filter((a) => targetIds.has(a.id))
   }
 }))

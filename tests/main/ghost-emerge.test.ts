@@ -70,7 +70,6 @@ describe('parseEmergeResponse', () => {
   it('parses valid JSON response', () => {
     const raw = JSON.stringify({
       tags: ['knowledge', 'synthesis'],
-      origin: 'emerge',
       body: '# Concept\n\nThis is synthesized content.'
     })
 
@@ -79,7 +78,6 @@ describe('parseEmergeResponse', () => {
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.value.tags).toEqual(['knowledge', 'synthesis'])
-      expect(result.value.origin).toBe('emerge')
       expect(result.value.body).toContain('synthesized content')
     }
   })
@@ -89,7 +87,6 @@ describe('parseEmergeResponse', () => {
 \`\`\`json
 {
   "tags": ["test"],
-  "origin": "emerge",
   "body": "Fenced body content"
 }
 \`\`\`
@@ -106,8 +103,7 @@ Done.`
 
   it('rejects response missing body field', () => {
     const raw = JSON.stringify({
-      tags: ['a'],
-      origin: 'emerge'
+      tags: ['a']
       // no body
     })
 
@@ -116,21 +112,6 @@ Done.`
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error).toContain('body')
-    }
-  })
-
-  it('rejects response missing origin field', () => {
-    const raw = JSON.stringify({
-      tags: ['a'],
-      body: 'Some body'
-      // no origin
-    })
-
-    const result = parseEmergeResponse(raw)
-
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.error).toContain('origin')
     }
   })
 
@@ -148,7 +129,6 @@ Done.`
   it('rejects when tags is not an array', () => {
     const raw = JSON.stringify({
       tags: 'not-an-array',
-      origin: 'emerge',
       body: 'Some body'
     })
 

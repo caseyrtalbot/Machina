@@ -1,26 +1,17 @@
 /**
  * Preview bar shown at the top of the canvas during ontology operations.
- * Displays group/card counts and provides Apply / Cancel / Agent actions.
+ * Displays group/card counts and provides Apply / Cancel actions.
  */
 
-import {
-  borderRadius,
-  colors,
-  floatingPanel,
-  getArtifactColor,
-  typography
-} from '../../design/tokens'
-
-const researchHue = getArtifactColor('research')
+import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
 
 interface OntologyPreviewProps {
-  readonly phase: 'preview' | 'error' | 'loading'
+  readonly phase: 'preview' | 'error'
   readonly errorMessage?: string
   readonly groupCount: number
   readonly cardCount: number
   readonly onApply: () => void
   readonly onCancel: () => void
-  readonly onRunAgent?: () => void
 }
 
 const barBase: React.CSSProperties = {
@@ -52,8 +43,7 @@ export function OntologyPreview({
   groupCount,
   cardCount,
   onApply,
-  onCancel,
-  onRunAgent
+  onCancel
 }: OntologyPreviewProps) {
   if (phase === 'error') {
     return (
@@ -115,19 +105,6 @@ export function OntologyPreview({
       >
         Cancel
       </button>
-      {onRunAgent && (
-        <button
-          onClick={onRunAgent}
-          style={{
-            ...btnBase,
-            backgroundColor: `color-mix(in srgb, ${researchHue} 15%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${researchHue} 30%, transparent)`,
-            color: researchHue
-          }}
-        >
-          + Agent Analysis
-        </button>
-      )}
     </div>
   )
 }

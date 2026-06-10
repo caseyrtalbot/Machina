@@ -4,7 +4,7 @@ import { useUiStore } from '../../store/ui-store'
 import { useThreadStore } from '../../store/thread-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
-import { buildGhostIndex, type GhostEntry } from '../../engine/ghost-index'
+import type { GhostEntry } from '../../engine/ghost-index'
 import { colors, transitions, typography, borderRadius, floatingPanel } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { groupByFrequency } from './ghost-sections'
@@ -63,6 +63,31 @@ function IconThinking() {
       <circle cx="6.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
       <circle cx="9.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
       <path d="M6 9.5c.5.8 1.2 1.2 2 1.2s1.5-.4 2-1.2" />
+    </svg>
+  )
+}
+
+function IconSpinner() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    >
+      <path d="M8 2.5 A5.5 5.5 0 0 1 13.5 8">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 8 8"
+          to="360 8 8"
+          dur="0.8s"
+          repeatCount="indefinite"
+        />
+      </path>
     </svg>
   )
 }
@@ -139,6 +164,7 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         top: pos.top,
@@ -297,6 +323,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={() => setContextOpen((prev) => !prev)}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -344,8 +371,9 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
         {ghost.id}
       </span>
 
-      {/* Actions (hover-reveal) */}
+      {/* Actions (hover-reveal). Clicks stop here so they don't toggle the row popup. */}
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           display: 'flex',
           gap: 4,
@@ -357,8 +385,8 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
           paddingLeft: 16
         }}
       >
-        <ActionIcon label="Create note" onClick={handleCreate}>
-          <IconPlus />
+        <ActionIcon label={isEmerging ? 'Creating…' : 'Create note'} onClick={handleCreate}>
+          {isEmerging ? <IconSpinner /> : <IconPlus />}
         </ActionIcon>
         <ActionIcon label="Show in graph" onClick={handleShowGraph}>
           <IconGraph />
@@ -366,10 +394,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
         <ActionIcon
           label="See references"
           buttonRef={contextBtnRef}
-          onClick={(e) => {
-            e.stopPropagation()
-            setContextOpen((prev) => !prev)
-          }}
+          onClick={() => setContextOpen((prev) => !prev)}
         >
           <IconThinking />
         </ActionIcon>
@@ -409,7 +434,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 // Empty State
 // ---------------------------------------------------------------------------
 
-function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
+function EmptyState() {
   return (
     <div
       className="h-full flex flex-col items-center justify-center gap-3"
@@ -434,11 +459,6 @@ function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
         <br />
         Your vault is fully connected.
       </div>
-      {hasDismissed && (
-        <div className="text-xs mt-2" style={{ opacity: 0.5 }}>
-          Some ghosts are dismissed
-        </div>
-      )}
     </div>
   )
 }
@@ -448,15 +468,18 @@ function EmptyState({ hasDismissed }: { readonly hasDismissed: boolean }) {
 // ---------------------------------------------------------------------------
 
 export function GhostPanel() {
-  const graph = useVaultStore((s) => s.graph)
-  const artifacts = useVaultStore((s) => s.artifacts)
+  // Memoized once per worker result in vault-store — no per-panel rebuilds.
+  const allGhosts = useVaultStore((s) => s.ghostIndex)
   const dismissedGhosts = useUiStore((s) => s.dismissedGhosts)
   const dismissGhost = useUiStore((s) => s.dismissGhost)
-
-  const allGhosts = useMemo(() => buildGhostIndex(graph, artifacts), [graph, artifacts])
+  const undismissGhost = useUiStore((s) => s.undismissGhost)
 
   const visibleGhosts = useMemo(
     () => allGhosts.filter((g) => !dismissedGhosts.includes(g.id)),
+    [allGhosts, dismissedGhosts]
+  )
+  const dismissedEntries = useMemo(
+    () => allGhosts.filter((g) => dismissedGhosts.includes(g.id)),
     [allGhosts, dismissedGhosts]
   )
 
@@ -464,8 +487,8 @@ export function GhostPanel() {
   const totalCount = visibleGhosts.length
   const maxCount = visibleGhosts[0]?.referenceCount ?? 1
 
-  if (visibleGhosts.length === 0) {
-    return <EmptyState hasDismissed={dismissedGhosts.length > 0} />
+  if (visibleGhosts.length === 0 && dismissedEntries.length === 0) {
+    return <EmptyState />
   }
 
   return (
@@ -530,6 +553,63 @@ export function GhostPanel() {
             ))}
           </div>
         ))}
+
+        {/* Dismissed ghosts: restorable, kept out of graph + sections */}
+        {dismissedEntries.length > 0 && (
+          <div>
+            <SectionLabel
+              as="div"
+              style={{
+                color: colors.text.muted,
+                padding: '12px 0 8px',
+                borderBottom: '1px solid var(--line-faint)',
+                marginBottom: 4
+              }}
+            >
+              Dismissed ({dismissedEntries.length})
+            </SectionLabel>
+            {dismissedEntries.map((ghost) => (
+              <div
+                key={ghost.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 0',
+                  gap: 10
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    color: colors.text.muted,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {ghost.id}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => undismissGhost(ghost.id)}
+                  className="cursor-pointer"
+                  style={{
+                    fontSize: 11,
+                    color: colors.text.secondary,
+                    border: '1px solid var(--line-faint)',
+                    borderRadius: borderRadius.tool,
+                    padding: '2px 8px',
+                    background: 'transparent',
+                    transition: `color ${transitions.focusRing}`
+                  }}
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

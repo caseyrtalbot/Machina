@@ -24,6 +24,8 @@ export interface EdgeData {
 export interface RendererCallbacks {
   readonly onNodeHover: (nodeIndex: number | null) => void
   readonly onNodeClick: (nodeIndex: number) => void
+  /** Fast-path open: double-click or cmd+click on a node. */
+  readonly onNodeOpen: (nodeIndex: number) => void
   readonly onNodeDrag: (nodeIndex: number, x: number, y: number) => void
   readonly onNodeDragEnd: (nodeIndex: number) => void
   readonly onViewportChange: (viewport: GraphViewport) => void
@@ -159,6 +161,7 @@ export class GraphRenderer {
   private readonly boundPointerDown: (e: PointerEvent) => void
   private readonly boundPointerMove: (e: PointerEvent) => void
   private readonly boundPointerUp: (e: PointerEvent) => void
+  private readonly boundDoubleClick: (e: MouseEvent) => void
 
   constructor(callbacks: RendererCallbacks) {
     this.callbacks = callbacks
@@ -166,6 +169,7 @@ export class GraphRenderer {
     this.boundPointerDown = this.handlePointerDown.bind(this)
     this.boundPointerMove = this.handlePointerMove.bind(this)
     this.boundPointerUp = this.handlePointerUp.bind(this)
+    this.boundDoubleClick = this.handleDoubleClick.bind(this)
   }
 
   // -------------------------------------------------------------------------
@@ -226,6 +230,7 @@ export class GraphRenderer {
     canvas.addEventListener('pointermove', this.boundPointerMove)
     canvas.addEventListener('pointerup', this.boundPointerUp)
     canvas.addEventListener('pointerleave', this.boundPointerUp)
+    canvas.addEventListener('dblclick', this.boundDoubleClick)
 
     this.mounted = true
     this.paused = false
@@ -249,6 +254,7 @@ export class GraphRenderer {
       canvas.removeEventListener('pointermove', this.boundPointerMove)
       canvas.removeEventListener('pointerup', this.boundPointerUp)
       canvas.removeEventListener('pointerleave', this.boundPointerUp)
+      canvas.removeEventListener('dblclick', this.boundDoubleClick)
 
       canvas.parentElement?.removeChild(canvas)
       this.app.destroy(true)
@@ -260,22 +266,6 @@ export class GraphRenderer {
     this.selectionRing = null
     this.nodeGraphics = []
     this.cachedQuadtree = null
-  }
-
-  pause(): void {
-    this.paused = true
-  }
-
-  resume(): void {
-    if (!this.paused) return
-    this.paused = false
-    if (this.mounted) {
-      this.markDirty()
-    }
-  }
-
-  isPaused(): boolean {
-    return this.paused
   }
 
   // -------------------------------------------------------------------------
@@ -322,6 +312,18 @@ export class GraphRenderer {
     this.viewport = viewport
     this.callbacks.onViewportChange(viewport)
     this.markDirty()
+  }
+
+  /**
+   * Pan (keeping the current zoom, floored at 1x) so the node sits at the
+   * viewport center. Used by the ghost-panel → graph handoff.
+   */
+  centerOnNode(nodeIndex: number): void {
+    const x = this.positions[nodeIndex * 2]
+    const y = this.positions[nodeIndex * 2 + 1]
+    if (x === undefined || y === undefined) return
+    const scale = Math.max(this.viewport.scale, 1)
+    this.setViewport({ x: -x * scale, y: -y * scale, scale })
   }
 
   getPositions(): Float32Array {
@@ -768,11 +770,24 @@ export class GraphRenderer {
     }
   }
 
-  private handlePointerUp(_e: PointerEvent): void {
+  private handleDoubleClick(e: MouseEvent): void {
+    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect()
+    const hitNode = this.findNodeAtScreen(e.clientX - rect.left, e.clientY - rect.top)
+    if (hitNode !== null) {
+      this.callbacks.onNodeOpen(hitNode)
+    }
+  }
+
+  private handlePointerUp(e: PointerEvent): void {
     if (this.dragNodeIndex !== null) {
       if (!this.pointerMoved) {
-        // Click (didn't move enough to be a drag)
-        this.callbacks.onNodeClick(this.dragNodeIndex)
+        // Click (didn't move enough to be a drag). Cmd+click is the
+        // open-note fast path; plain click toggles selection.
+        if (e.metaKey) {
+          this.callbacks.onNodeOpen(this.dragNodeIndex)
+        } else {
+          this.callbacks.onNodeClick(this.dragNodeIndex)
+        }
       } else {
         this.callbacks.onNodeDragEnd(this.dragNodeIndex)
       }

@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { Artifact } from '@shared/types'
 import {
   borderRadius,
@@ -8,6 +9,7 @@ import {
 } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useUiStore } from '../../store/ui-store'
+import { useVaultStore } from '../../store/vault-store'
 
 /**
  * Strip markdown formatting from a snippet so it reads as clean prose.
@@ -135,10 +137,53 @@ function BacklinkItem({
   )
 }
 
+interface LinkSectionProps {
+  readonly label: string
+  readonly artifacts: readonly Artifact[]
+  readonly currentNoteId: string
+  readonly currentNoteTitle?: string
+  readonly onNavigate: (id: string) => void
+}
+
+function LinkSection({
+  label,
+  artifacts,
+  currentNoteId,
+  currentNoteTitle,
+  onNavigate
+}: LinkSectionProps) {
+  if (artifacts.length === 0) return null
+  return (
+    <div style={{ paddingBottom: 8 }}>
+      <div style={{ padding: '4px 32px' }}>
+        <SectionLabel
+          style={{
+            fontSize: '10px',
+            letterSpacing: typography.metadata.letterSpacing,
+            color: colors.text.muted
+          }}
+        >
+          {label}
+        </SectionLabel>
+      </div>
+      {artifacts.map((artifact) => (
+        <BacklinkItem
+          key={artifact.id}
+          artifact={artifact}
+          currentNoteId={currentNoteId}
+          currentNoteTitle={currentNoteTitle}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </div>
+  )
+}
+
 interface BacklinksPanelProps {
   currentNoteId: string
   currentNotePath: string
   currentNoteTitle?: string
+  /** Inbound links: artifacts that link TO this note. */
   backlinks: Artifact[]
   onNavigate: (id: string) => void
 }
@@ -152,8 +197,18 @@ export function BacklinksPanel({
 }: BacklinksPanelProps) {
   const collapsed = useUiStore((s) => s.getBacklinkCollapsed(currentNotePath))
   const toggle = useUiStore((s) => s.toggleBacklinkCollapsed)
+  const getOutgoingLinks = useVaultStore((s) => s.getOutgoingLinks)
+  const graph = useVaultStore((s) => s.graph)
 
-  if (backlinks.length === 0) return null
+  // Outgoing links recompute when the graph changes (worker result), not per render.
+  const outgoingLinks = useMemo(
+    () => (currentNoteId ? getOutgoingLinks(currentNoteId) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- graph is the real data dependency
+    [currentNoteId, getOutgoingLinks, graph]
+  )
+
+  const totalCount = backlinks.length + outgoingLinks.length
+  if (totalCount === 0) return null
 
   return (
     // Console: hairline top border separates the backlinks bar from the
@@ -180,7 +235,7 @@ export function BacklinksPanel({
             letterSpacing: typography.metadata.letterSpacing
           }}
         >
-          Backlinks
+          Links
         </SectionLabel>
         <div className="flex items-center gap-2">
           <span
@@ -190,7 +245,7 @@ export function BacklinksPanel({
               fontSize: '11px'
             }}
           >
-            {backlinks.length}
+            {totalCount}
           </span>
           <span
             style={{
@@ -204,19 +259,24 @@ export function BacklinksPanel({
         </div>
       </button>
 
-      {/* Backlink list */}
+      {/* Link sections: inbound mentions and outgoing links, honestly separated */}
       {!collapsed && (
-        <div style={{ paddingBottom: 8 }}>
-          {backlinks.map((artifact) => (
-            <BacklinkItem
-              key={artifact.id}
-              artifact={artifact}
-              currentNoteId={currentNoteId}
-              currentNoteTitle={currentNoteTitle}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
+        <>
+          <LinkSection
+            label="Linked mentions"
+            artifacts={backlinks}
+            currentNoteId={currentNoteId}
+            currentNoteTitle={currentNoteTitle}
+            onNavigate={onNavigate}
+          />
+          <LinkSection
+            label="Links from this note"
+            artifacts={outgoingLinks}
+            currentNoteId={currentNoteId}
+            currentNoteTitle={currentNoteTitle}
+            onNavigate={onNavigate}
+          />
+        </>
       )}
     </div>
   )

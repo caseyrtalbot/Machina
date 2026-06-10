@@ -7,7 +7,9 @@ import { buildFileTree } from '../../sidebar/buildFileTree'
 import type { ArtifactOrigin } from '../../sidebar/origin-utils'
 import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
+import { useSidebarFilterStore } from '../../../store/sidebar-filter-store'
 import { useSidebarSelectionStore } from '../../../store/sidebar-selection-store'
+import { filterSidebarFiles } from './sidebar-filtering'
 import { useThreadStore } from '../../../store/thread-store'
 import { useUiStore } from '../../../store/ui-store'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from '../../../hooks/useCanvasAwareness'
@@ -107,10 +109,26 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
     }
   }, [files, sortMode])
 
+  // Workspace + tag filters narrow the file list before the tree is built.
+  const selectedTags = useSidebarFilterStore((s) => s.selectedTags)
+  const tagOperator = useSidebarFilterStore((s) => s.tagOperator)
+  const filteredFiles = useMemo(
+    () =>
+      filterSidebarFiles(stableFiles, {
+        vaultPath,
+        activeWorkspace,
+        selectedTags,
+        tagOperator,
+        artifacts,
+        fileToId
+      }),
+    [stableFiles, vaultPath, activeWorkspace, selectedTags, tagOperator, artifacts, fileToId]
+  )
+
   const allTreeNodes = useMemo(
     () =>
       buildFileTree(
-        stableFiles.map((file) => ({ path: file.path, modified: file.modified })),
+        filteredFiles.map((file) => ({ path: file.path, modified: file.modified })),
         vaultPath ?? '',
         {
           sortMode,
@@ -122,7 +140,7 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
           }
         }
       ),
-    [artifactTypes, stableFiles, sortMode, vaultPath]
+    [artifactTypes, filteredFiles, sortMode, vaultPath]
   )
   const allTreeNodeByPath = useMemo(
     () => new Map(allTreeNodes.map((node) => [node.path, node])),

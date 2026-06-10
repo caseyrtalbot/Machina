@@ -23,7 +23,6 @@ export interface ReferenceNote {
 
 interface EmergeResult {
   readonly tags: string[]
-  readonly origin: string
   readonly body: string
 }
 
@@ -58,7 +57,7 @@ ${refSections}
 
 Respond ONLY with a JSON object. Do not add any prose before or after.
 
-{"tags": ["string"], "origin": "emerge", "body": "string — markdown body content"}`
+{"tags": ["string"], "body": "string — markdown body content"}`
 }
 
 // ---------------------------------------------------------------------------
@@ -84,10 +83,6 @@ export function parseEmergeResponse(raw: string): Result<EmergeResult> {
     return { ok: false, error: 'Missing or invalid tags array' }
   }
 
-  if (typeof obj.origin !== 'string') {
-    return { ok: false, error: 'Missing or invalid origin string' }
-  }
-
   if (typeof obj.body !== 'string') {
     return { ok: false, error: 'Missing or invalid body string' }
   }
@@ -96,7 +91,6 @@ export function parseEmergeResponse(raw: string): Result<EmergeResult> {
     ok: true,
     value: {
       tags: obj.tags.map(String),
-      origin: obj.origin,
       body: obj.body
     }
   }
@@ -153,7 +147,6 @@ function buildArtifact(
 
   const tags = emergeResult?.tags ?? []
   const body = emergeResult?.body ?? ''
-  const origin = emergeResult?.origin ?? undefined
 
   return {
     id: ghostId,
@@ -168,20 +161,20 @@ function buildArtifact(
     tensions_with: [],
     appears_in: [],
     related: [],
-    origin: 'human',
+    // Synthesized notes carry agent provenance: serializeArtifact stamps
+    // `origin: agent` into frontmatter and the graph renders the agent stroke.
+    origin: 'agent',
     sources: [],
     concepts: [],
     bodyLinks: [],
     body,
-    frontmatter: origin ? { origin } : {}
+    frontmatter: {}
   }
 }
 
 // ---------------------------------------------------------------------------
 // Security: filename sanitization
 // ---------------------------------------------------------------------------
-
-const VALID_ORIGINS = new Set(['emerge', 'challenge'])
 
 /** Strip dangerous characters from ghost title before using as filename. */
 function sanitizeFilename(name: string): string {
@@ -235,11 +228,7 @@ export function registerGhostEmergeIpc(callClaudeFn: CallClaudeFn = callClaude):
         const rawResponse = await callClaudeFn(prompt)
         const parsed = parseEmergeResponse(rawResponse)
         if (parsed.ok) {
-          // Validate origin is from allowlist
-          const validatedOrigin = VALID_ORIGINS.has(parsed.value.origin)
-            ? parsed.value.origin
-            : 'emerge'
-          emergeResult = { ...parsed.value, origin: validatedOrigin }
+          emergeResult = parsed.value
         }
       } catch (err) {
         if (err instanceof PathGuardError) throw err

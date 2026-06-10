@@ -10,6 +10,7 @@ import { getGraphLod } from './graph-lod'
 import { resolveFocusIdx } from './graph-focus'
 import { colors, floatingPanel, typography } from '@renderer/design/tokens'
 import { useReducedMotion } from '@renderer/hooks/useReducedMotion'
+import { openArtifactInEditor } from '@renderer/system-artifacts/system-artifact-runtime'
 import type { SimNode, PhysicsCommand, PhysicsResult, ForceParams } from './graph-types'
 import type { KnowledgeGraph } from '@shared/types'
 
@@ -55,22 +56,31 @@ function fitAllNodes(renderer: GraphRenderer, container: HTMLElement): void {
   })
 }
 
-/** Convert KnowledgeGraph data into worker-compatible format. */
-function prepareSimData(graph: KnowledgeGraph) {
+/**
+ * Convert KnowledgeGraph data into worker-compatible format.
+ * Dismissed ghost nodes (and their edges) are excluded so the graph
+ * agrees with the ghost panel's dismissal state.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported for tests
+export function prepareSimData(graph: KnowledgeGraph, dismissedGhosts: ReadonlySet<string>) {
   const nodeIndexMap = new Map<string, number>()
-  const simNodes: SimNode[] = graph.nodes.map((n, i) => {
-    nodeIndexMap.set(n.id, i)
-    return {
-      index: i,
+  const simNodes: SimNode[] = []
+  for (const n of graph.nodes) {
+    const isGhost = !n.origin
+    if (isGhost && dismissedGhosts.has(n.id)) continue
+    const index = simNodes.length
+    nodeIndexMap.set(n.id, index)
+    simNodes.push({
+      index,
       id: n.id,
       title: n.title,
       type: n.type,
       signal: n.signal,
       connectionCount: n.connectionCount,
       origin: n.origin,
-      isGhost: !n.origin
-    }
-  })
+      isGhost
+    })
+  }
 
   const simEdges = graph.edges
     .map((e) => {
@@ -98,11 +108,13 @@ function GraphEmptyState({
         ? 'Graph is waiting on relationship data.'
         : 'No relationships were found for this vault yet.'
 
+  // Honest guidance only: point at affordances that exist today
+  // (tags/wikilinks or an agent thread). Wave 3.9 ships a real enrichment action.
   const description =
     artifactCount === 0
       ? 'Open a vault with markdown notes to populate the graph view.'
       : rawFileCount > 0
-        ? `Run /connect-vault in Claude to analyze the ${rawFileCount} file${rawFileCount === 1 ? '' : 's'} that still have no metadata or discovered connections.`
+        ? `${rawFileCount} file${rawFileCount === 1 ? ' has' : 's have'} no metadata or discovered connections yet. Add tags or [[wikilinks]], or ask the agent in a thread to connect them.`
         : 'Add links, tags, tensions, or generated metadata so the graph has nodes to render.'
 
   return (
@@ -197,6 +209,9 @@ export function GraphPanel() {
   const edgesRef = useRef<Array<{ source: number; target: number }>>([])
   const mountedRef = useRef(false)
   const hasAutoFitRef = useRef(false)
+  // Selection ids the renderer itself produced (click/deselect) — the
+  // store-sync effect skips centering for these so in-graph clicks don't pan.
+  const rendererSelectionRef = useRef<string | null>(null)
 
   const graph = useVaultStore((s) => s.graph)
   const artifactCount = useVaultStore((s) => s.artifacts.length)
@@ -257,11 +272,20 @@ export function GraphPanel() {
         // Toggle selection: clicking the same node again deselects
         const currentSelected = useGraphViewStore.getState().selectedNodeId
         const nextId = currentSelected === node.id ? null : node.id
+        rendererSelectionRef.current = nextId
         setSelectedNode(nextId)
         renderer.setSelectedNode(nextId !== null ? idx : null)
       },
+      onNodeOpen: (idx) => {
+        if (!mountedRef.current) return
+        const node = simNodesRef.current[idx]
+        if (!node) return
+        const path = useVaultStore.getState().artifactPathById[node.id]
+        if (path) openArtifactInEditor(path, node.title)
+      },
       onDeselect: () => {
         if (!mountedRef.current) return
+        rendererSelectionRef.current = null
         setSelectedNode(null)
         renderer.setSelectedNode(null)
       },
@@ -382,11 +406,12 @@ export function GraphPanel() {
   // The physics worker preserves existing node positions across re-inits,
   // so spurious graph ref changes (e.g., vault re-parse after editor flush)
   // won't cause visual spasms.
+  const dismissedGhosts = useUiStore((s) => s.dismissedGhosts)
   const prevTopologyRef = useRef({ nodeCount: 0, edgeCount: 0 })
   useEffect(() => {
     if (!workerRef.current || graph.nodes.length === 0) return
 
-    const { simNodes, simEdges, nodeIndexMap } = prepareSimData(graph)
+    const { simNodes, simEdges, nodeIndexMap } = prepareSimData(graph, new Set(dismissedGhosts))
     simNodesRef.current = simNodes
     nodeIndexMapRef.current = nodeIndexMap
     edgesRef.current = simEdges
@@ -401,6 +426,10 @@ export function GraphPanel() {
           kind: e.kind
         }))
       )
+      // Rebuilding simNodes shifts indices (e.g. dismissing a ghost), so the
+      // renderer's index-based selection must be remapped from the stable id.
+      const selectedId = useGraphViewStore.getState().selectedNodeId
+      renderer.setSelectedNode(selectedId !== null ? (nodeIndexMap.get(selectedId) ?? null) : null)
     }
 
     setGraphStats(simNodes.length, simEdges.length)
@@ -414,7 +443,23 @@ export function GraphPanel() {
 
     const cmd: PhysicsCommand = { type: 'init', nodes: simNodes, edges: simEdges }
     workerRef.current.postMessage(cmd)
-  }, [graph, setGraphStats])
+  }, [graph, dismissedGhosts, setGraphStats])
+
+  // Ghost panel → graph handoff: when selection is driven from outside the
+  // renderer (e.g. "Show in graph"), sync the renderer and center the node.
+  const selectedNodeId = useGraphViewStore((s) => s.selectedNodeId)
+  useEffect(() => {
+    const renderer = rendererRef.current
+    if (!renderer) return
+    const fromRenderer = selectedNodeId === rendererSelectionRef.current
+    rendererSelectionRef.current = selectedNodeId
+    if (fromRenderer) return
+
+    const idx =
+      selectedNodeId !== null ? (nodeIndexMapRef.current.get(selectedNodeId) ?? null) : null
+    renderer.setSelectedNode(idx)
+    if (idx !== null) renderer.centerOnNode(idx)
+  }, [selectedNodeId])
 
   // Reactively apply display options to the renderer
   const showEdges = useGraphViewStore((s) => s.showEdges)
@@ -550,9 +595,11 @@ export function GraphPanel() {
             >
               |
             </span>
+            {/* Honest string: /connect-vault ships nowhere. Wave 3.9 replaces
+                this hint with a first-class enrichment action. */}
             <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              {rawFileCount} file{rawFileCount !== 1 ? 's' : ''} still need metadata. Run
-              {' /connect-vault'}
+              {rawFileCount} file{rawFileCount !== 1 ? 's' : ''} still need metadata. Add tags or
+              links, or ask the agent
             </span>
           </div>
         </div>

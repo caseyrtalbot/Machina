@@ -2,14 +2,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
+import { setErrorNotifier } from '../../utils/error-logger'
 
 const mockEmergeGhost = vi.fn()
+const mockReadFile = vi.fn()
 
 vi.stubGlobal('window', {
   ...window,
   api: {
     vault: {
       emergeGhost: mockEmergeGhost
+    },
+    fs: {
+      readFile: mockReadFile
     },
     document: {
       saveContent: vi.fn().mockResolvedValue(undefined)
@@ -19,14 +24,25 @@ vi.stubGlobal('window', {
 
 const { useGhostEmerge } = await import('../useGhostEmerge')
 
+const SYNTHESIZED_NOTE = '---\nid: emerged\ntitle: emerged\n---\n\nSynthesized body content.\n'
+const EMPTY_NOTE = '---\nid: emerged\ntitle: emerged\n---\n\n'
+
 describe('useGhostEmerge', () => {
+  let notified: string[]
+
   beforeEach(() => {
+    notified = []
+    setErrorNotifier((message) => notified.push(message))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
     mockEmergeGhost.mockReset()
     mockEmergeGhost.mockResolvedValue({
       filePath: '/test-vault/emerged-note.md',
       folderCreated: false,
       folderPath: '/test-vault'
     })
+    mockReadFile.mockReset()
+    mockReadFile.mockResolvedValue(SYNTHESIZED_NOTE)
 
     useEditorStore.setState({
       activeNotePath: null,
@@ -42,6 +58,8 @@ describe('useGhostEmerge', () => {
   })
 
   afterEach(() => {
+    setErrorNotifier(() => {})
+    vi.restoreAllMocks()
     cleanup()
   })
 
@@ -70,14 +88,49 @@ describe('useGhostEmerge', () => {
     )
   })
 
-  it('navigates to emerged file path after success', async () => {
+  it('opens the emerged note in the editor after success', async () => {
     const { result } = renderHook(() => useGhostEmerge())
 
     await act(async () => {
       await result.current.emerge('ghost-123', 'My Ghost Note', ['/test-vault/ref1.md'])
     })
 
+    // openArtifactInEditor: tab opened and made active
     expect(useEditorStore.getState().activeNotePath).toBe('/test-vault/emerged-note.md')
+    expect(useEditorStore.getState().openTabs.map((t) => t.path)).toContain(
+      '/test-vault/emerged-note.md'
+    )
+    expect(notified).toEqual([])
+  })
+
+  it('notifies when the synthesized note came back empty (CLI fallback)', async () => {
+    mockReadFile.mockResolvedValue(EMPTY_NOTE)
+    const { result } = renderHook(() => useGhostEmerge())
+
+    await act(async () => {
+      await result.current.emerge('ghost-123', 'My Ghost Note', ['/test-vault/ref1.md'])
+    })
+
+    // Note still opens; user is told synthesis fell back to an empty note
+    expect(useEditorStore.getState().activeNotePath).toBe('/test-vault/emerged-note.md')
+    expect(notified).toHaveLength(1)
+    expect(notified[0]).toContain('My Ghost Note')
+    expect(notified[0]).toContain('empty note')
+  })
+
+  it('notifies the user when emergence fails', async () => {
+    mockEmergeGhost.mockRejectedValue(new Error('disk full'))
+
+    const { result } = renderHook(() => useGhostEmerge())
+
+    await act(async () => {
+      await result.current.emerge('ghost-123', 'Title', ['/ref.md'])
+    })
+
+    expect(result.current.isEmerging).toBe(false)
+    expect(useEditorStore.getState().activeNotePath).toBeNull()
+    expect(notified).toHaveLength(1)
+    expect(notified[0]).toContain('Title')
   })
 
   it('does nothing when vaultPath is null', async () => {
@@ -129,20 +182,6 @@ describe('useGhostEmerge', () => {
 
     // isEmerging should be false after completion
     expect(result.current.isEmerging).toBe(false)
-  })
-
-  it('resets isEmerging to false on error', async () => {
-    mockEmergeGhost.mockRejectedValue(new Error('disk full'))
-
-    const { result } = renderHook(() => useGhostEmerge())
-
-    await act(async () => {
-      await result.current.emerge('ghost-123', 'Title', ['/ref.md'])
-    })
-
-    expect(result.current.isEmerging).toBe(false)
-    // Should not navigate on error
-    expect(useEditorStore.getState().activeNotePath).toBeNull()
   })
 
   it('prevents concurrent emerge calls', async () => {

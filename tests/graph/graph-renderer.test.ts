@@ -7,6 +7,7 @@ function makeCallbacks(): RendererCallbacks {
   return {
     onNodeHover: vi.fn(),
     onNodeClick: vi.fn(),
+    onNodeOpen: vi.fn(),
     onNodeDrag: vi.fn(),
     onNodeDragEnd: vi.fn(),
     onViewportChange: vi.fn(),
@@ -30,11 +31,6 @@ describe('GraphRenderer', () => {
     const renderer = new GraphRenderer(makeCallbacks())
     expect(renderer).toBeDefined()
     expect(renderer.getNodeCount()).toBe(0)
-  })
-
-  it('tracks paused state before mount', () => {
-    const renderer = new GraphRenderer(makeCallbacks())
-    expect(renderer.isPaused()).toBe(true)
   })
 
   it('accepts position data before mount', () => {
@@ -74,23 +70,32 @@ describe('GraphRenderer', () => {
     renderer.setHighlightedNode(null)
   })
 
-  it('pause and resume toggle paused state', () => {
-    const renderer = new GraphRenderer(makeCallbacks())
-    expect(renderer.isPaused()).toBe(true)
-
-    // resume before mount should set paused=false but not start loop (no app)
-    renderer.resume()
-    expect(renderer.isPaused()).toBe(false)
-
-    renderer.pause()
-    expect(renderer.isPaused()).toBe(true)
-  })
-
   it('destroy is safe to call without mount', () => {
     const renderer = new GraphRenderer(makeCallbacks())
     // Calling destroy without ever calling mount should not throw
     renderer.destroy()
-    expect(renderer.isPaused()).toBe(true)
+  })
+
+  it('centerOnNode pans the viewport so the node sits at center', () => {
+    const callbacks = makeCallbacks()
+    const renderer = new GraphRenderer(callbacks)
+    renderer.setGraphData([makeNode({ index: 0 }), makeNode({ index: 1 })], [])
+    renderer.setPositions(new Float32Array([100, 200, -40, 60]))
+
+    renderer.centerOnNode(1)
+
+    // scale floors at 1; viewport offset is the negated node position * scale
+    expect(callbacks.onViewportChange).toHaveBeenCalledWith({ x: 40, y: -60, scale: 1 })
+  })
+
+  it('centerOnNode is a no-op when the node has no position yet', () => {
+    const callbacks = makeCallbacks()
+    const renderer = new GraphRenderer(callbacks)
+    renderer.setGraphData([makeNode({ index: 0 })], [])
+
+    renderer.centerOnNode(0)
+
+    expect(callbacks.onViewportChange).not.toHaveBeenCalled()
   })
 
   it('setPositions replaces buffer without affecting node count', () => {
