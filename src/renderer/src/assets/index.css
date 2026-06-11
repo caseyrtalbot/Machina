@@ -186,6 +186,8 @@ h6 {
 .te-titlebar-agent {
   margin-left: auto;
   padding-left: 12px;
+  /* Breathing room before the titlebar panel-toggle cluster. */
+  margin-right: 14px;
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.12em;

@@ -1,9 +1,13 @@
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ThreadMessage as TM } from '@shared/thread-types'
+import { resolveWikilinkTarget } from '@shared/engine/wikilink-resolver'
+import { useVaultStore } from '../../store/vault-store'
+import { useThreadStore } from '../../store/thread-store'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { rehypeEmojiIcons } from '../../markdown/rehype-emoji-icons'
+import { remarkWikilinks } from '../../markdown/remark-wikilinks'
 import { LucideInline } from '../../markdown/LucideInline'
 
 /**
@@ -20,7 +24,57 @@ interface Props {
   readonly streamingBody?: string
 }
 
+/** Open a chat [[wikilink]] in an editor dock tab if it resolves to a note. */
+function openWikilink(target: string): void {
+  const { artifacts, artifactPathById } = useVaultStore.getState()
+  const id = resolveWikilinkTarget(target, artifacts, artifactPathById)
+  const path = id ? artifactPathById[id] : undefined
+  if (path) {
+    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path })
+  }
+}
+
 const markdownComponents: Components = {
+  a(props) {
+    const {
+      node: _node,
+      children,
+      href,
+      ...rest
+    } = props as unknown as {
+      node?: unknown
+      children?: unknown
+      href?: string
+      [key: string]: unknown
+    }
+    const target = (rest as Record<string, unknown>)['data-wikilink-target']
+    if (typeof target === 'string') {
+      return (
+        <a
+          href="#wikilink"
+          data-wikilink-target={target}
+          title={target}
+          style={{
+            color: colors.accent.default,
+            textDecoration: 'none',
+            cursor: 'pointer',
+            borderBottom: `1px solid ${colors.accent.line}`
+          }}
+          onClick={(e) => {
+            e.preventDefault()
+            openWikilink(target)
+          }}
+        >
+          {children as never}
+        </a>
+      )
+    }
+    return (
+      <a href={href} {...(rest as object)}>
+        {children as never}
+      </a>
+    )
+  },
   span(props) {
     const {
       node: _node,
@@ -68,7 +122,7 @@ export function ThreadMessage({ message, streamingBody }: Props) {
       </div>
       <div className="thread-prose">
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={[remarkGfm, remarkWikilinks]}
           rehypePlugins={[rehypeEmojiIcons]}
           components={markdownComponents}
         >

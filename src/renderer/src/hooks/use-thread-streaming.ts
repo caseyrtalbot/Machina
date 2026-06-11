@@ -23,6 +23,13 @@ export function useThreadStreaming(): void {
         if (call) startToolCall(evt.threadId, call)
       } else if (evt.kind === 'tool_call_persisted') {
         appendToolCall(evt.threadId, evt.call, evt.result)
+        // The model resumes prose after tool results with no separator in the
+        // stream, gluing sentences together ("...topic.Good - I can see...").
+        // Join segments as paragraphs; CLI deltas embed this joiner already.
+        const buffered = useThreadStore.getState().streamingByThreadId[evt.threadId] ?? ''
+        if (buffered.length > 0 && !buffered.endsWith('\n\n')) {
+          append(evt.threadId, evt.runId, buffered.endsWith('\n') ? '\n' : '\n\n')
+        }
         if (evt.call.kind === 'pin_to_canvas' && evt.result.ok) {
           const out = evt.result.output as { cardId?: string; node?: CanvasNode } | null
           window.dispatchEvent(

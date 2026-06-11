@@ -117,6 +117,41 @@ describe('useThreadStreaming — CLI structured replies', () => {
   })
 })
 
+describe('useThreadStreaming — native segment joins', () => {
+  const toolEvent = {
+    kind: 'tool_call_persisted',
+    threadId: 'a',
+    runId: 'r1',
+    call: { id: 'c1', kind: 'read_note', args: { path: 'x.md' } },
+    result: { id: 'c1', ok: true, output: 'body' }
+  }
+
+  it('inserts a paragraph break when prose resumes after a tool call', () => {
+    useThreadStore.setState({ runIdByThreadId: { a: 'r1' } })
+    render(<Harness />)
+    act(() =>
+      nativeCb!({ kind: 'text', text: 'Let me look at your vault.', threadId: 'a', runId: 'r1' })
+    )
+    act(() => nativeCb!(toolEvent))
+    act(() => nativeCb!({ kind: 'text', text: 'Good, I found it.', threadId: 'a', runId: 'r1' }))
+    expect(useThreadStore.getState().streamingByThreadId['a']).toBe(
+      'Let me look at your vault.\n\nGood, I found it.'
+    )
+  })
+
+  it('does not stack separators across consecutive tool calls or add one before any text', () => {
+    useThreadStore.setState({ runIdByThreadId: { a: 'r1' } })
+    render(<Harness />)
+    act(() => nativeCb!(toolEvent))
+    expect(useThreadStore.getState().streamingByThreadId['a'] ?? '').toBe('')
+
+    act(() => nativeCb!({ kind: 'text', text: 'First segment.', threadId: 'a', runId: 'r1' }))
+    act(() => nativeCb!(toolEvent))
+    act(() => nativeCb!(toolEvent))
+    expect(useThreadStore.getState().streamingByThreadId['a']).toBe('First segment.\n\n')
+  })
+})
+
 describe('useThreadStreaming — native agent errors', () => {
   it('renders an AUTH failure as a system message instead of a raw error dump', async () => {
     useThreadStore.setState({ runIdByThreadId: { a: 'r1' } })
