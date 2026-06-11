@@ -1,0 +1,58 @@
+/*
+ * Minimal pdfjs text-layer styles, adapted from pdfjs-dist/web/pdf_viewer.css
+ * (v5.5). The TextLayer class positions each span with CSS vars that these
+ * rules consume; `--scale-factor` is set per page wrapper by PdfCard.
+ */
+
+.te-pdf-page {
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor, 1) * var(--user-unit));
+  position: relative;
+}
+
+.te-pdf-textlayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 1;
+
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.te-pdf-textlayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.te-pdf-textlayer > :not(.markedContent),
+.te-pdf-textlayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.te-pdf-textlayer .markedContent {
+  display: contents;
+}
+
+.te-pdf-textlayer ::selection {
+  background: color-mix(in srgb, var(--color-accent-default) 35%, transparent);
+}
