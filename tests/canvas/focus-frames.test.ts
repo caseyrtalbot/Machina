@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { renderHook } from '@testing-library/react'
 import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { createCanvasFile } from '../../src/shared/canvas-types'
+import { useCanvasKeyboardShortcuts } from '../../src/renderer/src/panels/canvas/use-canvas-keyboard-shortcuts'
+import { CommandStack } from '../../src/renderer/src/panels/canvas/canvas-commands'
 
 describe('focus-frames', () => {
   beforeEach(() => {
@@ -107,5 +110,59 @@ describe('focus-frames', () => {
     useCanvasStore.getState().clearFocusFrame('4')
     expect(useCanvasStore.getState().isDirty).toBe(false)
     expect(useCanvasStore.getState().focusFrames['4']).toBeUndefined()
+  })
+
+  describe('keyboard shortcuts (handler-level)', () => {
+    function renderShortcuts() {
+      const container = document.createElement('div')
+      // Non-zero rect so isCanvasHidden treats the canvas as visible.
+      container.getBoundingClientRect = () =>
+        ({
+          width: 800,
+          height: 600,
+          top: 0,
+          left: 0,
+          right: 800,
+          bottom: 600,
+          x: 0,
+          y: 0,
+          toJSON: () => ({})
+        }) as DOMRect
+      document.body.appendChild(container)
+      return renderHook(() =>
+        useCanvasKeyboardShortcuts({
+          commandStack: { current: new CommandStack() },
+          containerRef: { current: container },
+          setImportOpen: () => {}
+        })
+      )
+    }
+
+    it('Cmd+Shift+digit saves a frame even though macOS reports the shifted symbol in e.key', () => {
+      const { unmount } = renderShortcuts()
+      useCanvasStore.getState().setViewport({ x: 7, y: 8, zoom: 1.2 })
+
+      // On macOS, Cmd+Shift+1 arrives as key '!' / code 'Digit1'.
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '!', code: 'Digit1', metaKey: true, shiftKey: true })
+      )
+
+      expect(useCanvasStore.getState().focusFrames['1']).toEqual({ x: 7, y: 8, zoom: 1.2 })
+      unmount()
+    })
+
+    it('Cmd+digit jumps to the saved frame', () => {
+      const { unmount } = renderShortcuts()
+      useCanvasStore.getState().setViewport({ x: 7, y: 8, zoom: 1.2 })
+      useCanvasStore.getState().saveFocusFrame('2')
+      useCanvasStore.getState().setViewport({ x: 0, y: 0, zoom: 1 })
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '2', code: 'Digit2', metaKey: true })
+      )
+
+      expect(useCanvasStore.getState().viewport).toEqual({ x: 7, y: 8, zoom: 1.2 })
+      unmount()
+    })
   })
 })

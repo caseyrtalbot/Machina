@@ -129,12 +129,17 @@ export function useCanvasKeyboardShortcuts({
     const handler = (e: KeyboardEvent) => {
       // Hidden KeepAlive instances never handle keys (see isCanvasHidden).
       if (isCanvasHidden(containerRef)) return
-      if (e.metaKey && e.key >= '1' && e.key <= '5') {
+      // Match the physical digit via e.code: with Shift held, e.key reports
+      // the symbol ('!', '@', …), so a key-based range check would silently
+      // kill every Cmd+Shift+digit save (same pitfall as the shift-modified
+      // letter shortcuts in the handler below).
+      const frameSlot = /^Digit([1-5])$/.exec(e.code)?.[1]
+      if (e.metaKey && frameSlot) {
         e.preventDefault()
         if (e.shiftKey) {
-          useCanvasStore.getState().saveFocusFrame(e.key)
+          useCanvasStore.getState().saveFocusFrame(frameSlot)
         } else {
-          useCanvasStore.getState().jumpToFocusFrame(e.key)
+          useCanvasStore.getState().jumpToFocusFrame(frameSlot)
         }
         return
       }
