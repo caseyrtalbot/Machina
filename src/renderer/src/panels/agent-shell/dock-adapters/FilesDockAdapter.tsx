@@ -7,6 +7,7 @@ import { buildFileTree } from '../../sidebar/buildFileTree'
 import type { ArtifactOrigin } from '../../sidebar/origin-utils'
 import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
+import { useSettingsStore } from '../../../store/settings-store'
 import { useSidebarFilterStore } from '../../../store/sidebar-filter-store'
 import { useSidebarSelectionStore } from '../../../store/sidebar-selection-store'
 import { filterSidebarFiles } from './sidebar-filtering'
@@ -15,6 +16,7 @@ import { useUiStore } from '../../../store/ui-store'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from '../../../hooks/useCanvasAwareness'
 import { useAgentStates } from '../../../hooks/use-agent-states'
 import { openArtifactInEditor } from '../../../system-artifacts/system-artifact-runtime'
+import { createOrOpenDailyNote } from '../../../utils/daily-notes'
 import { logError } from '../../../utils/error-logger'
 
 type SortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
@@ -256,6 +258,33 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
     useUiStore.getState().toggleFileTreeCollapsed(path)
   }, [])
 
+  // Daily notes: create-or-open <dailyNoteFolder>/<date>.md and open it as an
+  // editor dock tab. Drives the sidebar calendar (DailyNoteSection).
+  const dailyNoteFolder = useSettingsStore((s) => s.dailyNoteFolder)
+  const dailyNoteTemplate = useSettingsStore((s) => s.dailyNoteTemplate)
+  const handleOpenDailyNote = useCallback(
+    async (dateStr: string) => {
+      if (!vaultPath) return
+      const templatePath = dailyNoteTemplate
+        ? dailyNoteTemplate.startsWith('/')
+          ? dailyNoteTemplate
+          : `${vaultPath}/${dailyNoteTemplate}`
+        : undefined
+      try {
+        const { path, title } = await createOrOpenDailyNote(
+          vaultPath,
+          dailyNoteFolder,
+          dateStr,
+          templatePath
+        )
+        openArtifactInEditor(path, title)
+      } catch (err) {
+        logError('daily-note-open', err)
+      }
+    },
+    [vaultPath, dailyNoteFolder, dailyNoteTemplate]
+  )
+
   const handleNewFile = useCallback(async () => {
     if (!vaultPath) return
     const existingPaths = new Set(files.map((f) => f.path))
@@ -441,6 +470,7 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
       onOpenVaultPicker={handleOpenVaultPicker}
       onRemoveFromHistory={handleRemoveFromHistory}
       onOpenSettings={onOpenSettings}
+      onOpenDailyNote={(dateStr) => void handleOpenDailyNote(dateStr)}
     />
   )
 }

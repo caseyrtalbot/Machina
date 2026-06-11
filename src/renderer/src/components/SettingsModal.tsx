@@ -11,7 +11,30 @@ import {
   zIndex
 } from '../design/tokens'
 import { ACCENT_PRESETS, type AccentId } from '../design/accent-presets'
+import { EMBEDDING_MODEL_DOWNLOAD_MB } from '@shared/engine/embeddings'
 import { FontPicker } from './FontPicker'
+
+interface EmbeddingsStatus {
+  enabled: boolean
+  state: 'off' | 'loading-model' | 'indexing' | 'ready' | 'error'
+  docCount: number
+  error?: string
+}
+
+function describeEmbeddings(status: EmbeddingsStatus): string {
+  switch (status.state) {
+    case 'loading-model':
+      return `downloading model (~${EMBEDDING_MODEL_DOWNLOAD_MB} MB)…`
+    case 'indexing':
+      return 'embedding notes…'
+    case 'ready':
+      return `${status.docCount} docs embedded`
+    case 'error':
+      return `error: ${status.error ?? 'unknown'}`
+    case 'off':
+      return 'off'
+  }
+}
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -288,7 +311,36 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   const setDefaultEditorMode = useSettingsStore((s) => s.setDefaultEditorMode)
   const setAutosaveInterval = useSettingsStore((s) => s.setAutosaveInterval)
   const setSpellCheck = useSettingsStore((s) => s.setSpellCheck)
+  const semanticSearch = useSettingsStore((s) => s.semanticSearch)
+  const setSemanticSearch = useSettingsStore((s) => s.setSemanticSearch)
   const vaultPath = useVaultStore((s) => s.vaultPath)
+
+  // Live embedder status (model download / indexing progress) while the
+  // modal is open and the opt-in is on. Off = zero embeddings IPC.
+  const [embedStatus, setEmbedStatus] = useState<EmbeddingsStatus | null>(null)
+  useEffect(() => {
+    if (!isOpen || !semanticSearch) return
+    let cancelled = false
+    const refresh = (): void => {
+      void window.api.embeddings
+        .status()
+        .then((status) => {
+          if (!cancelled) setEmbedStatus(status)
+        })
+        .catch(() => {})
+    }
+    refresh()
+    const timer = setInterval(refresh, 2000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [isOpen, semanticSearch])
+
+  const handleSemanticSearch = (value: boolean): void => {
+    setSemanticSearch(value)
+    void window.api.embeddings.setEnabled(value).catch(() => {})
+  }
 
   const handleFontChange = (name: string) => {
     setDisplayFont(name)
@@ -578,6 +630,29 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             <Toggle value={spellCheck} onChange={setSpellCheck} ariaLabel="Spell check" />
           </SettingRow>
 
+          {/* ── Search ── */}
+          <SectionHeading>Search</SectionHeading>
+          <SettingRow label="Semantic Search">
+            <Toggle
+              value={semanticSearch}
+              onChange={handleSemanticSearch}
+              ariaLabel="Semantic search"
+            />
+          </SettingRow>
+          <p
+            style={{
+              margin: '2px 0 10px',
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 10,
+              lineHeight: 1.5
+            }}
+          >
+            Meaning-based results merged into search, computed fully on-device. First enable
+            downloads a one-time ~{EMBEDDING_MODEL_DOWNLOAD_MB} MB model.
+            {semanticSearch && embedStatus ? ` Status: ${describeEmbeddings(embedStatus)}.` : ''}
+          </p>
+
           {/* ── Vault ── */}
           <SectionHeading>Vault</SectionHeading>
           <div className="settings-vault-card">
@@ -803,6 +878,17 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
           {/* ── Reset ── */}
           <div className="settings-footer gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                useClaudeStatusStore.getState().openOnboarding()
+              }}
+              className="settings-button transition-colors"
+              style={{ color: colors.text.muted }}
+            >
+              Run Setup
+            </button>
             <button
               type="button"
               onClick={() => void window.api.app.revealLogs()}

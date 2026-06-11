@@ -36,7 +36,9 @@ export function registerThreadIpc(): void {
       started: now,
       lastMessage: now,
       title: title ?? 'New thread',
-      dockState: { tabs: [] },
+      // New threads open with the canvas surface so the dock is never blank
+      // on first use (onboarding journey, plan item 3.5).
+      dockState: { tabs: [{ kind: 'canvas', id: 'default' }] },
       messages: []
     }
     await new ThreadStorage(vaultPath).saveThread(t)
