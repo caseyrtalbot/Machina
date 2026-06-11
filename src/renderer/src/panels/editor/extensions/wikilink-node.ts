@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { MarkdownTokenizer, MarkdownToken } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { createWikilinkSuggestion } from './wikilink-suggestion'
 
 interface WikilinkNodeOptions {
   HTMLAttributes: Record<string, unknown>
@@ -42,6 +43,16 @@ export const WikilinkNode = Node.create<WikilinkNodeOptions>({
           if (!attributes.alias) return {}
           return { 'data-wikilink-alias': attributes.alias as string }
         }
+      },
+      // True for `![[file]]` embeds whose target isn't an image (e.g. PDFs):
+      // they render as a link but keep the `!` on serialization.
+      embed: {
+        default: false,
+        parseHTML: (element) => element.getAttribute('data-wikilink-embed') === 'true',
+        renderHTML: (attributes) => {
+          if (!attributes.embed) return {}
+          return { 'data-wikilink-embed': 'true' }
+        }
       }
     }
   },
@@ -67,7 +78,8 @@ export const WikilinkNode = Node.create<WikilinkNodeOptions>({
 
   renderText({ node }) {
     const alias = node.attrs.alias as string | null
-    return alias ? `[[${node.attrs.target}|${alias}]]` : `[[${node.attrs.target}]]`
+    const bang = node.attrs.embed ? '!' : ''
+    return alias ? `${bang}[[${node.attrs.target}|${alias}]]` : `${bang}[[${node.attrs.target}]]`
   },
 
   addCommands() {
@@ -85,10 +97,13 @@ export const WikilinkNode = Node.create<WikilinkNodeOptions>({
   },
 
   addProseMirrorPlugins() {
+    const plugins: Plugin[] = [createWikilinkSuggestion(this.editor)]
+
     const onNavigate = this.options.onNavigate
-    if (!onNavigate) return []
+    if (!onNavigate) return plugins
 
     return [
+      ...plugins,
       new Plugin({
         key: new PluginKey('wikilinkClick'),
         props: {
@@ -142,6 +157,7 @@ export const WikilinkNode = Node.create<WikilinkNodeOptions>({
   renderMarkdown(node) {
     const target = node.attrs?.target ?? ''
     const alias = node.attrs?.alias as string | null
-    return alias ? `[[${target}|${alias}]]` : `[[${target}]]`
+    const bang = node.attrs?.embed ? '!' : ''
+    return alias ? `${bang}[[${target}|${alias}]]` : `${bang}[[${target}]]`
   }
 })
