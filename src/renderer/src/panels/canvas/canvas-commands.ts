@@ -1,5 +1,10 @@
-import type { CanvasEdge, CanvasNode, CanvasNodeType } from '@shared/canvas-types'
-import { useCanvasStore } from '../../store/canvas-store'
+import {
+  createCanvasNode,
+  type CanvasEdge,
+  type CanvasNode,
+  type CanvasNodeType
+} from '@shared/canvas-types'
+import { getActiveCanvasId, useCanvasStore } from '../../store/canvas-store'
 
 export interface Command {
   execute: () => void | Promise<void>
@@ -57,17 +62,24 @@ export class CommandStack {
 }
 
 // ── Active stack registry ────────────────────────────────────────────────────
-// CanvasView registers its CommandStack here so non-React call sites (drag
-// handlers, the connection overlay, card shells) can push undoable commands.
+// Each CanvasView registers its CommandStack under its canvasId so non-React
+// call sites (drag handlers, the connection overlay, card shells) can push
+// undoable commands. The active stack resolves through the active-canvas
+// indirection — never "last mounted view wins": with two KeepAlive-mounted
+// canvases, commands must land on the stack of the canvas the user is acting
+// on, not whichever view mounted last.
 
-let activeStack: CommandStack | null = null
+const stacksByCanvasId = new Map<string, CommandStack>()
 
-export function setActiveCommandStack(stack: CommandStack | null): void {
-  activeStack = stack
+export function registerCommandStack(canvasId: string, stack: CommandStack): () => void {
+  stacksByCanvasId.set(canvasId, stack)
+  return () => {
+    if (stacksByCanvasId.get(canvasId) === stack) stacksByCanvasId.delete(canvasId)
+  }
 }
 
 export function getActiveCommandStack(): CommandStack | null {
-  return activeStack
+  return stacksByCanvasId.get(getActiveCanvasId()) ?? null
 }
 
 // ── Command builders ─────────────────────────────────────────────────────────
@@ -203,6 +215,136 @@ export function layoutCommand(applyLayout: () => void): Command | null {
       useCanvasStore.setState({ clusterLabels: labelsBefore })
     }
   }
+}
+
+/**
+ * Nudge nodes by a fixed delta (arrow keys). Captures before/after at build
+ * time so undo/redo replay exact positions. Returns null when nothing moves.
+ */
+export function nudgeNodesCommand(ids: readonly string[], dx: number, dy: number): Command | null {
+  if (dx === 0 && dy === 0) return null
+  const idSet = new Set(ids)
+  const before = new Map<string, Position>()
+  const after = new Map<string, Position>()
+  for (const n of useCanvasStore.getState().nodes) {
+    if (!idSet.has(n.id)) continue
+    before.set(n.id, { x: n.position.x, y: n.position.y })
+    after.set(n.id, { x: n.position.x + dx, y: n.position.y + dy })
+  }
+  if (before.size === 0) return null
+  return moveNodesCommand(before, after)
+}
+
+// ── Duplicate / copy / paste ─────────────────────────────────────────────────
+// Clones get fresh ids at command-build time so redo re-inserts the same
+// nodes the undo removed. Edges are cloned only when both endpoints are in
+// the cloned set. The clipboard is canvas-internal (not the OS clipboard).
+
+const CLONE_OFFSET = 24
+
+function cloneNodesAndEdges(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  offset: number
+): { nodes: readonly CanvasNode[]; edges: readonly CanvasEdge[] } {
+  const idMap = new Map<string, string>()
+  const clonedNodes = nodes.map((n) => {
+    // isActive is runtime-only; a terminal's content is a live PTY session id
+    // — a clone must never attach to the original's session.
+    const { isActive: _ignored, ...metadata } = n.metadata
+    const clone = createCanvasNode(
+      n.type,
+      { x: n.position.x + offset, y: n.position.y + offset },
+      {
+        size: { ...n.size },
+        content: n.type === 'terminal' ? '' : n.content,
+        metadata
+      }
+    )
+    idMap.set(n.id, clone.id)
+    return clone
+  })
+  const clonedEdges = edges
+    .filter((e) => idMap.has(e.fromNode) && idMap.has(e.toNode))
+    .map((e) => ({
+      ...e,
+      // Fresh id (same source as the canvas-types factories); endpoints
+      // remapped to the clones.
+      id: globalThis.crypto.randomUUID(),
+      fromNode: idMap.get(e.fromNode) as string,
+      toNode: idMap.get(e.toNode) as string
+    }))
+  return { nodes: clonedNodes, edges: clonedEdges }
+}
+
+/** Insert pre-built clones; execute selects them, undo removes them. */
+function insertClonesCommand(nodes: readonly CanvasNode[], edges: readonly CanvasEdge[]): Command {
+  const nodeIds = new Set(nodes.map((n) => n.id))
+  const edgeIds = new Set(edges.map((e) => e.id))
+  return {
+    execute: () => {
+      const s = useCanvasStore.getState()
+      s.addNodesAndEdges(nodes, edges)
+      s.setSelection(new Set(nodeIds))
+    },
+    undo: () => {
+      // Route through removeNode (not a raw setState filter): a duplicated
+      // terminal clone spawns its own PTY which must be killed, and any
+      // focus/lock/selection pointing at a clone must be cleared.
+      const store = useCanvasStore.getState()
+      for (const id of nodeIds) store.removeNode(id)
+      // Backstop for cloned edges (today both endpoints are always clones,
+      // so removeNode has already dropped them).
+      useCanvasStore.setState((s) => ({
+        edges: s.edges.filter((e) => !edgeIds.has(e.id))
+      }))
+    }
+  }
+}
+
+/** ⌘D: offset clones of the current selection, which become the selection. */
+export function duplicateSelectionCommand(): Command | null {
+  const s = useCanvasStore.getState()
+  const selected = s.nodes.filter((n) => s.selectedNodeIds.has(n.id))
+  if (selected.length === 0) return null
+  const clones = cloneNodesAndEdges(selected, s.edges, CLONE_OFFSET)
+  return insertClonesCommand(clones.nodes, clones.edges)
+}
+
+interface CanvasClipboard {
+  readonly nodes: readonly CanvasNode[]
+  readonly edges: readonly CanvasEdge[]
+}
+
+let clipboard: CanvasClipboard | null = null
+let pasteSerial = 0
+
+/** ⌘C: snapshot the selection (and intra-selection edges). Returns the count copied. */
+export function copySelectionToClipboard(): number {
+  const s = useCanvasStore.getState()
+  const selected = s.nodes.filter((n) => s.selectedNodeIds.has(n.id))
+  if (selected.length === 0) return 0
+  const ids = new Set(selected.map((n) => n.id))
+  clipboard = {
+    nodes: selected,
+    edges: s.edges.filter((e) => ids.has(e.fromNode) && ids.has(e.toNode))
+  }
+  pasteSerial = 0
+  return selected.length
+}
+
+/** ⌘V: insert fresh-id clones of the clipboard, cascading the offset per paste. */
+export function pasteClipboardCommand(): Command | null {
+  if (!clipboard || clipboard.nodes.length === 0) return null
+  pasteSerial += 1
+  const clones = cloneNodesAndEdges(clipboard.nodes, clipboard.edges, CLONE_OFFSET * pasteSerial)
+  return insertClonesCommand(clones.nodes, clones.edges)
+}
+
+/** Test hook: reset the module-level clipboard between cases. */
+export function clearCanvasClipboard(): void {
+  clipboard = null
+  pasteSerial = 0
 }
 
 /** Clear everything; undo restores nodes, edges, ontology, and cluster labels. */

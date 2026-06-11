@@ -2,11 +2,16 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import {
+  copySelectionToClipboard,
+  duplicateSelectionCommand,
   layoutCommand,
+  nudgeNodesCommand,
+  pasteClipboardCommand,
   removeEdgeCommand,
   removeNodesCommand,
   type CommandStack
 } from './canvas-commands'
+import { SNAP_GRID_SIZE } from './use-canvas-drag'
 import { createNoteAtCursor } from './create-note-at-cursor'
 
 interface CanvasKeyboardShortcutOptions {
@@ -22,6 +27,52 @@ function isEditingSurfaceActive(): boolean {
   if ((document.activeElement as HTMLElement | null)?.isContentEditable) return true
   if (document.activeElement?.closest('.cm-editor')) return true
   return false
+}
+
+/**
+ * A visible `role="menu"` element (card/canvas context menu, zoom menu, agent
+ * picker) owns the keyboard — its ArrowUp/ArrowDown navigation must not also
+ * nudge cards. Zero-size menus are hidden behind a KeepAlive tab; ignore them.
+ */
+function isMenuOpen(): boolean {
+  for (const el of document.querySelectorAll('[role="menu"]')) {
+    const rect = el.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) return true
+  }
+  return false
+}
+
+/**
+ * True while this canvas panel is hidden behind another KeepAlive dock tab
+ * (display:none collapses its rect to zero). Every window-level key handler
+ * must bail when hidden: with two mounted CanvasViews, a hidden view's handler
+ * would build commands from the VISIBLE canvas's state (via the active-store
+ * proxy) and push them onto its own stack — replaying one canvas's commands
+ * onto another on undo, double-creating notes on `n`, double-advancing j/k.
+ */
+function isCanvasHidden(containerRef: RefObject<HTMLElement | null>): boolean {
+  const rect = containerRef.current?.getBoundingClientRect()
+  return !rect || rect.width === 0 || rect.height === 0
+}
+
+/**
+ * Spatial shortcuts (⌘A/⌘C/⌘V/⌘D, arrow nudge) must not fire while typing,
+ * while a menu is open, while a card is locked for interaction, or while the
+ * canvas panel is hidden behind another KeepAlive tab (display:none collapses
+ * its rect to zero). Exported for tests.
+ */
+export function isSpatialShortcutBlocked(containerRef: RefObject<HTMLElement | null>): boolean {
+  if (isEditingSurfaceActive()) return true
+  if (isMenuOpen()) return true
+  if (useCanvasStore.getState().lockedCardId) return true
+  return isCanvasHidden(containerRef)
+}
+
+const ARROW_DELTAS: Record<string, { dx: number; dy: number }> = {
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 }
 }
 
 function viewportCenter(containerRef: RefObject<HTMLElement | null>): { x: number; y: number } {
@@ -76,6 +127,8 @@ export function useCanvasKeyboardShortcuts({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Hidden KeepAlive instances never handle keys (see isCanvasHidden).
+      if (isCanvasHidden(containerRef)) return
       if (e.metaKey && e.key >= '1' && e.key <= '5') {
         e.preventDefault()
         if (e.shiftKey) {
@@ -118,6 +171,17 @@ export function useCanvasKeyboardShortcuts({
         void createNoteAtCursor(position)
       }
 
+      const arrow = ARROW_DELTAS[e.key]
+      if (arrow && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isSpatialShortcutBlocked(containerRef)) return
+        const { selectedNodeIds } = useCanvasStore.getState()
+        if (selectedNodeIds.size === 0) return
+        e.preventDefault()
+        const step = e.shiftKey ? SNAP_GRID_SIZE : 1
+        const cmd = nudgeNodesCommand([...selectedNodeIds], arrow.dx * step, arrow.dy * step)
+        if (cmd) commandStack.current.execute(cmd)
+      }
+
       if (e.key === 'Escape') {
         const { lockedCardId } = useCanvasStore.getState()
         if (lockedCardId) {
@@ -134,6 +198,10 @@ export function useCanvasKeyboardShortcuts({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey) return
+      // Hidden KeepAlive instances never handle keys: without this gate, a
+      // hidden view's ⌘Z replays ITS stack's commands into the visible canvas
+      // through the active-store proxy, and the autosaver persists the damage.
+      if (isCanvasHidden(containerRef)) return
       if (e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
         void commandStack.current.undo()
@@ -161,6 +229,30 @@ export function useCanvasKeyboardShortcuts({
           if (focusedNode?.content) {
             useCanvasStore.getState().openSplit(focusedNode.content)
           }
+        }
+      } else if (e.key === 'a' && !e.shiftKey) {
+        if (isSpatialShortcutBlocked(containerRef)) return
+        e.preventDefault()
+        const { nodes } = useCanvasStore.getState()
+        useCanvasStore.getState().setSelection(new Set(nodes.map((n) => n.id)))
+      } else if (e.key === 'd' && !e.shiftKey) {
+        if (isSpatialShortcutBlocked(containerRef)) return
+        const cmd = duplicateSelectionCommand()
+        if (cmd) {
+          e.preventDefault()
+          commandStack.current.execute(cmd)
+        }
+      } else if (e.key === 'c' && !e.shiftKey) {
+        // Only claim ⌘C when canvas cards are actually copied; otherwise the
+        // native text copy proceeds untouched.
+        if (isSpatialShortcutBlocked(containerRef)) return
+        if (copySelectionToClipboard() > 0) e.preventDefault()
+      } else if (e.key === 'v' && !e.shiftKey) {
+        if (isSpatialShortcutBlocked(containerRef)) return
+        const cmd = pasteClipboardCommand()
+        if (cmd) {
+          e.preventDefault()
+          commandStack.current.execute(cmd)
         }
       } else if (e.key === 'l' || e.key === 'L') {
         e.preventDefault()

@@ -3,7 +3,7 @@ import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { createCanvasNode, createCanvasEdge } from '../../src/shared/canvas-types'
 import {
   CommandStack,
-  setActiveCommandStack,
+  registerCommandStack,
   getActiveCommandStack,
   removeNodesCommand,
   removeNodeViaCallback,
@@ -39,11 +39,28 @@ describe('canvas undo commands', () => {
   })
 
   describe('active stack registry', () => {
-    it('registers and unregisters the active stack', () => {
+    it('resolves the stack registered under the active canvas id', () => {
       expect(getActiveCommandStack()).toBeNull()
-      setActiveCommandStack(stack)
+      const unregister = registerCommandStack('default', stack)
       expect(getActiveCommandStack()).toBe(stack)
-      setActiveCommandStack(null)
+      unregister()
+      expect(getActiveCommandStack()).toBeNull()
+    })
+
+    it('does not resolve a stack registered under an inactive canvas id', () => {
+      const unregister = registerCommandStack('some-other-canvas', stack)
+      expect(getActiveCommandStack()).toBeNull()
+      unregister()
+    })
+
+    it('unregister is a no-op when a newer stack replaced the registration', () => {
+      const first = new CommandStack()
+      const unregisterFirst = registerCommandStack('default', first)
+      const second = new CommandStack()
+      const unregisterSecond = registerCommandStack('default', second)
+      unregisterFirst()
+      expect(getActiveCommandStack()).toBe(second)
+      unregisterSecond()
       expect(getActiveCommandStack()).toBeNull()
     })
   })

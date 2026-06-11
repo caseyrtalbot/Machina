@@ -3,6 +3,13 @@ import { useCanvasStore } from '../../store/canvas-store'
 import { getMinSize, type CanvasNodeType } from '@shared/canvas-types'
 import { perfMark, perfMeasure } from '../../utils/perf-marks'
 import { getActiveCommandStack, moveNodesCommand, resizeNodeCommand } from './canvas-commands'
+import {
+  ALIGN_SNAP_THRESHOLD_PX,
+  AlignmentGuideOverlay,
+  computeAlignmentSnap,
+  type AlignmentBox,
+  type AlignmentGuide
+} from './canvas-alignment'
 
 /** Module-level interaction debounce to prevent timer stacking */
 let interactionTimer: ReturnType<typeof setTimeout> | null = null
@@ -65,9 +72,28 @@ export function useNodeDrag(nodeId: string) {
       }
       markInteracting(true)
 
+      // Alignment guides: snap the dragged card (the primary card in a group
+      // drag) against every non-dragged card's edges/centers. Guides render
+      // inside the transform layer so they pan/zoom with the content.
+      const transformLayer =
+        (e.currentTarget as HTMLElement).closest('[data-canvas-node]')?.parentElement ?? null
+      const guideOverlay = transformLayer ? new AlignmentGuideOverlay(transformLayer, zoom) : null
+      const draggedIds = isMultiDrag ? selectedNodeIds : new Set([nodeId])
+      const neighborBoxes: readonly AlignmentBox[] = nodes
+        .filter((n) => !draggedIds.has(n.id))
+        .map((n) => ({
+          x: n.position.x,
+          y: n.position.y,
+          width: n.size.width,
+          height: n.size.height
+        }))
+      const movingSize = { width: node.size.width, height: node.size.height }
+      const alignThreshold = ALIGN_SNAP_THRESHOLD_PX / zoom
+
       let latestSingleX = 0
       let latestSingleY = 0
       let latestMultiUpdates: Map<string, { x: number; y: number }> | null = null
+      let latestGuides: readonly AlignmentGuide[] = []
       let rafPending = false
 
       const onMove = (me: PointerEvent) => {
@@ -85,6 +111,16 @@ export function useNodeDrag(nodeId: string) {
           if (me.shiftKey) {
             primaryX = snapToGrid(primaryX, SNAP_GRID_SIZE)
             primaryY = snapToGrid(primaryY, SNAP_GRID_SIZE)
+            latestGuides = []
+          } else {
+            const snap = computeAlignmentSnap(
+              { x: primaryX, y: primaryY, ...movingSize },
+              neighborBoxes,
+              alignThreshold
+            )
+            primaryX = snap.x
+            primaryY = snap.y
+            latestGuides = snap.guides
           }
 
           const deltaX = primaryX - dragStart.current.nx
@@ -103,6 +139,7 @@ export function useNodeDrag(nodeId: string) {
               if (latestMultiUpdates) {
                 moveNodes(latestMultiUpdates)
               }
+              guideOverlay?.update(latestGuides)
             })
           }
         } else {
@@ -112,6 +149,16 @@ export function useNodeDrag(nodeId: string) {
           if (me.shiftKey) {
             newX = snapToGrid(newX, SNAP_GRID_SIZE)
             newY = snapToGrid(newY, SNAP_GRID_SIZE)
+            latestGuides = []
+          } else {
+            const snap = computeAlignmentSnap(
+              { x: newX, y: newY, ...movingSize },
+              neighborBoxes,
+              alignThreshold
+            )
+            newX = snap.x
+            newY = snap.y
+            latestGuides = snap.guides
           }
 
           latestSingleX = newX
@@ -122,6 +169,7 @@ export function useNodeDrag(nodeId: string) {
             requestAnimationFrame(() => {
               rafPending = false
               moveNode(nodeId, { x: latestSingleX, y: latestSingleY })
+              guideOverlay?.update(latestGuides)
             })
           }
         }
@@ -129,6 +177,11 @@ export function useNodeDrag(nodeId: string) {
 
       const onUp = () => {
         markInteracting(false)
+        // Guides exist only while dragging. Zero latestGuides first so a
+        // still-pending RAF update reconciles to nothing instead of
+        // resurrecting lines after destroy.
+        latestGuides = []
+        guideOverlay?.destroy()
         // Flush final position if a RAF is still pending
         if (rafPending) {
           const { moveNode: mv, moveNodes: mvs } = useCanvasStore.getState()

@@ -1,25 +1,45 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
 import { colors, borderRadius } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNode } from '@shared/canvas-types'
 import { getCardTypeColor } from './canvas-colors'
+import { useNodeDrag } from './use-canvas-drag'
 
 interface CardLodPreviewProps {
   node: CanvasNode
 }
 
+/** Pointer travel below this (in client px) still counts as a click. */
+const CLICK_SLOP_PX = 3
+
 /**
  * Lightweight LOD renderer for zoomed-out views.
  * Colored rectangle with a type label — no editor, PTY, or image decoder.
+ * Draggable so coarse rearrangement works below the full-card zoom threshold.
  */
 function CardLodPreviewInner({ node }: CardLodPreviewProps) {
   const setSelection = useCanvasStore((s) => s.setSelection)
   const toggleSelection = useCanvasStore((s) => s.toggleSelection)
   const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
+  const { onDragStart } = useNodeDrag(node.id)
+  const pointerDownAt = useRef<{ x: number; y: number } | null>(null)
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      pointerDownAt.current = { x: e.clientX, y: e.clientY }
+      onDragStart(e)
+    },
+    [onDragStart]
+  )
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
+      // A drag ends with a click on the same element; don't let it collapse
+      // the selection that was just dragged.
+      const down = pointerDownAt.current
+      pointerDownAt.current = null
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_SLOP_PX) return
       if (e.shiftKey) {
         toggleSelection(node.id)
       } else {
@@ -44,8 +64,10 @@ function CardLodPreviewInner({ node }: CardLodPreviewProps) {
         backgroundColor: color,
         opacity: 0.15,
         borderRadius: borderRadius.card,
-        border: isSelected ? `2px solid ${colors.accent.default}` : `1px solid ${color}`
+        border: isSelected ? `2px solid ${colors.accent.default}` : `1px solid ${color}`,
+        cursor: 'grab'
       }}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
     >
       <span
