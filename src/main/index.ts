@@ -17,6 +17,10 @@ import { registerClaudeStatusIpc } from './ipc/claude-status'
 import { registerThreadIpc } from './ipc/thread-ipc'
 import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
+import { registerPdfIndexIpc, setPdfIndexSearchEngine } from './ipc/pdf-index'
+import { registerEmbeddingsIpc, setEmbedderService } from './ipc/embeddings'
+import { EmbedderService } from './services/embedder-service'
+import { TE_DIR } from '../shared/constants'
 import { McpLifecycle } from './services/mcp-lifecycle'
 import { initAutoUpdates } from './services/auto-update'
 import { PtyMonitor } from './services/pty-monitor'
@@ -178,6 +182,19 @@ async function reconfigureForVault(vaultPath: string): Promise<void> {
   // Keep the index live: watcher batches re-parse changed .md files into the
   // same VaultIndex/SearchEngine the MCP facade queries (frozen-at-open bug).
   setVaultBatchListener(createLiveIndexUpdater(deps))
+
+  // PDF text indexed by the renderer (3.10a) lands in the same SearchEngine.
+  setPdfIndexSearchEngine(deps.searchEngine)
+
+  // Opt-in local embeddings (3.11): the service follows the SearchEngine
+  // corpus (notes + PDF pages) but stays fully inert — no model download,
+  // no disk writes — until the renderer's Settings toggle enables it.
+  const embedder = new EmbedderService({
+    storageDir: join(vaultPath, TE_DIR, 'embeddings'),
+    modelCacheDir: join(app.getPath('userData'), 'transformers-cache')
+  })
+  embedder.attach(deps.searchEngine)
+  setEmbedderService(embedder)
 
   mcpLifecycle.createForVault(vaultPath, {
     ...deps,
@@ -409,6 +426,8 @@ app.whenReady().then(() => {
   registerThreadIpc()
   registerAgentNativeIpc()
   registerCliThreadIpc()
+  registerPdfIndexIpc()
+  registerEmbeddingsIpc()
 
   // No-ops unless a publish feed is configured (see auto-update.ts).
   void initAutoUpdates({

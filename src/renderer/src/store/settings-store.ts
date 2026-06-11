@@ -24,6 +24,9 @@ interface SettingsState {
   readonly dailyNoteTemplate: string
   // Canvas text-card save destination
   readonly canvasTextSaveFolder: string
+  /** Opt-in local semantic search (3.11). Off = no model download, no
+   * embeddings IPC. Enabling triggers a one-time ~25 MB model download. */
+  readonly semanticSearch: boolean
 }
 
 interface SettingsActions {
@@ -43,6 +46,7 @@ interface SettingsActions {
   setDailyNoteFolder: (value: string) => void
   setDailyNoteTemplate: (value: string) => void
   setCanvasTextSaveFolder: (value: string) => void
+  setSemanticSearch: (value: boolean) => void
 }
 
 type SettingsStore = SettingsState & SettingsActions
@@ -65,6 +69,7 @@ export const useSettingsStore = create<SettingsStore>()(
       dailyNoteFolder: 'daily',
       dailyNoteTemplate: '',
       canvasTextSaveFolder: 'Inbox',
+      semanticSearch: false,
 
       setEnv: (key, value) => set((state) => ({ env: { ...state.env, [key]: value } })),
       resetEnv: () => set({ env: { ...ENV_DEFAULTS } }),
@@ -81,11 +86,12 @@ export const useSettingsStore = create<SettingsStore>()(
       setTemplateFolder: (value) => set({ templateFolder: value }),
       setDailyNoteFolder: (value) => set({ dailyNoteFolder: value }),
       setDailyNoteTemplate: (value) => set({ dailyNoteTemplate: value }),
-      setCanvasTextSaveFolder: (value) => set({ canvasTextSaveFolder: value })
+      setCanvasTextSaveFolder: (value) => set({ canvasTextSaveFolder: value }),
+      setSemanticSearch: (value) => set({ semanticSearch: value })
     }),
     {
       name: 'machina-settings',
-      version: 12,
+      version: 13,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -191,6 +197,11 @@ export const useSettingsStore = create<SettingsStore>()(
               existingEnv.canvasGrid = ENV_DEFAULTS.canvasGrid
             }
           }
+        }
+
+        if (version < 13) {
+          // v12 → v13: opt-in local semantic search (3.11), off by default.
+          if (typeof state.semanticSearch !== 'boolean') state.semanticSearch = false
         }
 
         // Validate accentId on every load: a removed/typo'd preset id otherwise

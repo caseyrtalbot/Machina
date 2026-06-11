@@ -54,7 +54,9 @@ const api = {
       ghostTitle: string,
       referencePaths: readonly string[],
       vaultPath: string
-    ) => typedInvoke('vault:emerge-ghost', { ghostId, ghostTitle, referencePaths, vaultPath })
+    ) => typedInvoke('vault:emerge-ghost', { ghostId, ghostTitle, referencePaths, vaultPath }),
+    indexPdfContent: (pdfPath: string, pages: ReadonlyArray<{ page: number; text: string }>) =>
+      typedInvoke('vault:index-pdf-content', { pdfPath, pages })
   },
   shell: {
     showInFolder: (path: string) => typedInvoke('shell:show-in-folder', { path }),
@@ -140,6 +142,11 @@ const api = {
       typedInvoke('cli-thread:input', req),
     close: (threadId: string) => typedInvoke('cli-thread:close', { threadId }),
     cancel: (threadId: string) => typedInvoke('cli-thread:cancel', { threadId })
+  },
+  embeddings: {
+    setEnabled: (enabled: boolean) => typedInvoke('embeddings:set-enabled', { enabled }),
+    status: () => typedInvoke('embeddings:status'),
+    search: (query: string, k?: number) => typedInvoke('embeddings:search', { query, k })
   },
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getHomePath: () => homedir(),

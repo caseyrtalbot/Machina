@@ -55,6 +55,12 @@ export interface IpcChannels {
   }
   'vault:watch-start': { request: { vaultPath: string }; response: void }
   'vault:watch-stop': { request: void; response: void }
+  // Per-page PDF text extracted by the renderer (3.10a), upserted into the
+  // main-process SearchEngine so MCP search.query covers PDF content too.
+  'vault:index-pdf-content': {
+    request: { pdfPath: string; pages: ReadonlyArray<{ page: number; text: string }> }
+    response: void
+  }
 
   // --- Shell ---
   'shell:show-in-folder': { request: { path: string }; response: void }
@@ -264,6 +270,24 @@ export interface IpcChannels {
   }
   'cli-thread:close': { request: { threadId: string }; response: void }
   'cli-thread:cancel': { request: { threadId: string }; response: { ok: boolean } }
+
+  // --- Local embeddings / semantic search (3.11) ---
+  // Strictly opt-in: the renderer only invokes these when the Settings
+  // toggle is on, so disabled means zero embeddings IPC traffic.
+  'embeddings:set-enabled': { request: { enabled: boolean }; response: void }
+  'embeddings:status': {
+    request: void
+    response: {
+      enabled: boolean
+      state: 'off' | 'loading-model' | 'indexing' | 'ready' | 'error'
+      docCount: number
+      error?: string
+    }
+  }
+  'embeddings:search': {
+    request: { query: string; k?: number }
+    response: import('./engine/search-engine').SearchHit[]
+  }
 }
 
 export type AgentNativeApprovalPreview =
@@ -279,6 +303,10 @@ export type AgentNativeApprovalPreview =
 export type AgentNativeEventBody =
   | { kind: 'text'; text: string }
   | { kind: 'message_end' }
+  // The turn exhausted MAX_TOOL_ITERATIONS while the model still wanted tools.
+  // Emitted before message_end so consumers can tell "stopped mid-task" from
+  // "finished" (the text notice alone is not machine-readable).
+  | { kind: 'turn_limit' }
   | { kind: 'error'; code: import('./thread-types').ToolErrorCode; message: string }
   | {
       kind: 'tool_call_persisted'
