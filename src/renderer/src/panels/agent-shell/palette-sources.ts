@@ -104,6 +104,46 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       }
     },
     {
+      id: 'action:toggle-threads',
+      kind: 'action',
+      title: 'Toggle thread sidebar',
+      subtitle: 'cmd+shift+b',
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().toggleSidebarCollapsed()
+      }
+    },
+    {
+      id: 'action:toggle-chat',
+      kind: 'action',
+      title: 'Toggle chat panel',
+      subtitle: 'cmd+shift+c',
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().toggleChatCollapsed()
+      }
+    },
+    {
+      id: 'action:toggle-files',
+      kind: 'action',
+      title: 'Toggle files panel',
+      subtitle: 'cmd+shift+v',
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().toggleFilesPanel()
+      }
+    },
+    {
+      id: 'action:focus-mode',
+      kind: 'action',
+      title: 'Toggle focus mode',
+      subtitle: 'cmd+shift+f · dock only',
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().toggleFocusMode()
+      }
+    },
+    {
       id: 'action:toggle-auto-accept',
       kind: 'action',
       title: 'Toggle auto-accept on active thread',

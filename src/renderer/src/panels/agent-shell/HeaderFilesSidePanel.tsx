@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { FolderTree } from 'lucide-react'
-import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { colors, transitions, typography } from '../../design/tokens'
 import { FilesDockAdapter } from './dock-adapters/FilesDockAdapter'
+import { TitlebarPanelToggle } from './TitlebarPanelToggle'
 import {
   clampFilesPanelWidth,
   persistFilesPanelWidth,
   readPersistedFilesPanelWidth
 } from './files-side-panel-storage'
 
-const TRIGGER_BUTTON_SIZE = 26
 const RESIZE_HANDLE_WIDTH = 6
 
 interface HeaderFilesToggleButtonProps {
@@ -18,46 +18,17 @@ interface HeaderFilesToggleButtonProps {
 }
 
 export function HeaderFilesToggleButton({ open, onToggle }: HeaderFilesToggleButtonProps) {
-  const [hovered, setHovered] = useState(false)
-
-  const triggerStyle: CSSProperties = {
-    width: TRIGGER_BUTTON_SIZE,
-    height: TRIGGER_BUTTON_SIZE,
-    padding: 0,
-    boxSizing: 'border-box',
-    borderRadius: borderRadius.inline,
-    border: `1px solid ${
-      open ? colors.accent.line : hovered ? colors.border.default : 'transparent'
-    }`,
-    background: open
-      ? 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
-      : hovered
-        ? 'var(--bg-tint-text)'
-        : 'transparent',
-    color: open ? colors.accent.default : hovered ? colors.text.primary : colors.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: `background ${transitions.focusRing}, color ${transitions.focusRing}, border-color ${transitions.focusRing}`,
-    // @ts-expect-error -- Electron-only CSS property
-    WebkitAppRegion: 'no-drag'
-  }
-
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      aria-label={open ? 'Collapse files' : 'Expand files'}
-      title={open ? 'Collapse files' : 'Files'}
-      aria-expanded={open}
-      aria-controls="header-files-side-panel"
-      style={triggerStyle}
+    <TitlebarPanelToggle
+      open={open}
+      onToggle={onToggle}
+      expandLabel="Expand files"
+      collapseLabel="Collapse files"
+      title="Files"
+      controlsId="header-files-side-panel"
     >
       <FolderTree size={15} strokeWidth={1.75} aria-hidden />
-    </button>
+    </TitlebarPanelToggle>
   )
 }
 
@@ -69,11 +40,10 @@ interface HeaderFilesSidePanelProps {
 }
 
 /**
- * Right-edge slide-out Files panel. Persistent (no outside-click dismiss); the
- * header toggle or Esc closes it. Slides via translateX so the open/close
- * motion stays smooth even when the FilesDockAdapter tree is large. Width is
- * user-resizable via the left-edge drag handle, matching the sidebar/dock
- * resize behavior.
+ * Right-edge Files panel. A real flex column in the shell row — opening it
+ * reflows the dock instead of occluding it. Persistent (no outside-click
+ * dismiss); the header toggle or Esc closes it. Width is user-resizable via
+ * the left-edge drag handle, matching the sidebar/chat resize behavior.
  */
 export function HeaderFilesSidePanel({
   open,
@@ -98,31 +68,23 @@ export function HeaderFilesSidePanel({
   }, [open, onClose])
 
   const panelStyle: CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width,
-    background: floatingPanel.glass.popoverBg,
-    backdropFilter: floatingPanel.glass.popoverBlur,
-    WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
-    borderLeft: `1px solid ${colors.border.default}`,
-    boxShadow: open ? floatingPanel.shadowCompact : 'none',
+    position: 'relative',
+    width: open ? width : 0,
+    // Open: shrinkable down to the storage module's min so a cramped window
+    // squeezes panels instead of overflowing the row. Closed: hard 0.
+    minWidth: open ? 280 : 0,
+    flexShrink: open ? 1 : 0,
+    background: colors.bg.rail,
+    borderLeft: open ? `1px solid ${colors.border.default}` : 'none',
+    boxSizing: 'border-box',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     fontFamily: typography.fontFamily.body,
     color: colors.text.primary,
-    transform: open ? 'translateX(0)' : `translateX(${width}px)`,
-    opacity: open ? 1 : 0,
-    pointerEvents: open ? 'auto' : 'none',
-    // Suppress the slide transition while actively dragging so width changes
+    // Suppress the width transition while actively dragging so width changes
     // are 1:1 with the cursor instead of trailing through a 180ms ease.
-    transition: resizing
-      ? `opacity ${transitions.surface}, box-shadow ${transitions.surface}`
-      : `transform ${transitions.surface}, opacity ${transitions.surface}, box-shadow ${transitions.surface}, width ${transitions.surface}`,
-    zIndex: 60,
-    willChange: 'transform, width'
+    transition: resizing ? 'none' : `width ${transitions.surface}`
   }
 
   return (
@@ -136,14 +98,20 @@ export function HeaderFilesSidePanel({
       data-open={open ? 'true' : 'false'}
       style={panelStyle}
     >
-      <LeftEdgeResizeHandle
-        width={width}
-        onChange={(next) => setWidth(clampFilesPanelWidth(next))}
-        onResizingChange={setResizing}
-        onCommit={(next) => persistFilesPanelWidth(clampFilesPanelWidth(next))}
-      />
+      {open && (
+        <LeftEdgeResizeHandle
+          width={width}
+          onChange={(next) => setWidth(clampFilesPanelWidth(next))}
+          onResizingChange={setResizing}
+          onCommit={(next) => persistFilesPanelWidth(clampFilesPanelWidth(next))}
+        />
+      )}
       {hasOpened && (
-        <FilesDockAdapter onChangeVault={onChangeVault} onOpenSettings={onOpenSettings} />
+        // Inner wrapper pinned to the resting width so content doesn't
+        // reflow mid-animation while the outer column collapses to 0.
+        <div style={{ width, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <FilesDockAdapter onChangeVault={onChangeVault} onOpenSettings={onOpenSettings} />
+        </div>
       )}
     </div>
   )

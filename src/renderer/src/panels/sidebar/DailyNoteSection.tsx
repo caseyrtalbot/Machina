@@ -15,6 +15,25 @@ interface DailyNoteSectionProps {
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const
 
+const COLLAPSED_STORAGE_KEY = 'te.daily-notes-collapsed'
+
+function readDailyNotesCollapsed(): boolean {
+  try {
+    // Absent key (first run) reads as collapsed — the calendar is opt-in.
+    return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function persistDailyNotesCollapsed(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
+  } catch {
+    /* localStorage unavailable; non-fatal */
+  }
+}
+
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate()
 }
@@ -43,8 +62,17 @@ export function DailyNoteSection({
   onFileSelect,
   onContextMenu
 }: DailyNoteSectionProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  // Collapsed by default: the expanded calendar costs ~230px of a panel whose
+  // primary job is the file tree. The user's choice persists per machine.
+  const [collapsed, setCollapsed] = useState(() => readDailyNotesCollapsed())
   const [viewDate, setViewDate] = useState(() => new Date())
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      persistDailyNotesCollapsed(!prev)
+      return !prev
+    })
+  }, [])
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const files = useVaultStore((s) => s.files)
@@ -116,7 +144,7 @@ export function DailyNoteSection({
           cursor: 'pointer',
           padding: 0
         }}
-        onClick={() => setCollapsed((c) => !c)}
+        onClick={toggleCollapsed}
       >
         <span
           className="text-[9px] transition-transform"

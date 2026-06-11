@@ -172,6 +172,72 @@ describe('useAgentShellKeybindings — editor history (Cmd+Opt+Left/Right)', () 
   })
 })
 
+describe('useAgentShellKeybindings — panel toggles', () => {
+  beforeEach(() => {
+    useThreadStore.setState({
+      vaultPath: '/vault',
+      sidebarCollapsed: false,
+      chatCollapsed: false,
+      dockCollapsed: false,
+      filesPanelOpen: false,
+      focusMode: false,
+      focusSnapshot: null
+    })
+    // persistLayout fires on toggles; stub the config IPC it reads/writes.
+    // @ts-expect-error test stub
+    window.api.thread = {
+      readConfig: vi.fn().mockResolvedValue({}),
+      writeConfig: vi.fn().mockResolvedValue(undefined)
+    }
+  })
+
+  it('Cmd+Shift+B toggles the thread sidebar', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+    fireKey({ key: 'B', metaKey: true, shiftKey: true })
+    expect(useThreadStore.getState().sidebarCollapsed).toBe(true)
+    fireKey({ key: 'B', metaKey: true, shiftKey: true })
+    expect(useThreadStore.getState().sidebarCollapsed).toBe(false)
+  })
+
+  it('Cmd+Shift+C toggles the chat panel', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+    fireKey({ key: 'C', metaKey: true, shiftKey: true })
+    expect(useThreadStore.getState().chatCollapsed).toBe(true)
+  })
+
+  it('Cmd+Shift+V toggles the files panel', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+    fireKey({ key: 'V', metaKey: true, shiftKey: true })
+    expect(useThreadStore.getState().filesPanelOpen).toBe(true)
+  })
+
+  it('Cmd+Shift+F enters and exits focus mode', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+    fireKey({ key: 'F', metaKey: true, shiftKey: true })
+    const s = useThreadStore.getState()
+    expect(s.focusMode).toBe(true)
+    expect(s.sidebarCollapsed).toBe(true)
+    expect(s.chatCollapsed).toBe(true)
+    fireKey({ key: 'F', metaKey: true, shiftKey: true })
+    expect(useThreadStore.getState().focusMode).toBe(false)
+    expect(useThreadStore.getState().chatCollapsed).toBe(false)
+  })
+
+  it('panel toggles are suppressed inside editable targets', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+    const textarea = document.createElement('textarea')
+    document.body.appendChild(textarea)
+    try {
+      textarea.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'B', metaKey: true, shiftKey: true, bubbles: true })
+      )
+      expect(useThreadStore.getState().sidebarCollapsed).toBe(false)
+    } finally {
+      textarea.remove()
+    }
+  })
+})
+
 describe('useAgentShellKeybindings — Cmd+Shift+O outline toggle', () => {
   it('toggles outline visibility', () => {
     renderHook(() => useAgentShellKeybindings(defaultOpts()))

@@ -8,7 +8,22 @@ import { AgentBadge } from './agent-badge'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
 
-export function ThreadPanel() {
+interface ThreadPanelProps {
+  /**
+   * Fixed pixel width. When omitted the panel flexes to fill the row — used
+   * when the dock is collapsed and chat is the only remaining surface.
+   */
+  readonly width?: number
+}
+
+export function ThreadPanel({ width }: ThreadPanelProps = {}) {
+  // Fixed mode still allows shrink-to-min: when the window is too narrow for
+  // every pane's preferred width, chat gives way first (down to 320) instead
+  // of pushing the files panel off-screen.
+  const sizing =
+    width === undefined
+      ? ({ flex: 1, minWidth: 320 } as const)
+      : ({ width, minWidth: 320, flexShrink: 1 } as const)
   const activeId = useThreadStore((s) => s.activeThreadId)
   const t = useThreadStore((s) => (activeId ? (s.threadsById[activeId] ?? null) : null))
   const streaming = useThreadStore((s) =>
@@ -44,8 +59,8 @@ export function ThreadPanel() {
     return (
       <section
         style={{
-          flex: 1,
-          minWidth: 320,
+          ...sizing,
+          boxSizing: 'border-box',
           padding: 24,
           color: colors.text.muted,
           background: colors.bg.base,
@@ -65,8 +80,7 @@ export function ThreadPanel() {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        flex: 1,
-        minWidth: 320,
+        ...sizing,
         height: '100%',
         background: colors.bg.base
       }}

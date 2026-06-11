@@ -23,11 +23,10 @@ function tabIdentity(tab: DockTab): string {
   return id
 }
 
-interface SurfaceDockProps {
-  readonly width?: number
-}
+/** Floor below which dock surfaces (editor, canvas, graph) stop being usable. */
+const DOCK_MIN_WIDTH = 240
 
-export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
+export function SurfaceDock() {
   const id = useThreadStore((s) => s.activeThreadId)
   const tabs = useThreadStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
   const collapsed = useThreadStore((s) => s.dockCollapsed)
@@ -93,8 +92,10 @@ export function SurfaceDock({ width = 480 }: SurfaceDockProps = {}) {
   return (
     <aside
       style={{
-        width,
-        flexShrink: 0,
+        // The dock is the workbench: it claims all width the fixed-size rails
+        // (sidebar, chat, ribbon, files panel) leave over.
+        flex: 1,
+        minWidth: DOCK_MIN_WIDTH,
         background: colors.bg.rail,
         display: 'flex',
         flexDirection: 'column'

@@ -3,13 +3,14 @@ import type { ReactNode } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useThreadStore } from '../../store/thread-store'
 import { useThreadStreaming } from '../../hooks/use-thread-streaming'
+import { PanelLeft, MessageSquare } from 'lucide-react'
 import { ThreadSidebar } from './ThreadSidebar'
 import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
 import { SideDockRibbon } from './SideDockRibbon'
 import { HeaderFilesSidePanel, HeaderFilesToggleButton } from './HeaderFilesSidePanel'
-import { persistFilesPanelOpen, readPersistedFilesPanelOpen } from './files-side-panel-storage'
+import { TitlebarPanelToggle } from './TitlebarPanelToggle'
 import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
@@ -34,9 +35,16 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   const toggleDock = useThreadStore((s) => s.toggleDock)
   const dockCollapsed = useThreadStore((s) => s.dockCollapsed)
   const sidebarWidth = useThreadStore((s) => s.sidebarWidth)
-  const dockWidth = useThreadStore((s) => s.dockWidth)
+  const chatWidth = useThreadStore((s) => s.chatWidth)
+  const sidebarCollapsed = useThreadStore((s) => s.sidebarCollapsed)
+  const chatCollapsed = useThreadStore((s) => s.chatCollapsed)
+  const filesPanelOpen = useThreadStore((s) => s.filesPanelOpen)
   const setSidebarWidth = useThreadStore((s) => s.setSidebarWidth)
-  const setDockWidth = useThreadStore((s) => s.setDockWidth)
+  const setChatWidth = useThreadStore((s) => s.setChatWidth)
+  const toggleSidebarCollapsed = useThreadStore((s) => s.toggleSidebarCollapsed)
+  const toggleChatCollapsed = useThreadStore((s) => s.toggleChatCollapsed)
+  const toggleFilesPanel = useThreadStore((s) => s.toggleFilesPanel)
+  const closeFilesPanel = useThreadStore((s) => s.closeFilesPanel)
   const persistLayout = useThreadStore((s) => s.persistLayout)
 
   // Boot-route once per vaultPath: select the most recent thread or create a
@@ -55,7 +63,9 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
       const threads = Object.values(store.threadsById)
       if (threads.length > 0) {
         const sorted = [...threads].sort((a, b) => b.lastMessage.localeCompare(a.lastMessage))
-        await store.selectThread(sorted[0].id)
+        // reveal:false — boot restoration must not defeat a persisted
+        // chat-collapsed layout the way a user click intentionally does.
+        await store.selectThread(sorted[0].id, { reveal: false })
       } else {
         await store.createThread('machina-native', DEFAULT_NATIVE_MODEL, 'Welcome')
       }
@@ -67,19 +77,6 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   const [paletteOpen, setPaletteOpen] = useState(false)
   const openPalette = useCallback(() => setPaletteOpen(true), [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
-
-  const [filesPanelOpen, setFilesPanelOpen] = useState<boolean>(() => readPersistedFilesPanelOpen())
-  const toggleFilesPanel = useCallback(() => {
-    setFilesPanelOpen((prev) => {
-      const next = !prev
-      persistFilesPanelOpen(next)
-      return next
-    })
-  }, [])
-  const closeFilesPanel = useCallback(() => {
-    setFilesPanelOpen(false)
-    persistFilesPanelOpen(false)
-  }, [])
 
   const keybindingOpts = useMemo(
     () => ({ toggleDock, openPalette, closePalette }),
@@ -94,28 +91,61 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
     >
       <WindowDragRegion
         centerSlot={<TitlebarBreadcrumb />}
-        rightSlot={<HeaderFilesToggleButton open={filesPanelOpen} onToggle={toggleFilesPanel} />}
+        rightSlot={
+          <>
+            <TitlebarPanelToggle
+              open={!sidebarCollapsed}
+              onToggle={toggleSidebarCollapsed}
+              expandLabel="Expand threads"
+              collapseLabel="Collapse threads"
+              title="Threads"
+            >
+              <PanelLeft size={15} strokeWidth={1.75} aria-hidden />
+            </TitlebarPanelToggle>
+            <TitlebarPanelToggle
+              open={!chatCollapsed}
+              onToggle={toggleChatCollapsed}
+              expandLabel="Expand chat"
+              collapseLabel="Collapse chat"
+              title="Chat"
+            >
+              <MessageSquare size={15} strokeWidth={1.75} aria-hidden />
+            </TitlebarPanelToggle>
+            <HeaderFilesToggleButton open={filesPanelOpen} onToggle={toggleFilesPanel} />
+          </>
+        }
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}>
-        <ThreadSidebar width={sidebarWidth} onChangeVault={onChangeVault} />
-        <ResizeHandle
-          side="sidebar"
-          width={sidebarWidth}
-          onChange={setSidebarWidth}
-          onCommit={() => void persistLayout()}
-        />
-        <ThreadPanel />
-        <StaticDivider />
-        <SideDockRibbon onOpenPalette={openPalette} onOpenSettings={onOpenSettings} />
-        {!dockCollapsed && (
-          <ResizeHandle
-            side="dock"
-            width={dockWidth}
-            onChange={setDockWidth}
-            onCommit={() => void persistLayout()}
-          />
+        {!sidebarCollapsed && (
+          <>
+            <ThreadSidebar width={sidebarWidth} onChangeVault={onChangeVault} />
+            <ResizeHandle
+              side="sidebar"
+              width={sidebarWidth}
+              onChange={setSidebarWidth}
+              onCommit={() => void persistLayout()}
+            />
+          </>
         )}
-        <SurfaceDock width={dockWidth} />
+        {!chatCollapsed && (
+          <>
+            {/* Dock visible: chat holds a fixed width and the dock flexes.
+                Dock collapsed: chat is the last surface standing and flexes. */}
+            <ThreadPanel width={dockCollapsed ? undefined : chatWidth} />
+            {dockCollapsed ? (
+              <StaticDivider />
+            ) : (
+              <ResizeHandle
+                side="chat"
+                width={chatWidth}
+                onChange={setChatWidth}
+                onCommit={() => void persistLayout()}
+              />
+            )}
+          </>
+        )}
+        <SideDockRibbon onOpenPalette={openPalette} onOpenSettings={onOpenSettings} />
+        <SurfaceDock />
         <HeaderFilesSidePanel
           open={filesPanelOpen}
           onClose={closeFilesPanel}

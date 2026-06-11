@@ -11,6 +11,10 @@ import type { AgentIdentity } from '@shared/agent-identity'
 import { TE_DIR } from '@shared/constants'
 import { setActiveCanvas } from './canvas-store'
 import { transportFor } from './agent-transport'
+import {
+  persistFilesPanelOpen,
+  readPersistedFilesPanelOpen
+} from '../panels/agent-shell/files-side-panel-storage'
 
 interface ThreadState {
   vaultPath: string | null
@@ -30,16 +34,41 @@ interface ThreadState {
   dockCollapsed: boolean
   /** Pixel width of the thread sidebar (left pane). Persisted in vault config. */
   sidebarWidth: number
-  /** Pixel width of the surface dock (right pane). Persisted in vault config. */
-  dockWidth: number
+  /** Pixel width of the chat panel. The dock flexes to fill the remainder. */
+  chatWidth: number
+  /** Thread sidebar hidden. Persisted in vault config. */
+  sidebarCollapsed: boolean
+  /** Chat panel hidden (dock takes the full width). Persisted in vault config. */
+  chatCollapsed: boolean
+  /** Files side panel open. Persisted in localStorage (per machine, not vault). */
+  filesPanelOpen: boolean
+  /** Focus mode: sidebar/chat/files hidden, dock full-bleed. Ephemeral. */
+  focusMode: boolean
+  /** Panel visibility before entering focus mode, restored on exit. */
+  focusSnapshot: {
+    sidebarCollapsed: boolean
+    chatCollapsed: boolean
+    filesPanelOpen: boolean
+    dockCollapsed: boolean
+  } | null
 
   setVaultPath: (p: string) => void
   loadThreads: () => Promise<void>
   loadLayout: () => Promise<void>
   setSidebarWidth: (w: number) => void
-  setDockWidth: (w: number) => void
+  setChatWidth: (w: number) => void
+  toggleSidebarCollapsed: () => void
+  toggleChatCollapsed: () => void
+  toggleFilesPanel: () => void
+  closeFilesPanel: () => void
+  toggleFocusMode: () => void
   persistLayout: () => Promise<void>
-  selectThread: (id: string) => Promise<void>
+  /**
+   * Activate a thread. `reveal` (default true) re-expands a collapsed chat
+   * panel — pass false for boot-time restoration so the persisted collapse
+   * state survives restart.
+   */
+  selectThread: (id: string, opts?: { reveal?: boolean }) => Promise<void>
   createThread: (agent: AgentIdentity, model: string, title?: string) => Promise<Thread>
   archiveThread: (id: string) => Promise<void>
   unarchiveThread: (id: string) => Promise<void>
@@ -106,13 +135,18 @@ const initial = {
   dockActiveIndexByThreadId: {} as Record<string, number>,
   dockCollapsed: false,
   sidebarWidth: 240,
-  dockWidth: 480
+  chatWidth: 420,
+  sidebarCollapsed: false,
+  chatCollapsed: false,
+  filesPanelOpen: readPersistedFilesPanelOpen(),
+  focusMode: false,
+  focusSnapshot: null as ThreadState['focusSnapshot']
 }
 
 /** Sidebar pixel bounds. Min lets a single mono label + pill ellipsize cleanly. */
 const SIDEBAR_MIN = 160
-/** Dock pixel bounds. Min lets the tab strip + a narrow surface render. */
-const DOCK_MIN = 240
+/** Chat panel pixel bounds. Min keeps the composer + a readable bubble column. */
+const CHAT_MIN = 320
 const PANE_MAX_RATIO = 0.85
 
 function clampPaneWidth(w: number, min: number): number {
@@ -143,16 +177,74 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const v = get().vaultPath
     if (!v) return
     const cfg = await window.api.thread.readConfig(v)
+    // Never restore both chat and dock collapsed — that renders an empty shell.
+    const chatCollapsed = cfg.chatCollapsed ?? false
+    const dockCollapsed = (cfg.dockCollapsed ?? false) && !chatCollapsed
     set({
       sidebarWidth: clampPaneWidth(cfg.sidebarWidth ?? 240, SIDEBAR_MIN),
-      dockWidth: clampPaneWidth(cfg.dockWidth ?? 480, DOCK_MIN),
-      dockCollapsed: cfg.dockCollapsed ?? false
+      chatWidth: clampPaneWidth(cfg.chatWidth ?? 420, CHAT_MIN),
+      sidebarCollapsed: cfg.sidebarCollapsed ?? false,
+      chatCollapsed,
+      dockCollapsed
     })
   },
 
   setSidebarWidth: (w) => set({ sidebarWidth: clampPaneWidth(w, SIDEBAR_MIN) }),
 
-  setDockWidth: (w) => set({ dockWidth: clampPaneWidth(w, DOCK_MIN) }),
+  setChatWidth: (w) => set({ chatWidth: clampPaneWidth(w, CHAT_MIN) }),
+
+  toggleSidebarCollapsed: () => {
+    set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed, focusMode: false, focusSnapshot: null }))
+    void get().persistLayout()
+  },
+
+  toggleChatCollapsed: () => {
+    set((s) => ({
+      chatCollapsed: !s.chatCollapsed,
+      // Collapsing chat while the dock is also collapsed would leave nothing
+      // on screen — re-expand the dock to take the freed width.
+      dockCollapsed: !s.chatCollapsed ? false : s.dockCollapsed,
+      focusMode: false,
+      focusSnapshot: null
+    }))
+    void get().persistLayout()
+  },
+
+  toggleFilesPanel: () => {
+    const next = !get().filesPanelOpen
+    persistFilesPanelOpen(next)
+    set({ filesPanelOpen: next, focusMode: false, focusSnapshot: null })
+  },
+
+  closeFilesPanel: () => {
+    if (!get().filesPanelOpen) return
+    persistFilesPanelOpen(false)
+    set({ filesPanelOpen: false })
+  },
+
+  toggleFocusMode: () => {
+    const s = get()
+    if (s.focusMode && s.focusSnapshot) {
+      set({ ...s.focusSnapshot, focusMode: false, focusSnapshot: null })
+      return
+    }
+    // Focus mode is ephemeral: no persistLayout / localStorage writes here, so
+    // a quit while focused restores the pre-focus layout on next launch.
+    set({
+      focusMode: true,
+      focusSnapshot: {
+        sidebarCollapsed: s.sidebarCollapsed,
+        chatCollapsed: s.chatCollapsed,
+        filesPanelOpen: s.filesPanelOpen,
+        dockCollapsed: s.dockCollapsed
+      },
+      sidebarCollapsed: true,
+      chatCollapsed: true,
+      filesPanelOpen: false,
+      // The dock is the only surface left in focus mode — force it visible.
+      dockCollapsed: false
+    })
+  },
 
   persistLayout: async () => {
     const v = get().vaultPath
@@ -161,12 +253,14 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     await window.api.thread.writeConfig(v, {
       ...cfg,
       sidebarWidth: get().sidebarWidth,
-      dockWidth: get().dockWidth,
+      chatWidth: get().chatWidth,
+      sidebarCollapsed: get().sidebarCollapsed,
+      chatCollapsed: get().chatCollapsed,
       dockCollapsed: get().dockCollapsed
     })
   },
 
-  selectThread: async (id) => {
+  selectThread: async (id, opts) => {
     const prev = get().activeThreadId
     if (prev && prev !== id) await flushDockState(prev)
     const v = get().vaultPath
@@ -179,7 +273,14 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         console.warn(`[thread-store] dropped ${dropped} dock tab(s) with missing resources`)
       }
     }
-    set({ activeThreadId: id })
+    // Selecting a thread implies wanting to read it — surface the chat panel
+    // if it was collapsed (and drop focus mode rather than half-honoring it).
+    const reveal = opts?.reveal ?? true
+    set((s) =>
+      reveal && s.chatCollapsed
+        ? { activeThreadId: id, chatCollapsed: false, focusMode: false, focusSnapshot: null }
+        : { activeThreadId: id }
+    )
   },
 
   createThread: async (agent, model, title) => {
@@ -189,7 +290,10 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     set((s) => ({
       threadsById: { ...s.threadsById, [t.id]: t },
       dockTabsByThreadId: { ...s.dockTabsByThreadId, [t.id]: t.dockState.tabs.slice() },
-      activeThreadId: t.id
+      activeThreadId: t.id,
+      chatCollapsed: false,
+      focusMode: false,
+      focusSnapshot: null
     }))
     const started = await transportFor(agent).start(t, v)
     if (!started.ok) {
@@ -605,7 +709,13 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     }),
 
   toggleDock: () => {
-    set((s) => ({ dockCollapsed: !s.dockCollapsed }))
+    set((s) => ({
+      dockCollapsed: !s.dockCollapsed,
+      // Mirror of toggleChatCollapsed: never leave both panes collapsed.
+      chatCollapsed: !s.dockCollapsed ? false : s.chatCollapsed,
+      focusMode: false,
+      focusSnapshot: null
+    }))
     // Fire-and-forget: persist the new collapsed state so it survives restart.
     void get().persistLayout()
   }

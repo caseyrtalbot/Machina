@@ -147,7 +147,9 @@ export function VaultSelector({
   }, [ctxMenu, currentPath, onRemoveFromHistory])
 
   return (
-    <div className="relative" ref={menuRef}>
+    // minWidth 0 lets this flex item shrink so the vault name truncates instead
+    // of overflowing into (and overlapping) the Files label beside it.
+    <div className="relative" style={{ minWidth: 0 }} ref={menuRef}>
       <div className="flex items-center" style={{ minWidth: 0 }}>
         <button
           onClick={toggle}

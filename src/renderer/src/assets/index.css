@@ -944,6 +944,9 @@ body {
   gap: 8px;
   min-width: 0;
   flex: 1 1 auto;
+  /* Backstop: at minimum panel width the vault name truncates; anything that
+     still doesn't fit clips instead of painting over the icon cluster. */
+  overflow: hidden;
 }
 
 .sidebar-section-bar-divider {
@@ -962,6 +965,8 @@ body {
   border: none;
   padding: 0;
   cursor: pointer;
+  /* The Files label/count never shrinks — the vault name truncates instead. */
+  flex-shrink: 0;
 }
 
 .sidebar-section-copy {

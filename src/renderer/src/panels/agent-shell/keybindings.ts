@@ -82,6 +82,20 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
       if (key === '/' || (key === 'd' && e.shiftKey)) {
         e.preventDefault()
         opts.toggleDock()
+      } else if (key === 'b' && e.shiftKey) {
+        // Panel visibility cluster: ⌘⇧B threads, ⌘⇧C chat, ⌘⇧V vault files
+        // (⌘⇧E belongs to the canvas split editor), ⌘⇧F focus mode (dock only).
+        e.preventDefault()
+        useThreadStore.getState().toggleSidebarCollapsed()
+      } else if (key === 'c' && e.shiftKey) {
+        e.preventDefault()
+        useThreadStore.getState().toggleChatCollapsed()
+      } else if (key === 'v' && e.shiftKey) {
+        e.preventDefault()
+        useThreadStore.getState().toggleFilesPanel()
+      } else if (key === 'f' && e.shiftKey) {
+        e.preventDefault()
+        useThreadStore.getState().toggleFocusMode()
       } else if (key === 'k') {
         e.preventDefault()
         opts.openPalette()
