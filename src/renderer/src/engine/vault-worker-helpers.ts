@@ -1,5 +1,8 @@
 import { parseArtifact } from './parser'
 import { buildGraph } from './graph-builder'
+import { SearchEngine } from '@shared/engine/search-engine'
+import type { SearchHit } from '@shared/engine/search-engine'
+import type { PdfPageText } from '@shared/engine/pdf-extractor'
 import type { Artifact } from '@shared/types'
 import type { ParseError, WorkerResult } from './types'
 
@@ -11,14 +14,26 @@ export type WorkerInMessage =
       updates: ReadonlyArray<{ path: string; content: string }>
       removes: readonly string[]
     }
+  | { type: 'search'; requestId: number; query: string; limit?: number }
+  | { type: 'index-pdf'; pdfPath: string; pages: ReadonlyArray<PdfPageText> }
 
 export type WorkerOutMessage = { type: 'loaded' | 'updated' } & WorkerResult
+
+export interface WorkerSearchResponse {
+  readonly type: 'search-results'
+  readonly requestId: number
+  readonly hits: readonly SearchHit[]
+}
+
+export type WorkerMessage = WorkerOutMessage | WorkerSearchResponse
 
 interface WorkerHelpers {
   addFile: (path: string, content: string) => void
   removeFile: (path: string) => void
   buildResult: () => WorkerResult
   clearAll: () => void
+  search: (query: string, limit?: number) => SearchHit[]
+  indexPdf: (pdfPath: string, pages: readonly PdfPageText[]) => void
 }
 
 export function createWorkerHelpers(): WorkerHelpers {
@@ -26,6 +41,9 @@ export function createWorkerHelpers(): WorkerHelpers {
   const fileToId = new Map<string, string>()
   const artifactPathById = new Map<string, string>()
   const errors: ParseError[] = []
+  // Full-text engine for human search (3.1) — lives here because the worker
+  // already holds every parsed body; queries never touch the UI thread.
+  const searchEngine = new SearchEngine()
 
   function clearErrorsForPath(path: string): void {
     for (let i = errors.length - 1; i >= 0; i--) {
@@ -47,6 +65,13 @@ export function createWorkerHelpers(): WorkerHelpers {
       artifacts.set(id, artifact)
       fileToId.set(path, id)
       artifactPathById.set(id, path)
+      searchEngine.upsert({
+        id,
+        title: artifact.title,
+        tags: artifact.tags ?? [],
+        body: artifact.body ?? '',
+        path
+      })
     } else {
       errors.push({ filename: path, error: result.error })
     }
@@ -59,7 +84,16 @@ export function createWorkerHelpers(): WorkerHelpers {
       artifacts.delete(id)
       fileToId.delete(path)
       artifactPathById.delete(id)
+      searchEngine.remove(id)
     }
+  }
+
+  function search(query: string, limit?: number): SearchHit[] {
+    return searchEngine.search(query, limit)
+  }
+
+  function indexPdf(pdfPath: string, pages: readonly PdfPageText[]): void {
+    searchEngine.indexPdfPages(pdfPath, pages)
   }
 
   function buildResult(): WorkerResult {
@@ -83,9 +117,10 @@ export function createWorkerHelpers(): WorkerHelpers {
     fileToId.clear()
     artifactPathById.clear()
     errors.length = 0
+    searchEngine.clear()
   }
 
-  return { addFile, removeFile, buildResult, clearAll }
+  return { addFile, removeFile, buildResult, clearAll, search, indexPdf }
 }
 
 /** Minimum gap between graph rebuilds posted during chunked appends. */
@@ -103,12 +138,16 @@ export const APPEND_POST_INTERVAL_MS = 1000
  *   ~100 escalating O(n²) graph rebuilds during hydration.
  * - `update-many` (one watcher batch) applies every remove+update, then does a
  *   single rebuild — instead of one rebuild per changed file.
+ * - `search` (human full-text query) answers from the hosted SearchEngine with
+ *   no graph rebuild; the response carries the caller's requestId.
+ * - `index-pdf` (3.10a) upserts per-page PDF text into the SearchEngine only —
+ *   no artifact, no graph rebuild, no post. PDFs are searchable, not parsed.
  */
 export function createWorkerController(
-  post: (msg: WorkerOutMessage) => void,
+  post: (msg: WorkerMessage) => void,
   intervalMs: number = APPEND_POST_INTERVAL_MS
 ): { handleMessage: (msg: WorkerInMessage) => void } {
-  const { addFile, removeFile, buildResult, clearAll } = createWorkerHelpers()
+  const { addFile, removeFile, buildResult, clearAll, search, indexPdf } = createWorkerHelpers()
   let appendTimer: ReturnType<typeof setTimeout> | undefined
   let lastPostAt = Number.NEGATIVE_INFINITY
 
@@ -152,6 +191,16 @@ export function createWorkerController(
           addFile(file.path, file.content)
         }
         postNow('updated')
+        break
+      case 'search':
+        post({
+          type: 'search-results',
+          requestId: msg.requestId,
+          hits: search(msg.query, msg.limit)
+        })
+        break
+      case 'index-pdf':
+        indexPdf(msg.pdfPath, msg.pages)
         break
     }
   }

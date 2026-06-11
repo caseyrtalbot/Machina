@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react'
+import { registerSearchWorker, deliverSearchResults } from './vault-search'
 import type { WorkerResult } from './types'
 
 interface VaultWorkerActions {
@@ -18,10 +19,20 @@ export function useVaultWorker(onResult: (result: WorkerResult) => void): VaultW
 
   useEffect(() => {
     const worker = new Worker(new URL('./vault-worker.ts', import.meta.url), { type: 'module' })
-    worker.onmessage = (e: MessageEvent) => onResultRef.current(e.data)
+    worker.onmessage = (e: MessageEvent) => {
+      // Search responses go to the vault-search client; everything else is a
+      // WorkerResult destined for vault-store.
+      if (e.data?.type === 'search-results') {
+        deliverSearchResults(e.data)
+        return
+      }
+      onResultRef.current(e.data)
+    }
     worker.onerror = (err) => console.error('[VaultWorker] Error:', err)
     workerRef.current = worker
+    registerSearchWorker(worker)
     return () => {
+      registerSearchWorker(null)
       worker.terminate()
       workerRef.current = null
     }

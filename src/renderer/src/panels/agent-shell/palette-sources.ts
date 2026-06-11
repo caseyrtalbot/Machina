@@ -1,10 +1,12 @@
 import MiniSearch from 'minisearch'
 import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
+import type { SearchHit } from '@shared/engine/search-engine'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
+import { useClaudeStatusStore } from '../../store/claude-status-store'
 
-export type PaletteItemKind = 'thread' | 'file' | 'surface' | 'action'
+export type PaletteItemKind = 'thread' | 'file' | 'surface' | 'action' | 'note'
 
 export interface PaletteItem {
   readonly id: string
@@ -57,19 +59,20 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
     })
   }
 
-  // Only the default canvas is real today: named canvas tabs all render the single global
-  // canvas store, so per-id entries would show the wrong data. Restore per-id entries once
-  // Wave 3 item 3.8 lands real per-canvasId stores.
-  items.push({
-    id: 'surface:canvas:default',
-    kind: 'surface',
-    title: 'Open canvas',
-    subtitle: 'dock surface',
-    run: () => {
-      opts.closePalette()
-      useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: 'default' })
-    }
-  })
+  // Real per-canvasId stores landed with 3.8: every discovered canvas id gets
+  // an entry, each opening a dock tab backed by its own store instance.
+  for (const canvasId of vaultStore.canvasIds) {
+    items.push({
+      id: `surface:canvas:${canvasId}`,
+      kind: 'surface',
+      title: canvasId === 'default' ? 'Open canvas' : `Open canvas: ${canvasId}`,
+      subtitle: 'dock surface',
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
+      }
+    })
+  }
 
   const otherSurfaces: ReadonlyArray<{ kind: DockTab['kind']; title: string; tab: DockTab }> = [
     { kind: 'graph', title: 'Open graph view', tab: { kind: 'graph' } },
@@ -110,10 +113,48 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
         const id = useThreadStore.getState().activeThreadId
         if (id) useThreadStore.getState().toggleAutoAccept(id)
       }
+    },
+    {
+      id: 'action:run-setup',
+      kind: 'action',
+      title: 'Run setup',
+      subtitle: 'agent onboarding walkthrough',
+      run: () => {
+        opts.closePalette()
+        useClaudeStatusStore.getState().openOnboarding()
+      }
     }
   )
 
   return items
+}
+
+/**
+ * Map full-text SearchHits (vault-worker SearchEngine) onto palette items.
+ * Skips hits whose path already appears among `shownIds` as a `file:` item so
+ * a note matched by both filename and body shows once (the filename row wins).
+ */
+export function noteHitItems(
+  hits: readonly SearchHit[],
+  shownIds: ReadonlySet<string>,
+  opts: PaletteSourcesOptions
+): PaletteItem[] {
+  return hits
+    .filter((hit) => !shownIds.has(`file:${hit.path}`))
+    .map((hit) => ({
+      // PDF hits (3.10a) arrive one per page for the same path — the page
+      // suffix keeps palette/MiniSearch ids unique. Note hits are unchanged.
+      id: hit.page !== undefined ? `note:${hit.path}#p${hit.page}` : `note:${hit.path}`,
+      kind: 'note' as const,
+      title: hit.page !== undefined ? `${hit.title} · p.${hit.page}` : hit.title,
+      // Embedding-sourced hits (3.11) are prefixed so the palette hints why a
+      // result without a literal match is here.
+      subtitle: `${hit.semantic === true ? 'semantic · ' : ''}${hit.snippet || hit.path}`,
+      run: () => {
+        opts.closePalette()
+        useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: hit.path })
+      }
+    }))
 }
 
 export function buildIndex(items: readonly PaletteItem[]): MiniSearch<IndexDoc> {

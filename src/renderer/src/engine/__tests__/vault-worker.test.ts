@@ -74,7 +74,9 @@ describe('vault-worker controller', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     posts = []
-    controller = createWorkerController((msg) => posts.push(msg))
+    // This suite only sends load/append/update-many, so every post is a
+    // WorkerOutMessage; search round-trips live in tests/engine/vault-worker-search.test.ts.
+    controller = createWorkerController((msg) => posts.push(msg as WorkerOutMessage))
   })
 
   afterEach(() => {

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
-import { buildPaletteItems, buildIndex, searchPalette } from '../palette-sources'
+import { buildPaletteItems, buildIndex, noteHitItems, searchPalette } from '../palette-sources'
 import type { Thread } from '@shared/thread-types'
+import type { SearchHit } from '@shared/engine/search-engine'
 
 const sampleThread = (id: string, title: string): Thread => ({
   id,
@@ -92,12 +93,69 @@ describe('palette-sources', () => {
     expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/spark.md' })
   })
 
-  it('emits only the default canvas entry even when other canvas ids are discovered', () => {
-    // Per-id canvas stores are not implemented (Wave 3 item 3.8) — hide the affordance.
+  it('emits one canvas entry per discovered canvas id (3.8 per-id stores)', () => {
     useVaultStore.setState({ canvasIds: ['default', 'research', 'planning'] })
     const items = buildPaletteItems({ closePalette: () => {} })
     const canvasItems = items.filter((i) => i.id.startsWith('surface:canvas:'))
-    expect(canvasItems.map((i) => i.title)).toEqual(['Open canvas'])
+    expect(canvasItems.map((i) => i.title)).toEqual([
+      'Open canvas',
+      'Open canvas: research',
+      'Open canvas: planning'
+    ])
+  })
+
+  it('running a named canvas entry opens a per-id canvas dock tab', () => {
+    useVaultStore.setState({ canvasIds: ['default', 'research'] })
+    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    const items = buildPaletteItems({ closePalette: () => {} })
+    const named = items.find((i) => i.id === 'surface:canvas:research')
+    expect(named).toBeDefined()
+    named!.run()
+    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'research' })
+  })
+
+  it('maps full-text hits to note items with snippet subtitles, deduped against file rows', () => {
+    const hits: SearchHit[] = [
+      {
+        id: 'spark',
+        title: 'spark',
+        path: '/v/notes/spark.md',
+        snippet: '...the spark of an idea...',
+        score: 2
+      },
+      {
+        id: 'deep',
+        title: 'Deep Note',
+        path: '/v/notes/deep.md',
+        snippet: '...buried body match...',
+        score: 1
+      }
+    ]
+    // spark.md already shown as a filename match — only the body-only hit remains.
+    const shown = new Set(['file:/v/notes/spark.md'])
+    const items = noteHitItems(hits, shown, { closePalette: () => {} })
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      id: 'note:/v/notes/deep.md',
+      kind: 'note',
+      title: 'Deep Note',
+      subtitle: '...buried body match...'
+    })
+  })
+
+  it('running a note item closes the palette and opens an editor dock tab', () => {
+    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    const close = vi.fn()
+    const items = noteHitItems(
+      [{ id: 'deep', title: 'Deep Note', path: '/v/notes/deep.md', snippet: 's', score: 1 }],
+      new Set<string>(),
+      { closePalette: close }
+    )
+    items[0].run()
+    expect(close).toHaveBeenCalled()
+    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/deep.md' })
   })
 
   it('opening the canvas surface routes the dock tab to the default canvas', () => {

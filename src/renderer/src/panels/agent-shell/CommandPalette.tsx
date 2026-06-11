@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   colors,
   borderRadius,
@@ -9,14 +9,26 @@ import {
 } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
-import { buildIndex, buildPaletteItems, searchPalette, type PaletteItem } from './palette-sources'
+import { searchVault } from '../../engine/vault-search'
+import type { SearchHit } from '@shared/engine/search-engine'
+import {
+  buildIndex,
+  buildPaletteItems,
+  noteHitItems,
+  searchPalette,
+  type PaletteItem
+} from './palette-sources'
 
 const KIND_LABEL: Record<PaletteItem['kind'], string> = {
   thread: 'thread',
   file: 'file',
   surface: 'surface',
-  action: 'action'
+  action: 'action',
+  note: 'note'
 }
+
+const FULLTEXT_DEBOUNCE_MS = 150
+const FULLTEXT_LIMIT = 8
 
 function PaletteFooterHint({
   label,
@@ -64,7 +76,33 @@ export function CommandPalette({
     [open, onClose]
   )
   const index = useMemo(() => (open ? buildIndex(items) : null), [open, items])
-  const results = useMemo(() => (index ? searchPalette(index, items, q) : []), [index, items, q])
+
+  // Full-text body search (vault-worker SearchEngine), debounced off the
+  // synchronous palette index so typing stays instant.
+  const [noteHits, setNoteHits] = useState<readonly SearchHit[]>([])
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(() => {
+      if (!open || !q.trim()) {
+        setNoteHits([])
+        return
+      }
+      void searchVault(q, FULLTEXT_LIMIT).then((hits) => {
+        if (!cancelled) setNoteHits(hits)
+      })
+    }, FULLTEXT_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [open, q])
+
+  const results = useMemo(() => {
+    const base = index ? searchPalette(index, items, q) : []
+    if (!q.trim() || noteHits.length === 0) return base
+    const shownIds = new Set(base.map((it) => it.id))
+    return [...base, ...noteHitItems(noteHits, shownIds, { closePalette: onClose })]
+  }, [index, items, q, noteHits, onClose])
 
   if (!open) return null
 
