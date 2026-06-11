@@ -8,6 +8,7 @@ import type {
 } from '@shared/types'
 import type { ParseError, WorkerResult } from '@engine/types'
 import { buildGhostIndex, type GhostEntry } from '@engine/ghost-index'
+import { findMentions, type MentionMatch } from '@engine/unlinked-mentions'
 import { TE_DIR } from '@shared/constants'
 import { notifyError } from '../utils/error-logger'
 
@@ -30,6 +31,12 @@ function toVaultFile(entry: FilesystemFileEntry, source: 'vault' | 'system'): Va
     modified: entry.mtime ?? '',
     source
   }
+}
+
+export interface UnlinkedMention {
+  readonly artifact: Artifact
+  /** Whole-word, unlinked occurrences of the target's title/id in artifact.body. */
+  readonly matches: readonly MentionMatch[]
 }
 
 interface VaultStore {
@@ -68,6 +75,8 @@ interface VaultStore {
   getBacklinks: (targetId: string) => Artifact[]
   /** Artifacts the source note links to ("links from this note"). */
   getOutgoingLinks: (sourceId: string) => Artifact[]
+  /** Artifacts whose bodies mention the target's title/id without linking it. */
+  getUnlinkedMentions: (targetId: string, targetTitle?: string) => UnlinkedMention[]
 }
 
 export const useVaultStore = create<VaultStore>((set, get) => ({
@@ -204,5 +213,18 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       }
     }
     return artifacts.filter((a) => targetIds.has(a.id))
+  },
+
+  getUnlinkedMentions: (targetId: string, targetTitle?: string): UnlinkedMention[] => {
+    const { artifacts, artifactById } = get()
+    const title = targetTitle ?? artifactById[targetId]?.title ?? ''
+    const terms = [title, targetId]
+    const results: UnlinkedMention[] = []
+    for (const artifact of artifacts) {
+      if (artifact.id === targetId) continue
+      const matches = findMentions(artifact.body, terms)
+      if (matches.length > 0) results.push({ artifact, matches })
+    }
+    return results
   }
 }))

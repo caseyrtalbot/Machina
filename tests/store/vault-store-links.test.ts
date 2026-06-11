@@ -143,6 +143,38 @@ describe('vault-store link queries', () => {
   })
 })
 
+describe('vault-store unlinked mentions', () => {
+  beforeEach(() => {
+    useVaultStore.setState(useVaultStore.getInitialState())
+    useVaultStore.setState({
+      artifacts: [
+        makeArtifact('target', { title: 'Spaced Repetition' }),
+        makeArtifact('plain', { body: 'I read about spaced repetition today.' }),
+        makeArtifact('linked', { body: 'See [[Spaced Repetition]] for the method.' }),
+        makeArtifact('by-id', { body: 'The target note covers this.' })
+      ],
+      artifactById: {
+        target: makeArtifact('target', { title: 'Spaced Repetition' })
+      }
+    })
+  })
+
+  it('returns artifacts with unlinked title/id mentions, excluding self and linked-only', () => {
+    const mentions = useVaultStore.getState().getUnlinkedMentions('target', 'Spaced Repetition')
+    const ids = mentions.map((m) => m.artifact.id).sort()
+
+    // 'plain' mentions the title; 'by-id' mentions the id; 'linked' only links
+    expect(ids).toEqual(['by-id', 'plain'])
+    const plain = mentions.find((m) => m.artifact.id === 'plain')
+    expect(plain?.matches).toHaveLength(1)
+  })
+
+  it('falls back to the target artifact title when none is passed', () => {
+    const mentions = useVaultStore.getState().getUnlinkedMentions('target')
+    expect(mentions.map((m) => m.artifact.id).sort()).toEqual(['by-id', 'plain'])
+  })
+})
+
 describe('vault-store ghost index memoization', () => {
   beforeEach(() => {
     useVaultStore.setState(useVaultStore.getInitialState())

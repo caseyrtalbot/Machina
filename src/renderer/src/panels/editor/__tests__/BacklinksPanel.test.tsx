@@ -40,7 +40,9 @@ describe('BacklinksPanel sections', () => {
     useVaultStore.setState(useVaultStore.getInitialState())
     useVaultStore.setState({
       graph,
-      artifacts: [makeArtifact('a', 'links to current'), makeArtifact('b'), makeArtifact('current')]
+      // Bodies deliberately avoid the words "current"/"CURRENT" so the
+      // unlinked-mention scan stays empty unless a test opts in.
+      artifacts: [makeArtifact('a', 'links elsewhere'), makeArtifact('b'), makeArtifact('current')]
     })
     // Expand the panel (collapsed defaults to true per note path)
     useUiStore.setState({ backlinkCollapsed: { '/vault/current.md': false } })
@@ -97,5 +99,74 @@ describe('BacklinksPanel sections', () => {
     const { container } = renderPanel([])
 
     expect(container.firstChild).toBeNull()
+  })
+})
+
+describe('BacklinksPanel unlinked mentions', () => {
+  const apiBackup = (window as { api?: unknown }).api
+
+  beforeEach(() => {
+    useVaultStore.setState(useVaultStore.getInitialState())
+    useVaultStore.setState({
+      graph: { nodes: [], edges: [] },
+      artifacts: [
+        makeArtifact('a', 'talks about CURRENT without linking'),
+        makeArtifact('b', 'already links [[CURRENT]] properly'),
+        makeArtifact('current')
+      ],
+      artifactPathById: { a: '/vault/a.md', b: '/vault/b.md', current: '/vault/current.md' }
+    })
+    useUiStore.setState({ backlinkCollapsed: { '/vault/current.md': false } })
+  })
+
+  afterEach(() => {
+    ;(window as { api?: unknown }).api = apiBackup
+    cleanup()
+  })
+
+  function renderPanel() {
+    return render(
+      <BacklinksPanel
+        currentNoteId="current"
+        currentNotePath="/vault/current.md"
+        currentNoteTitle="CURRENT"
+        backlinks={[]}
+        onNavigate={vi.fn()}
+      />
+    )
+  }
+
+  it('lists artifacts that mention the title without linking, excluding linked ones', () => {
+    const { getByText, queryByText } = renderPanel()
+
+    expect(getByText('Unlinked mentions')).toBeTruthy()
+    expect(getByText('A')).toBeTruthy()
+    // b's mention is already inside [[...]] — not an unlinked mention
+    expect(queryByText('B')).toBeNull()
+    // header count: 1 unlinked mention, no links
+    expect(getByText('1')).toBeTruthy()
+  })
+
+  it('linkifies via the document IPC path on click', async () => {
+    // open (not fs.readFile) so an open note's unsaved edits are the input
+    const open = vi
+      .fn()
+      .mockResolvedValue({ content: 'talks about CURRENT without linking', version: 0 })
+    const saveContent = vi.fn().mockResolvedValue(undefined)
+    const close = vi.fn().mockResolvedValue(undefined)
+    ;(window as { api?: unknown }).api = {
+      document: { open, saveContent, close }
+    }
+
+    const { getByText, findByText } = renderPanel()
+    getByText('Link').click()
+
+    expect(await findByText('Linked')).toBeTruthy()
+    expect(open).toHaveBeenCalledWith('/vault/a.md')
+    expect(saveContent).toHaveBeenCalledWith(
+      '/vault/a.md',
+      'talks about [[CURRENT]] without linking'
+    )
+    expect(close).toHaveBeenCalledWith('/vault/a.md')
   })
 })
