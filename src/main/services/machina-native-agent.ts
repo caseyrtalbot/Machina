@@ -260,6 +260,9 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
           kind: 'text',
           text: `\n\n[Stopped: reached the ${MAX_TOOL_ITERATIONS}-tool-call limit for one turn. Send a follow-up message to continue.]`
         })
+        // Structured companion to the text notice so the renderer can render
+        // "stopped mid-task" distinctly from a clean finish.
+        emit(runId, opts.threadId, { kind: 'turn_limit' })
       }
       emit(runId, opts.threadId, { kind: 'message_end' })
     } catch (err) {

@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
+import { useEnrichmentRunStore } from '@renderer/store/enrichment-run-store'
 import { useSettingsStore } from '@renderer/store/settings-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { GraphRenderer } from './graph-renderer'
 import { LabelLayer } from './graph-label-layer'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
+import { EnrichmentPill } from './EnrichmentPill'
+import { selectEnrichmentTargets } from './enrichment-targets'
 import { getGraphLod } from './graph-lod'
 import { resolveFocusIdx } from './graph-focus'
 import { colors, floatingPanel, typography } from '@renderer/design/tokens'
@@ -109,7 +112,8 @@ function GraphEmptyState({
         : 'No relationships were found for this vault yet.'
 
   // Honest guidance only: point at affordances that exist today
-  // (tags/wikilinks or an agent thread). Wave 3.9 ships a real enrichment action.
+  // (tags/wikilinks or an agent thread). Once the graph has nodes, the
+  // EnrichmentPill offers the one-click agent pass.
   const description =
     artifactCount === 0
       ? 'Open a vault with markdown notes to populate the graph view.'
@@ -216,18 +220,13 @@ export function GraphPanel() {
   const graph = useVaultStore((s) => s.graph)
   const artifactCount = useVaultStore((s) => s.artifacts.length)
   const rawFileCount = useVaultStore((s) => {
-    const total = s.artifacts.length
-    if (total === 0) return 0
-    const raw = s.artifacts.filter(
-      (a) =>
-        a.connections.length === 0 &&
-        a.clusters_with.length === 0 &&
-        a.tensions_with.length === 0 &&
-        a.related.length === 0 &&
-        a.tags.length === 0
-    ).length
-    return raw
+    if (s.artifacts.length === 0 || !s.vaultPath) return 0
+    return selectEnrichmentTargets(s.artifacts, s.artifactPathById, s.vaultPath).length
   })
+  // A successful enrichment pass drains the backlog to 0 — keep the pill
+  // mounted while a run is active or just finished so its progress/"finished"
+  // states stay visible instead of vanishing with the count.
+  const enrichmentActive = useEnrichmentRunStore((s) => s.starting || s.threadId !== null)
 
   const setHoveredNode = useGraphViewStore((s) => s.setHoveredNode)
   const setSelectedNode = useGraphViewStore((s) => s.setSelectedNode)
@@ -568,41 +567,9 @@ export function GraphPanel() {
         <GraphStatusRail nodeCount={graph.nodes.length} edgeCount={graph.edges.length} />
       )}
 
-      {/* Hint: files need enrichment */}
-      {rawFileCount > 0 && !isGraphEmpty && (
-        <div className="absolute inset-0 flex items-end justify-center z-10 pointer-events-none pb-14">
-          <div
-            className="text-center px-4 py-2"
-            style={{
-              backgroundColor: floatingPanel.glass.bg,
-              backdropFilter: floatingPanel.glass.blur,
-              border: '1px solid color-mix(in srgb, var(--canvas-link-cyan) 18%, transparent)',
-              boxShadow: floatingPanel.shadowCompact
-            }}
-          >
-            <span
-              className="text-[10px] uppercase tracking-[0.16em]"
-              style={{
-                color: 'color-mix(in srgb, var(--canvas-link-cyan) 82%, transparent)',
-                fontFamily: typography.fontFamily.mono
-              }}
-            >
-              Enrichment
-            </span>
-            <span
-              className="text-xs mx-2"
-              style={{ color: 'var(--color-text-muted)', opacity: 0.25 }}
-            >
-              |
-            </span>
-            {/* Honest string: /connect-vault ships nowhere. Wave 3.9 replaces
-                this hint with a first-class enrichment action. */}
-            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              {rawFileCount} file{rawFileCount !== 1 ? 's' : ''} still need metadata. Add tags or
-              links, or ask the agent
-            </span>
-          </div>
-        </div>
+      {/* Enrichment pill: one-click native-agent pass over unconnected files (3.9) */}
+      {(rawFileCount > 0 || enrichmentActive) && !isGraphEmpty && (
+        <EnrichmentPill rawFileCount={rawFileCount} />
       )}
 
       {/* Settings toggle button */}
