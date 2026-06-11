@@ -36,6 +36,9 @@ export interface IpcChannels {
   // Response is the canonicalized vault root (symlinks resolved, NFC) so the
   // renderer, watcher, and main-process index share one path namespace.
   'vault:init': { request: { vaultPath: string }; response: string }
+  // Copy an external file (Finder drop, file picker) into <vault>/assets/ so
+  // later reads pass PathGuard. In-vault sources are returned uncopied.
+  'vault:import-asset': { request: { sourcePath: string }; response: { path: string } }
   'vault:list-system-artifacts': {
     request: { vaultPath: string; kind?: SystemArtifactKind }
     response: string[]

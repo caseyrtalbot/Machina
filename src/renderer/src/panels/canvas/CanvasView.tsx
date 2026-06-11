@@ -67,6 +67,19 @@ function isTypingContext(): boolean {
   return el.closest('.cm-editor') !== null
 }
 
+/**
+ * Bring a dropped media file inside the vault (copy to <vault>/assets/) so
+ * PathGuard-gated reads succeed. Falls back to the original path on failure;
+ * the card then surfaces the load error instead of silently breaking.
+ */
+async function importDroppedAsset(path: string): Promise<string> {
+  try {
+    return (await window.api.vault.importAsset(path)).path
+  } catch {
+    return path
+  }
+}
+
 const folderMapProgressStyle: React.CSSProperties = {
   position: 'absolute',
   bottom: 16,
@@ -344,13 +357,15 @@ export function CanvasView({
             break
           }
           case 'image': {
-            const alt = file.path.split('/').pop() ?? ''
-            node = createCanvasNode('image', pos, { metadata: { src: file.path, alt } })
+            const src = await importDroppedAsset(file.path)
+            const alt = src.split('/').pop() ?? ''
+            node = createCanvasNode('image', pos, { metadata: { src, alt } })
             break
           }
           case 'pdf': {
+            const src = await importDroppedAsset(file.path)
             node = createCanvasNode('pdf', pos, {
-              metadata: { src: file.path, pageCount: 0, currentPage: 1 }
+              metadata: { src, pageCount: 0, currentPage: 1 }
             })
             break
           }

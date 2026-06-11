@@ -19,6 +19,9 @@ const fileService = new FileService()
  */
 let activePathGuard: PathGuard | null = null
 
+/** Canonicalized root of the active vault (set alongside activePathGuard). */
+let activeVaultRoot: string | null = null
+
 /** Callback invoked after vault:init completes. Set via onVaultReady(). */
 let vaultReadyCallback: ((vaultPath: string) => Promise<void> | void) | null = null
 
@@ -30,6 +33,7 @@ export function onVaultReady(cb: (vaultPath: string) => Promise<void> | void): v
 /** Update the active PathGuard when the vault root changes. */
 function setActiveVault(vaultPath: string): void {
   activePathGuard = new PathGuard(vaultPath)
+  activeVaultRoot = canonicalizePath(vaultPath)
 }
 
 /**
@@ -101,6 +105,18 @@ export function registerFilesystemIpc(): void {
     const resolved = guardPath(args.path, 'fs:mkdir')
     const { mkdir } = await import('node:fs/promises')
     await mkdir(resolved, { recursive: true })
+  })
+
+  typedHandle('vault:import-asset', async (args) => {
+    if (!activePathGuard || !activeVaultRoot) {
+      throw new Error('vault:import-asset called before vault:init')
+    }
+    // The one sanctioned outside-vault read: copying user-dropped media INTO
+    // the vault so every later read passes PathGuard. Sources already inside
+    // the vault are referenced in place without copying.
+    const { importAssetIntoVault } = await import('../utils/asset-import')
+    const path = await importAssetIntoVault(args.sourcePath, activeVaultRoot, activePathGuard)
+    return { path }
   })
 
   typedHandle('fs:read-binary', async (args) => {

@@ -41,6 +41,7 @@ const api = {
   },
   vault: {
     init: (vaultPath: string) => typedInvoke('vault:init', { vaultPath }),
+    importAsset: (sourcePath: string) => typedInvoke('vault:import-asset', { sourcePath }),
     readConfig: (vaultPath: string) => typedInvoke('vault:read-config', { vaultPath }),
     readState: (vaultPath: string) => typedInvoke('vault:read-state', { vaultPath }),
     writeState: (vaultPath: string, state: VaultState) =>

@@ -114,7 +114,10 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
 
     loadPdf().catch((err) => {
       if (cancelled) return
-      setError(err?.message ?? 'Failed to load PDF')
+      // Strip Electron's IPC wrapper so the card shows the actual cause
+      // ("PathGuardError: ..." rather than "Error invoking remote method...").
+      const raw: string = err?.message ?? 'Failed to load PDF'
+      setError(raw.replace(/^Error invoking remote method '[^']+': /, ''))
       setLoading(false)
     })
 

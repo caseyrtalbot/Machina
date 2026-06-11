@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, memo } from 'react'
 import { useCanvasStore } from '../../store/canvas-store'
+import { logError } from '../../utils/error-logger'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 import type { CanvasNode, ImageNodeMeta } from '@shared/canvas-types'
@@ -64,8 +65,9 @@ export function ImageCard({ node }: ImageCardProps): React.ReactElement {
         setBlobUrl(url)
         setLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         if (revoked) return
+        logError('image-card-load', err)
         setError(true)
         setLoading(false)
       })
@@ -124,6 +126,30 @@ function ImageContent({
     )
   }
 
+  // Error wins over the missing-source placeholder: a failed load also leaves
+  // displaySrc null, and "No image source" misdiagnoses it.
+  if (error) {
+    return (
+      <div className="text-center" style={{ color: colors.text.muted }}>
+        <svg
+          width={32}
+          height={32}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className="mx-auto mb-2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M9 9l6 6M15 9l-6 6" />
+        </svg>
+        <span className="text-xs">
+          Couldn&apos;t load image. Drop it on the canvas to re-import.
+        </span>
+      </div>
+    )
+  }
+
   if (!displaySrc) {
     return (
       <div className="text-center" style={{ color: colors.text.muted }}>
@@ -141,26 +167,6 @@ function ImageContent({
           <path d="M21 15l-5-5L5 21" />
         </svg>
         <span className="text-xs">No image source</span>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center" style={{ color: colors.text.muted }}>
-        <svg
-          width={32}
-          height={32}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="mx-auto mb-2"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M9 9l6 6M15 9l-6 6" />
-        </svg>
-        <span className="text-xs">Failed to load image</span>
       </div>
     )
   }

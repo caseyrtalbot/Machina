@@ -61,13 +61,21 @@ function pickFileAndAdd(
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = accept
-  input.onchange = () => {
+  input.onchange = async () => {
     const file = input.files?.[0]
     if (!file) return
     const filePath = window.api.getFilePath(file)
-    if (filePath) {
-      onAddCard(type, { metadata: buildMeta(filePath, file.name) })
+    if (!filePath) return
+    // Copy outside-vault picks into <vault>/assets/ so PathGuard-gated reads
+    // succeed; in-vault picks come back unchanged. On failure fall back to
+    // the original path and let the card surface the load error.
+    let resolved = filePath
+    try {
+      resolved = (await window.api.vault.importAsset(filePath)).path
+    } catch {
+      /* keep original path */
     }
+    onAddCard(type, { metadata: buildMeta(resolved, file.name) })
   }
   input.click()
 }
