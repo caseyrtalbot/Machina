@@ -40,7 +40,10 @@ beforeEach(() => {
     on: {
       agentNativeEvent: vi.fn().mockReturnValue(() => {}),
       threadCliMessage: vi.fn().mockReturnValue(() => {}),
-      agentNativeDockAction: vi.fn().mockReturnValue(() => {})
+      agentNativeDockAction: vi.fn().mockReturnValue(() => {}),
+      cliAgentSessionStatus: vi.fn().mockReturnValue(() => {}),
+      cliAgentContextUpdated: vi.fn().mockReturnValue(() => {}),
+      terminalExit: vi.fn().mockReturnValue(() => {})
     }
   }
 })

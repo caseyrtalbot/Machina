@@ -4,6 +4,8 @@ import { useBlockStore } from '../../store/block-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeContext } from '../../hooks/useClaudeContext'
 import { useClaudeStatus } from '../../hooks/use-claude-status'
+import { useCliAgentPresence } from '../../hooks/use-cli-agent-presence'
+import { CliAgentBadge } from '../../components/CliAgentBadge'
 import { buildCanvasContext } from '../../engine/context-serializer'
 import { buildBlockProjection, pickPinnableBlock } from './block-pin'
 import { CardShell } from './CardShell'
@@ -100,6 +102,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const isClaudeCard = node.metadata?.initialCommand === 'claude' || !!node.metadata?.actionId
   const { contextBadge, markError: _markError } = useClaudeContext(node, isClaudeCard)
   const claudeStatus = useClaudeStatus()
+  const agentPresence = useCliAgentPresence()
+  const sessionAgent = node.content ? (agentPresence[node.content] ?? null) : null
 
   const removeNode = useCanvasStore((s) => s.removeNode)
   const updateContent = useCanvasStore((s) => s.updateNodeContent)
@@ -466,20 +470,23 @@ export function TerminalCard({ node }: TerminalCardProps) {
         ) : null
       }
       titleExtra={
-        isClaudeCard && (!claudeStatus.installed || !claudeStatus.authenticated) ? (
-          <span
-            className="flex items-center gap-1 text-[10px]"
-            style={{ color: colors.claude.warning }}
-          >
+        <>
+          {sessionAgent ? <CliAgentBadge presence={sessionAgent} /> : null}
+          {isClaudeCard && (!claudeStatus.installed || !claudeStatus.authenticated) ? (
             <span
-              className="inline-block rounded-full"
-              style={{ width: 5, height: 5, backgroundColor: colors.claude.warning }}
-            />
-            {!claudeStatus.installed ? 'CLI not found' : 'Not signed in'}
-          </span>
-        ) : (
-          contextBadge
-        )
+              className="flex items-center gap-1 text-[10px]"
+              style={{ color: colors.claude.warning }}
+            >
+              <span
+                className="inline-block rounded-full"
+                style={{ width: 5, height: 5, backgroundColor: colors.claude.warning }}
+              />
+              {!claudeStatus.installed ? 'CLI not found' : 'Not signed in'}
+            </span>
+          ) : (
+            contextBadge
+          )}
+        </>
       }
     >
       {!sessionDead && hookBanner !== 'hidden' ? (

@@ -93,6 +93,11 @@ const mockInstallHooks = vi.fn()
     hooksStatus: mockHooksStatus,
     installHooks: mockInstallHooks
   },
+  on: {
+    cliAgentSessionStatus: vi.fn(() => vi.fn()),
+    cliAgentContextUpdated: vi.fn(() => vi.fn()),
+    terminalExit: vi.fn(() => vi.fn())
+  },
   getHomePath: mockGetHomePath,
   getTerminalPreloadPath: mockGetTerminalPreloadPath
 }

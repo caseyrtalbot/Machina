@@ -32,7 +32,14 @@ beforeEach(() => {
     activeThreadId: 'a'
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(window as any).api = { fs: { fileExists: () => Promise.resolve(true) } }
+  ;(window as any).api = {
+    fs: { fileExists: () => Promise.resolve(true) },
+    on: {
+      cliAgentSessionStatus: () => () => {},
+      cliAgentContextUpdated: () => () => {},
+      terminalExit: () => () => {}
+    }
+  }
 })
 
 function tabBar() {
