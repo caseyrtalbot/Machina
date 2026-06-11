@@ -202,13 +202,17 @@ export function useCanvasKeyboardShortcuts({
       // hidden view's ⌘Z replays ITS stack's commands into the visible canvas
       // through the active-store proxy, and the autosaver persists the damage.
       if (isCanvasHidden(containerRef)) return
-      if (e.key === 'z' && !e.shiftKey) {
+      // Normalize case: with Shift held, e.key arrives uppercase ('Z', 'E'),
+      // so comparing the raw key against lowercase silently kills every
+      // shift-modified shortcut in this handler.
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) {
         e.preventDefault()
         void commandStack.current.undo()
-      } else if (e.key === 'z' && e.shiftKey) {
+      } else if (key === 'z' && e.shiftKey) {
         e.preventDefault()
         void commandStack.current.redo()
-      } else if (e.key === 'g') {
+      } else if (key === 'g') {
         if (
           !containerRef.current?.contains(document.activeElement) &&
           document.activeElement !== document.body
@@ -216,7 +220,7 @@ export function useCanvasKeyboardShortcuts({
           return
         e.preventDefault()
         setImportOpen(true)
-      } else if (e.key === 'e' && e.shiftKey) {
+      } else if (key === 'e' && e.shiftKey) {
         e.preventDefault()
         const { splitFilePath: sp } = useCanvasStore.getState()
         if (sp) {
@@ -230,31 +234,31 @@ export function useCanvasKeyboardShortcuts({
             useCanvasStore.getState().openSplit(focusedNode.content)
           }
         }
-      } else if (e.key === 'a' && !e.shiftKey) {
+      } else if (key === 'a' && !e.shiftKey) {
         if (isSpatialShortcutBlocked(containerRef)) return
         e.preventDefault()
         const { nodes } = useCanvasStore.getState()
         useCanvasStore.getState().setSelection(new Set(nodes.map((n) => n.id)))
-      } else if (e.key === 'd' && !e.shiftKey) {
+      } else if (key === 'd' && !e.shiftKey) {
         if (isSpatialShortcutBlocked(containerRef)) return
         const cmd = duplicateSelectionCommand()
         if (cmd) {
           e.preventDefault()
           commandStack.current.execute(cmd)
         }
-      } else if (e.key === 'c' && !e.shiftKey) {
+      } else if (key === 'c' && !e.shiftKey) {
         // Only claim ⌘C when canvas cards are actually copied; otherwise the
         // native text copy proceeds untouched.
         if (isSpatialShortcutBlocked(containerRef)) return
         if (copySelectionToClipboard() > 0) e.preventDefault()
-      } else if (e.key === 'v' && !e.shiftKey) {
+      } else if (key === 'v' && !e.shiftKey) {
         if (isSpatialShortcutBlocked(containerRef)) return
         const cmd = pasteClipboardCommand()
         if (cmd) {
           e.preventDefault()
           commandStack.current.execute(cmd)
         }
-      } else if (e.key === 'l' || e.key === 'L') {
+      } else if (key === 'l') {
         e.preventDefault()
         const center = viewportCenter(containerRef)
         if (e.shiftKey) {
