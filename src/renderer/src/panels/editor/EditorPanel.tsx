@@ -18,7 +18,10 @@ import { MermaidCodeBlock } from './extensions/mermaid-code-block'
 import { SlashCommand } from './extensions/slash-command'
 import { CalloutBlock } from './extensions/callout-block'
 import { HighlightMark } from './extensions/highlight-mark'
+import { FindInNote } from './extensions/find-in-note'
+import { FindBar } from './FindBar'
 import { WikilinkNode } from './extensions/wikilink-node'
+import { VaultImage, resolveVaultImageUrl } from './extensions/vault-image'
 import DragHandle from '@tiptap/extension-drag-handle'
 import { MachinaTableKit } from './extensions/table-kit'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
@@ -86,6 +89,12 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     actions: ContextMenuAction[]
   } | null>(null)
 
+  // Find-in-note bar (rich mode). Counter instead of boolean so a repeat
+  // Cmd+F while open refocuses the input; 0 = closed.
+  const [findSignal, setFindSignal] = useState(0)
+  const handleFindOpen = useCallback(() => setFindSignal((s) => s + 1), [])
+  const closeFindBar = useCallback(() => setFindSignal(0), [])
+
   // Resolve a wikilink target to an artifact and navigate, with optional heading scroll
   const handleWikilinkNavigate = useCallback(
     (target: string) => {
@@ -100,6 +109,30 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     [onNavigate]
   )
 
+  // Resolve a vault-relative image src to a blob URL: try relative to the
+  // open note's folder first (standard markdown), then the vault root.
+  const resolveImageSrc = useCallback(async (src: string): Promise<string | null> => {
+    let decoded = src
+    if (src.includes('%')) {
+      try {
+        decoded = decodeURIComponent(src)
+      } catch {
+        decoded = src
+      }
+    }
+    const candidates: string[] = []
+    if (decoded.startsWith('/')) {
+      candidates.push(decoded)
+    } else {
+      const notePath = useEditorStore.getState().activeNotePath
+      const noteDir = notePath ? notePath.slice(0, notePath.lastIndexOf('/')) : ''
+      if (noteDir) candidates.push(`${noteDir}/${decoded}`)
+      const vaultPath = useVaultStore.getState().vaultPath
+      if (vaultPath) candidates.push(`${vaultPath.replace(/\/$/, '')}/${decoded}`)
+    }
+    return resolveVaultImageUrl(candidates)
+  }, [])
+
   // Build Tiptap extensions
   const extensions = useMemo(
     () => [
@@ -112,6 +145,8 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       CalloutBlock,
       HighlightMark,
       WikilinkNode.configure({ onNavigate: handleWikilinkNavigate }),
+      VaultImage.configure({ resolveSrc: resolveImageSrc }),
+      FindInNote.configure({ onOpen: handleFindOpen }),
       MachinaTableKit,
       DragHandle.configure({
         render() {
@@ -123,7 +158,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       }),
       SlashCommand
     ],
-    [handleWikilinkNavigate]
+    [handleWikilinkNavigate, handleFindOpen, resolveImageSrc]
   )
 
   // Stable ref for the resolved path so callbacks don't go stale
@@ -313,6 +348,9 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       const ed = editorRef.current
       const manager = ed?.storage.markdown?.manager
       if (next === 'source') {
+        // Source mode has its own CodeMirror search; unmounting the FindBar
+        // clears rich-mode highlight decorations via its cleanup effect.
+        setFindSignal(0)
         if (ed && manager) {
           // syncContent (not setContent): re-serializing for display is not a
           // user edit — marking the store dirty here would rewrite an
@@ -489,7 +527,10 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           Outline
         </button>
       </div>
-      <div className="flex-1 flex min-h-0 min-w-0">
+      <div className="flex-1 flex min-h-0 min-w-0 relative">
+        {mode === 'rich' && editor && findSignal > 0 && (
+          <FindBar editor={editor} focusSignal={findSignal} onClose={closeFindBar} />
+        )}
         <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
           <FrontmatterHeader
             artifact={artifact}
