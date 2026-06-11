@@ -1,28 +1,33 @@
 /**
  * Canvas auto-save: debounced persistence of canvas state to disk.
- * Single autosaver for the canvas — wired once at the App level.
+ * Single autosaver for ALL canvas instances — wired once at the App level.
  *
- * Mirrors the vault-persist pattern:
+ * Mirrors the vault-persist pattern, per store instance (3.8 multi-canvas):
  * - 2s debounce after any canvas mutation (isDirty becomes true)
  * - Pan-end (isInteracting falling edge) saves viewport drift without
  *   dirtying every pan frame
  * - Version-safe: a mutation landing mid-save keeps the canvas dirty
  *   (markSaved no-ops) and reschedules instead of being lost
- * - Flush on app quit (via app:will-quit)
- * - Subscribe/unsubscribe lifecycle managed by caller
+ * - Flush on app quit (via app:will-quit) covers every loaded instance,
+ *   not just the active canvas
+ * - Subscribe/unsubscribe lifecycle managed by caller; instances created
+ *   after subscription (new canvas tabs) are picked up via the registry
  */
 
-import { useCanvasStore } from './canvas-store'
+import {
+  getAllCanvasStores,
+  onCanvasStoreCreated,
+  type CanvasStore,
+  type CanvasStoreApi
+} from './canvas-store'
 import { saveCanvas } from '../panels/canvas/canvas-io'
 import { logError, notifyError } from '../utils/error-logger'
 
 const AUTOSAVE_DEBOUNCE_MS = 2000
 
-let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+const autosaveTimers = new Map<CanvasStoreApi, ReturnType<typeof setTimeout>>()
 
-type CanvasState = ReturnType<typeof useCanvasStore.getState>
-
-function viewportDrifted(state: CanvasState): boolean {
+function viewportDrifted(state: CanvasStore): boolean {
   const { viewport, savedViewport } = state
   if (!savedViewport) return false
   return (
@@ -32,8 +37,8 @@ function viewportDrifted(state: CanvasState): boolean {
   )
 }
 
-async function performSave(): Promise<void> {
-  const state = useCanvasStore.getState()
+async function performSave(store: CanvasStoreApi): Promise<void> {
+  const state = store.getState()
   if (!state.filePath) return
   if (!state.isDirty && !viewportDrifted(state)) return
 
@@ -43,62 +48,95 @@ async function performSave(): Promise<void> {
     await saveCanvas(state.filePath, canvasFile)
     state.markSaved(version, canvasFile.viewport)
     // A mutation landed mid-save: markSaved no-oped, keep the loop alive.
-    if (useCanvasStore.getState().isDirty) scheduleAutosave()
+    if (store.getState().isDirty) scheduleAutosave(store)
   } catch (err) {
     notifyError('canvas-autosave', err, 'Failed to save canvas')
   }
 }
 
-function scheduleAutosave(): void {
-  if (autosaveTimer !== null) clearTimeout(autosaveTimer)
-  autosaveTimer = setTimeout(() => {
-    autosaveTimer = null
-    void performSave()
-  }, AUTOSAVE_DEBOUNCE_MS)
+/**
+ * Debounced save request. Exported for the file-lifecycle hook: when a canvas
+ * gains its filePath after content already exists, isDirty is already true so
+ * the rising-edge watcher below never fires — the adopter asks explicitly.
+ */
+export function scheduleAutosave(store: CanvasStoreApi): void {
+  const existing = autosaveTimers.get(store)
+  if (existing !== undefined) clearTimeout(existing)
+  autosaveTimers.set(
+    store,
+    setTimeout(() => {
+      autosaveTimers.delete(store)
+      void performSave(store)
+    }, AUTOSAVE_DEBOUNCE_MS)
+  )
+}
+
+function clearTimer(store: CanvasStoreApi): void {
+  const timer = autosaveTimers.get(store)
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    autosaveTimers.delete(store)
+  }
 }
 
 /**
- * Flush canvas to disk immediately (for quit/unload).
- * Also persists a drifted viewport even when the canvas is otherwise clean.
+ * Flush every canvas instance to disk immediately (for quit/unload).
+ * Also persists a drifted viewport even when a canvas is otherwise clean.
  */
 export async function flushCanvasSave(): Promise<void> {
-  if (autosaveTimer !== null) {
-    clearTimeout(autosaveTimer)
-    autosaveTimer = null
-  }
-  try {
-    await performSave()
-  } catch (err) {
-    logError('canvas-flush', err)
-  }
+  const stores = [...getAllCanvasStores().values()]
+  for (const store of stores) clearTimer(store)
+  await Promise.all(
+    stores.map(async (store) => {
+      try {
+        // Drain, don't single-pass: a mutation landing mid-save keeps the
+        // store dirty and performSave reschedules a debounced retry that a
+        // quitting app would never run. Bounded so a persistently failing
+        // save (performSave swallows errors) cannot loop forever.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          await performSave(store)
+          clearTimer(store)
+          const state = store.getState()
+          if (!state.filePath || !state.isDirty) break
+        }
+      } catch (err) {
+        logError('canvas-flush', err)
+      }
+    })
+  )
 }
 
-/**
- * Subscribe to canvas store changes and auto-save when dirty,
- * or when a pan/zoom interaction ends with the viewport moved.
- * Returns an unsubscribe function.
- */
-export function subscribeCanvasAutosave(): () => void {
-  let prevDirty = useCanvasStore.getState().isDirty
-  let prevInteracting = useCanvasStore.getState().isInteracting
+function watchStore(store: CanvasStoreApi): () => void {
+  let prevDirty = store.getState().isDirty
+  let prevInteracting = store.getState().isInteracting
 
-  const unsub = useCanvasStore.subscribe((state) => {
+  return store.subscribe((state) => {
     if (state.isDirty && !prevDirty) {
-      scheduleAutosave()
+      scheduleAutosave(store)
     }
     // Pan-end: persist viewport drift without dirtying every pan frame.
     if (prevInteracting && !state.isInteracting && viewportDrifted(state)) {
-      scheduleAutosave()
+      scheduleAutosave(store)
     }
     prevDirty = state.isDirty
     prevInteracting = state.isInteracting
   })
+}
+
+/**
+ * Subscribe every canvas store (existing and future) and auto-save when one
+ * becomes dirty, or when a pan/zoom interaction ends with the viewport moved.
+ * Returns an unsubscribe function.
+ */
+export function subscribeCanvasAutosave(): () => void {
+  const unsubs: Array<() => void> = []
+  for (const store of getAllCanvasStores().values()) unsubs.push(watchStore(store))
+  unsubs.push(onCanvasStoreCreated((_id, store) => unsubs.push(watchStore(store))))
 
   return () => {
-    unsub()
-    if (autosaveTimer !== null) {
-      clearTimeout(autosaveTimer)
-      autosaveTimer = null
-    }
+    for (const unsub of unsubs) unsub()
+    unsubs.length = 0
+    for (const timer of autosaveTimers.values()) clearTimeout(timer)
+    autosaveTimers.clear()
   }
 }

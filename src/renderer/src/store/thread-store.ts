@@ -9,6 +9,7 @@ import type {
 import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { TE_DIR } from '@shared/constants'
+import { setActiveCanvas } from './canvas-store'
 import { transportFor } from './agent-transport'
 
 interface ThreadState {
@@ -610,6 +611,18 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   }
 }))
 
+// Active-canvas indirection (3.8): whenever the active dock tab is a canvas,
+// point the global `useCanvasStore` proxy at that canvas's store instance.
+// Non-canvas tabs keep the last canvas active so palette/sidebar actions that
+// target "the canvas" keep meaning the one the user last looked at.
+useThreadStore.subscribe((s) => {
+  const threadId = s.activeThreadId
+  if (!threadId) return
+  const tabs = s.dockTabsByThreadId[threadId] ?? []
+  const tab = tabs[s.dockActiveIndexByThreadId[threadId] ?? 0]
+  if (tab?.kind === 'canvas') setActiveCanvas(tab.id)
+})
+
 /** Truncate a serialized payload so history summaries stay token-bounded. */
 function clip(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s
@@ -670,7 +683,7 @@ async function validateTabs(
         return window.api.fs.fileExists(t.path)
       }
       if (t.kind === 'canvas' && t.id !== 'default') {
-        // Per-id canvas files are not yet implemented; only the global "default" is real.
+        // Named canvases are real per-id stores (3.8); drop tabs whose file is gone.
         return window.api.fs.fileExists(`${vault}/${TE_DIR}/canvas/${t.id}.json`)
       }
       // terminal and the static kinds (graph, ghosts, health) are always valid in v1

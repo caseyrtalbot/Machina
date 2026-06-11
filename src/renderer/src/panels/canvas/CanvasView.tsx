@@ -17,7 +17,7 @@ import { CardShellSkeleton } from './CardShellSkeleton'
 import { CardLodPreview } from './CardLodPreview'
 import { EdgeLayer } from './EdgeLayer'
 import { ConnectionDragOverlay } from './ConnectionDragOverlay'
-import { clearCanvasCommand, CommandStack, setActiveCommandStack } from './canvas-commands'
+import { clearCanvasCommand, CommandStack, registerCommandStack } from './canvas-commands'
 import { CommandStackProvider } from './command-stack-context'
 import { CanvasToolbar } from './CanvasToolbar'
 import { CanvasMinimap } from './CanvasMinimap'
@@ -31,7 +31,8 @@ import { useViewportCulling } from './use-canvas-culling'
 import { getLodLevel } from './use-canvas-lod'
 import { findOpenPosition } from './canvas-layout'
 import { SplitDividerAndPanel } from './SplitDividerAndPanel'
-import { CanvasWelcomeCard } from './CanvasEmptyStates'
+import { CanvasWelcomeCard, CanvasEmptyVaultCard, ShortcutOverlay } from './CanvasEmptyStates'
+import { createNoteAtCursor } from './create-note-at-cursor'
 import { useSaveTextCard } from './useSaveTextCard'
 import { SaveTextCardDialog } from './SaveTextCardDialog'
 import { slugifyFilename } from './text-card-save'
@@ -44,7 +45,6 @@ import { FolderMapPreviewGhosts, FolderMapPreviewBar } from './FolderMapPreview'
 import { SectionOverlay } from './SectionOverlay'
 import { OntologyPreview } from './OntologyPreview'
 import { useOntologyOrchestrator } from './ontology-orchestrator'
-import { useAgentPlanListener } from '../../hooks/use-agent-plan-listener'
 import { useCanvasCardAddedListener } from '../../hooks/use-canvas-card-added-listener'
 import { DEFAULT_CANVAS_ID, useCanvasFileLifecycle } from './use-canvas-file-lifecycle'
 import { useCanvasKeyboardShortcuts } from './use-canvas-keyboard-shortcuts'
@@ -55,6 +55,17 @@ import {
   filterCanvasAdditions,
   type CanvasMutationPlan
 } from '@shared/canvas-mutation-types'
+
+/** True when keystrokes belong to a text-editing surface, so global canvas
+ * overlays (the `?` shortcut sheet) must not react. */
+function isTypingContext(): boolean {
+  if (useCanvasStore.getState().focusedTerminalId) return true
+  const el = document.activeElement as HTMLElement | null
+  if (!el) return false
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return true
+  if (el.isContentEditable) return true
+  return el.closest('.cm-editor') !== null
+}
 
 const folderMapProgressStyle: React.CSSProperties = {
   position: 'absolute',
@@ -91,20 +102,33 @@ export function CanvasView({
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
   const [importOpen, setImportOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [folderMapProgress, setFolderMapProgress] = useState<FolderMapProgress | null>(null)
   const [previewPlan, setPreviewPlan] = useState<CanvasMutationPlan | null>(null)
   const ontology = useOntologyOrchestrator(commandStack)
-  useAgentPlanListener()
   useCanvasCardAddedListener(canvasId)
   useCanvasFileLifecycle(canvasId)
   useCanvasKeyboardShortcuts({ commandStack, containerRef, setImportOpen })
 
-  // Register the stack so non-React call sites (drag-end, connection overlay,
-  // card shells, toolbar menus) can push undoable commands.
+  // Register the stack under this canvasId so non-React call sites (drag-end,
+  // connection overlay, card shells, toolbar menus) resolve the stack of the
+  // ACTIVE canvas — not the last-mounted view's.
+  useEffect(() => registerCommandStack(canvasId, commandStack.current), [canvasId])
+
+  // `?` toggles the dismissible shortcut overlay — but never while typing in
+  // an input/editor, and only while this canvas panel is actually visible
+  // (KeepAlive hides inactive tabs with display:none → zero-size rect).
   useEffect(() => {
-    const stack = commandStack.current
-    setActiveCommandStack(stack)
-    return () => setActiveCommandStack(null)
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== '?' || e.metaKey || e.ctrlKey || e.altKey) return
+      if (isTypingContext()) return
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect || rect.width === 0 || rect.height === 0) return
+      e.preventDefault()
+      setShortcutsOpen((open) => !open)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -539,6 +563,19 @@ export function CanvasView({
 
           <ConnectionDragOverlay />
           {nodes.length === 0 && !vaultPath && <CanvasWelcomeCard />}
+          {nodes.length === 0 && vaultPath && artifacts.length === 0 && (
+            <CanvasEmptyVaultCard
+              onCreateNote={() => {
+                const vp = useCanvasStore.getState().viewport
+                void createNoteAtCursor({
+                  x: (-vp.x + containerSize.width / 2) / vp.zoom,
+                  y: (-vp.y + containerSize.height / 2) / vp.zoom
+                })
+              }}
+              onOpenImport={() => setImportOpen(true)}
+            />
+          )}
+          {shortcutsOpen && <ShortcutOverlay onClose={() => setShortcutsOpen(false)} />}
           <ZoomIndicator />
           <EdgeDots containerWidth={containerSize.width} containerHeight={containerSize.height} />
           <ClusterLabels viewport={viewport} />

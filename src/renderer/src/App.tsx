@@ -33,6 +33,7 @@ import {
 } from './store/vault-persist'
 import { rehydrateUiStore } from './store/ui-store'
 import { subscribeCanvasAutosave } from './store/canvas-autosave'
+import { useAgentPlanListener } from './hooks/use-agent-plan-listener'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { Artifact } from '@shared/types'
 
@@ -311,6 +312,12 @@ export default function App() {
   useEffect(() => {
     return subscribeCanvasAutosave()
   }, [])
+
+  // Single app-level subscription: the listener scans the store registry, so
+  // mounting it per CanvasView applied each accepted agent plan once per open
+  // canvas tab — the duplicate add/remove failed live re-validation and raised
+  // a spurious "changes were rejected" toast.
+  useAgentPlanListener()
 
   useEffect(() => {
     return registerQuitHandler()

@@ -102,6 +102,36 @@ describe('canvas-autosave', () => {
     expect(useCanvasStore.getState().isDirty).toBe(false)
   })
 
+  it('flushCanvasSave drains a mutation that lands mid-save instead of leaving it queued', async () => {
+    let resolveSave!: () => void
+    vi.mocked(saveCanvas).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve
+        })
+    )
+
+    useCanvasStore
+      .getState()
+      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+
+    const flush = flushCanvasSave()
+    expect(saveCanvas).toHaveBeenCalledTimes(1)
+
+    // Mutation lands while the flush's first write is still in flight. Quit
+    // must not proceed with this version sitting in a debounce timer that
+    // will never run.
+    useCanvasStore
+      .getState()
+      .addNode(createCanvasNode('text', { x: 10, y: 10 }, { width: 200, height: 200 }))
+
+    resolveSave()
+    await flush
+
+    expect(saveCanvas).toHaveBeenCalledTimes(2)
+    expect(useCanvasStore.getState().isDirty).toBe(false)
+  })
+
   it('does not save when no filePath is loaded', async () => {
     useCanvasStore.getState().closeCanvas()
     useCanvasStore.setState({ isDirty: true })
