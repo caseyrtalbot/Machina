@@ -101,11 +101,12 @@ const cliTransport: AgentTransport = {
     return result.ok ? { ok: true } : { ok: false, error: result.error }
   },
 
-  sendTurn: async (thread, text) => {
+  sendTurn: async (thread, text, ctx) => {
     const res = await window.api.cliThread.input({
       threadId: thread.id,
       identity: thread.agent,
-      text
+      text,
+      cwd: ctx.vaultPath
     })
     return res.ok
       ? { ok: true }

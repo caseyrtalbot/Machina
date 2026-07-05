@@ -3,8 +3,10 @@
  * Standalone MCP server for Machina vaults.
  *
  * Claude Code (or any MCP client) spawns this as a subprocess and
- * communicates over stdio. The server exposes read-only vault tools:
- * vault.read_file, search.query, graph.get_neighbors, graph.get_ghosts.
+ * communicates over stdio. The server exposes read-only workspace tools:
+ * vault.read_file (+ workspace.read_file alias), search.query,
+ * graph.get_neighbors, graph.get_ghosts, project.map_folder,
+ * canvas.get_snapshot.
  *
  * Write tools are intentionally excluded: without Electron's dialog
  * there is no HITL gate to confirm destructive operations.
@@ -63,7 +65,7 @@ export async function startMcpServer(vaultPath: string): Promise<void> {
   await server.connect(transport)
 
   process.stderr.write(
-    `[machina-mcp] Server ready (4 read-only tools, ${deps.vaultIndex.getArtifacts().length} files indexed)\n`
+    `[machina-mcp] Server ready (7 read-only tools, ${deps.vaultIndex.getArtifacts().length} files indexed)\n`
   )
 }
 

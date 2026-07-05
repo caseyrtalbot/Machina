@@ -39,7 +39,12 @@ const api = {
     fileMtime: (path: string) => typedInvoke('fs:file-mtime', { path }),
     readFilesBatch: (paths: readonly string[]) => typedInvoke('fs:read-files-batch', { paths })
   },
+  workspace: {
+    open: (path: string) => typedInvoke('workspace:open', { path }),
+    current: () => typedInvoke('workspace:current')
+  },
   vault: {
+    // Legacy alias for workspace:open (kept for one release, contracts §1).
     init: (vaultPath: string) => typedInvoke('vault:init', { vaultPath }),
     importAsset: (sourcePath: string) => typedInvoke('vault:import-asset', { sourcePath }),
     readConfig: (vaultPath: string) => typedInvoke('vault:read-config', { vaultPath }),
@@ -139,7 +144,7 @@ const api = {
   cliThread: {
     spawn: (req: { threadId: string; identity: AgentIdentity; cwd: string }) =>
       typedInvoke('cli-thread:spawn', req),
-    input: (req: { threadId: string; identity: AgentIdentity; text: string }) =>
+    input: (req: { threadId: string; identity: AgentIdentity; text: string; cwd: string }) =>
       typedInvoke('cli-thread:input', req),
     close: (threadId: string) => typedInvoke('cli-thread:close', { threadId }),
     cancel: (threadId: string) => typedInvoke('cli-thread:cancel', { threadId })

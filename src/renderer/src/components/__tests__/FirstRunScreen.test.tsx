@@ -8,12 +8,12 @@ interface ApiStub {
   vault: { init: ReturnType<typeof vi.fn> }
 }
 
-function stubApi(values: { lastVaultPath?: unknown; pathExists?: boolean; history?: unknown }) {
+function stubApi(values: { lastWorkspacePath?: unknown; pathExists?: boolean; history?: unknown }) {
   const api: ApiStub = {
     config: {
       read: vi.fn(async (_scope: string, key: string) => {
-        if (key === 'lastVaultPath') return values.lastVaultPath ?? null
-        if (key === 'vaultHistory') return values.history ?? null
+        if (key === 'lastWorkspacePath') return values.lastWorkspacePath ?? null
+        if (key === 'workspaceHistory') return values.history ?? null
         return null
       }),
       write: vi.fn(async () => undefined)
@@ -35,26 +35,26 @@ afterEach(() => {
 
 describe('checkSavedVault', () => {
   it('returns first-run with no notice when nothing is saved', async () => {
-    const api = stubApi({ lastVaultPath: null })
+    const api = stubApi({ lastWorkspacePath: null })
     const result = await checkSavedVault()
     expect(result).toEqual({ kind: 'first-run', missingPath: null })
     expect(api.app.pathExists).not.toHaveBeenCalled()
   })
 
   it('loads the saved vault when it still exists', async () => {
-    const api = stubApi({ lastVaultPath: '/vaults/notes', pathExists: true })
+    const api = stubApi({ lastWorkspacePath: '/vaults/notes', pathExists: true })
     const result = await checkSavedVault()
     expect(result).toEqual({ kind: 'load', path: '/vaults/notes' })
     expect(api.config.write).not.toHaveBeenCalled()
   })
 
   it('missing vault path resolves to first-run, clears config, and never inits (no mkdir)', async () => {
-    const api = stubApi({ lastVaultPath: '/vaults/deleted', pathExists: false })
+    const api = stubApi({ lastWorkspacePath: '/vaults/deleted', pathExists: false })
     const result = await checkSavedVault()
     expect(result).toEqual({ kind: 'first-run', missingPath: '/vaults/deleted' })
     // Stale entry cleared so the ghost vault is not retried next launch.
-    expect(api.config.write).toHaveBeenCalledWith('app', 'lastVaultPath', null)
-    // Never reaches vault:init, which is what would mkdir the ghost vault.
+    expect(api.config.write).toHaveBeenCalledWith('app', 'lastWorkspacePath', null)
+    // Never reaches workspace:open, which is what would mkdir the ghost workspace.
     expect(api.vault.init).not.toHaveBeenCalled()
   })
 })

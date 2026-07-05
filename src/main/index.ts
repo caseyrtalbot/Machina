@@ -3,7 +3,9 @@ import { execSync } from 'child_process'
 import { join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { registerFilesystemIpc, onVaultReady } from './ipc/filesystem'
+import { registerFilesystemIpc } from './ipc/filesystem'
+import { registerWorkspaceIpc } from './ipc/workspace'
+import { getWorkspaceService } from './services/workspace-service'
 import { registerWatcherIpc, getVaultWatcher, setVaultBatchListener } from './ipc/watcher'
 import { registerShellIpc, getShellService } from './ipc/shell'
 import { registerConfigIpc, readAppConfigValue, writeAppConfigValue } from './ipc/config'
@@ -405,14 +407,15 @@ app.whenReady().then(() => {
 
   registerConfigIpc()
   registerFilesystemIpc()
+  registerWorkspaceIpc()
   registerClaudeStatusIpc(claudeStatus)
   claudeStatus.start()
   quitCoordinator.registerIpc()
 
-  // Wire MCP + agent + health services to vault initialization. The controller
-  // rebuilds the index + MCP server and re-points services on each vault switch
-  // without re-registering IPC handlers.
-  onVaultReady(reconfigureForVault)
+  // Wire MCP + agent + health services to workspace initialization. The
+  // controller rebuilds the index + MCP server and re-points services on each
+  // workspace switch without re-registering IPC handlers.
+  getWorkspaceService().onReady((ws) => reconfigureForVault(ws.root))
 
   createWindow()
   registerWatcherIpc()

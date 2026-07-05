@@ -185,9 +185,9 @@ export default function App() {
   const orchestrateLoad = useCallback(
     async (requestedPath: string) => {
       perfMark('vault-load-start')
-      // vault:init returns the canonicalized root (symlinks resolved, NFC);
-      // use it everywhere so renderer keys match watcher event paths.
-      const path = await window.api.vault.init(requestedPath)
+      // workspace:open returns the canonicalized root (symlinks resolved,
+      // NFC); use it everywhere so renderer keys match watcher event paths.
+      const { root: path } = await window.api.workspace.open(requestedPath)
       await loadVault(path)
       const state = useVaultStore.getState().state
       if (state?.lastOpenNote) {
@@ -195,12 +195,12 @@ export default function App() {
       }
       rehydrateUiState()
       rehydrateUiStore()
-      window.api.config.write('app', 'lastVaultPath', path)
+      window.api.config.write('app', 'lastWorkspacePath', path)
 
-      // Persist vault history (most-recent-first, deduped, capped at 10)
-      const history = (await window.api.config.read('app', 'vaultHistory')) as string[] | null
+      // Persist workspace history (most-recent-first, deduped, capped at 10)
+      const history = (await window.api.config.read('app', 'workspaceHistory')) as string[] | null
       const updated = [path, ...(history ?? []).filter((p) => p !== path)].slice(0, 10)
-      await window.api.config.write('app', 'vaultHistory', updated)
+      await window.api.config.write('app', 'workspaceHistory', updated)
 
       await window.api.vault.watchStart(path)
       // Only send .md files to the vault worker (knowledge engine only parses markdown)
@@ -280,8 +280,8 @@ export default function App() {
     void (async () => {
       try {
         // checkSavedVault verifies the path still exists before loading; a
-        // missing vault clears lastVaultPath and shows first-run instead of
-        // letting vault:init mkdir a ghost vault.
+        // missing workspace clears lastWorkspacePath and shows first-run
+        // instead of letting workspace:open mkdir a ghost workspace.
         const check = await checkSavedVault()
         if (check.kind === 'load') {
           await orchestrateLoad(check.path)

@@ -125,7 +125,7 @@ describe('MCP Server', () => {
     rmSync(vaultRoot, { recursive: true, force: true })
   })
 
-  it('lists 9 registered tools when gate is provided', async () => {
+  it('lists 12 registered tools when gate is provided (vault.* + workspace.* aliases)', async () => {
     const gate = new AlwaysApproveGate()
     const { client, server } = await createConnectedPair(vaultRoot, gate)
 
@@ -141,8 +141,49 @@ describe('MCP Server', () => {
       'search.query',
       'vault.create_file',
       'vault.read_file',
-      'vault.write_file'
+      'vault.write_file',
+      'workspace.create_file',
+      'workspace.read_file',
+      'workspace.write_file'
     ])
+
+    await client.close()
+    await server.close()
+  })
+
+  it('workspace.read_file alias stamps the invoked name into the Spotlighting envelope', async () => {
+    const { client, server } = await createConnectedPair(vaultRoot)
+
+    const result = await client.callTool({
+      name: 'workspace.read_file',
+      arguments: { path: join(vaultRoot, 'notes', 'hello.md') }
+    })
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text
+    expect(text).toContain('<tool_result tool="workspace.read_file" trust="user_content">')
+    expect(text).toContain('# Hello World')
+
+    await client.close()
+    await server.close()
+  })
+
+  it('workspace.write_file alias passes the invoked name to the gate', async () => {
+    const gate = new AlwaysApproveGate()
+    const { client, server } = await createConnectedPair(vaultRoot, gate)
+
+    const filePath = join(vaultRoot, 'notes', 'hello.md')
+    const result = await client.callTool({
+      name: 'workspace.write_file',
+      arguments: {
+        path: filePath,
+        content: '---\nid: hello\ntitle: Hello Alias\ntype: note\n---\n\n# Alias Write\n'
+      }
+    })
+
+    expect(result.isError).toBeFalsy()
+    expect(readFileSync(filePath, 'utf-8')).toContain('# Alias Write')
+    expect(gate.calls).toHaveLength(1)
+    expect(gate.calls[0].tool).toBe('workspace.write_file')
 
     await client.close()
     await server.close()

@@ -56,12 +56,12 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
   )
   const [sortMode, setSortMode] = useState<SortMode>('name')
   const [searchQuery, setSearchQuery] = useState('')
-  const [vaultHistory, setVaultHistory] = useState<string[]>([])
+  const [workspaceHistory, setVaultHistory] = useState<string[]>([])
 
   // Vault history with on-load existence check.
   useEffect(() => {
     window.api.config
-      .read('app', 'vaultHistory')
+      .read('app', 'workspaceHistory')
       .then(async (history) => {
         if (!Array.isArray(history)) return
         const paths = history as string[]
@@ -71,7 +71,7 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
         const valid = checks.filter((c) => c.exists).map((c) => c.path)
         setVaultHistory(valid)
         if (valid.length !== paths.length) {
-          window.api.config.write('app', 'vaultHistory', valid)
+          window.api.config.write('app', 'workspaceHistory', valid)
         }
       })
       .catch((err) => logError('vault-history', err))
@@ -315,9 +315,9 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
     async (path: string) => {
       const exists = await window.api.app.pathExists(path)
       if (!exists) {
-        const history = (await window.api.config.read('app', 'vaultHistory')) as string[] | null
+        const history = (await window.api.config.read('app', 'workspaceHistory')) as string[] | null
         const updated = (history ?? []).filter((p) => p !== path)
-        await window.api.config.write('app', 'vaultHistory', updated)
+        await window.api.config.write('app', 'workspaceHistory', updated)
         setVaultHistory(updated)
         return
       }
@@ -330,9 +330,9 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
   )
 
   const handleRemoveFromHistory = useCallback(async (pathToRemove: string) => {
-    const history = (await window.api.config.read('app', 'vaultHistory')) as string[] | null
+    const history = (await window.api.config.read('app', 'workspaceHistory')) as string[] | null
     const updated = (history ?? []).filter((p) => p !== pathToRemove)
-    await window.api.config.write('app', 'vaultHistory', updated)
+    await window.api.config.write('app', 'workspaceHistory', updated)
     setVaultHistory(updated)
   }, [])
 
@@ -453,7 +453,7 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
       agentActive={vaultAgentAlive}
       sortMode={sortMode}
       vaultName={vaultName}
-      vaultHistory={vaultHistory}
+      workspaceHistory={workspaceHistory}
       systemArtifacts={systemArtifacts}
       onSearch={setSearchQuery}
       onWorkspaceSelect={setActiveWorkspace}

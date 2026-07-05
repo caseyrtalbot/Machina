@@ -55,7 +55,7 @@ interface SidebarProps {
   canvasConnectionCounts?: ReadonlyMap<string, number>
   sortMode?: SortMode
   vaultName?: string
-  vaultHistory?: readonly string[]
+  workspaceHistory?: readonly string[]
   systemArtifacts?: readonly SystemArtifactListItem[]
   onSearch: (query: string) => void
   onWorkspaceSelect: (workspace: string | null) => void
@@ -97,7 +97,7 @@ const SORT_LABELS: Record<SortMode, string> = {
 function ActionBar({
   sortMode = 'modified',
   vaultName,
-  vaultHistory = [],
+  workspaceHistory = [],
   fileCount = 0,
   filesCollapsed = false,
   onNewFile,
@@ -110,7 +110,7 @@ function ActionBar({
 }: {
   sortMode?: SortMode
   vaultName?: string
-  vaultHistory?: readonly string[]
+  workspaceHistory?: readonly string[]
   fileCount?: number
   filesCollapsed?: boolean
   onNewFile?: () => void
@@ -134,7 +134,7 @@ function ActionBar({
             <VaultSelector
               currentName={vaultName}
               currentPath={useVaultStore.getState().vaultPath}
-              history={vaultHistory}
+              history={workspaceHistory}
               onSelectVault={onSelectVault}
               onOpenPicker={onOpenVaultPicker}
               onRemoveFromHistory={onRemoveFromHistory}
@@ -372,7 +372,7 @@ export function Sidebar({
   agentActive,
   sortMode = 'modified',
   vaultName,
-  vaultHistory,
+  workspaceHistory,
   systemArtifacts,
   onSearch,
   onWorkspaceSelect,
@@ -487,7 +487,7 @@ export function Sidebar({
         <ActionBar
           sortMode={sortMode}
           vaultName={vaultName}
-          vaultHistory={vaultHistory}
+          workspaceHistory={workspaceHistory}
           fileCount={fileCount}
           filesCollapsed={filesCollapsed}
           onNewFile={onNewFile}

@@ -22,11 +22,13 @@ const state = vi.hoisted(() => ({
   },
   rename: vi.fn().mockResolvedValue(undefined),
   documentManager: { rename: vi.fn() },
-  vaultHistory: [] as string[]
+  workspaceHistory: [] as string[]
 }))
 
 vi.mock('../config', () => ({
-  readAppConfigValue: vi.fn((key: string) => (key === 'vaultHistory' ? state.vaultHistory : null))
+  readAppConfigValue: vi.fn((key: string) =>
+    key === 'workspaceHistory' ? state.workspaceHistory : null
+  )
 }))
 
 vi.mock('electron', () => ({
@@ -76,7 +78,7 @@ describe('shell + rename IPC handlers', () => {
 
   beforeEach(async () => {
     state.handlers.clear()
-    state.vaultHistory = []
+    state.workspaceHistory = []
     vi.clearAllMocks()
 
     const base = join(
@@ -116,13 +118,13 @@ describe('shell + rename IPC handlers', () => {
   })
 
   it('shell:show-in-folder allows a recent-vault root from persisted history', async () => {
-    state.vaultHistory = ['/Users/someone/OtherVault']
+    state.workspaceHistory = ['/Users/someone/OtherVault']
     await invoke('shell:show-in-folder', { path: '/Users/someone/OtherVault' })
     expect(state.shell.showItemInFolder).toHaveBeenCalledWith('/Users/someone/OtherVault')
   })
 
   it('shell:show-in-folder still rejects out-of-vault paths not in history', async () => {
-    state.vaultHistory = ['/Users/someone/OtherVault']
+    state.workspaceHistory = ['/Users/someone/OtherVault']
     await expect(invoke('shell:show-in-folder', { path: '/etc' })).rejects.toThrow(PathGuardError)
     expect(state.shell.showItemInFolder).not.toHaveBeenCalled()
   })

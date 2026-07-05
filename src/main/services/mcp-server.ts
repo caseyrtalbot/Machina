@@ -1,10 +1,12 @@
 /**
  * MCP server for Machina.
  *
- * Exposes vault content via nine tools: vault.read_file, search.query,
+ * Exposes workspace content via twelve tools: vault.read_file, search.query,
  * graph.get_neighbors, graph.get_ghosts, project.map_folder, canvas.get_snapshot
  * (reads); vault.write_file, vault.create_file, canvas.apply_plan (writes gated
- * by ElectronHitlGate + WriteRateLimiter).
+ * by ElectronHitlGate + WriteRateLimiter). The three vault.* tools are also
+ * registered under workspace.* aliases (workstation step 1) — same handlers,
+ * with the invoked name flowing into Spotlighting envelopes and gate prompts.
  * Read tools wrap content in Spotlighting trust markers. Write tools
  * require HITL gate approval before execution.
  * Uses stdio transport for Claude Desktop integration.
@@ -73,18 +75,20 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
 
   // -- Read-only tools --
 
-  server.registerTool(
-    'vault.read_file',
-    {
-      description: 'Read a file from the vault. Content is wrapped in trust markers.',
-      inputSchema: { path: z.string().describe('Absolute path to file within vault') }
-    },
-    async ({ path }) => {
-      const content = await facade.readFile(path)
-      const wrapped = wrapSpotlighting('vault.read_file', path, content)
-      return { content: [{ type: 'text' as const, text: wrapped }] }
-    }
-  )
+  for (const toolName of ['vault.read_file', 'workspace.read_file'] as const) {
+    server.registerTool(
+      toolName,
+      {
+        description: 'Read a file from the workspace. Content is wrapped in trust markers.',
+        inputSchema: { path: z.string().describe('Absolute path to file within the workspace') }
+      },
+      async ({ path }) => {
+        const content = await facade.readFile(path)
+        const wrapped = wrapSpotlighting(toolName, path, content)
+        return { content: [{ type: 'text' as const, text: wrapped }] }
+      }
+    )
+  }
 
   server.registerTool(
     'search.query',
@@ -220,99 +224,104 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
   // -- Write tools (require HITL gate) --
 
   if (gate) {
-    server.registerTool(
-      'vault.write_file',
-      {
-        description: 'Write content to an existing file in the vault. Requires HITL approval.',
-        inputSchema: {
-          path: z.string().describe('Absolute path to file within vault'),
-          content: z.string().describe('New file content (with frontmatter)'),
-          expectedMtime: z.string().optional().describe('Expected mtime for optimistic locking')
-        }
-      },
-      async ({ path, content, expectedMtime }) => {
-        // Capture mtime BEFORE the gate so a user edit during the approval wait
-        // is detected as a conflict, even if the agent omitted expectedMtime.
-        // vault.write_file requires the file to already exist; reject otherwise.
-        let preGateMtime: string
-        try {
-          const fileStat = await stat(path)
-          preGateMtime = fileStat.mtime.toISOString()
-        } catch {
+    for (const writeToolName of ['vault.write_file', 'workspace.write_file'] as const) {
+      server.registerTool(
+        writeToolName,
+        {
+          description:
+            'Write content to an existing file in the workspace. Requires HITL approval.',
+          inputSchema: {
+            path: z.string().describe('Absolute path to file within the workspace'),
+            content: z.string().describe('New file content (with frontmatter)'),
+            expectedMtime: z.string().optional().describe('Expected mtime for optimistic locking')
+          }
+        },
+        async ({ path, content, expectedMtime }) => {
+          // Capture mtime BEFORE the gate so a user edit during the approval wait
+          // is detected as a conflict, even if the agent omitted expectedMtime.
+          // write_file requires the file to already exist; reject otherwise.
+          let preGateMtime: string
+          try {
+            const fileStat = await stat(path)
+            preGateMtime = fileStat.mtime.toISOString()
+          } catch {
+            return {
+              content: [{ type: 'text' as const, text: `File not found: ${path}` }],
+              isError: true
+            }
+          }
+
+          const rateExceeded = rateLimiter?.isExceeded() ?? false
+
+          const decision = await gate.confirm({
+            tool: writeToolName,
+            path,
+            description: rateExceeded
+              ? 'Write rate limit exceeded. Confirm to continue.'
+              : `Write to ${path}`,
+            contentPreview: content.slice(0, 200)
+          })
+
+          if (!decision.allowed) {
+            return {
+              content: [{ type: 'text' as const, text: `Denied: ${decision.reason}` }],
+              isError: true
+            }
+          }
+
+          await facade.writeFile(path, content, {
+            agentId: 'mcp-agent',
+            expectedMtime: expectedMtime ?? preGateMtime
+          })
+
+          rateLimiter?.record()
+
           return {
-            content: [{ type: 'text' as const, text: `File not found: ${path}` }],
-            isError: true
+            content: [{ type: 'text' as const, text: `Successfully wrote to ${path}` }]
           }
         }
+      )
+    }
 
-        const rateExceeded = rateLimiter?.isExceeded() ?? false
+    for (const createToolName of ['vault.create_file', 'workspace.create_file'] as const) {
+      server.registerTool(
+        createToolName,
+        {
+          description: 'Create a new file in the workspace. Always requires HITL approval.',
+          inputSchema: {
+            path: z.string().describe('Absolute path for the new file'),
+            content: z.string().describe('File content (must include frontmatter with id:)')
+          }
+        },
+        async ({ path, content }) => {
+          const rateExceeded = rateLimiter?.isExceeded() ?? false
 
-        const decision = await gate.confirm({
-          tool: 'vault.write_file',
-          path,
-          description: rateExceeded
-            ? 'Write rate limit exceeded. Confirm to continue.'
-            : `Write to ${path}`,
-          contentPreview: content.slice(0, 200)
-        })
+          const decision = await gate.confirm({
+            tool: createToolName,
+            path,
+            description: rateExceeded
+              ? 'Write rate limit exceeded. Confirm to continue.'
+              : `Create new file at ${path}`,
+            contentPreview: content.slice(0, 200)
+          })
 
-        if (!decision.allowed) {
+          if (!decision.allowed) {
+            return {
+              content: [{ type: 'text' as const, text: `Denied: ${decision.reason}` }],
+              isError: true
+            }
+          }
+
+          await facade.createFile(path, content, { agentId: 'mcp-agent' })
+
+          rateLimiter?.record()
+
           return {
-            content: [{ type: 'text' as const, text: `Denied: ${decision.reason}` }],
-            isError: true
+            content: [{ type: 'text' as const, text: `Successfully created ${path}` }]
           }
         }
-
-        await facade.writeFile(path, content, {
-          agentId: 'mcp-agent',
-          expectedMtime: expectedMtime ?? preGateMtime
-        })
-
-        rateLimiter?.record()
-
-        return {
-          content: [{ type: 'text' as const, text: `Successfully wrote to ${path}` }]
-        }
-      }
-    )
-
-    server.registerTool(
-      'vault.create_file',
-      {
-        description: 'Create a new file in the vault. Always requires HITL approval.',
-        inputSchema: {
-          path: z.string().describe('Absolute path for the new file'),
-          content: z.string().describe('File content (must include frontmatter with id:)')
-        }
-      },
-      async ({ path, content }) => {
-        const rateExceeded = rateLimiter?.isExceeded() ?? false
-
-        const decision = await gate.confirm({
-          tool: 'vault.create_file',
-          path,
-          description: rateExceeded
-            ? 'Write rate limit exceeded. Confirm to continue.'
-            : `Create new file at ${path}`,
-          contentPreview: content.slice(0, 200)
-        })
-
-        if (!decision.allowed) {
-          return {
-            content: [{ type: 'text' as const, text: `Denied: ${decision.reason}` }],
-            isError: true
-          }
-        }
-
-        await facade.createFile(path, content, { agentId: 'mcp-agent' })
-
-        rateLimiter?.record()
-
-        return {
-          content: [{ type: 'text' as const, text: `Successfully created ${path}` }]
-        }
-      }
-    )
+      )
+    }
 
     server.registerTool(
       'canvas.apply_plan',

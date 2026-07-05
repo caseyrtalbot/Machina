@@ -34,12 +34,13 @@ const MCP_PATH = '/mcp'
 
 /**
  * Tools registered by createMcpServer when a gate is provided (always, via
- * createForVault): 6 reads (vault.read_file, search.query, graph.get_neighbors,
- * graph.get_ghosts, project.map_folder, canvas.get_snapshot) + 3 gated writes
- * (vault.write_file, vault.create_file, canvas.apply_plan). A lifecycle test
- * lists tools over the transport and asserts this count, so it cannot go stale.
+ * createForVault): 7 reads (vault.read_file + its workspace.read_file alias,
+ * search.query, graph.get_neighbors, graph.get_ghosts, project.map_folder,
+ * canvas.get_snapshot) + 5 gated writes (vault.write_file, vault.create_file
+ * + their workspace.* aliases, canvas.apply_plan). A lifecycle test lists
+ * tools over the transport and asserts this count, so it cannot go stale.
  */
-export const MCP_TOOL_COUNT = 9
+export const MCP_TOOL_COUNT = 12
 
 export interface McpStatus {
   readonly running: boolean

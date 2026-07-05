@@ -2,9 +2,9 @@ import { dialog, shell } from 'electron'
 import { FileService } from '../services/file-service'
 import { createVaultIgnoreFilter } from '../services/vault-watcher'
 import { isExternalHttpNavigation } from '../services/external-navigation'
-import { PathGuard } from '../services/path-guard'
+import { getWorkspaceService } from '../services/workspace-service'
 import { getDocumentManager } from './documents'
-import { teConfigPath, teStatePath, assertWithinVault, canonicalizePath } from '../utils/paths'
+import { teConfigPath, teStatePath, assertWithinVault } from '../utils/paths'
 import { getIgnorePatterns } from '../utils/vault-config'
 import { TE_DIR } from '@shared/constants'
 import { typedHandle } from '../typed-ipc'
@@ -13,38 +13,17 @@ import type { VaultConfig, VaultState } from '../../shared/types'
 const fileService = new FileService()
 
 /**
- * Active vault PathGuard instance. Set when vault:init is called
- * (the first lifecycle event for any vault). Used by fs:* handlers
- * that enforce vault-scoped access.
- */
-let activePathGuard: PathGuard | null = null
-
-/** Canonicalized root of the active vault (set alongside activePathGuard). */
-let activeVaultRoot: string | null = null
-
-/** Callback invoked after vault:init completes. Set via onVaultReady(). */
-let vaultReadyCallback: ((vaultPath: string) => Promise<void> | void) | null = null
-
-/** Register a callback to fire when a vault is initialized. */
-export function onVaultReady(cb: (vaultPath: string) => Promise<void> | void): void {
-  vaultReadyCallback = cb
-}
-
-/** Update the active PathGuard when the vault root changes. */
-function setActiveVault(vaultPath: string): void {
-  activePathGuard = new PathGuard(vaultPath)
-  activeVaultRoot = canonicalizePath(vaultPath)
-}
-
-/**
- * Assert that the active PathGuard exists and the path is within the vault.
- * Throws if no vault is initialized or the path escapes the vault boundary.
+ * Assert that a workspace is open and the path is within its root.
+ * Throws if no workspace is open or the path escapes the boundary.
+ * The error message keeps the legacy vault:init wording — callers and
+ * tests match on it.
  */
 function guardPath(path: string, channel: string): string {
-  if (!activePathGuard) {
+  const ws = getWorkspaceService()
+  if (!ws.current()) {
     throw new Error(`${channel} called before vault:init`)
   }
-  return activePathGuard.assertWithinVault(path)
+  return ws.guard().assertWithinVault(path)
 }
 
 export function registerFilesystemIpc(): void {
@@ -108,14 +87,15 @@ export function registerFilesystemIpc(): void {
   })
 
   typedHandle('vault:import-asset', async (args) => {
-    if (!activePathGuard || !activeVaultRoot) {
+    const ws = getWorkspaceService().current()
+    if (!ws) {
       throw new Error('vault:import-asset called before vault:init')
     }
     // The one sanctioned outside-vault read: copying user-dropped media INTO
     // the vault so every later read passes PathGuard. Sources already inside
     // the vault are referenced in place without copying.
     const { importAssetIntoVault } = await import('../utils/asset-import')
-    const path = await importAssetIntoVault(args.sourcePath, activeVaultRoot, activePathGuard)
+    const path = await importAssetIntoVault(args.sourcePath, ws.root, getWorkspaceService().guard())
     return { path }
   })
 
@@ -180,18 +160,11 @@ export function registerFilesystemIpc(): void {
   // --- Vault data ---
 
   typedHandle('vault:init', async (args) => {
-    // Canonicalize once (symlinks resolved, NFC) and return the result so
-    // PathGuard, the watcher root, the vault index, and the renderer all share
-    // one path namespace. Otherwise on symlinked vault paths agent writes
-    // index under the canonical path while the watcher echo refreshes the
-    // raw-path entry, leaving duplicate notes in MCP search/graph.
-    const vaultPath = canonicalizePath(args.vaultPath)
-    setActiveVault(vaultPath)
-    await fileService.initVault(vaultPath)
-    // Await so index/MCP/health wiring completes before vault:init resolves and
-    // any rejection propagates to the renderer instead of going unhandled.
-    await vaultReadyCallback?.(vaultPath)
-    return vaultPath
+    // Legacy alias for workspace:open (kept for one release, contracts §1).
+    // WorkspaceService canonicalizes, guards, scaffolds, and awaits ready
+    // callbacks so any rejection propagates to the renderer.
+    const ws = await getWorkspaceService().open(args.vaultPath)
+    return ws.root
   })
 
   typedHandle('vault:read-config', async (args) => {
@@ -235,9 +208,9 @@ export function registerFilesystemIpc(): void {
     } catch (err) {
       // Recent-vault roots (VaultSelector "Reveal in Finder") are outside the
       // active vault by definition. Allow exact matches against the persisted
-      // vault history; everything else stays guarded.
+      // workspace history; everything else stays guarded.
       const { readAppConfigValue } = await import('./config')
-      const history = readAppConfigValue<readonly string[]>('vaultHistory') ?? []
+      const history = readAppConfigValue<readonly string[]>('workspaceHistory') ?? []
       if (!history.includes(args.path)) throw err
       shell.showItemInFolder(args.path)
     }

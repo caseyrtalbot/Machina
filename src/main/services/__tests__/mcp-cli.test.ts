@@ -91,13 +91,14 @@ describe('MCP CLI server (standalone)', () => {
     return { server, client, deps }
   }
 
-  it('indexes vault files and creates a server with 4 read-only tools', async () => {
+  it('indexes vault files and creates a server with 7 read-only tools', async () => {
     const { server, client, deps } = await createCliServer()
 
     // Should have indexed both files
     expect(deps.vaultIndex.getArtifacts().length).toBe(2)
 
-    // Should only expose read tools (no gate = no write tools) + read-only new tools
+    // Should only expose read tools (no gate = no write tools), including the
+    // workspace.read_file alias (workstation step 1)
     const tools = await client.listTools()
     const toolNames = tools.tools.map((t) => t.name).sort()
     expect(toolNames).toEqual([
@@ -106,7 +107,8 @@ describe('MCP CLI server (standalone)', () => {
       'graph.get_neighbors',
       'project.map_folder',
       'search.query',
-      'vault.read_file'
+      'vault.read_file',
+      'workspace.read_file'
     ])
 
     await client.close()

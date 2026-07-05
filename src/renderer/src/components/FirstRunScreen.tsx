@@ -7,21 +7,23 @@ export type SavedVaultCheck =
   | { readonly kind: 'first-run'; readonly missingPath: string | null }
 
 /**
- * Resolve what to do with the persisted lastVaultPath at boot.
+ * Resolve what to do with the persisted lastWorkspacePath at boot (main
+ * falls back to the legacy vault-path key while the new key is absent).
  *
- * A vault that no longer exists on disk is NOT recreated: the stale config
- * entry is cleared and first-run shows a "not found" notice instead of
- * mkdir-ing a ghost vault via vault:init.
+ * A workspace that no longer exists on disk is NOT recreated: the stale
+ * config entry is cleared (a stored null must not resurrect the legacy key)
+ * and first-run shows a "not found" notice instead of mkdir-ing a ghost
+ * workspace via workspace:open.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export async function checkSavedVault(): Promise<SavedVaultCheck> {
-  const saved = await window.api.config.read('app', 'lastVaultPath')
+  const saved = await window.api.config.read('app', 'lastWorkspacePath')
   if (typeof saved !== 'string' || !saved) {
     return { kind: 'first-run', missingPath: null }
   }
   const exists = await window.api.app.pathExists(saved)
   if (exists) return { kind: 'load', path: saved }
-  await window.api.config.write('app', 'lastVaultPath', null)
+  await window.api.config.write('app', 'lastWorkspacePath', null)
   return { kind: 'first-run', missingPath: saved }
 }
 
@@ -41,7 +43,7 @@ export function FirstRunScreen({ notice, onOpenFolder, onOpenPath }: FirstRunScr
 
   useEffect(() => {
     window.api.config
-      .read('app', 'vaultHistory')
+      .read('app', 'workspaceHistory')
       .then((h) => {
         if (Array.isArray(h)) {
           setHistory(h.filter((p): p is string => typeof p === 'string'))

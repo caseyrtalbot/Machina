@@ -29,6 +29,16 @@ export interface IpcChannels {
     response: Array<{ path: string; content: string | null; error?: string }>
   }
 
+  // --- Workspace (workstation contracts §1/§6) ---
+  'workspace:open': {
+    request: { path: string }
+    response: import('./workspace-types').Workspace
+  }
+  'workspace:current': {
+    request: void
+    response: import('./workspace-types').Workspace | null
+  }
+
   // --- Vault ---
   'vault:read-config': { request: { vaultPath: string }; response: VaultConfig }
   'vault:read-state': { request: { vaultPath: string }; response: VaultState }
@@ -268,6 +278,9 @@ export interface IpcChannels {
       threadId: string
       identity: import('./agent-identity').AgentIdentity
       text: string
+      // Per-turn cwd from the renderer (workstation step 1): the renderer
+      // already holds the workspace root; main no longer reads it from config.
+      cwd: string
     }
     response: { ok: boolean }
   }
