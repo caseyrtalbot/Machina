@@ -19,10 +19,14 @@ Cross-step rules:
 - Dev-app smoke checks are Claude-driven (Casey is not handed DevTools steps); Electron
   visual verification is by Casey observing — no programmatic Electron screenshots.
 
-## Step 1 — Workspace generalization
+## Step 1 — Workspace generalization — **DONE** (`76d0699`, 2026-07-05)
 
 Replace the vault singleton with `WorkspaceService`; open any folder; per-turn cwd from
-the renderer; MCP aliases. No dependency on later steps.
+the renderer; MCP aliases. No dependency on later steps. Shipped as specced with two
+additions recorded in HANDOFF.md: the stale e2e suite was repaired to the current UI
+(one `test.fixme` against the known-open titlebar drag issue), and no
+`getActiveVaultRoot()` bridge exists — later steps resolve root via
+`getWorkspaceService().current()`.
 
 **New files:** `src/shared/workspace-types.ts` (WorkspaceId brand + constructor,
 Workspace, WorkspaceCapability); `src/main/services/workspace-service.ts` — pure

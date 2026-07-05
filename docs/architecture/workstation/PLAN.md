@@ -78,7 +78,7 @@ Deliverables shipped: `00-seam-audit.md` (work orders with file:line evidence),
 `01-interface-contracts.md` (workspace service, git service, session/adapter/projection
 types, gate-parity mechanism, harness schema, reserved IPC channels).
 
-### Phase 1 — Tracer bullet (the daily-driver seed)
+### Phase 1 — Tracer bullet (the daily-driver seed) — step 1 DONE (`76d0699`)
 
 Canonical order (v1.1, reordered after the 11-agent adversarial pass — gate parity
 consumes GitService, so the substrate lands first; the snapshot stays wired until the
