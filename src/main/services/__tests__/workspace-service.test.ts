@@ -136,4 +136,44 @@ describe('WorkspaceService.open', () => {
     })
     await expect(service.open(root)).rejects.toThrow('wiring failed')
   })
+
+  it('serializes concurrent open() calls — no interleaving, last caller wins', async () => {
+    const rootA = join(root, 'a')
+    const rootB = join(root, 'b')
+    mkdirSync(rootA, { recursive: true })
+    mkdirSync(rootB, { recursive: true })
+
+    const service = new WorkspaceService()
+    const events: string[] = []
+    service.onReady(async (ws) => {
+      const name = ws.root.endsWith('/a') ? 'a' : 'b'
+      events.push(`start:${name}`)
+      // Yield long enough that an unserialized second open would interleave.
+      await new Promise((r) => setTimeout(r, 30))
+      events.push(`end:${name}`)
+    })
+
+    const [wsA, wsB] = await Promise.all([service.open(rootA), service.open(rootB)])
+
+    expect(events).toEqual(['start:a', 'end:a', 'start:b', 'end:b'])
+    expect(wsA.root.endsWith('/a')).toBe(true)
+    expect(wsB.root.endsWith('/b')).toBe(true)
+    expect(service.current()?.root).toBe(wsB.root)
+    expect(service.guard().assertWithinVault(join(wsB.root, 'x.md'))).toBe(join(wsB.root, 'x.md'))
+  })
+
+  it('a failed open() does not poison the chain for the next call', async () => {
+    const service = new WorkspaceService()
+    let failFirst = true
+    service.onReady(() => {
+      if (failFirst) {
+        failFirst = false
+        throw new Error('wiring failed')
+      }
+    })
+
+    await expect(service.open(root)).rejects.toThrow('wiring failed')
+    const ws = await service.open(root)
+    expect(service.current()).toEqual(ws)
+  })
 })

@@ -131,6 +131,20 @@ pattern, `ShellService.create` already takes per-session cwd, `ThreadStorage` al
 takes its root, `commitPreAgentSnapshot` already wired at CLI spawn. The full reuse map
 with import-graph evidence is in 00-seam-audit.md §1.
 
+## Known follow-ups from the step 1 review (dual review: Claude adversarial + Codex cold-read)
+
+- **FilesDockAdapter vault switching bypasses `workspace.open()`** (pre-existing, NOT
+  introduced by step 1): `handleOpenVaultPicker` / `handleSelectVault`
+  (`FilesDockAdapter.tsx` ~305–330) call `vault.watchStop()/watchStart()` and
+  `setVaultPath()` directly, so PathGuard, MCP, index, and health stay bound to the OLD
+  root while the renderer (and therefore the CLI agent's per-turn cwd) follows the new
+  one — a split-brain switch. Fix by routing those handlers through `workspace.open()`.
+  Natural home: step 4 (dock shell touches this surface) or a standalone small fix
+  before it.
+- `WorkspaceService.open()` re-entrancy was flagged in the same review and is FIXED on
+  main (serialized open chain, last caller wins; regression tests in the
+  workspace-service suite). No action needed — noted so nobody re-litigates it.
+
 ## Open items deliberately left for later phases
 
 Adapter registry + session-types (Phase 2), loop scheduler (Phase 3), LSP + git map

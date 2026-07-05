@@ -88,11 +88,26 @@ export class WorkspaceService {
   private activeWorkspace: Workspace | null = null
   private activeGuard: PathGuard | null = null
   private readonly readyCallbacks: Array<(ws: Workspace) => void | Promise<void>> = []
+  /** Serializes open() calls — see the re-entrancy note on open(). */
+  private openChain: Promise<unknown> = Promise.resolve()
 
   constructor(private readonly fileService: FileService = new FileService()) {}
 
-  /** Canonicalize, detect capabilities, build PathGuard, scaffold, fire ready callbacks. */
+  /**
+   * Canonicalize, detect capabilities, build PathGuard, scaffold, fire ready
+   * callbacks. Calls are serialized in arrival order: ready callbacks
+   * reconfigure shared process state (index, MCP lifecycle, health, agents),
+   * so two interleaved opens could leave services split across roots, with
+   * the slower open overwriting the newer one. The last CALLER wins, not the
+   * last finisher. A failed open does not poison the chain.
+   */
   async open(path: string): Promise<Workspace> {
+    const run = this.openChain.then(() => this.doOpen(path))
+    this.openChain = run.catch(() => undefined)
+    return run
+  }
+
+  private async doOpen(path: string): Promise<Workspace> {
     const root = canonicalizePath(path)
     // Detect BEFORE scaffold: initVault creates TE_DIR unconditionally, and
     // detection must never key on TE_DIR contents (a once-opened coding repo
