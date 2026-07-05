@@ -34,9 +34,10 @@ The single-vault assumption is smaller than expected — one module-level single
 config key:
 
 **The singleton.** `src/main/ipc/filesystem.ts:34-36` — `setActiveVault(vaultPath)` builds a
-module-level `activePathGuard` + `activeVaultRoot` on `vault:load`
-(`filesystem.ts:188-194`), with an `onVaultReady` callback hook (`filesystem.ts:26-29`).
-This is the object the Workspace service replaces.
+module-level `activePathGuard` + `activeVaultRoot` in the `vault:init` handler
+(`filesystem.ts:182-194`; an earlier draft said `vault:load` — no such channel exists),
+with an `onVaultReady` callback hook (`filesystem.ts:26-29`). This is the object the
+Workspace service replaces.
 
 **`lastVaultPath` production reads/writes (3 sites + tests):**
 
@@ -44,6 +45,12 @@ This is the object the Workspace service replaces.
 - `src/renderer/src/App.tsx:198` — persisted on every vault load
 - `src/renderer/src/components/FirstRunScreen.tsx:18,24` — boot resolution / clear
 - `src/renderer/src/components/__tests__/FirstRunScreen.test.tsx` — test stubs
+- `e2e/app.spec.ts:29,117` — Playwright seeds/clears the key; a rename sweep that skips
+  these breaks the e2e suite
+
+The sibling key `vaultHistory` migrates too: it is load-bearing in main
+(`shell:show-in-folder` uses it as a PathGuard bypass allowlist, `filesystem.ts:240`) and
+drives the recent-vaults UI (App.tsx, FirstRunScreen, FilesDockAdapter, Sidebar).
 
 **PathGuard call sites (rename `resolveInVault` → workspace-rooted; behavior unchanged):**
 `src/main/ipc/filesystem.ts`, `src/main/ipc/ghost-emerge.ts`, `src/main/mcp-cli.ts`,
@@ -112,13 +119,21 @@ re-attach window. Tracked as a Phase 1 step-3 acceptance item.
 
 ## 5. Coordination with the production-grade plan
 
-`docs/refactor/production-grade-plan.md` (Wave 1 ground rule) gives item 1.9 exclusive
-ownership of `src/shared/ipc-channels.ts`, `src/preload/index.ts`, and
-`src/main/index.ts`, and forbids other Wave 1 items from adding IPC channels. The
-workstation track adds channels (contracts §5) — sequence any Phase 1 implementation that
-touches those three files after Wave 1 item 1.9 lands, or rebase over it. Item 1.1's
-PathGuard hardening of `shell:*`/`fs:*` handlers overlaps §2 above and should land first;
-the workspace rename then picks it up wholesale.
+**Resolved (2026-07-05 adversarial pass): the item-1.9 sequencing constraint is moot.**
+Item 1.9 landed as commit `4c126f2` (verified ancestor of the audited HEAD `7735644`), and
+all of Wave 1 (1.1–1.11) plus several Wave 2 items are on main. Item 1.1's PathGuard
+hardening of `shell:*`/`fs:*` handlers is therefore already in the tree the workspace
+rename inherits. The only remaining coordination risk is in-flight Wave 2/3 branches
+touching `ipc-channels.ts` / `preload/index.ts` / `main/index.ts` — ordinary rebase
+awareness, no serialization needed.
 
 Lessons log location: this track uses the existing `docs/refactor/` convention (the plan
 draft said `docs/refactor-log/`; that directory does not exist — reconciled here).
+
+## 6. Corrections log
+
+- 2026-07-05: `vault:load` → `vault:init` (§2); `lastVaultPath` e2e sites and
+  `vaultHistory` added to the work order (§2); §5 rewritten — item 1.9 verified landed.
+  Source: 4-lens adversarial verification (52 claims examined; all §1/§3/§4 citations
+  confirmed exact). Also noted: `vault-git.ts:28`'s own doc comment says
+  `.te/no-auto-commit` — stale source comment; the real flag is `<TE_DIR>/no-auto-commit`.

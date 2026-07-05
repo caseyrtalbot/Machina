@@ -39,14 +39,24 @@ export interface WorkspaceService {
 ```
 
 Capability detection (pure, unit-testable): `knowledge` when the root contains any `.md`
-outside `.machina/` or an existing `.machina/` vault config; `coding` when the root
-contains `.git/` or a recognized manifest (`package.json`, `Cargo.toml`, `pyproject.toml`,
-`go.mod`). Both may be true; the knowledge capability toggle (Q5/Q13) reads this.
+outside `<TE_DIR>/`; `coding` when the root contains `.git/` or a recognized manifest
+(`package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`); empty-evidence default =
+`['knowledge']` (preserves first-run UX). **v1.1 correction:** the original "existing
+`.machina/` config ⇒ knowledge" clause is dropped — `open()` scaffolds TE_DIR
+unconditionally (the renderer load path hard-requires it), which made that clause
+self-fulfilling: every once-opened coding repo would reclassify as knowledge on reopen.
+Detection therefore runs **before** scaffold and never keys on TE_DIR contents. Both
+capabilities may be true; the knowledge toggle (Q5/Q13) reads this. Revisit conditional
+scaffolding when the renderer becomes capability-aware.
 
 Migration: `vault:init` delegates to `WorkspaceService.open` and stays as an alias for one
-release; `lastVaultPath` config key is renamed `lastWorkspacePath` with a one-time read
-fallback (3 production sites, audit §2). PathGuard's API is untouched — only its
-construction moves.
+release; config keys `lastVaultPath` → `lastWorkspacePath` **and `vaultHistory` →
+`workspaceHistory`** (the history key is load-bearing: PathGuard bypass allowlist +
+recent-vaults UI) with an absent-only read fallback — a stored `null` must NOT resurrect
+the legacy value. PathGuard's API is untouched — only its construction moves. Naming note:
+the renderer already uses "workspace" for the vault folder *filter*
+(`vault-store.activeWorkspace`) — no compile collision, but the filter concept should be
+renamed in a later cleanup; recorded so the overload is a decision, not an accident.
 
 ## 2. Git service (main process)
 
@@ -55,30 +65,51 @@ construction moves.
 service boundary, `.machina/no-auto-commit` opt-out respected.
 
 ```ts
-// src/main/services/git-service.ts
+// src/shared/git-types.ts (types shared with the renderer; service impl in main)
 export interface CommitApprovedOpts {
-  readonly agentId: string // harness slug, or adapter id for ad-hoc threads
+  readonly agentId: string // harness slug, or adapter id for ad-hoc threads; SAFE_ID_RE-validated
   readonly threadId: string
-  readonly paths: readonly string[] // staged exactly; never `git add -A`
-  readonly message: string // first line; trailers appended by the service
+  readonly paths: readonly string[] // staged exactly via `git add -- <paths>`; never `add -A`
+  readonly message: string // first line only; trailers appended by the service
 }
 
 export type GitOpResult =
   | { readonly ok: true; readonly sha?: string }
   | { readonly ok: false; readonly reason: string }
 
+export type GitFileState = 'modified' | 'added' | 'deleted' | 'renamed'
+export interface GitStatusEntry { readonly path: string; readonly state: GitFileState; readonly origPath?: string }
+/** isRepo lets the renderer surface "non-repo = no rollback protection" honestly. */
+export interface GitStatusResult { readonly isRepo: boolean; readonly entries: readonly GitStatusEntry[] }
+
+// src/main/services/git-service.ts (vault-git.ts grown via git mv, history preserved)
 export interface GitService {
   isRepo(root: string): boolean
-  status(root: string): readonly { path: string; state: 'modified' | 'added' | 'deleted' }[]
-  /** Unified diff for the given paths against HEAD (unstaged included). */
+  headSha(root: string): string | null
+  status(root: string): readonly GitStatusEntry[] // porcelain v1 -z; '??' → added
+  /**
+   * Review diff: tracked paths via `git diff HEAD`; untracked/new paths synthesized via
+   * `git diff --no-index /dev/null <path>` so agent-CREATED files never review blind.
+   */
   diff(root: string, paths?: readonly string[]): string
   commitApproved(root: string, opts: CommitApprovedOpts): GitOpResult
-  /** Revert every commit carrying the trailer, newest first, as one revert commit. */
+  /**
+   * Enumerate commits via `git log --format=%(trailers:key=Machina-Agent,valueonly)` with
+   * EXACT value match in JS (no --grep injection/prefix collisions); one revert commit
+   * carrying Machina-Reverts (never Machina-Agent, so reverts are not re-enumerated).
+   */
   revertAgent(root: string, agentId: string): GitOpResult
-  /** Restore paths to HEAD (reject flow). Tracked files only; new files are deleted. */
-  discard(root: string, paths: readonly string[]): GitOpResult
+  /** Reject flow. Tracked → `git restore --source=HEAD`; untracked → trash (recoverable), not rm. */
+  discard(root: string, paths: readonly string[]): Promise<GitOpResult>
 }
 ```
+
+Guards, all structured-error not throw: `SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/`
+on agentId/threadId (blocks trailer forgery/format injection); paths must be relative,
+non-`-`-leading, and resolve inside root; a message first-line starting with `Machina-` is
+neutralized. `.machina/no-auto-commit` (TE_DIR-resolved) gates **automatic** commits only
+(`commitPreAgentSnapshot`); commitApproved/revertAgent/discard are explicit user actions
+and proceed regardless.
 
 **Attribution is by commit trailers, not refs** — this is what the plan's "tagged commits"
 resolves to:
@@ -90,12 +121,13 @@ Machina-Agent: test-fixer
 Machina-Session: th_9f2c41aa
 ```
 
-Trailers survive rebase, `git log --grep='^Machina-Agent: test-fixer'` enumerates one
-agent's commits for `revertAgent`, and the tag/branch namespaces stay clean.
-`commitPreAgentSnapshot` (vault-git.ts:32) is unchanged and remains wired at spawn until
-Phase 1 step 5 retires it. Interim hardening (cheap, before step 4): also call it per turn
-in `CliThreadSpawner.sendUserMessage` to close the PTY-lifetime granularity gap found in
-audit §3.
+Trailers survive rebase, trailer enumeration finds one agent's commits for `revertAgent`,
+and the tag/branch namespaces stay clean. Trailer attribution is review bookkeeping, **not
+tamper-proof**: the CLI child is a full shell and can forge, strip, or self-commit — see
+§4's security-boundary statement. `commitPreAgentSnapshot` (vault-git.ts:32) is unchanged
+and remains wired at spawn until Phase 1 step 5 retires it. Interim hardening: also call
+it per turn in `CliThreadSpawner.input()` — **not** `sendUserMessage`, which has no cwd
+(adversarial correction) — to close the PTY-lifetime granularity gap found in audit §3.
 
 ## 3. Session, adapter, projection (shared types)
 
@@ -121,10 +153,12 @@ export interface AgentAdapter {
 }
 ```
 
-The adapter registry is a `Record<AdapterId, AgentAdapter>` in main; the existing
-`formatCliInvocation` switch and the `cli-agent-thread-bridge` parser move behind it with
-behavior identical for the three known CLIs. `CLI_AGENT_IDENTITIES` maps 1:1 onto
-`AdapterId` minus `raw`.
+**Phase scope (adversarial pass):** the adapter registry and `session-types.ts` are
+**Phase 2**; Phase 1 keeps the `formatCliInvocation` switch as-is. The types above are the
+target shape, not Phase 1 work. (Nuance recorded: gemini does have a heuristic parser
+today — `geminiToolCallParser`, `cli-agent-parsers.ts` — but the bridge treats it as
+non-structured; "absent parser = raw projection" describes the bridge contract, not the
+file.) `CLI_AGENT_IDENTITIES` maps 1:1 onto `AdapterId` minus `raw`.
 
 **Projection** is not a new subsystem — it names the existing seam:
 
@@ -140,50 +174,91 @@ Migration = `session-router.unregister` → new surface mounts → `terminal:rec
 webContentsId. All three pieces exist (audit §4); Phase 1 only adds the renderer
 affordance.
 
-## 4. Gate parity for CLI agents (the load-bearing contract)
+## 4. Gate parity for CLI agents (the load-bearing contract) — v1.1, post adversarial pass
 
 CLI children write to disk directly (audit §3); in-process interception is impossible.
-Parity is **post-hoc, before persistence is blessed**:
+The gate is **post-persistence containment**: the write is live on disk (and visible to
+open editors via the vault watcher) the moment the agent makes it. What the queue governs
+is whether the write gets *blessed into history* (commit with trailers) or *reverted*.
+Queue UI copy must say exactly this and never claim writes are blocked.
+
+**This is not a security boundary.** The CLI child is a full shell at the user's
+permission level: it can self-commit, `git reset --hard`, forge or strip trailers, chmod
+files, or edit `.gitignore`. Phase 1 delivers accident containment + visibility; a
+`headMoved` tripwire (HEAD captured at turn start vs turn end) detects crude history
+rewrites and surfaces a banner + audit entry. Adapter-native permission hooks (Claude Code
+`--permission-prompt-tool` routed into `HitlGate`) are the Phase 2+ enforcement path.
 
 ```
-CLI turn in flight (bridge knows in-flight per thread)
-  → AgentWriteWatcher attributes workspace-root fs events to that thread
-  → PendingChange { threadId, agentId, paths, diff (GitService.diff) }
-  → approval queue (renderer)
+CLI turn window (CliTurnRegistry — NEW primitive; the bridge tracks nothing per-thread)
+  → AgentWriteWatcher attributes workspace-root fs events to the open turn
+  → PendingChange (one per turn, coalesced; diff snapshot via GitService.diff)
+  → approval queue (renderer tray)
       approve → GitService.commitApproved (trailers) → AuditLogger entry
+                (non-repo: acknowledge + audit only — no commit possible)
       reject  → GitService.discard(paths)            → AuditLogger entry
+                (non-repo: disabled, item flagged "no rollback")
 ```
 
 ```ts
-// src/main/services/agent-write-watcher.ts
+// src/shared/git-types.ts
+export interface PendingChangeFlags {
+  readonly highVelocity: boolean //  WriteRateLimiter per thread
+  readonly headMoved: boolean //     agent ran git itself during the turn
+  readonly concurrentTurns: boolean // >1 turn window matched — ambiguous attribution
+  readonly degradedAttribution: boolean // shell hooks absent; PTY-alive fallback window
+  readonly forbidden: boolean //     touched a HARNESS_PROTECTED_GLOBS path
+}
 export interface PendingChange {
-  readonly id: string
+  readonly id: string // one per turn: pc_<turnId>, updated as writes land
+  readonly kind: 'cli-change' | 'gate-confirm'
   readonly threadId: string
   readonly agentId: string
   readonly paths: readonly string[]
+  readonly diff: string // snapshot at capture — the review artifact and stale-check baseline
   readonly capturedAt: string
+  readonly revertible: boolean // false in non-repo workspaces
+  readonly flags: PendingChangeFlags
+  readonly description?: string
 }
 ```
 
-Contract points:
+Contract points (each traceable to a verified finding):
 
-- **Attribution window**: fs events are attributed to a thread only while its invocation is
-  in flight (`CliAgentThreadBridge` already tracks this per thread). Concurrent user edits
-  during an agent turn are a known ambiguity — the diff review surface shows them and the
-  human decides; no heuristics.
-- **Watcher reuse**: same chokidar + batching pattern as `vault-watcher.ts`; ignores
-  `.git/` and honors `gitignore-filter.ts`.
+- **Attribution = CliTurnRegistry**, a new main-process primitive (the earlier claim that
+  `CliAgentThreadBridge` "already tracks this" was wrong — it holds no per-thread in-flight
+  state; the renderer's flag is out of main's reach). Turn start = spawner sends the
+  invocation; turn end = bridge block-completion callback, **plus a 1500ms linger** to
+  cover the watcher's `awaitWriteFinish` 300ms + batch lag (writes in the last moments of
+  a turn must not escape). **Degraded mode**: when shell hooks never emit block events
+  (they require installed hooks), the window falls back to PTY-alive attribution with the
+  `degradedAttribution` flag — silently attributing zero writes is the failure mode.
+- **TOCTOU guard**: `resolve()` recomputes the diff; a mismatch with the reviewed snapshot
+  returns `stale-diff`, refreshes the item, and forces re-review. Narrowed, not closed
+  (recompute→commit is not atomic) — residual risk documented.
+- **Watcher policy — its OWN ignore set, explicitly NOT vault-watcher's**
+  (`DEFAULT_IGNORE_PATTERNS` ignores TE_DIR and every dotpath, which would blind the
+  `verify.sh` auto-reject and all dotfile writes). Excluded: `.git`, `node_modules`,
+  `dist/build/out`, and the app's own churn (`<TE_DIR>/state.json`, `threads/`,
+  `artifacts/`, `embeddings/`). Watched: everything else **including dotfiles, `.env`,
+  `.gitignore` itself, and `<TE_DIR>/agents/**`**. `.gitignore` is NOT honored — an agent
+  write to an ignored `.env` must not be invisible (git can't diff/commit it, but the
+  queue shows it). Self-writes suppressed via a `DocumentManager.hasPendingWrite` seam so
+  user autosaves during a turn aren't misattributed (timing race accepted + documented).
+- **Non-repo workspaces** (codex spawns with `--skip-git-repo-check`): the gate is
+  visibility + audit only — approve acknowledges, reject is disabled, item carries the
+  "no rollback" flag. Never render the queue as protection there.
+- **Unattributed writes** (outside any turn window) are not queued; they get an audit
+  entry (`cli-agent:unattributed-write`) so escapes are logged, not silent.
 - **Gate reuse**: the queue is a `HitlGate` implementation (`QueueHitlGate implements
-  HitlGate`, `hitl-gate.ts:22`), so the native agent and MCP writes can converge on the
-  same queue UI later without a second approval model. `WriteRateLimiter` runs per thread
-  to flag high-velocity turns in the queue exactly as it flags MCP writes today.
-- **Scope limits, stated honestly**: post-hoc watching sees only the workspace root.
-  Out-of-root writes by a CLI child are invisible to Machina and remain at the user's OS
-  trust level — unchanged from today, documented in the queue UI. Adapter-native hooks
-  (Claude Code `--permission-prompt-tool` routed into `HitlGate`) are the Phase 2+ upgrade
-  that closes this per adapter.
-- **Never-regress rule**: `commitPreAgentSnapshot` stays wired until approve/reject +
-  `revertAgent` are proven on a real repo (Phase 1 step 5 exit evidence).
+  HitlGate`, `hitl-gate.ts:22`), so native-agent and MCP writes can converge on the same
+  queue UI later. `WriteRateLimiter` runs per thread → `highVelocity` flag.
+- **Scope limits, stated honestly**: watching sees only the workspace root; out-of-root
+  writes and the excluded TE_DIR app-state subpaths remain at the user's OS trust level —
+  unchanged from today, documented in the queue UI footer.
+- **Never-regress rule**: `commitPreAgentSnapshot` stays wired (spawn + per-turn) until
+  approve/reject + `revertAgent` are proven on a real repo against the step 5 evidence
+  checklist. No window where neither mechanism covers rollback.
 
 ## 5. Agent harness folder (on-disk schema)
 
@@ -208,10 +283,21 @@ budgets: { maxTurns: 10, maxWritesPerMinute: 10 }
 ```
 
 `scope.json`: `{ goal, allowedGlobs, forbiddenGlobs, acceptance, rollback }` — the
-curriculum 14.36 shape. `forbiddenGlobs` always contains `.machina/agents/*/verify.sh` and
-`.machina/agents/*/rules.md`; the harness generator refuses to emit a contract without
-them, and `AgentWriteWatcher` auto-rejects (and audits) any pending change touching
-`verify.sh` regardless of contract.
+curriculum 14.36 shape. `forbiddenGlobs` always contains `HARNESS_PROTECTED_GLOBS`
+(verify.sh + rules.md under **both** `.machina/` and `.machina-dev/` — TE_DIR flips per
+runtime, the on-disk contract must not); the harness generator refuses to emit a contract
+without them, and `AgentWriteWatcher` auto-rejects (and audits) any pending change touching
+`verify.sh` regardless of contract — reachable only because §4's watcher explicitly
+include-lists `<TE_DIR>/agents/**`. `verify.sh` also ships mode `0o555` (defense-in-depth,
+not a boundary — a same-user shell can chmod it back).
+
+**Corrections (adversarial pass):** the "indexed by knowledge capability, zero extra
+wiring" claim was false — vault-watcher ignores the whole TE_DIR subtree, so `state.md`
+never reaches the index. Phase 1 repo memory is **prompt-composition only** (state.md is
+read and injected into the agent prompt); indexing is deferred, with un-ignoring the
+agents subtree as the future path. `scope.json` is advisory in Phase 1: nothing on the CLI
+write path enforces globs — the watcher's auto-reject and the queue are the only teeth,
+and UI copy must not imply more.
 
 ## 6. IPC channels (names reserved; registration follows the 4-step pattern)
 
@@ -220,32 +306,53 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 ```ts
 'workspace:open':        { request: { path: string }; response: Workspace }
 'workspace:current':     { request: void; response: Workspace | null }
-'git:status':            { request: void; response: GitStatusEntry[] }
+'git:status':            { request: void; response: GitStatusResult } // { isRepo, entries } — renderer must see non-repo
 'git:diff':              { request: { paths?: string[] }; response: string }
 'git:commit-approved':   { request: CommitApprovedOpts; response: GitOpResult }
 'git:revert-agent':      { request: { agentId: string }; response: GitOpResult }
-'harness:create':        { request: { template: string; slug: string }; response: { root: string } }
+'fs:select-file':        { request: void; response: string | null } // editor-center open, guard-checked
+'harness:create':        { request: { template: string; slug: string }
+                           response: { ok: true; root: string } | { ok: false; error: string } } // Result-style: duplicate/invalid slug are expected failures
 'harness:list':          { request: void; response: HarnessSummary[] }
 'approvals:list':        { request: void; response: PendingChange[] }
-'approvals:resolve':     { request: { id: string; approve: boolean }; response: GitOpResult }
+'approvals:resolve':     { request: { id: string; approve: boolean; message?: string }; response: GitOpResult }
 // IpcEvents
 'approvals:changed':     { pending: number }
 ```
 
-Git channels take no `root` — main resolves it from `WorkspaceService.current()`, so the
-renderer can never point git at an arbitrary path.
+Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
+(interim bridge before step 1: a `getActiveVaultRoot()` export), so the renderer can never
+point git or the generator at an arbitrary path.
 
-**Sequencing constraint** (audit §5): `src/shared/ipc-channels.ts`, `src/preload/index.ts`,
-and `src/main/index.ts` are owned by production-grade-plan item 1.9 during its Wave 1. The
-channel registrations above land after 1.9, or rebase over it.
+**Sequencing constraint — resolved moot** (audit §5 correction): item 1.9 landed as
+`4c126f2`, an ancestor of HEAD. Only ordinary rebase awareness against in-flight Wave 2/3
+branches remains.
 
-## 7. Phase 1 step ↔ contract map
+## 7. Phase 1 canonical order ↔ contract map — v1.1
+
+Reordered after the adversarial pass: the original order had gate parity (old step 2)
+consuming GitService/approvals artifacts assigned to old step 4 — the two specs
+double-built the same files with contradictory shapes. Canonical order:
 
 | Phase 1 step | Contracts consumed |
 | --- | --- |
 | 1 Workspace generalization | §1 (+ `vault.*`→`workspace.*` MCP aliases, audit §2) |
-| 2 Gate parity | §4 (watcher, queue, audit) + §2 interim per-turn snapshot |
-| 3 Dock IDE shell | §3 projection (existing seam only) |
-| 4 Commit-per-approval | §2 (`commitApproved`, trailers) + §6 git/approvals channels |
-| 5 Retire snapshot | §2 never-regress rule — evidence gate, no new interface |
-| 6 test-fixer template | §5 folder schema + §6 harness channels |
+| 2 Git substrate | §2 full GitService + ApprovalQueue + §6 git/approvals channels (queue empty until step 3) |
+| 3 Gate parity | §4 (CliTurnRegistry, AgentWriteWatcher, QueueHitlGate, tray) + §2 per-turn snapshot in `input()` |
+| 4 Dock IDE shell | §3 projection (existing seam only; independent of 2–3, may land in parallel after 1) |
+| 5 Retire snapshot | §2/§4 never-regress rule — evidence gate (G1–G8), no new interface |
+| 6 test-fixer template | §5 folder schema + §6 harness channels + agentId(slug) → turn registry → trailers |
+
+Implementation detail per step: `02-phase-1-specs.md`.
+
+## 8. Contract changelog
+
+- **v1.1 (2026-07-05)** — after 4-lens adversarial verification + 6-designer spec pass +
+  completeness critique (11 agents): §2 shapes hardened (SAFE_ID_RE, trailer enumeration
+  via `trailers:valueonly`, Machina-Reverts, `--no-index` diffs for new files, recoverable
+  discard, opt-out scope); §3 adapter registry deferred to Phase 2; §4 rewritten —
+  post-persistence containment framing, CliTurnRegistry replaces the false
+  bridge-tracks-in-flight claim, own watcher ignore policy, non-repo policy, security
+  -boundary statement, flags/TOCTOU; §5 state.md indexing corrected to prompt-composition
+  only, dual-TE_DIR protected globs; §6 response shapes + moot sequencing; §7 reordered.
+- **v1.0 (2026-07-05)** — initial Phase 0 contracts (`ec6fa6d`).
