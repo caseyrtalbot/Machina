@@ -23,11 +23,30 @@ npx vitest run tests/main/git-service.test.ts tests/main/approval-queue.test.ts 
 Gates G2 and G8 were unit-testable but uncovered; their tests were **written in this
 step's Part A** and pass (marked NEW below).
 
+**LANDING STATUS (2026-07-06, landed): ALL GATES GREEN — every box below is checked
+against evidence collected fresh at the landing HEAD.** The branch was rebased onto
+main at `5f5c641` (step 6 landed first, so the transcripts below also witness
+slug-trailer attribution on the exact tracer-bullet path — every turn ran with
+`agentId: 'test-fixer'`). Fresh full gate at the rebased code HEAD (`d862e81`):
+`npm run check` 281 files / **3149 passed**, `npm run build` green, `npm run test:e2e`
+**17 passed / 1 fixme-skipped**. Cited suites re-run fresh:
+
+```
+npx vitest run tests/main/git-service.test.ts tests/main/approval-queue.test.ts \
+  src/main/services/__tests__/cli-turn-registry.test.ts \
+  src/main/services/__tests__/agent-write-watcher.test.ts \
+  src/main/services/__tests__/cli-thread-spawner.test.ts
+# 5 files, 172 tests, 172 passed  (183 pre-Part-B minus the 11 deleted snapshot tests)
+```
+
+`rg -n 'commitPreAgentSnapshot|PreAgentCommitResult|isAutoCommitOptedOut' src tests e2e`
+returns zero matches. Full P1/P2 transcripts are recorded at the bottom of this file.
+
 ## Gate checklist
 
 ### G1 — Reject restores (modified + created files)
 
-- [ ] Rejecting a pending change restores a modified tracked file from HEAD and removes
+- [x] Rejecting a pending change restores a modified tracked file from HEAD and removes
       an agent-created file (recoverably), leaving porcelain clean.
 
 Evidence — cited tests (service + queue level):
@@ -44,7 +63,7 @@ End-to-end witness: landing transcript P1 step 7 (reject turn 2 on a real repo).
 
 ### G2 — Approve-then-revertAgent equals the pre-agent tree
 
-- [ ] The replacement rollback path (approve → `revertAgent`) lands a tree
+- [x] The replacement rollback path (approve → `revertAgent`) lands a tree
       byte-identical to the pre-agent state — the guarantee
       `git reset --hard <snapshot>~1` used to give.
 
@@ -63,7 +82,7 @@ End-to-end witness: landing transcript P1 step 8 (tree-sha equality on a real re
 
 ### G3 — Trailer integrity
 
-- [ ] Both attribution trailers round-trip through git; forgery, injection, and
+- [x] Both attribution trailers round-trip through git; forgery, injection, and
       collision paths are closed.
 
 Evidence — cited tests (`tests/main/git-service.test.ts`):
@@ -80,7 +99,7 @@ trailers on the built app).
 
 ### G4 — Exact staging (the inverse of the snapshot's `add -A` overreach)
 
-- [ ] Approve stages exactly the approved paths; bystander dirty files and user-staged
+- [x] Approve stages exactly the approved paths; bystander dirty files and user-staged
       files are untouched. (The retired snapshot's `git add -A` swept unrelated user
       work into every snapshot commit — retirement must prove the replacement never
       overreaches.)
@@ -97,7 +116,7 @@ Plus ignored-path staging (approve must not brick): `tests/main/approval-queue.t
 
 ### G5 — Attribution quiescence (write inside the 300ms+batch lag at turn end still queued)
 
-- [ ] A write landing at the very end of a turn — inside the watcher's
+- [x] A write landing at the very end of a turn — inside the watcher's
       `awaitWriteFinish` (300ms) + 50ms batch lag — is still attributed and queued.
       Mechanism: `LINGER_MS = 1500` keeps a closed window attributable past
       `turnEnded`, with margin over 300 + 50 + dispatch lag.
@@ -118,7 +137,7 @@ the file written as the agent's LAST action before the turn completed.
 
 ### G6 — Degraded-mode attribution with hooks absent (the likely blocker)
 
-- [ ] With shell hooks absent (no block events ever), an agent write is STILL queued —
+- [x] With shell hooks absent (no block events ever), an agent write is STILL queued —
       attributed via the PTY-alive fallback and flagged `degradedAttribution` — not
       silently dropped and not merely audited as an escape. **Failing this gate means
       the snapshot stays wired. Do not soften it to unblock Part B.**
@@ -142,7 +161,7 @@ holds when the bridge never fires `onTurnComplete`.
 
 ### G7 — Dotpath coverage + no self-trigger
 
-- [ ] The watcher sees dotpath writes (`.env`, `.gitignore`, `<TE_DIR>/agents/**`) and
+- [x] The watcher sees dotpath writes (`.env`, `.gitignore`, `<TE_DIR>/agents/**`) and
       never triggers on the app's own churn or on the queue's own operations.
 
 Evidence — cited tests (`src/main/services/__tests__/agent-write-watcher.test.ts`):
@@ -164,7 +183,7 @@ can never feed back into the watcher.
 
 ### G8 — Per-turn granularity (approve turn 1, reject turn 2, turn-1 commit intact)
 
-- [ ] Resolving one turn never disturbs another turn's outcome — at least the
+- [x] Resolving one turn never disturbs another turn's outcome — at least the
       granularity the retired per-turn snapshot gave.
 
 Evidence — cited tests:
@@ -258,3 +277,58 @@ npx vitest run tests/main/git-service.test.ts tests/main/approval-queue.test.ts 
 ```
 
 Only after every G-box above is checked does Part B (the removal commit) land.
+
+## Landing transcripts (2026-07-06, fresh at the rebased landing HEAD)
+
+Both procedures ran on the BUILT app (`out/main/index.js`, TE_DIR = `.machina`) via
+Playwright Electron probes, one app instance at a time, each against its own throwaway
+repo (never the e2e fixture). Step 6 had already landed, so every turn was sent with
+`agentId: 'test-fixer'` — the transcripts witness slug-trailer attribution on the exact
+tracer-bullet path (G3/G8). Probe workspaces were pruned from `machina-settings.json`
+afterward; `~/.te.zsh` was restored immediately after P2.
+
+### P1 — real-repo session (G1/G2/G3/G4/G8 + exit bar) — PASS, all assertions
+
+Throwaway repo seeded with `notes.md` + a seed commit; `PRE_TREE d32186a…`.
+
+1. Turn 1 (`cli-claude`, hooks present): agent created `p1-new.txt` with a sentinel.
+   Queue showed exactly ONE item `pc_t1`, `agentId: test-fixer`, paths
+   `["p1-new.txt"]`, diff containing the sentinel, `revertible: true`, all flags false.
+   `git log --format=%s` contained ZERO `pre-agent snapshot` subjects.
+2. Approve → `{ok:true, sha:151a8ed…}`. `git log -1 --format=%B`:
+   `Machina-Agent: test-fixer` + `Machina-Session: p1thread1783359148261` (G3).
+   `git show --name-only` listed exactly `p1-new.txt` — the item's paths, nothing
+   else (G4). TURN1_SHA = `151a8ed…`.
+3. Turn 2: agent modified `notes.md`; a SECOND item `pc_t2` appeared (distinct id, G8).
+4. Reject turn 2 → `{ok:true}`. Porcelain clean apart from the app's own untracked
+   `.machina/` scaffold (app state, not an agent write; the watcher excludes it too);
+   `notes.md` byte-identical to seed; `git rev-parse HEAD` still TURN1_SHA (G1 + G8:
+   turn-1 commit intact).
+5. `revertAgent('test-fixer')` → `{ok:true, sha:c7d8570…}`; `git rev-parse HEAD^{tree}`
+   equals PRE_TREE (G2); revert commit carries `Machina-Reverts: 151a8ed…` (TURN1_SHA).
+6. Final session log: `Revert agent changes (test-fixer)` / `test: p1 turn-1 approved` /
+   `seed` — zero `pre-agent snapshot` commits with reject, approve, and revert all
+   exercised (the step-5 exit bar).
+
+### P2 — G6, hooks absent — PASS, GATE GREEN
+
+`~/.te.zsh` moved to `~/.te.zsh.step5-bak` (rc source line is `[ -f ]`-guarded);
+verified absent. Fresh throwaway repo, seed commit. One turn instructed the agent to
+run a single Bash call: write `g6-early.txt`, `sleep 35`, write `g6-late.txt`.
+
+- ZERO block events ever reached the renderer (`block:update` collector empty) — the
+  bridge never fired `onTurnComplete`; the turn window never closed normally.
+- Both writes landed on disk; the queue held ONE item `pc_t1` with BOTH paths coalesced
+  (`g6-early.txt`, `g6-late.txt`), `agentId: test-fixer`, and
+  **`flags.degradedAttribution: true`** — the late write attributed ~45s after turn
+  start, past `DEGRADED_AFTER_MS = 30_000`, via the PTY-alive fallback.
+- None of the fail conditions fired: no on-disk write without a queue item, zero
+  `unattributed-write` audit lines mentioning the g6 paths, and the degraded flag was
+  present — not a silent-confidence pass.
+
+First P2 attempt is recorded honestly: the agent (three separate tool calls requested)
+stopped after the early write, so the >30s condition was never exercised — that run
+proved only that hooks-absent early writes queue non-degraded (`pc_t1`,
+`g6-early.txt`, degraded false, zero block events). The re-run above with a single
+deterministic Bash command exercised the full degraded path. Both runs queued every
+write that landed; nothing was silently dropped in either.

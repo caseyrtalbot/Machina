@@ -25,11 +25,14 @@ Playwright probes: `git.status`/`diff`/`commitApproved` (both trailers in `git l
 `revertAgent` (restore + Machina-Reverts) on a real dirtied repo, non-repo structured
 no-ops, and per-turn snapshot granularity (2 turns sent ⇒ exactly 2 pre-agent snapshot
 commits). **Steps 3 (gate parity) and 4 (dock shell) are both SHIPPED** — see their
-"What step N changed under you" sections below. **The next work is step 5 (retire the
-pre-run snapshot — evidence gate G1–G8 first) and step 6 (test-fixer template);
-`HANDOFF-PARALLEL-STEPS-5-6.md` is the two-session work order with the coordination
-contract.** The pre-run snapshot is STILL WIRED (spawn + per-turn) — step 5 retires it
-only after the evidence gate passes on fresh runs.
+"What step N changed under you" sections below. **Steps 5 (snapshot retirement) and 6
+(test-fixer template) are ALSO SHIPPED** (2026-07-06, parallel sessions; step 6 landed
+first at `5f5c641`, step 5 rebased onto it and landed only after all of G1–G8 passed
+on fresh evidence). The pre-run snapshot is RETIRED — the approvals gate owns CLI
+rollback now; the gate checklist, parity ledger, and full P1/P2 transcripts live in
+`03-snapshot-retirement-evidence.md`. Remaining Phase-1 work: the tracer-bullet run
+recorded with Casey confirming on the running app, then delete
+`HANDOFF-PARALLEL-STEPS-5-6.md`.
 
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
@@ -204,6 +207,36 @@ only after the evidence gate passes on fresh runs.
    `claude --print` never blocked on an interactive permission prompt — in
    real use the user answers those in the dock terminal.
 
+## What step 5 changed under you (snapshot retirement)
+
+1. **`commitPreAgentSnapshot` is GONE.** Both call sites removed from
+   `CliThreadSpawner` (spawn-site + the per-turn call in `input()`), and the
+   function, `PreAgentCommitResult`, the `<TE_DIR>/no-auto-commit` opt-out, and
+   `isAutoCommitOptedOut` are deleted from `git-service.ts`. `isGitRepo` and the
+   whole §2 substrate are unchanged. `cwdByThread` was NOT orphaned (it still
+   feeds `registry.turnStarted`) and stays. `rg 'commitPreAgentSnapshot' src
+   tests` is zero — do not reintroduce it; rollback is the approvals gate
+   (commitApproved trailers / discard / revertAgent).
+2. **The retirement was evidence-gated, not assumed.** All of G1–G8 passed
+   fresh at the landing HEAD — including G6 (hooks physically absent: writes
+   still queue via the PTY-alive fallback with `flags.degradedAttribution`,
+   proven on the built app with zero block events) — see
+   `03-snapshot-retirement-evidence.md` for the checklist, the parity ledger
+   (non-repo, gitignored, out-of-root, agent-runs-git), and the full P1/P2
+   transcripts. The opt-out went with the snapshot because it only ever gated
+   automatic commits and none remain (contracts §8 v1.1.4 — renumbered; step 6
+   landed first and took v1.1.3).
+3. **A probe-transcript gotcha for later steps**: the app scaffolds its own
+   untracked `<TE_DIR>/` in any opened repo — a "porcelain clean" assertion
+   after reject must except that scaffold (it is app state, not an agent
+   write; the watcher excludes it too).
+4. **Doc reconciliation**: overview.md CLI-agent paragraph, contracts §2/§4
+   dated status lines, CLAUDE.md agents bullet, and safety-subsystem.md
+   CLI-thread section all now describe the approvals-gate containment story
+   (the latter two are gitignored — updated copies were synced to the
+   canonical clone at landing). AGENTS.md regeneration remains PARKED
+   (backlog: steps 1 + 5).
+
 ## What step 3 changed under you (gate parity)
 
 1. **The attribution primitive is `getCliTurnRegistry()`**
@@ -283,9 +316,10 @@ Repo gotchas the step-1 team hit (they will bite you too):
    via git. UI copy and your own mental model must never claim writes are blocked. The
    agent is a full shell — it can run git itself; we detect (headMoved tripwire), we do
    not prevent. Real enforcement is Phase 2 (adapter-native permission hooks).
-2. **Never let rollback coverage gap.** `commitPreAgentSnapshot` stays wired (spawn +
-   per-turn) until step 5's G1–G8 evidence gate passes on fresh runs. If G6
-   (degraded-mode attribution) fails, the snapshot stays — that is the correct outcome.
+2. **Never let rollback coverage gap.** DISCHARGED 2026-07-06: step 5's G1–G8 evidence
+   gate passed on fresh runs (G6 included) and the snapshot was retired in the same
+   step — coverage never gapped. The rule's spirit survives: rollback is now the
+   approvals gate exclusively; do not weaken it without an equivalent evidence gate.
 3. **The AgentWriteWatcher must NOT reuse vault-watcher's ignore patterns.** Those
    ignore TE_DIR and all dotpaths, which would blind the verify.sh auto-reject and every
    `.env` write. Contracts §4 v1.1 specifies its own ignore policy.
@@ -323,7 +357,8 @@ PTY core with ring-buffer reconnect (`terminal:reconnect` already exists — mig
 a renderer affordance), block protocol (OSC hooks → BlockDetector → BlockWatcher),
 safety trio (`hitl-gate.ts` / `audit-logger.ts` / `path-guard.ts`), typed-IPC 4-step
 pattern, `ShellService.create` already takes per-session cwd, `ThreadStorage` already
-takes its root, `commitPreAgentSnapshot` already wired at CLI spawn. The full reuse map
+takes its root. (The pre-run snapshot listed here historically was retired by step 5 —
+rollback is the approvals gate.) The full reuse map
 with import-graph evidence is in 00-seam-audit.md §1.
 
 ## Known follow-ups from the step 1 review (dual review: Claude adversarial + Codex cold-read)

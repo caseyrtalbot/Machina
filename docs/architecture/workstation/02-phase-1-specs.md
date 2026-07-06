@@ -251,7 +251,25 @@ done` in a strip terminal → Move to canvas → tick numbers consecutive across
 boundary → Move to dock → still consecutive → Ctrl+C + `echo ok` proves same PTY;
 relaunch restores strips at persisted cwd; closed strip tab leaves no orphan shell (ps).
 
-## Step 5 — Retire the pre-run snapshot (evidence gate first)
+## Step 5 — Retire the pre-run snapshot (evidence gate first) — **DONE** (2026-07-06)
+
+Landed with ALL gates G1–G8 green on evidence collected fresh at the landing HEAD
+(rebased onto step 6's `5f5c641`): full gate green (3149 unit tests, build, e2e 17
+passed / 1 fixme-skipped), the five cited suites re-run fresh (172 passed), and both
+transcript procedures executed on the built app against throwaway repos —
+`03-snapshot-retirement-evidence.md` holds the checked boxes, parity ledger, and full
+P1/P2 transcripts. G6 (degraded-mode attribution, hooks physically absent) passed
+end-to-end: zero block events, both writes of one turn coalesced into a single queue
+item with `flags.degradedAttribution: true`, the late write attributed ~45s after turn
+start via the PTY-alive fallback. Because step 6 landed first, the transcripts also
+witness slug-trailer attribution (`agentId`/`Machina-Agent: test-fixer`) on the exact
+tracer-bullet path. Exit bar met: `rg -n commitPreAgentSnapshot src tests` zero; the
+P1 real-repo session log shows zero `pre-agent snapshot` commits with reject, approve,
+and `revertAgent` all exercised. Deliberate deviation (contracts §8, renumbered to
+v1.1.4 — step 6 landed first and took v1.1.3): the `<TE_DIR>/no-auto-commit` opt-out
+and `isAutoCommitOptedOut` retired with the snapshot; `isGitRepo` kept (production
+importers remain). AGENTS.md regen stays PARKED (backlog: steps 1 + 5). Original spec
+follows.
 
 Part A: write `03-snapshot-retirement-evidence.md` with gate checklist **G1–G8** — each
 item citing a passing test (file + name) or fresh manual transcript at current HEAD: G1
