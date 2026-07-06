@@ -95,6 +95,52 @@ step 3 consumes.
    `hasLiveSession` branch (the respawn path snapshots inside `spawn()` — exactly one
    snapshot per turn, ordering-tested). Step 5's retirement removes both call sites.
 
+## What step 4 changed under you (`424b3cc`)
+
+1. **Terminal strip state is per-thread and rides the thread file.**
+   `dockState` is now `{ tabs, terminalStrip? }` (`src/shared/thread-types.ts`);
+   legacy files decode `terminalStrip === undefined`. The strip store
+   (`src/renderer/src/store/terminal-strip-store.ts`) must never import
+   thread-store (thread-store imports it: seed in `loadThreads`, flush in
+   `flushDockState`, drop in `deleteThread`). `seed()` is FIRST-WRITE-WINS —
+   `loadThreads` re-runs mid-session (unarchive, vault re-open) and must not
+   clobber live sessions. `drop()` kills the thread's bound PTYs.
+2. **PTY lifetime across surfaces.** Migration = the existing
+   `terminal:reconnect` seam (contracts §3): `stripToCanvas`/`canvasToStrip`
+   (`terminal-migration.ts`) never kill; `canvas-store.removeNode(id,
+   { preserveSession: true })` is the kill opt-out. The load-bearing tests
+   assert kill is NEVER called on detach/migration — keep them honest.
+3. **The close-before-bind race is handled by pendingKill parking.** Closing a
+   strip tab whose webview has not yet reported `session-created` parks the
+   session (store field `pendingKill`, runtime-only, never persisted); its
+   webview stays mounted hidden IN THE SAME KEYED MAP POSITION (a remount
+   would spawn a second PTY) until the id arrives and `resolvePendingKill`
+   kills it. Known residual: spawn-then-instant-thread-switch (or thread
+   delete) before bind still leaks one PTY — the reporting webview unmounts.
+   Real fix is host-side sessionId pre-allocation (extend `terminal:create`
+   to accept a caller-supplied id); left for a later step.
+4. **TerminalDockAdapter** now takes `cwd` + `onSessionCreated`/`onSessionExited`
+   (ipc-message protocol shared with TerminalCard) and always puts `cwd` in the
+   webview URL — a stale persisted sessionId falls through reconnect and
+   respawns there. URL construction lives in the pure builders in
+   `terminal-webview-src.ts`; keep param names in sync with
+   `TerminalApp.readUrlParams`.
+5. **`fs:select-file`** landed per contracts §6 (guard-checked, null outside
+   root, `guardSelectedFile` exported for tests). Appended at the END of
+   `IpcChannels` and of the preload `fs` namespace (parallel-session
+   append-only rule) — a later tidy-up may regroup it with the fs section.
+6. **FilesDockAdapter vault switching is fixed** (step-1 review follow-up):
+   `handleOpenVaultPicker`/`handleSelectVault` now dispatch the
+   `te:open-vault` CustomEvent → `orchestrateLoad` → `workspace.open()`. The
+   `onChangeVault` prop is accepted but unused.
+7. **Known cosmetic/UX residuals** (from the step-4 review, deliberately not
+   done): strip webview has no render-process-gone recovery; ctrl+backquote
+   does not reach the host while a terminal webview has focus (webview
+   isolation); a PTY that exits while its strip webview is unmounted respawns
+   fresh on revisit; `thread-store.ts` sits at ~830 lines (was 825 — the 3
+   sanctioned touches only). **Manual migration acceptance (tick-counter,
+   Casey observing) is still open.**
+
 Repo gotchas the step-1 team hit (they will bite you too):
 
 - **CLAUDE.md is gitignored in this repo.** `AGENTS.md` is the tracked copy and is

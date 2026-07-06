@@ -1,5 +1,13 @@
 # Parallel work order — steps 3 + 4 (written post step 2, `3198ddd`)
 
+> **STATUS: session B (step 4) LANDED on main at `424b3cc` + docs commit,
+> 2026-07-05.** Session A (step 3): rebase onto main, re-run the FULL gate
+> fresh, then land per the protocol below. Shared-hotspot note for A: B
+> appended `fs:select-file` at the very END of `IpcChannels` and of the
+> preload `fs` namespace, and B's strip mount in AgentShell territory is one
+> self-contained `<TerminalStrip />` line inside `SurfaceDock.tsx` — your tray
+> mount in AgentShell should not collide. Delete this file once step 3 lands.
+
 Two sessions can run these steps simultaneously: step 3 (gate parity) and step 4 (dock
 IDE shell) touch almost disjoint code, and both depend only on work that has already
 landed. Each session: read `HANDOFF.md` in this folder first (the cold start), then your

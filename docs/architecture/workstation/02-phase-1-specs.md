@@ -192,7 +192,16 @@ turn auto-rejected while state.json churn produces zero items; non-repo cwd ⇒ 
 rollback" flag + disabled Reject; **agent running `git commit` itself mid-turn ⇒
 headMoved banner + audit entry**.
 
-## Step 4 — Minimal dock IDE shell (parallel-safe after step 1)
+## Step 4 — Minimal dock IDE shell (parallel-safe after step 1) — **DONE** (`424b3cc`, 2026-07-05)
+
+> Landed by session B (parallel work order). Gate: check green (3006 tests incl.
+> ~110 new step-4 tests), build green, e2e 17 passed / 1 fixme-skipped, Playwright
+> smoke probe 7/7 (ctrl+backquote spawn, PTY cwd == workspace root via lsof, closed
+> tab leaves no orphan shell, relaunch restores strip at persisted cwd, .ts renders
+> CodeMirror, autosave lands on disk). Post-review hardening beyond this spec is
+> recorded in HANDOFF.md "What step 4 changed under you". **Manual migration
+> acceptance (tick-counter continuity, Casey observing) is still OPEN** — the one
+> unticked exit item.
 
 Editor center and agent panel already exist (EditorPanel routes non-.md to
 CodeFileEditor/CodeMirror 6; ThreadPanel is the agent panel) — the build is the terminal
