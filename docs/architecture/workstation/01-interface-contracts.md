@@ -382,6 +382,29 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.1.5 (2026-07-06, pre-Phase-2 hardening)** — §5 hardening: `createHarness`
+  refuses (structured error, no harness content written, empty slug dir removed
+  non-recursively; the pre-check `mkdir -p` may leave an inert empty `agents/`
+  dir at the redirect target — no files, nothing executable) when the created
+  directory does not canonicalize to exactly
+  `<canonicalRoot>/<TE_DIR>/agents/<slug>`. Rationale: a symlink at `<TE_DIR>`
+  or `<TE_DIR>/agents` redirected every harness write — verify.sh included —
+  outside the watched root, where the approvals watcher (`followSymlinks:
+  false`) and the `HARNESS_PROTECTED_GLOBS` auto-reject can never see it.
+  Realpath EQUALITY, not containment: the glob matcher is literal-relative-path
+  based, so even an intra-root alias defeats it. `listHarnesses` gets the same
+  guard skip-not-throw style (symlinked agents dir ⇒ `[]`). Slug-level
+  symlinks (live or dangling) were already refused by the non-recursive-mkdir
+  EEXIST no-overwrite check — now locked by regression tests. The
+  write-failure cleanup is bounded (deletes exactly the six known entries,
+  never recursive) so a raced parent swap cannot steer a recursive delete.
+  Accepted residual, same posture as §4's stale-diff TOCTOU: the
+  check-then-write window is narrowed, not closed — a same-privilege process
+  that swaps a parent symlink DURING create can still redirect writes; the
+  gate is not a security boundary. Residuals for Phase 2: the
+  verify.sh/SKILL.md read/exec path must re-run the same check at read time,
+  and the harness linter should flag symlinks in the agents ancestry.
+
 - **v1.1.4 (2026-07-06, step 5 landing)** — the §2/§4 never-regress rule is discharged:
   `commitPreAgentSnapshot` retired (spawn-site + per-turn call sites removed from
   `CliThreadSpawner`, function deleted from `git-service.ts`) after the G1–G8 evidence

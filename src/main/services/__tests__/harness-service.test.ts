@@ -12,15 +12,26 @@ import { HARNESS_TEMPLATES } from '../../../shared/harness-templates'
 import { HARNESS_PROTECTED_GLOBS } from '../../../shared/harness-types'
 
 let root: string
+let extraDirs: string[]
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-service-'))
+  extraDirs = []
 })
 
 afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true })
+  for (const dir of extraDirs) {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
   vi.restoreAllMocks()
 })
+
+const makeOutsideDir = async (): Promise<string> => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-outside-'))
+  extraDirs.push(dir)
+  return dir
+}
 
 const harnessDir = (): string => path.join(root, '.machina', 'agents', 'test-fixer')
 
@@ -110,6 +121,51 @@ describe('createHarness', () => {
     }
   })
 
+  it('refuses a symlinked <TE_DIR>: nothing written at the target, empty slug dir cleaned up non-recursively', async () => {
+    const outside = await makeOutsideDir()
+    await fs.symlink(outside, path.join(root, '.machina'))
+
+    const result = await createHarness(root, 'test-fixer', 'test-fixer')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('escapes its contract location')
+    // No harness content at the redirect target.
+    await expect(fs.stat(path.join(outside, 'agents', 'test-fixer'))).rejects.toThrow()
+    // Cleanup was non-recursive: the agents dir the recursive mkdir made at
+    // the target survives — we never delete through the symlink.
+    expect((await fs.stat(path.join(outside, 'agents'))).isDirectory()).toBe(true)
+  })
+
+  it('refuses a symlinked agents dir: nothing written at the target, empty slug dir cleaned up', async () => {
+    const outside = await makeOutsideDir()
+    await fs.mkdir(path.join(root, '.machina'))
+    await fs.symlink(outside, path.join(root, '.machina', 'agents'))
+
+    const result = await createHarness(root, 'test-fixer', 'test-fixer')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('escapes its contract location')
+    await expect(fs.stat(path.join(outside, 'test-fixer'))).rejects.toThrow()
+    expect(await fs.readdir(outside)).toEqual([])
+  })
+
+  it('refuses a pre-existing symlink at the slug path (live and dangling) via the no-overwrite branch, target untouched', async () => {
+    const outside = await makeOutsideDir()
+    await fs.mkdir(path.join(root, '.machina', 'agents'), { recursive: true })
+    await fs.symlink(outside, path.join(root, '.machina', 'agents', 'test-fixer'))
+    await fs.symlink(
+      path.join(root, 'does-not-exist'),
+      path.join(root, '.machina', 'agents', 'dangling')
+    )
+
+    const live = await createHarness(root, 'test-fixer', 'test-fixer')
+    expect(live.ok).toBe(false)
+    if (!live.ok) expect(live.error).toContain('already exists')
+    expect(await fs.readdir(outside)).toEqual([])
+
+    const dangling = await createHarness(root, 'test-fixer', 'dangling')
+    expect(dangling.ok).toBe(false)
+    if (!dangling.ok) expect(dangling.error).toContain('already exists')
+  })
+
   it('cleans up the partial directory when a write mid-create fails', async () => {
     const spy = vi.spyOn(fs, 'writeFile').mockImplementation(async (target) => {
       if (String(target).endsWith('scope.json')) throw new Error('disk full')
@@ -140,6 +196,18 @@ describe('listHarnesses', () => {
         adapter: 'claude'
       }
     ])
+  })
+
+  it('returns [] when the agents dir is a symlink, even one holding valid harnesses', async () => {
+    const otherWorkspace = await makeOutsideDir()
+    await createHarness(otherWorkspace, 'test-fixer', 'test-fixer')
+    await fs.mkdir(path.join(root, '.machina'))
+    await fs.symlink(
+      path.join(otherWorkspace, '.machina', 'agents'),
+      path.join(root, '.machina', 'agents')
+    )
+
+    expect(await listHarnesses(root)).toEqual([])
   })
 
   it('skips malformed entries instead of throwing', async () => {

@@ -12,7 +12,14 @@
  *   3. create never overwrites, ever — an existing dir (or file) at the slug
  *      path is a structured error, and a failed create cleans up the partial
  *      dir it made;
- *   4. verify.sh is written LAST, then chmod 0o555 (defense-in-depth, not a
+ *   4. the created directory must canonicalize to EXACTLY
+ *      `<root>/<TE_DIR>/agents/<slug>` before anything is written — a symlink
+ *      at <TE_DIR> or <TE_DIR>/agents would redirect every write (verify.sh
+ *      included) outside the watched root, where the approvals watcher
+ *      (followSymlinks: false) and the protected-glob auto-reject can never
+ *      see it. Realpath equality, not containment: an intra-root alias would
+ *      still defeat the literal-relative-path glob matcher;
+ *   5. verify.sh is written LAST, then chmod 0o555 (defense-in-depth, not a
  *      boundary — contracts §5).
  *
  * `listHarnesses` is skip-not-throw: malformed entries never break the list.
@@ -75,6 +82,29 @@ export async function createHarness(
     return { ok: false, error: `could not create harness directory: ${String(err)}` }
   }
 
+  // Invariant 4: symlinked-parent refusal, checked between mkdir and the
+  // first write. workspaceRoot is canonical at open, but re-canonicalizing it
+  // here is a cheap invariant (and keeps the check honest for callers that
+  // pass a symlink-prefixed root, e.g. macOS tmpdirs in tests).
+  let realDir: string
+  let realRoot: string
+  try {
+    ;[realDir, realRoot] = await Promise.all([fs.realpath(dir), fs.realpath(workspaceRoot)])
+  } catch (err) {
+    await fs.rmdir(dir).catch(() => {})
+    return { ok: false, error: `could not canonicalize harness directory: ${String(err)}` }
+  }
+  if (realDir !== path.join(realRoot, TE_DIR, 'agents', slug)) {
+    // Remove ONLY the empty slug dir this call just made — never recursive
+    // on this path: a recursive rm would delete through the symlink into the
+    // outside target.
+    await fs.rmdir(dir).catch(() => {})
+    return {
+      ok: false,
+      error: `harness path escapes its contract location (symlinked parent?): ${slug}`
+    }
+  }
+
   try {
     await fs.writeFile(
       path.join(dir, SKILL_FILE),
@@ -94,9 +124,20 @@ export async function createHarness(
   } catch (err) {
     // Cleanup the partial dir this create made — never leave a half-harness
     // that a later create would refuse to repair (no-overwrite is absolute).
-    await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+    // Bounded, not recursive: delete exactly the entries this create writes,
+    // so a raced parent-symlink swap can never steer a recursive delete
+    // beyond files with these known names.
+    await removePartialHarness(dir)
     return { ok: false, error: `harness create failed: ${String(err)}` }
   }
+}
+
+async function removePartialHarness(dir: string): Promise<void> {
+  for (const file of [VERIFY_FILE, STATE_FILE, SCOPE_FILE, RULES_FILE, SKILL_FILE]) {
+    await fs.rm(path.join(dir, file), { force: true }).catch(() => {})
+  }
+  await fs.rmdir(path.join(dir, HANDOFFS_DIR)).catch(() => {})
+  await fs.rmdir(dir).catch(() => {})
 }
 
 export async function listHarnesses(workspaceRoot: string): Promise<HarnessSummary[]> {
@@ -106,6 +147,19 @@ export async function listHarnesses(workspaceRoot: string): Promise<HarnessSumma
     entries = await fs.readdir(root, { withFileTypes: true })
   } catch {
     return [] // no agents dir yet — an empty list, not an error
+  }
+
+  // Same symlinked-parent refusal as createHarness, skip-not-throw style: a
+  // redirected agents dir lists nothing rather than laundering outside
+  // content in as harnesses.
+  try {
+    const [realAgents, realRoot] = await Promise.all([
+      fs.realpath(root),
+      fs.realpath(workspaceRoot)
+    ])
+    if (realAgents !== path.join(realRoot, TE_DIR, 'agents')) return []
+  } catch {
+    return []
   }
 
   const summaries: HarnessSummary[] = []
