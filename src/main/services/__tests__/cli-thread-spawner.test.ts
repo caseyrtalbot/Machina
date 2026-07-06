@@ -375,6 +375,147 @@ describe('CliThreadSpawner', () => {
   })
 })
 
+describe('CliThreadSpawner turn registry (workstation step 3)', () => {
+  function fakeRegistry() {
+    return {
+      turnStarted: vi.fn((_opts: { threadId: string; agentId: string; cwd: string }) => undefined),
+      threadClosed: vi.fn((_threadId: string) => undefined)
+    }
+  }
+
+  function registryBridge(): CliAgentThreadBridge {
+    return {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+  }
+
+  it('input on a dead thread spawns, then opens the turn window with the default agentId', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    const res = await spawner.input('thread-A', 'cli-claude', 'list files', '/v')
+    expect(res.ok).toBe(true)
+    expect(registry.turnStarted).toHaveBeenCalledTimes(1)
+    expect(registry.turnStarted).toHaveBeenCalledWith({
+      threadId: 'thread-A',
+      agentId: 'cli-claude',
+      cwd: '/v'
+    })
+  })
+
+  it('input with an explicit agentId opens the turn window under that harness slug', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    const res = await spawner.input('thread-A', 'cli-claude', 'fix tests', '/v', 'test-fixer')
+    expect(res.ok).toBe(true)
+    expect(registry.turnStarted).toHaveBeenCalledTimes(1)
+    expect(registry.turnStarted).toHaveBeenCalledWith({
+      threadId: 'thread-A',
+      agentId: 'test-fixer',
+      cwd: '/v'
+    })
+  })
+
+  it('agentId persists per thread: the next input without one still uses the stored slug', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    await spawner.input('thread-A', 'cli-claude', 'first', '/v', 'test-fixer')
+    await spawner.input('thread-A', 'cli-claude', 'second', '/v')
+    expect(registry.turnStarted).toHaveBeenCalledTimes(2)
+    expect(registry.turnStarted).toHaveBeenLastCalledWith({
+      threadId: 'thread-A',
+      agentId: 'test-fixer',
+      cwd: '/v'
+    })
+  })
+
+  it('opens the turn window BEFORE the PTY write (turnStarted precedes writeAgentInput)', async () => {
+    const { shell, pty } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    await spawner.input('thread-A', 'cli-claude', 'go', '/v')
+    expect(registry.turnStarted).toHaveBeenCalledTimes(1)
+    expect(pty.writeAgentInput).toHaveBeenCalledTimes(1)
+    const turnOrder = registry.turnStarted.mock.invocationCallOrder[0]
+    const writeOrder = pty.writeAgentInput.mock.invocationCallOrder[0]
+    expect(turnOrder).toBeLessThan(writeOrder)
+  })
+
+  it('snapshots BEFORE opening the turn window on a live session (headShaAtStart is post-snapshot)', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    vi.mocked(commitPreAgentSnapshot).mockClear()
+    // Fresh input on the LIVE session takes the per-turn path.
+    const res = await spawner.input('thread-A', 'cli-claude', 'go on', '/v')
+    expect(res.ok).toBe(true)
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(commitPreAgentSnapshot).toHaveBeenCalledTimes(1)
+    expect(registry.turnStarted).toHaveBeenCalledTimes(1)
+    const snapshotOrder = vi.mocked(commitPreAgentSnapshot).mock.invocationCallOrder[0]
+    const turnOrder = registry.turnStarted.mock.invocationCallOrder[0]
+    expect(snapshotOrder).toBeLessThan(turnOrder)
+  })
+
+  it('close() drops the turn window via registry.threadClosed', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    spawner.close('thread-A')
+    expect(registry.threadClosed).toHaveBeenCalledTimes(1)
+    expect(registry.threadClosed).toHaveBeenCalledWith('thread-A')
+  })
+
+  it('a spawner without a registry option still sends and closes without throwing', async () => {
+    const { shell, pty } = fakeServices()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')]
+    })
+    const res = await spawner.input('thread-A', 'cli-claude', 'hello', '/v')
+    expect(res.ok).toBe(true)
+    expect(pty.writeAgentInput).toHaveBeenCalledTimes(1)
+    expect(() => spawner.close('thread-A')).not.toThrow()
+    expect(shell.kill).toHaveBeenCalledWith('sess-xyz')
+  })
+})
+
 describe('isCliAgentIdentity', () => {
   it('accepts the three CLI agent identities', () => {
     expect(isCliAgentIdentity('cli-claude')).toBe(true)

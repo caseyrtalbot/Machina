@@ -434,3 +434,84 @@ describe('CliAgentThreadBridge', () => {
     expect(emitted.map((e) => e.threadId)).toEqual(['thread-A', 'thread-B'])
   })
 })
+
+describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
+  function recordingWithLog(): {
+    bridge: CliAgentThreadBridge
+    log: { kind: 'message' | 'turn-complete'; threadId: string }[]
+  } {
+    const log: { kind: 'message' | 'turn-complete'; threadId: string }[] = []
+    const bridge = new CliAgentThreadBridge({
+      onMessage: (e) => log.push({ kind: 'message', threadId: e.threadId }),
+      onTurnComplete: (threadId) => log.push({ kind: 'turn-complete', threadId })
+    })
+    return { bridge, log }
+  }
+
+  it('fires exactly once per completed block; running observes do not fire', () => {
+    const { bridge, log } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', 'claude --print "x"')
+    bridge.observe('s1', block)
+    expect(log.filter((e) => e.kind === 'turn-complete')).toEqual([])
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+    // Re-observing the same completed block must not re-fire.
+    bridge.observe('s1', block)
+    bridge.observe('s1', block)
+    expect(log.filter((e) => e.kind === 'turn-complete')).toEqual([
+      { kind: 'turn-complete', threadId: 'thread-A' }
+    ])
+  })
+
+  it('fires for cancelled blocks too', () => {
+    const { bridge, log } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    const block = startedBlock('s1', 'claude --print "x"')
+    const r = cancelBlock(block, 5000)
+    if (!r.ok) throw new Error(r.error)
+    bridge.observe('s1', r.value)
+    expect(log.filter((e) => e.kind === 'turn-complete')).toEqual([
+      { kind: 'turn-complete', threadId: 'thread-A' }
+    ])
+  })
+
+  it('does not fire for unbound sessions', () => {
+    const { bridge, log } = recordingWithLog()
+    const block = completed(startedBlock('s1', 'claude --print "x"'), 0)
+    bridge.observe('s1', block)
+    expect(log).toEqual([])
+  })
+
+  it('does not fire for non-CLI-agent commands on a bound session', () => {
+    const { bridge, log } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    const block = completed(startedBlock('s1', 'npm test'), 0)
+    bridge.observe('s1', block)
+    expect(log).toEqual([])
+  })
+
+  it("fires AFTER the block's final onMessage", () => {
+    const { bridge, log } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    const block = completed(startedBlock('s1', 'claude --print "x"'), 0)
+    bridge.observe('s1', block)
+    expect(log).toEqual([
+      { kind: 'message', threadId: 'thread-A' },
+      { kind: 'turn-complete', threadId: 'thread-A' }
+    ])
+  })
+
+  it('fires once per block for separate blocks in the same session', () => {
+    const { bridge, log } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    const a = completed(startedBlock('s1', 'claude --print "a"'), 0)
+    bridge.observe('s1', a)
+    const p = pendingBlock('b-s1-2', meta('s1'))
+    const r = startBlock(p, 'claude --print "b"', 2000)
+    if (!r.ok) throw new Error(r.error)
+    const b = completed(r.value, 0)
+    bridge.observe('s1', b)
+    expect(log.filter((e) => e.kind === 'turn-complete')).toHaveLength(2)
+  })
+})

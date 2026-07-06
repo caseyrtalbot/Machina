@@ -50,6 +50,12 @@ export interface CliAgentThreadMessageEvent {
 
 interface CliAgentThreadBridgeOptions {
   readonly onMessage: (event: CliAgentThreadMessageEvent) => void
+  /**
+   * Fired exactly once per completed (or cancelled) block on a bound
+   * session — the turn-window close signal for the CliTurnRegistry
+   * (workstation step 3). Optional so existing tests stay valid.
+   */
+  readonly onTurnComplete?: (threadId: string) => void
 }
 
 /** Incremental parse state for one block's structured (JSONL) output. */
@@ -150,6 +156,9 @@ export class CliAgentThreadBridge {
     binding.streamStates.delete(blockId)
     const message = buildFinalMessage(block, agent, state)
     this.opts.onMessage({ threadId: binding.threadId, message })
+    // After the final message: the write-linger window opens from the block's
+    // completion, and emittedBlockIds already guarantees once-per-block.
+    this.opts.onTurnComplete?.(binding.threadId)
   }
 
   closeSession(sessionId: string): void {

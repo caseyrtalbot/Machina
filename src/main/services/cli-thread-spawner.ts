@@ -105,10 +105,18 @@ type SpawnResult =
   | { readonly ok: true; readonly sessionId: string }
   | { readonly ok: false; readonly error: string }
 
+/** The slice of CliTurnRegistry the spawner drives (workstation step 3). */
+export interface SpawnerTurnRegistry {
+  turnStarted(opts: { threadId: string; agentId: string; cwd: string }): unknown
+  threadClosed(threadId: string): void
+}
+
 interface CliThreadSpawnerOptions {
   readonly shellService: ShellService
   readonly bridge: CliAgentThreadBridge
   readonly detect?: () => Promise<readonly CLIAgentInstallation[]>
+  /** Optional so existing tests and callers stay valid; wired in ipc/cli-thread.ts. */
+  readonly registry?: SpawnerTurnRegistry
 }
 
 export class CliThreadSpawner {
@@ -122,13 +130,27 @@ export class CliThreadSpawner {
    * agent conversation even though the thread UI shows history.
    */
   private readonly turnsSent = new Set<string>()
+  /** Per-thread cwd of the last spawn/input — the turn window's root. */
+  private readonly cwdByThread = new Map<string, string>()
+  /**
+   * Per-thread harness slug (the step 6 seam). Absent → the turn's agentId
+   * defaults to the adapter identity (`cli-claude` etc.).
+   */
+  private readonly agentIdByThread = new Map<string, string>()
 
   constructor(private readonly opts: CliThreadSpawnerOptions) {}
 
-  async spawn(threadId: string, identity: AgentIdentity, cwd: string): Promise<SpawnResult> {
+  async spawn(
+    threadId: string,
+    identity: AgentIdentity,
+    cwd: string,
+    agentId?: string
+  ): Promise<SpawnResult> {
     if (!isCliAgentIdentity(identity)) {
       return { ok: false, error: `not a CLI agent: ${identity}` }
     }
+    this.cwdByThread.set(threadId, cwd)
+    if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
     // Rollback safety: snapshot the vault before the agent can touch it.
     // Never blocks the spawn — returns a structured no-op on non-repo,
     // opt-out, nothing-to-commit, or git failure.
@@ -159,10 +181,13 @@ export class CliThreadSpawner {
     threadId: string,
     identity: AgentIdentity,
     text: string,
-    cwd: string
+    cwd: string,
+    agentId?: string
   ): Promise<{ ok: boolean }> {
+    this.cwdByThread.set(threadId, cwd)
+    if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
     if (!this.hasLiveSession(threadId)) {
-      const spawned = await this.spawn(threadId, identity, cwd)
+      const spawned = await this.spawn(threadId, identity, cwd, agentId)
       if (!spawned.ok) return { ok: false }
     } else {
       // Per-turn rollback granularity: spawn() only snapshots when the PTY is
@@ -173,8 +198,11 @@ export class CliThreadSpawner {
     return { ok: this.sendUserMessage(threadId, identity, text) }
   }
 
-  /** True when a session is bound for `threadId` and its PTY is still alive. */
-  private hasLiveSession(threadId: string): boolean {
+  /**
+   * True when a session is bound for `threadId` and its PTY is still alive.
+   * Public: the turn registry's degraded-mode window is exactly this probe.
+   */
+  hasLiveSession(threadId: string): boolean {
     const sid = this.sessionByThread.get(threadId)
     if (!sid) return false
     return this.opts.shellService.getPtyService().getActiveSessions().includes(sid)
@@ -190,6 +218,17 @@ export class CliThreadSpawner {
       resumeSessionId: this.opts.bridge.getAgentSessionId(threadId),
       continueConversation: this.turnsSent.has(threadId)
     })
+    // Open the attribution window BEFORE the PTY write: headShaAtStart must
+    // be captured (post pre-agent snapshot) before the agent can move HEAD,
+    // and the first write must never land ahead of its turn window.
+    const cwd = this.cwdByThread.get(threadId)
+    if (this.opts.registry !== undefined && cwd !== undefined) {
+      this.opts.registry.turnStarted({
+        threadId,
+        agentId: this.agentIdByThread.get(threadId) ?? identity,
+        cwd
+      })
+    }
     this.opts.shellService.getPtyService().writeAgentInput(sessionId, `${command}\r`, 'batched')
     this.turnsSent.add(threadId)
     return true
@@ -200,6 +239,9 @@ export class CliThreadSpawner {
     if (!sid) return
     this.opts.shellService.kill(brandSessionId(sid))
     this.sessionByThread.delete(threadId)
+    // A killed PTY cannot write: drop the turn window immediately (no
+    // linger) so later user edits are never attributed to a dead agent.
+    this.opts.registry?.threadClosed(threadId)
   }
 
   /**

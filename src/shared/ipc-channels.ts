@@ -270,6 +270,9 @@ export interface IpcChannels {
       threadId: string
       identity: import('./agent-identity').AgentIdentity
       cwd: string
+      // Optional harness slug (workstation step 3, the step 6 seam): flows
+      // into turn attribution and commit trailers. Absent → identity.
+      agentId?: string
     }
     response: { ok: true; sessionId: string } | { ok: false; error: string }
   }
@@ -281,6 +284,8 @@ export interface IpcChannels {
       // Per-turn cwd from the renderer (workstation step 1): the renderer
       // already holds the workspace root; main no longer reads it from config.
       cwd: string
+      // Optional harness slug (workstation step 3, the step 6 seam).
+      agentId?: string
     }
     response: { ok: boolean }
   }

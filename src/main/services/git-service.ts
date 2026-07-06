@@ -99,13 +99,23 @@ interface RunGitResult {
  * which exits 1 on success-with-diff).
  */
 function runGit(root: string, args: readonly string[]): RunGitResult {
+  return runGitWithInput(root, args)
+}
+
+/**
+ * runGit with optional stdin payload (NUL-delimited pathname lists for
+ * `--stdin -z` plumbing like check-ignore). stdin is closed-empty when no
+ * input is given, matching the previous 'ignore' behavior.
+ */
+function runGitWithInput(root: string, args: readonly string[], input?: string): RunGitResult {
   try {
     const stdout = execFileSync('git', [...args], {
       cwd: root,
       encoding: 'utf-8',
       timeout: GIT_TIMEOUT_MS,
       maxBuffer: MAX_GIT_BUFFER_BYTES,
-      stdio: ['ignore', 'pipe', 'pipe']
+      input: input ?? '',
+      stdio: ['pipe', 'pipe', 'pipe']
     })
     return { ok: true, code: 0, stdout, stderr: '' }
   } catch (err) {
@@ -128,6 +138,25 @@ export function headSha(root: string): string | null {
   if (!isGitRepo(root)) return null
   const res = runGit(root, ['rev-parse', 'HEAD'])
   return res.ok ? res.stdout.trim() : null
+}
+
+/**
+ * Shas reachable from `toSha` but not `fromSha` (`git rev-list from..to`),
+ * newest first. Null on failure — including a `fromSha` made unreachable by
+ * history rewriting, which callers must treat as suspicious, not clean.
+ * Used by the headMoved tripwire to decide whether HEAD movement during a
+ * turn is fully explained by the queue's own approval commits.
+ */
+export function commitsBetween(
+  root: string,
+  fromSha: string,
+  toSha: string
+): readonly string[] | null {
+  if (!isGitRepo(root)) return null
+  if (!/^[0-9a-f]{4,64}$/i.test(fromSha) || !/^[0-9a-f]{4,64}$/i.test(toSha)) return null
+  const res = runGit(root, ['rev-list', `${fromSha}..${toSha}`])
+  if (!res.ok) return null
+  return res.stdout.split('\n').filter((s) => s.length > 0)
 }
 
 interface PorcelainEntry {
@@ -309,6 +338,37 @@ export function diff(root: string, paths?: readonly string[]): string {
     for (const e of untracked) parts.push(noIndexDiff(root, e.path))
   }
   return truncateDiff(parts.join(''))
+}
+
+/**
+ * Paths `git add` would REFUSE: gitignored and absent from both the index
+ * and HEAD. Tracked-but-ignored files stage fine and are not returned.
+ * The approve path must exclude these before commitApproved — `git add`
+ * exits 1 on any ignored pathname while still staging the rest, which would
+ * brick the whole item on retry (workstation step 3 review blocker).
+ */
+export function ignoredUntracked(root: string, paths: readonly string[]): readonly string[] {
+  if (!isGitRepo(root) || paths.length === 0) return []
+  const requested = paths.map((p) => normalize(p))
+  // check-ignore treats input as pathnames (not pathspecs) — literal-safe.
+  // `-z` REQUIRES `--stdin` (arg mode with -z is fatal exit 128), and -z is
+  // non-negotiable: without it git C-quotes unusual pathnames in stdout and
+  // the set lookups below would miss them. Exit 0 = some ignored, 1 = none;
+  // any failure yields empty stdout, filtering nothing, so commitApproved
+  // surfaces the real git failure instead of silently skipping paths.
+  const ignored = runGitWithInput(
+    root,
+    ['check-ignore', '-z', '--stdin'],
+    requested.join('\0') + '\0'
+  )
+  const ignoredSet = new Set(ignored.stdout.split('\0').filter((p) => p.length > 0))
+  if (ignoredSet.size === 0) return []
+  const indexed = runGit(root, ['ls-files', '-z', '--', ...literalPathspecs(requested)])
+  const indexSet = new Set(indexed.ok ? indexed.stdout.split('\0').filter((p) => p.length > 0) : [])
+  return requested.filter(
+    (p) =>
+      ignoredSet.has(p) && !indexSet.has(p) && !runGit(root, ['cat-file', '-e', `HEAD:${p}`]).ok
+  )
 }
 
 /**

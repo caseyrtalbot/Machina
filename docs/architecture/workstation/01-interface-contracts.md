@@ -371,6 +371,28 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.1.2 (2026-07-05, step 3 landing)** — deviations found while implementing gate
+  parity, reviewed by a 3-lens workflow + independent fix verification + Codex cold
+  read: §4 headMoved hardened from tip-compare to an IMMUTABLE `headShaAtStart` +
+  per-turn ledger of queue-made approval commits + `git rev-list` walk
+  (`isAgentHeadMove`) — a mid-turn user approval must not erase evidence of an earlier
+  agent commit (Codex finding); detection runs at every attributed batch AND at turn
+  close (a trailing self-commit emits no watched fs event), both audited
+  (`cli-agent:head-moved`). Turn close uses open-invocation counting (a cancelled
+  turn's late block event must not close the follow-up turn); every OPEN window
+  requires PTY liveness (a crashed shell must not leave an eternal attribution
+  window). Approve stages around gitignored-untracked paths (`ignoredUntracked`:
+  check-ignore minus index/HEAD membership) — `git add` exits 1 on ignored pathnames
+  while partially staging, which bricked the item (review blocker); all-ignored items
+  degrade to acknowledge. The watcher suppresses the queue's own discard echoes (TTL
+  window) so Reject cannot resurrect its own item; `autoReject` is root-guarded
+  (`expectedRoot`) and the approvals surface is disarmed FIRST on workspace switch.
+  `dist/build/out` excluded at top level only (nested `scripts/build/` stays watched);
+  `.git`/`node_modules` at any depth. Documented accepted residuals: self-write
+  suppression outranks the forbidden check (inverse would auto-discard legitimate
+  editor edits to rules.md; ~2s same-path race = the §4 accepted timing race), and
+  old-workspace PTYs writing unwatched after a switch (§4 scope limits — killing PTYs
+  on switch is a product decision deferred).
 - **v1.1.1 (2026-07-05, step 2 landing)** — deviations discovered while implementing and
   adversarially reviewing the git substrate, folded back in the same commit: §2
   Machina-Reverts trailer value is the reverted shas (agentId-only semantics could not

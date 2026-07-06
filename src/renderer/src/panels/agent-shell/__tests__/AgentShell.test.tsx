@@ -37,7 +37,12 @@ beforeEach(() => {
       readConfig: vi.fn().mockResolvedValue(baseConfig),
       writeConfig: vi.fn().mockResolvedValue(undefined)
     },
+    approvals: {
+      list: vi.fn().mockResolvedValue([]),
+      resolve: vi.fn().mockResolvedValue({ ok: true })
+    },
     on: {
+      approvalsChanged: vi.fn().mockReturnValue(() => {}),
       agentNativeEvent: vi.fn().mockReturnValue(() => {}),
       threadCliMessage: vi.fn().mockReturnValue(() => {}),
       agentNativeDockAction: vi.fn().mockReturnValue(() => {}),

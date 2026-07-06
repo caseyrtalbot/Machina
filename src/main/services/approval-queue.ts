@@ -41,6 +41,12 @@ export interface ApprovalQueueGitDeps {
   readonly commitApproved: (root: string, opts: CommitApprovedOpts) => GitOpResult
   /** Pre-bound discard: the IPC layer injects the removeFile (trash) callback. */
   readonly discard: (root: string, paths: readonly string[]) => Promise<GitOpResult>
+  /**
+   * Paths `git add` would refuse (gitignored, untracked, absent from HEAD).
+   * Approve stages around them — `git add` exits 1 on any ignored pathname
+   * while still staging the rest, which would brick the item on every retry.
+   */
+  readonly ignoredUntracked: (root: string, paths: readonly string[]) => readonly string[]
 }
 
 export interface ApprovalQueueDeps {
@@ -139,6 +145,84 @@ export class ApprovalQueue {
   }
 
   /**
+   * OR-merge flags into an EXISTING turn item without touching paths/diff.
+   * Used by the end-of-turn headMoved tripwire — a turn whose only git
+   * activity was a self-commit has no fs-event path into recordWrites.
+   * Returns false (and records nothing) when no item exists for the turn.
+   */
+  flagExisting(turnId: string, flags: Partial<PendingChangeFlags>): boolean {
+    const id = `pc_${turnId}`
+    const existing = this.items.get(id)
+    if (existing === undefined) return false
+    this.items.set(id, { ...existing, flags: mergeFlags(existing.flags, flags) })
+    this.notifyChanged()
+    return true
+  }
+
+  /**
+   * Immediate containment for HARNESS_PROTECTED_GLOBS hits (contracts §4/§5):
+   * discard the forbidden paths right now — no user round-trip — and audit.
+   * Operates on ONLY the forbidden paths, never the turn's whole item: a
+   * merged discard would revert legitimate writes still awaiting review.
+   * Non-repo (or failed discard): nothing can be restored, so the paths are
+   * recorded into the turn's item flagged `forbidden` — visibility must not
+   * vanish just because rollback is impossible.
+   *
+   * `expectedRoot` is the watcher's own root: during a workspace switch the
+   * old watcher can still flush a batch AFTER the active workspace flipped,
+   * and a discard against the new root with old-root-relative paths would be
+   * destructive. Mismatch → audit only, no discard, no queue item.
+   */
+  async autoReject(opts: RecordWritesOpts, expectedRoot?: string): Promise<GitOpResult> {
+    const root = this.deps.getRoot()
+    if (expectedRoot !== undefined && root !== expectedRoot) {
+      const result: GitOpResult = { ok: false, reason: 'workspace-changed' }
+      this.auditAutoReject(opts, 'error', result)
+      return result
+    }
+    const flagged: RecordWritesOpts = {
+      ...opts,
+      flags: { ...opts.flags, forbidden: true }
+    }
+    if (root === null || !this.deps.git.isRepo(root)) {
+      this.recordWrites(flagged)
+      const result: GitOpResult = {
+        ok: false,
+        reason: root === null ? 'no-workspace' : 'not-a-git-repo'
+      }
+      this.auditAutoReject(opts, 'error', result)
+      return result
+    }
+    const result = await this.deps.git.discard(root, opts.paths)
+    if (!result.ok) {
+      this.recordWrites(flagged)
+      this.auditAutoReject(opts, 'error', result)
+      return result
+    }
+    this.auditAutoReject(opts, 'denied', result)
+    return result
+  }
+
+  /**
+   * Drop every item and deny every waiting gate confirm — called when the
+   * approvals surface re-binds to a new workspace root. Items captured
+   * against the old root must never be resolvable against the new one.
+   */
+  clear(): void {
+    for (const waiter of this.gateWaiters.values()) {
+      clearTimeout(waiter.timer)
+      waiter.resolve({
+        allowed: false,
+        reason: 'Denied: approval queue cleared (workspace changed)'
+      })
+    }
+    this.gateWaiters.clear()
+    this.items.clear()
+    this.capturedRoots.clear()
+    this.notifyChanged()
+  }
+
+  /**
    * Resolve one pending change. approve → commitApproved (trailers) when the
    * root is a repo, else acknowledge + audit; reject → discard, except
    * non-repo where the item is RETAINED (`not-a-git-repo` — nothing to
@@ -213,11 +297,24 @@ export class ApprovalQueue {
         this.notifyChanged()
         return this.audited(id, approve, item.paths, 'allowed', { ok: true }, message)
       }
+      // Gitignored-untracked paths cannot be staged; commit around them.
+      // They were still reviewed (the diff synthesizes them via --no-index)
+      // and the audit entry names what was acknowledged without a commit.
+      const skippedIgnored = this.deps.git.ignoredUntracked(root, item.paths)
+      const commitPaths = item.paths.filter((p) => !skippedIgnored.includes(p))
+      if (commitPaths.length === 0) {
+        // Everything in the item is unstageable — approve degrades to the
+        // acknowledge path (same as non-repo), never to a stuck item.
+        this.items.delete(id)
+        this.capturedRoots.delete(id)
+        this.notifyChanged()
+        return this.audited(id, approve, item.paths, 'allowed', { ok: true }, message)
+      }
       const trimmed = message?.trim() ?? ''
       const result = this.deps.git.commitApproved(root, {
         agentId: item.agentId,
         threadId: item.threadId,
-        paths: item.paths,
+        paths: commitPaths,
         message: trimmed.length > 0 ? trimmed : `Approve agent changes (${item.agentId})`
       })
       if (!result.ok) {
@@ -316,6 +413,21 @@ export class ApprovalQueue {
       { ok: true },
       message
     )
+  }
+
+  private auditAutoReject(
+    opts: RecordWritesOpts,
+    decision: AuditEntry['decision'],
+    result: GitOpResult
+  ): void {
+    this.deps.audit.log({
+      ts: this.nowIso(),
+      tool: 'approvals:auto-reject',
+      args: { turnId: opts.turnId, threadId: opts.threadId, agentId: opts.agentId },
+      affectedPaths: [...opts.paths],
+      decision,
+      ...(result.ok ? {} : { error: result.reason })
+    })
   }
 
   /** Write the resolve's single AuditEntry and pass the result through. */

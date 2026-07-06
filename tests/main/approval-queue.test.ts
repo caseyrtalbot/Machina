@@ -15,7 +15,8 @@ import {
   isGitRepo,
   diff as gitDiff,
   commitApproved,
-  discard as gitDiscard
+  discard as gitDiscard,
+  ignoredUntracked
 } from '../../src/main/services/git-service'
 
 // ---------------------------------------------------------------------------
@@ -31,9 +32,11 @@ interface Harness {
     diff: ReturnType<typeof vi.fn>
     commitApproved: ReturnType<typeof vi.fn>
     discard: ReturnType<typeof vi.fn>
+    ignoredUntracked: ReturnType<typeof vi.fn>
   }
   setDiff(next: string): void
   setRoot(next: string | null): void
+  setIgnoredUntracked(next: readonly string[]): void
 }
 
 function makeHarness(opts: { isRepo?: boolean; root?: string | null } = {}): Harness {
@@ -42,11 +45,13 @@ function makeHarness(opts: { isRepo?: boolean; root?: string | null } = {}): Har
   let diffValue = 'diff-v1'
   let rootValue = opts.root !== undefined ? opts.root : '/workspace'
   let tick = 0
+  let ignoredValue: readonly string[] = []
   const git = {
     isRepo: vi.fn((): boolean => opts.isRepo ?? true),
     diff: vi.fn((): string => diffValue),
     commitApproved: vi.fn((): GitOpResult => ({ ok: true, sha: 'abc123' })),
-    discard: vi.fn(async (): Promise<GitOpResult> => ({ ok: true }))
+    discard: vi.fn(async (): Promise<GitOpResult> => ({ ok: true })),
+    ignoredUntracked: vi.fn((): readonly string[] => ignoredValue)
   }
   const queue = new ApprovalQueue({
     git,
@@ -65,6 +70,9 @@ function makeHarness(opts: { isRepo?: boolean; root?: string | null } = {}): Har
     },
     setRoot: (next) => {
       rootValue = next
+    },
+    setIgnoredUntracked: (next) => {
+      ignoredValue = next
     }
   }
 }
@@ -410,6 +418,227 @@ describe('ApprovalQueue notify', () => {
 })
 
 // ---------------------------------------------------------------------------
+// autoReject
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue autoReject', () => {
+  it('repo: discards ONLY the forbidden paths, keeps them out of the queue, audits denied', async () => {
+    const h = makeHarness()
+    // Legitimate writes for the same turn already await review.
+    recordTurn(h)
+
+    const result = await h.queue.autoReject({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['.claude/settings.json']
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(h.git.discard).toHaveBeenCalledTimes(1)
+    expect(h.git.discard).toHaveBeenCalledWith('/workspace', ['.claude/settings.json'])
+    // The forbidden paths do NOT land in the queue; the legit item is untouched.
+    expect(h.queue.list()).toHaveLength(1)
+    expect(h.queue.list()[0]?.paths).toEqual(['a.txt'])
+    expect(h.queue.list()[0]?.flags.forbidden).toBe(false)
+    expect(h.audit).toHaveLength(1)
+    expect(h.audit[0]).toMatchObject({
+      tool: 'approvals:auto-reject',
+      decision: 'denied',
+      affectedPaths: ['.claude/settings.json'],
+      args: { turnId: 't1', threadId: 'th-1', agentId: 'fixer' }
+    })
+    expect(h.audit[0]?.error).toBeUndefined()
+  })
+
+  it('discard failure: paths merge into the turn item flagged forbidden, audit is error', async () => {
+    const h = makeHarness()
+    h.git.discard.mockResolvedValue({ ok: false, reason: 'discard-failed' })
+    // Pre-existing attributed writes with a tripped flag: the merge must not clobber them.
+    h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['a.txt'],
+      flags: { highVelocity: true }
+    })
+
+    const result = await h.queue.autoReject({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['secret.env']
+    })
+
+    expect(result).toEqual({ ok: false, reason: 'discard-failed' })
+    const item = h.queue.list()[0]
+    expect(h.queue.list()).toHaveLength(1) // coalesced into pc_t1, not a new item
+    expect(item?.id).toBe('pc_t1')
+    expect(item?.paths).toEqual(['a.txt', 'secret.env'])
+    expect(item?.flags.forbidden).toBe(true)
+    expect(item?.flags.highVelocity).toBe(true) // prior flag survives the merge
+    // Diff is the standard recordWrites recompute over the merged set — no clobber beyond that.
+    expect(h.git.diff).toHaveBeenLastCalledWith('/workspace', ['a.txt', 'secret.env'])
+    expect(item?.diff).toBe('diff-v1')
+    expect(h.audit[0]).toMatchObject({
+      tool: 'approvals:auto-reject',
+      decision: 'error',
+      error: 'discard-failed',
+      affectedPaths: ['secret.env']
+    })
+  })
+
+  it('non-repo: no discard, item retained flagged forbidden, result not-a-git-repo', async () => {
+    const h = makeHarness({ isRepo: false })
+
+    const result = await h.queue.autoReject({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['secret.env']
+    })
+
+    expect(result).toEqual({ ok: false, reason: 'not-a-git-repo' })
+    expect(h.git.discard).not.toHaveBeenCalled()
+    const item = h.queue.list()[0]
+    expect(item?.id).toBe('pc_t1')
+    expect(item?.paths).toEqual(['secret.env'])
+    expect(item?.flags.forbidden).toBe(true)
+    expect(h.audit[0]).toMatchObject({
+      tool: 'approvals:auto-reject',
+      decision: 'error',
+      error: 'not-a-git-repo'
+    })
+  })
+
+  it('expectedRoot mismatch: no discard, no item, audit error workspace-changed', async () => {
+    const h = makeHarness() // getRoot() → /workspace
+
+    const result = await h.queue.autoReject(
+      {
+        turnId: 't1',
+        threadId: 'th-1',
+        agentId: 'fixer',
+        paths: ['secret.env']
+      },
+      '/old-workspace'
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'workspace-changed' })
+    expect(h.git.discard).not.toHaveBeenCalled()
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit).toHaveLength(1)
+    expect(h.audit[0]).toMatchObject({
+      tool: 'approvals:auto-reject',
+      decision: 'error',
+      error: 'workspace-changed',
+      affectedPaths: ['secret.env']
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// approve around ignored-untracked paths
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue approve with ignored-untracked paths', () => {
+  it('commits around ignored-untracked paths and removes the item', async () => {
+    const h = makeHarness()
+    h.setIgnoredUntracked(['.env'])
+    h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['src/a.ts', '.env']
+    })
+
+    const result = await h.queue.resolve('pc_t1', true)
+
+    expect(result).toEqual({ ok: true, sha: 'abc123' })
+    expect(h.git.ignoredUntracked).toHaveBeenCalledWith('/workspace', ['src/a.ts', '.env'])
+    expect(h.git.commitApproved).toHaveBeenCalledTimes(1)
+    const opts = h.git.commitApproved.mock.calls[0]?.[1] as { paths: readonly string[] }
+    expect(opts.paths).toEqual(['src/a.ts'])
+    expect(h.queue.list()).toEqual([])
+  })
+
+  it('all paths ignored-untracked: approve acknowledges without a commit', async () => {
+    const h = makeHarness()
+    h.setIgnoredUntracked(['.env', 'secrets/.env.local'])
+    h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['.env', 'secrets/.env.local']
+    })
+
+    const result = await h.queue.resolve('pc_t1', true)
+
+    expect(result).toEqual({ ok: true })
+    expect(h.git.commitApproved).not.toHaveBeenCalled()
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit).toHaveLength(1)
+    expect(h.audit[0]).toMatchObject({ tool: 'approvals:resolve', decision: 'allowed' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// flagExisting
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue flagExisting', () => {
+  it('OR-merges flags into an existing turn item without touching paths/diff', () => {
+    const h = makeHarness()
+    const recorded = h.queue.recordWrites({
+      turnId: 't9',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['a.txt']
+    })
+    const notifiesBefore = h.notifications.length
+
+    const flagged = h.queue.flagExisting('t9', { headMoved: true })
+
+    expect(flagged).toBe(true)
+    const item = h.queue.list()[0]
+    expect(item?.id).toBe('pc_t9')
+    expect(item?.flags.headMoved).toBe(true)
+    expect(item?.paths).toEqual(recorded.paths)
+    expect(item?.diff).toBe(recorded.diff)
+    expect(h.notifications.length).toBe(notifiesBefore + 1)
+  })
+
+  it('unknown turn returns false and adds no item', () => {
+    const h = makeHarness()
+    const flagged = h.queue.flagExisting('t-unknown', { headMoved: true })
+    expect(flagged).toBe(false)
+    expect(h.queue.list()).toEqual([])
+    expect(h.notifications).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// clear
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue clear', () => {
+  it('denies pending gate confirms, empties the queue, and notifies 0', async () => {
+    const h = makeHarness()
+    recordTurn(h) // → notify 1
+    const decision = h.queue.enqueueGateConfirm(GATE_OPTS, 30_000) // → notify 2
+
+    h.queue.clear() // → notify 0
+
+    const denied = await decision
+    expect(denied.allowed).toBe(false)
+    expect(denied.reason).toMatch(/cleared/)
+    expect(denied.reason).toMatch(/workspace/)
+    expect(h.queue.list()).toEqual([])
+    expect(h.notifications).toEqual([1, 2, 0])
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Integration: real GitService on a real temp repo
 // ---------------------------------------------------------------------------
 
@@ -422,7 +651,8 @@ describe('ApprovalQueue with real git-service', () => {
       isRepo: isGitRepo,
       diff: gitDiff,
       commitApproved,
-      discard: (repoRoot, paths) => gitDiscard(repoRoot, paths, (abs) => rm(abs))
+      discard: (repoRoot, paths) => gitDiscard(repoRoot, paths, (abs) => rm(abs)),
+      ignoredUntracked
     }
     const queue = new ApprovalQueue({
       git,
@@ -497,5 +727,24 @@ describe('ApprovalQueue with real git-service', () => {
     expect(queue.list()).toEqual([])
     const status = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf-8' })
     expect(status.trim()).toBe('')
+  })
+
+  it('ignoredUntracked flags gitignored-untracked files but not tracked-but-ignored ones', () => {
+    root = mkdtempSync(join(tmpdir(), 'machina-approval-queue-'))
+    initRepo(root)
+    const opts = { cwd: root, stdio: 'ignore' } as const
+
+    writeFileSync(join(root, '.gitignore'), '.env\napp.log\n')
+    writeFileSync(join(root, '.env'), 'SECRET=1\n')
+    writeFileSync(join(root, 'src.ts'), 'export {}\n')
+    expect(ignoredUntracked(root, ['src.ts', '.env'])).toEqual(['.env'])
+
+    // Tracked-but-ignored: force-added and committed, then modified. It
+    // stages fine, so it must NOT be returned.
+    writeFileSync(join(root, 'app.log'), 'v1\n')
+    execFileSync('git', ['add', '-f', 'app.log'], opts)
+    execFileSync('git', ['commit', '-m', 'track ignored log', '--quiet', '--no-verify'], opts)
+    writeFileSync(join(root, 'app.log'), 'v2\n')
+    expect(ignoredUntracked(root, ['app.log', '.env'])).toEqual(['.env'])
   })
 })

@@ -20,7 +20,7 @@ import { registerThreadIpc } from './ipc/thread-ipc'
 import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { registerPdfIndexIpc, setPdfIndexSearchEngine } from './ipc/pdf-index'
-import { registerGitIpc } from './ipc/git'
+import { initApprovalsForRoot, registerGitIpc, stopApprovals } from './ipc/git'
 import { registerEmbeddingsIpc, setEmbedderService } from './ipc/embeddings'
 import { EmbedderService } from './services/embedder-service'
 import { TE_DIR } from '../shared/constants'
@@ -174,6 +174,11 @@ function ensureHealthMonitor(): VaultHealthMonitor {
 // Awaited from vault:init so failures surface to the caller instead of
 // becoming unhandled rejections.
 async function reconfigureForVault(vaultPath: string): Promise<void> {
+  // Disarm the old workspace's agent write watcher BEFORE anything else:
+  // the active workspace has already flipped, and a stale watcher batch
+  // routing against the new root is destructive (autoReject discards).
+  await stopApprovals()
+
   // Drop any pending-write suppression flags inherited from the previous
   // vault. Otherwise an inflight write against the old vault can leak
   // suppression into the new one and swallow legitimate external-change
@@ -217,6 +222,15 @@ async function reconfigureForVault(vaultPath: string): Promise<void> {
   setHealthMonitor(health)
   health.switchVault(vaultPath)
   health.start(vaultPath)
+
+  // Gate parity (step 3): re-bind the agent write watcher + approval queue
+  // to the new root. A watcher failure must not fail vault init — the gate
+  // degrades to no-visibility (as before step 3), not to a blocked workspace.
+  try {
+    await initApprovalsForRoot(vaultPath)
+  } catch (err) {
+    console.error('[approvals] failed to start agent write watcher', err)
+  }
 }
 
 function createWindow(): BrowserWindow {

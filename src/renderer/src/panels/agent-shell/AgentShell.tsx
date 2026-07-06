@@ -10,6 +10,7 @@ import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
 import { SideDockRibbon } from './SideDockRibbon'
 import { HeaderFilesSidePanel, HeaderFilesToggleButton } from './HeaderFilesSidePanel'
+import { ApprovalsTray } from './ApprovalsTray'
 import { TitlebarPanelToggle } from './TitlebarPanelToggle'
 import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
@@ -93,6 +94,7 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
         centerSlot={<TitlebarBreadcrumb />}
         rightSlot={
           <>
+            <ApprovalsTray />
             <TitlebarPanelToggle
               open={!sidebarCollapsed}
               onToggle={toggleSidebarCollapsed}

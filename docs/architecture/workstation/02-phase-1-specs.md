@@ -136,7 +136,17 @@ stale-diff, unknown-change, non-repo approve-acknowledge.
 shows both trailers, revertAgent restores; non-repo returns structured no-ops; snapshot
 commits now count == turns sent (per-turn granularity evidence).
 
-## Step 3 — Gate parity (attribution + watcher + queue UI)
+## Step 3 — Gate parity (attribution + watcher + queue UI) — **DONE** (2026-07-05)
+
+Landed with full gate green (3024 unit tests, build, e2e fresh post-rebase) and the
+exit bar smoke-verified on the built app via Playwright probes: one coalesced
+PendingChange with non-empty diff; Reject ⇒ porcelain clean with no watcher-echo
+resurrection; Approve ⇒ both trailers + 'allowed' NDJSON line; verify.sh auto-rejected
+(trashed + audited) while state.json churn produced zero items; non-repo ⇒
+revertible:false + "No rollback" chip + disabled Reject; mid-turn `git commit` ⇒
+headMoved flag + banner + `cli-agent:head-moved` audit line. Deviations from this
+spec are in contracts §8 (v1.1.2); QueueHitlGate is built + unit-tested but NOT wired
+over the MCP gate in production, as specced.
 
 The producers. Depends on steps 1–2.
 

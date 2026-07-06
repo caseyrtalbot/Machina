@@ -68,7 +68,8 @@ describe('cli-thread IPC handlers', () => {
       'th_1',
       'cli-claude',
       'fix the tests',
-      '/repos/project'
+      '/repos/project',
+      undefined
     )
   })
 
@@ -88,6 +89,6 @@ describe('cli-thread IPC handlers', () => {
       identity: 'cli-codex',
       cwd: '/repos/other'
     })
-    expect(state.spawner.spawn).toHaveBeenCalledWith('th_2', 'cli-codex', '/repos/other')
+    expect(state.spawner.spawn).toHaveBeenCalledWith('th_2', 'cli-codex', '/repos/other', undefined)
   })
 })

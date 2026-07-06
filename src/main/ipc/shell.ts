@@ -14,6 +14,8 @@ import { register, unregister, getWebContents } from '../services/session-router
 import { BlockWatcher } from '../services/block-watcher'
 import { CLIAgentSessionListener } from '../services/cli-agent-session-listener'
 import { CliAgentThreadBridge } from '../services/cli-agent-thread-bridge'
+import { getCliTurnRegistry } from '../services/cli-turn-registry'
+import { checkHeadMovedAtTurnEnd } from './git'
 import { getMainWindow } from '../window-registry'
 import type { SessionId } from '@shared/types'
 
@@ -33,7 +35,15 @@ const cliAgentListener = new CLIAgentSessionListener({
 })
 
 const cliAgentThreadBridge = new CliAgentThreadBridge({
-  onMessage: (event) => sendToMainWindow('thread:cli-message', event)
+  onMessage: (event) => sendToMainWindow('thread:cli-message', event),
+  // Turn-window close for the gate-parity attribution registry (step 3):
+  // once per completed block, which is once per CLI turn. When a turn
+  // actually closes, run the end-of-turn headMoved check — a final
+  // self-commit produces no watched fs event, so this is its only tripwire.
+  onTurnComplete: (threadId) => {
+    const closed = getCliTurnRegistry().turnEnded(threadId)
+    if (closed !== undefined) checkHeadMovedAtTurnEnd(closed)
+  }
 })
 
 const blockWatcher = new BlockWatcher({

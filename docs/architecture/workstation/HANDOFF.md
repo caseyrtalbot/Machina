@@ -24,10 +24,11 @@ mutation-verified tests). Full gate green (`npm run check` 2909 tests, build,
 Playwright probes: `git.status`/`diff`/`commitApproved` (both trailers in `git log`)/
 `revertAgent` (restore + Machina-Reverts) on a real dirtied repo, non-repo structured
 no-ops, and per-turn snapshot granularity (2 turns sent ⇒ exactly 2 pre-agent snapshot
-commits). **The next work is step 3 (gate parity); step 4 (dock shell) remains
-parallel-safe — `HANDOFF-PARALLEL-STEPS-3-4.md` is the two-session work order with the
-coordination contract.** Section "What step 2 changed under you" below lists the seams
-step 3 consumes.
+commits). **Steps 3 (gate parity) and 4 (dock shell) are both SHIPPED** — see their
+"What step N changed under you" sections below. **The next work is step 5 (retire the
+pre-run snapshot — evidence gate G1–G8 first) and step 6 (test-fixer template).** The
+pre-run snapshot is STILL WIRED (spawn + per-turn) — step 5 retires it only after the
+evidence gate passes on fresh runs.
 
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
@@ -38,10 +39,10 @@ step 3 consumes.
 3. **01-interface-contracts.md** — the typed contracts (v1.1). Section 4 is the
    load-bearing one: read its framing before touching anything agent-related.
 4. **02-phase-1-specs.md** — six implementation specs in canonical order, one commit
-   each. This is your work queue. Steps 1–2 are DONE (`76d0699`, `3198ddd`); step 3
-   (gate parity) is next, and step 4 (dock shell) can run in parallel with 3. Line
-   numbers in the specs were verified at `7735644`/`ec6fa6d` and steps 1–2 have since
-   moved code — re-verify with `rg` before editing.
+   each. This is your work queue. Steps 1–4 are DONE (`76d0699`, `3198ddd`, `424b3cc`,
+   step 3's landing commit); next are steps 5–6. Line numbers in the specs were
+   verified at `7735644`/`ec6fa6d` and later steps have since moved code — re-verify
+   with `rg` before editing.
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -140,6 +141,57 @@ step 3 consumes.
    fresh on revisit; `thread-store.ts` sits at ~830 lines (was 825 — the 3
    sanctioned touches only). **Manual migration acceptance (tick-counter,
    Casey observing) is still open.**
+
+## What step 3 changed under you (gate parity)
+
+1. **The attribution primitive is `getCliTurnRegistry()`**
+   (`src/main/services/cli-turn-registry.ts`). Turn windows: open on spawner
+   send, closed by the bridge's `onTurnComplete` (once per completed/cancelled
+   block) via **open-invocation counting** — `turnEnded` only stamps when
+   sends minus completions drains to 0, so a cancelled turn's late block
+   cannot close the follow-up turn (over-counting leaves the window open:
+   over-attribution, never silent escape). EVERY open window requires
+   `isPtyAlive` (late-bound probe = `spawner.hasLiveSession`, set in
+   `ipc/cli-thread.ts`); closed windows linger LINGER_MS regardless.
+   `threadClosed` drops the window with zero linger — trailing ~400ms of fs
+   events become audited unattributed writes (accepted trade, documented).
+2. **headMoved is a two-point tripwire with an immutable baseline.**
+   `headShaAtStart` never changes; queue-made approval commits are recorded
+   per-turn (`noteQueueCommit`, wired in `ipc/git.ts`) and excused by the
+   `git rev-list` walk in `isAgentHeadMove` (exported, pure). Detection at
+   every attributed batch (audited once per turn) AND at turn close
+   (`checkHeadMovedAtTurnEnd` in `ipc/git.ts` — catches a trailing
+   self-commit that produces no watched fs event). An agent commit hiding
+   BENEATH a later approval commit is still caught (walk-based, not
+   tip-compare). A turn that commits and then writes can produce two audit
+   entries (mid-turn + turn-end, disambiguated by `at:'turn-end'`) — by
+   design, two independent detection points.
+3. **`AgentWriteWatcher` re-binds via `initApprovalsForRoot(root)`**; its
+   counterpart `stopApprovals()` is the FIRST await in `reconfigureForVault`
+   (the active workspace flips before ready callbacks run — a stale watcher
+   batch must never route against the new root; `autoReject` also takes the
+   watcher's `expectedRoot` and refuses on mismatch). The watcher suppresses
+   the queue's own discard echoes (`suppress(paths)`, 10s TTL, wired around
+   the discard binding in `ipc/git.ts`) — without it, a Reject inside a
+   still-open window resurrects the just-resolved item. `dist/build/out` are
+   excluded at TOP LEVEL only; `.git`/`node_modules` at any depth.
+4. **Approve commits AROUND gitignored-untracked paths**
+   (`git-service.ignoredUntracked`: check-ignore `--stdin -z` minus
+   index/HEAD membership) — `git add` exits 1 on any ignored pathname while
+   still staging the rest, which would brick the item on every retry.
+   All-ignored items degrade to acknowledge. Tracked-but-ignored files are
+   NOT filtered.
+5. **Known accepted residuals**: CLI PTYs from workspace A keep writing
+   unwatched after a switch to B (contracts §4 scope limits — the tray footer
+   states root-only scope; killing PTYs on switch is a product decision, not
+   step 3's); self-write suppression outranks the forbidden-path check
+   (inverting would auto-trash legitimate user edits to rules.md made through
+   the editor; the ~2s same-path race is the contract's accepted timing
+   race); `WriteRateLimiter` uses wall-clock internally while the watcher
+   clock is injectable (prod-consistent; velocity tests use real timing).
+6. **The step 6 seam is live**: `cli-thread:spawn`/`input` accept optional
+   `agentId` (stored per thread, defaults to identity) — the harness slug
+   flows into turn attribution and commit trailers with no further plumbing.
 
 Repo gotchas the step-1 team hit (they will bite you too):
 
