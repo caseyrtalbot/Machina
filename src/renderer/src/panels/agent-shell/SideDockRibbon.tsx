@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Sparkles,
   Square,
+  SquareTerminal,
   type LucideIcon
 } from 'lucide-react'
 import type { DockTab } from '@shared/dock-types'
@@ -20,6 +21,7 @@ import { borderRadius, colors, transitions } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
+import { openStripTerminal } from './terminal-migration'
 
 interface SideDockRibbonProps {
   readonly onOpenPalette: () => void
@@ -128,6 +130,11 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
           label="Open health"
           icon={Activity}
           onClick={() => openSurface({ kind: 'health' })}
+        />
+        <RibbonAction
+          label="New terminal"
+          icon={SquareTerminal}
+          onClick={() => openStripTerminal()}
         />
       </RibbonGroup>
 

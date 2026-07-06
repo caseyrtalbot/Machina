@@ -26,6 +26,24 @@ function guardPath(path: string, channel: string): string {
   return ws.guard().assertWithinVault(path)
 }
 
+/**
+ * fs:select-file guard: the picker roams anywhere, but only paths inside the
+ * workspace root come back — everything else (or no open workspace) is null,
+ * not an error, so the renderer treats it like a cancelled dialog.
+ * Exported for tests.
+ */
+export function guardSelectedFile(
+  picked: string,
+  guard: { assertWithinVault(path: string): string } | null
+): string | null {
+  if (!guard) return null
+  try {
+    return guard.assertWithinVault(picked)
+  } catch {
+    return null
+  }
+}
+
 export function registerFilesystemIpc(): void {
   typedHandle('fs:read-file', async (args) => {
     const resolved = guardPath(args.path, 'fs:read-file')
@@ -61,6 +79,13 @@ export function registerFilesystemIpc(): void {
   typedHandle('fs:select-vault', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  typedHandle('fs:select-file', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openFile'] })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const ws = getWorkspaceService()
+    return guardSelectedFile(result.filePaths[0], ws.current() ? ws.guard() : null)
   })
 
   typedHandle('fs:rename-file', async (args) => {

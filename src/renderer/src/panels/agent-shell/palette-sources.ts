@@ -5,6 +5,8 @@ import type { SearchHit } from '@shared/engine/search-engine'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeStatusStore } from '../../store/claude-status-store'
+import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
+import { openStripTerminal, openStripTerminalInFolder } from './terminal-migration'
 
 export type PaletteItemKind = 'thread' | 'file' | 'surface' | 'action' | 'note'
 
@@ -162,6 +164,38 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       run: () => {
         opts.closePalette()
         useClaudeStatusStore.getState().openOnboarding()
+      }
+    },
+    {
+      id: 'action:new-terminal',
+      kind: 'action',
+      title: 'New terminal',
+      subtitle: 'ctrl+` · terminal strip at workspace root',
+      run: () => {
+        opts.closePalette()
+        openStripTerminal()
+      }
+    },
+    {
+      id: 'action:new-terminal-in-folder',
+      kind: 'action',
+      title: 'New terminal in folder…',
+      subtitle: 'terminal strip · pick any directory',
+      run: async () => {
+        opts.closePalette()
+        await openStripTerminalInFolder()
+      }
+    },
+    {
+      id: 'action:open-file-in-editor',
+      kind: 'action',
+      title: 'Open file in editor…',
+      subtitle: 'workspace files only',
+      run: async () => {
+        opts.closePalette()
+        const path = await window.api.fs.selectFile()
+        if (!path) return
+        openArtifactInEditor(path, path.split('/').pop() ?? path)
       }
     }
   )

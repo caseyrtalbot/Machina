@@ -10,16 +10,19 @@ vi.mock('../CardShell', () => ({
     title,
     children,
     onActivateContentClick,
-    titleExtra
+    titleExtra,
+    headerActions
   }: {
     title: string
     children: React.ReactNode
     onActivateContentClick?: (e: React.MouseEvent<HTMLDivElement>) => void
     titleExtra?: React.ReactNode
+    headerActions?: React.ReactNode
   }) => (
     <div data-testid="card-shell">
       <div data-testid="card-title">{title}</div>
       {titleExtra && <div data-testid="title-extra">{titleExtra}</div>}
+      {headerActions && <div data-testid="header-actions">{headerActions}</div>}
       <div data-testid="card-content" onClick={onActivateContentClick}>
         {children}
       </div>
@@ -76,6 +79,12 @@ vi.mock('../../../hooks/useClaudeContext', () => ({
 
 vi.mock('../../../engine/context-serializer', () => ({
   buildCanvasContext: vi.fn(() => ({ text: '', fileCount: 0 }))
+}))
+
+// terminal-migration: mocked so 'Move to dock' tests observe the call without
+// touching the strip store or the live PTY.
+vi.mock('../../agent-shell/terminal-migration', () => ({
+  canvasToStrip: vi.fn()
 }))
 
 // Mock window.api — assign onto existing window to preserve happy-dom globals
@@ -461,5 +470,65 @@ describe('TerminalCard (webview host)', () => {
 
     expect(mockUpdateContent).toHaveBeenCalledWith('term-1', 'session-new')
     expect(restarted?.getAttribute('src')).toBe(launchSrc)
+  })
+})
+
+describe('TerminalCard move-to-dock header action', () => {
+  afterEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+    mockFocusedTerminalId = null
+    mockFocusedCardId = null
+    mockLockedCardId = null
+  })
+
+  it('renders the action when the node has a live session', async () => {
+    const { TerminalCard } = await import('../TerminalCard')
+    const node = makeTerminalNode({ content: 'session-live' })
+    render(<TerminalCard node={node} />)
+
+    expect(screen.getByTestId('terminal-move-to-dock')).toBeTruthy()
+  })
+
+  it('does not render the action when the node has no session (empty content)', async () => {
+    const { TerminalCard } = await import('../TerminalCard')
+    const node = makeTerminalNode({ content: '' })
+    render(<TerminalCard node={node} />)
+
+    expect(screen.queryByTestId('terminal-move-to-dock')).toBeNull()
+  })
+
+  it('does not render the action once the session is dead', async () => {
+    const { TerminalCard } = await import('../TerminalCard')
+    const node = makeTerminalNode({ content: 'session-dying' })
+    const { container } = render(<TerminalCard node={node} />)
+
+    expect(screen.getByTestId('terminal-move-to-dock')).toBeTruthy()
+
+    const { webview } = attachWebviewHarness(container)
+    await act(async () => {
+      dispatchWebviewEvent(webview, 'ipc-message', {
+        channel: 'session-exited',
+        args: ['session-dying', 0]
+      })
+    })
+
+    expect(await screen.findByText('Session ended')).toBeTruthy()
+    expect(screen.queryByTestId('terminal-move-to-dock')).toBeNull()
+  })
+
+  it('clicking the action invokes canvasToStrip with the node without killing the terminal', async () => {
+    const { canvasToStrip } = await import('../../agent-shell/terminal-migration')
+    const { TerminalCard } = await import('../TerminalCard')
+    const node = makeTerminalNode({ content: 'session-migrate' })
+    render(<TerminalCard node={node} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('terminal-move-to-dock'))
+    })
+
+    expect(canvasToStrip).toHaveBeenCalledTimes(1)
+    expect(canvasToStrip).toHaveBeenCalledWith(node)
+    expect(mockKill).not.toHaveBeenCalled()
   })
 })

@@ -6,6 +6,7 @@ import { colors, typography } from '../../design/tokens'
 import { type DockTab } from '@shared/dock-types'
 import { useCliAgentPresence, type CLIAgentPresence } from '../../hooks/use-cli-agent-presence'
 import { CliAgentBadge } from '../../components/CliAgentBadge'
+import { TerminalStrip } from './TerminalStrip'
 
 const EMPTY_TABS: readonly DockTab[] = []
 
@@ -156,6 +157,7 @@ export function SurfaceDock() {
           <EmptyDockState />
         )}
       </div>
+      <TerminalStrip />
     </aside>
   )
 }

@@ -10,6 +10,7 @@ import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { TE_DIR } from '@shared/constants'
 import { setActiveCanvas } from './canvas-store'
+import { useTerminalStripStore } from './terminal-strip-store'
 import { transportFor } from './agent-transport'
 import {
   persistFilesPanelOpen,
@@ -169,6 +170,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     for (const t of list) {
       byId[t.id] = t
       dockByThread[t.id] = t.dockState.tabs.slice()
+      // Terminal strip state rides the thread file; legacy files seed undefined (no-op).
+      useTerminalStripStore.getState().seed(t.id, t.dockState.terminalStrip)
     }
     set({ threadsById: byId, dockTabsByThreadId: dockByThread })
   },
@@ -388,6 +391,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
     })
+    useTerminalStripStore.getState().drop(id)
   },
 
   renameThread: async (id, title) => {
@@ -819,7 +823,8 @@ export async function flushDockState(id: string): Promise<void> {
   const t = s.threadsById[id]
   if (!s.vaultPath || !t) return
   const tabs = s.dockTabsByThreadId[id] ?? []
-  const next: Thread = { ...t, dockState: { tabs } }
+  const terminalStrip = useTerminalStripStore.getState().byThreadId[id]
+  const next: Thread = { ...t, dockState: { tabs, ...(terminalStrip ? { terminalStrip } : {}) } }
   useThreadStore.setState({ threadsById: { ...s.threadsById, [id]: next } })
   await window.api.thread.save(s.vaultPath, next)
 }

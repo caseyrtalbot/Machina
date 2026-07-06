@@ -84,7 +84,8 @@ export interface CanvasStore {
 
   // Node mutations
   addNode: (node: CanvasNode) => void
-  removeNode: (id: string) => void
+  /** preserveSession skips the terminal PTY kill — canvas→dock migration only. */
+  removeNode: (id: string, opts?: { preserveSession?: boolean }) => void
   moveNode: (id: string, position: { x: number; y: number }) => void
   moveNodes: (updates: ReadonlyMap<string, { x: number; y: number }>) => void
   resizeNode: (id: string, size: { width: number; height: number }) => void
@@ -288,10 +289,12 @@ export function createCanvasStore(): CanvasStoreApi {
 
     addNode: (node) => set((s) => ({ nodes: [...s.nodes, node], ...dirty(s) })),
 
-    removeNode: (id) => {
+    removeNode: (id, opts) => {
       const removed = get().nodes.find((n) => n.id === id)
       // Canvas-level delete must not orphan the live PTY behind a terminal card.
-      if (removed?.type === 'terminal' && removed.content) {
+      // preserveSession opts out for canvas→dock migration, where the session
+      // deliberately outlives the card and reconnects in the terminal strip.
+      if (removed?.type === 'terminal' && removed.content && !opts?.preserveSession) {
         window.api?.terminal?.kill(sessionId(removed.content))
       }
       set((s) => {

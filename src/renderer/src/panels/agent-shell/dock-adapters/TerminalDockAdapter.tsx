@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVaultStore } from '../../../store/vault-store'
 import { colors, typography } from '../../../design/tokens'
+import { buildTerminalWebviewSrc, resolveTerminalWebviewBase } from '../terminal-webview-src'
 
 interface LoadFailure {
   readonly code: number
@@ -8,24 +9,48 @@ interface LoadFailure {
   readonly url: string
 }
 
-export function TerminalDockAdapter({ sessionId }: { readonly sessionId: string }) {
+interface TerminalDockAdapterProps {
+  readonly sessionId: string
+  /** Spawn/respawn directory. Defaults to the vault root. */
+  readonly cwd?: string
+  /** Fires when the webview spawns a fresh PTY (fresh launch or stale-session respawn). */
+  readonly onSessionCreated?: (sessionId: string) => void
+  /** Fires when the PTY exits (user typed `exit`, process ended). */
+  readonly onSessionExited?: () => void
+}
+
+export function TerminalDockAdapter({
+  sessionId,
+  cwd,
+  onSessionCreated,
+  onSessionExited
+}: TerminalDockAdapterProps) {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const preloadPath = useMemo(() => 'file://' + window.api.getTerminalPreloadPath(), [])
-  // When sessionId is empty the webview's TerminalApp spawns a fresh PTY
-  // rooted at the vault cwd; passing a sessionId reattaches to a survivor.
+  // When sessionId is empty the webview's TerminalApp spawns a fresh PTY at
+  // cwd; passing a sessionId reattaches to a survivor, and cwd doubles as the
+  // respawn target when that sessionId turns out to be stale.
   const webviewSrc = useMemo(() => {
-    const params = new URLSearchParams()
-    if (sessionId) params.set('sessionId', sessionId)
-    if (vaultPath) {
-      params.set('vaultPath', vaultPath)
-      if (!sessionId) params.set('cwd', vaultPath)
-    }
-    const base = import.meta.env.DEV
-      ? new URL('/terminal-webview/index.html', window.location.origin).href
-      : new URL('./terminal-webview/index.html', window.location.href).href
-    const qs = params.toString()
-    return qs ? `${base}?${qs}` : base
-  }, [sessionId, vaultPath])
+    const base = resolveTerminalWebviewBase(
+      import.meta.env.DEV,
+      window.location.origin,
+      window.location.href
+    )
+    return buildTerminalWebviewSrc(base, {
+      sessionId: sessionId || undefined,
+      cwd: cwd ?? vaultPath ?? undefined,
+      vaultPath: vaultPath ?? undefined
+    })
+  }, [sessionId, cwd, vaultPath])
+
+  // Session lifecycle callbacks live in refs so a new callback identity does
+  // not tear down and re-register the webview listeners mid-session.
+  const onSessionCreatedRef = useRef(onSessionCreated)
+  const onSessionExitedRef = useRef(onSessionExited)
+  useEffect(() => {
+    onSessionCreatedRef.current = onSessionCreated
+    onSessionExitedRef.current = onSessionExited
+  }, [onSessionCreated, onSessionExited])
 
   const webviewRef = useRef<Electron.WebviewTag | null>(null)
   const [failure, setFailure] = useState<LoadFailure | null>(null)
@@ -55,11 +80,27 @@ export function TerminalDockAdapter({ sessionId }: { readonly sessionId: string 
       })
     }
     const onLoad = () => setFailure(null)
+    // Guest lifecycle messages (same protocol as TerminalCard): the webview
+    // reports the sessionId it actually runs, which is how a dock terminal
+    // learns its identity after a fresh spawn or a stale-session respawn.
+    const onIpcMessage = (event: Event): void => {
+      const ipcEvent = event as Event & {
+        readonly channel: string
+        readonly args: readonly unknown[]
+      }
+      if (ipcEvent.channel === 'session-created') {
+        onSessionCreatedRef.current?.(String(ipcEvent.args[0]))
+      } else if (ipcEvent.channel === 'session-exited') {
+        onSessionExitedRef.current?.()
+      }
+    }
     el.addEventListener('did-fail-load', onFail as EventListener)
     el.addEventListener('did-finish-load', onLoad)
+    el.addEventListener('ipc-message', onIpcMessage)
     return () => {
       el.removeEventListener('did-fail-load', onFail as EventListener)
       el.removeEventListener('did-finish-load', onLoad)
+      el.removeEventListener('ipc-message', onIpcMessage)
     }
   }, [webviewSrc, reloadKey])
 

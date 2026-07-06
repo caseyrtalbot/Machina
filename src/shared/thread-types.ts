@@ -1,5 +1,5 @@
 import type { AgentIdentity } from './agent-identity'
-import type { DockTab } from './dock-types'
+import type { DockTab, TerminalStripState } from './dock-types'
 
 export interface Thread {
   readonly id: string
@@ -8,7 +8,8 @@ export interface Thread {
   readonly started: string
   lastMessage: string
   title: string
-  dockState: { tabs: DockTab[] }
+  /** terminalStrip is absent on legacy thread files (decodes as undefined). */
+  dockState: { tabs: DockTab[]; terminalStrip?: TerminalStripState }
   messages: ThreadMessage[]
   autoAcceptSession?: boolean
 }

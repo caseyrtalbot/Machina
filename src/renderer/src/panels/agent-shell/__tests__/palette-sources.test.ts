@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
+import { useEditorStore } from '../../../store/editor-store'
 import { buildPaletteItems, buildIndex, noteHitItems, searchPalette } from '../palette-sources'
+import { openStripTerminal, openStripTerminalInFolder } from '../terminal-migration'
 import type { Thread } from '@shared/thread-types'
 import type { SearchHit } from '@shared/engine/search-engine'
+
+vi.mock('../terminal-migration', () => ({
+  openStripTerminal: vi.fn(),
+  openStripTerminalInFolder: vi.fn().mockResolvedValue(null)
+}))
 
 const sampleThread = (id: string, title: string): Thread => ({
   id,
@@ -167,5 +174,72 @@ describe('palette-sources', () => {
     canvas!.run()
     const tabs = useThreadStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'default' })
+  })
+})
+
+describe('palette-sources — step 4 terminal + editor actions', () => {
+  const selectFile = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useEditorStore.setState(useEditorStore.getInitialState())
+    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    // @ts-expect-error test stub
+    window.api = { fs: { selectFile } }
+  })
+
+  it('includes the new-terminal, new-terminal-in-folder, and open-file-in-editor actions', () => {
+    const items = buildPaletteItems({ closePalette: () => {} })
+    const ids = new Set(items.map((i) => i.id))
+    expect(ids.has('action:new-terminal')).toBe(true)
+    expect(ids.has('action:new-terminal-in-folder')).toBe(true)
+    expect(ids.has('action:open-file-in-editor')).toBe(true)
+  })
+
+  it('running new-terminal closes the palette and spawns a strip terminal', async () => {
+    const close = vi.fn()
+    const items = buildPaletteItems({ closePalette: close })
+    const item = items.find((i) => i.id === 'action:new-terminal')
+    expect(item).toBeDefined()
+    await item!.run()
+    expect(close).toHaveBeenCalled()
+    expect(openStripTerminal).toHaveBeenCalledTimes(1)
+  })
+
+  it('running new-terminal-in-folder closes the palette and runs the folder-picker flow', async () => {
+    const close = vi.fn()
+    const items = buildPaletteItems({ closePalette: close })
+    const item = items.find((i) => i.id === 'action:new-terminal-in-folder')
+    expect(item).toBeDefined()
+    await item!.run()
+    expect(close).toHaveBeenCalled()
+    expect(openStripTerminalInFolder).toHaveBeenCalledTimes(1)
+  })
+
+  it('open-file-in-editor opens an editor tab and dock tab when a file is picked', async () => {
+    selectFile.mockResolvedValue('/v/notes/deep.md')
+    const close = vi.fn()
+    const items = buildPaletteItems({ closePalette: close })
+    const item = items.find((i) => i.id === 'action:open-file-in-editor')
+    expect(item).toBeDefined()
+    await item!.run()
+    expect(close).toHaveBeenCalled()
+    const editor = useEditorStore.getState()
+    expect(editor.activeNotePath).toBe('/v/notes/deep.md')
+    expect(
+      editor.openTabs.some((t) => t.path === '/v/notes/deep.md' && t.title === 'deep.md')
+    ).toBe(true)
+    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/deep.md' })
+  })
+
+  it('open-file-in-editor does nothing when the picker returns null', async () => {
+    selectFile.mockResolvedValue(null)
+    const items = buildPaletteItems({ closePalette: vi.fn() })
+    const item = items.find((i) => i.id === 'action:open-file-in-editor')
+    await item!.run()
+    expect(useEditorStore.getState().activeNotePath).toBeNull()
+    expect(useEditorStore.getState().openTabs).toEqual([])
+    expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
   })
 })

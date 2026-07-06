@@ -5,6 +5,7 @@ import { useVaultStore } from '../../store/vault-store'
 import { useEditorStore, createUntitledNote } from '../../store/editor-store'
 import { useUiStore } from '../../store/ui-store'
 import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
+import { toggleTerminalStrip } from './terminal-migration'
 
 interface AgentShellKeybindingOptions {
   readonly toggleDock: () => void
@@ -42,6 +43,14 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
       }
 
       const cmd = e.metaKey || e.ctrlKey
+
+      // Ctrl+` toggles the terminal strip (VS Code convention), from anywhere
+      // including text inputs. Ctrl only — Cmd+` is macOS window cycling.
+      if (e.ctrlKey && !e.metaKey && e.key === '`') {
+        e.preventDefault()
+        toggleTerminalStrip()
+        return
+      }
 
       // Cmd+. cancels the active agent run from anywhere, including text
       // inputs. Mirrors the macOS convention (Terminal, browsers) where

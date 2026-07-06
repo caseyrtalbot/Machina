@@ -24,6 +24,7 @@ type SortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
 const EMPTY_SET = new Set<string>()
 
 interface FilesDockAdapterProps {
+  /** Accepted for caller compatibility; vault switching now dispatches te:open-vault. */
   readonly onChangeVault?: () => void
   readonly onOpenSettings?: () => void
 }
@@ -35,7 +36,7 @@ interface FilesDockAdapterProps {
  * becomes an Editor dock tab. Replaces the legacy `ConnectedSidebar`
  * that lived inside the pre-AgentShell three-panel layout.
  */
-export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAdapterProps = {}) {
+export function FilesDockAdapter({ onOpenSettings }: FilesDockAdapterProps = {}) {
   const files = useVaultStore((s) => s.files)
   const config = useVaultStore((s) => s.config)
   const activeWorkspace = useVaultStore((s) => s.activeWorkspace)
@@ -302,32 +303,27 @@ export function FilesDockAdapter({ onChangeVault, onOpenSettings }: FilesDockAda
     openArtifactInEditor(filePath, title)
   }, [vaultPath, files])
 
+  // Vault switching routes through the te:open-vault event → orchestrateLoad →
+  // workspace.open(), the one full-switch path. The previous direct
+  // watchStop/watchStart + setVaultPath left PathGuard, MCP, index, and health
+  // bound to the OLD root (split-brain switch, step-1 review finding).
   const handleOpenVaultPicker = useCallback(async () => {
     const path = await window.api.fs.selectVault()
     if (!path) return
-    onChangeVault?.()
-    await window.api.vault.watchStop()
-    await window.api.vault.watchStart(path)
-    useVaultStore.getState().setVaultPath(path)
-  }, [onChangeVault])
+    window.dispatchEvent(new CustomEvent('te:open-vault', { detail: path }))
+  }, [])
 
-  const handleSelectVault = useCallback(
-    async (path: string) => {
-      const exists = await window.api.app.pathExists(path)
-      if (!exists) {
-        const history = (await window.api.config.read('app', 'workspaceHistory')) as string[] | null
-        const updated = (history ?? []).filter((p) => p !== path)
-        await window.api.config.write('app', 'workspaceHistory', updated)
-        setVaultHistory(updated)
-        return
-      }
-      onChangeVault?.()
-      await window.api.vault.watchStop()
-      await window.api.vault.watchStart(path)
-      useVaultStore.getState().setVaultPath(path)
-    },
-    [onChangeVault]
-  )
+  const handleSelectVault = useCallback(async (path: string) => {
+    const exists = await window.api.app.pathExists(path)
+    if (!exists) {
+      const history = (await window.api.config.read('app', 'workspaceHistory')) as string[] | null
+      const updated = (history ?? []).filter((p) => p !== path)
+      await window.api.config.write('app', 'workspaceHistory', updated)
+      setVaultHistory(updated)
+      return
+    }
+    window.dispatchEvent(new CustomEvent('te:open-vault', { detail: path }))
+  }, [])
 
   const handleRemoveFromHistory = useCallback(async (pathToRemove: string) => {
     const history = (await window.api.config.read('app', 'workspaceHistory')) as string[] | null

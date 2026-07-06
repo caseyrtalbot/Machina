@@ -5,6 +5,11 @@ import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useUiStore } from '../../../store/ui-store'
+import { toggleTerminalStrip } from '../terminal-migration'
+
+vi.mock('../terminal-migration', () => ({
+  toggleTerminalStrip: vi.fn()
+}))
 
 function fireKey(init: KeyboardEventInit): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { ...init, bubbles: true }))
@@ -235,6 +240,39 @@ describe('useAgentShellKeybindings — panel toggles', () => {
     } finally {
       textarea.remove()
     }
+  })
+})
+
+describe('useAgentShellKeybindings — Ctrl+` terminal strip toggle', () => {
+  it('Ctrl+` dispatches toggleTerminalStrip', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: '`', ctrlKey: true })
+
+    expect(toggleTerminalStrip).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires even from inside an editable target', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    const textarea = document.createElement('textarea')
+    document.body.appendChild(textarea)
+    try {
+      textarea.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '`', ctrlKey: true, bubbles: true })
+      )
+      expect(toggleTerminalStrip).toHaveBeenCalledTimes(1)
+    } finally {
+      textarea.remove()
+    }
+  })
+
+  it('Cmd+` (metaKey) does NOT trigger it — that chord is macOS window cycling', () => {
+    renderHook(() => useAgentShellKeybindings(defaultOpts()))
+
+    fireKey({ key: '`', metaKey: true })
+
+    expect(toggleTerminalStrip).not.toHaveBeenCalled()
   })
 })
 

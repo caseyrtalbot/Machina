@@ -155,3 +155,45 @@ describe('thread-md auto-accept persistence', () => {
     expect(matter(reencoded).data.auto_accept_session).toBeUndefined()
   })
 })
+
+describe('thread-md terminal strip persistence (workstation step 4)', () => {
+  const strip = {
+    sessions: [
+      { tabId: 'tab-1', sessionId: 'pty-abc', cwd: '/Users/casey/Projects/thought-engine' },
+      { tabId: 'tab-2', sessionId: '', cwd: '/Users/casey/My Vault/sub dir' }
+    ],
+    activeTabId: 'tab-1',
+    collapsed: true,
+    height: 320
+  }
+
+  it('round-trips dockState.terminalStrip through encode -> decode', () => {
+    const dockState = {
+      tabs: [{ kind: 'terminal' as const, sessionId: 'pty-abc' }, { kind: 'graph' as const }],
+      terminalStrip: strip
+    }
+    const decoded = decodeThread(encodeThread(baseThread({ dockState })))
+    expect(decoded.dockState).toEqual(dockState)
+  })
+
+  it('re-encode of a decoded thread is byte-identical (stable persisted format)', () => {
+    const md = encodeThread(
+      baseThread({ dockState: { tabs: [{ kind: 'canvas', id: 'c1' }], terminalStrip: strip } })
+    )
+    expect(encodeThread(decodeThread(md))).toBe(md)
+  })
+
+  it('decodes a legacy thread file without terminalStrip as undefined, tabs intact', () => {
+    const legacy = matter.stringify('', {
+      agent: 'machina-native',
+      model: 'claude-sonnet-4-6',
+      started: '2026-05-01T00:00:00Z',
+      last_message: '2026-05-01T00:00:00Z',
+      title: 'Legacy dock',
+      dock_state: { tabs: [{ kind: 'editor', path: 'notes/a.md' }, { kind: 'ghosts' }] }
+    })
+    const t = decodeThread(legacy)
+    expect(t.dockState.terminalStrip).toBeUndefined()
+    expect(t.dockState.tabs).toEqual([{ kind: 'editor', path: 'notes/a.md' }, { kind: 'ghosts' }])
+  })
+})

@@ -323,6 +323,11 @@ export interface IpcChannels {
     request: { id: string; approve: boolean; message?: string }
     response: import('./git-types').GitOpResult
   }
+
+  // --- Dock IDE shell (workstation contracts §6, step 4) ---
+  // Editor-center file open. Guard-checked: null when the pick is cancelled
+  // or the chosen file sits outside the workspace root.
+  'fs:select-file': { request: void; response: string | null }
 }
 
 export type AgentNativeApprovalPreview =

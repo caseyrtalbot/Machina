@@ -38,7 +38,8 @@ const api = {
     readBinary: (path: string) => typedInvoke('fs:read-binary', { path }),
     listAllFiles: (dir: string) => typedInvoke('fs:list-all-files', { dir }),
     fileMtime: (path: string) => typedInvoke('fs:file-mtime', { path }),
-    readFilesBatch: (paths: readonly string[]) => typedInvoke('fs:read-files-batch', { paths })
+    readFilesBatch: (paths: readonly string[]) => typedInvoke('fs:read-files-batch', { paths }),
+    selectFile: () => typedInvoke('fs:select-file')
   },
   workspace: {
     open: (path: string) => typedInvoke('workspace:open', { path }),

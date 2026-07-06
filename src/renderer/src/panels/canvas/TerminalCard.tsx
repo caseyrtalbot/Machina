@@ -8,6 +8,7 @@ import { useCliAgentPresence } from '../../hooks/use-cli-agent-presence'
 import { CliAgentBadge } from '../../components/CliAgentBadge'
 import { buildCanvasContext } from '../../engine/context-serializer'
 import { buildBlockProjection, pickPinnableBlock } from './block-pin'
+import { canvasToStrip } from '../agent-shell/terminal-migration'
 import { CardShell } from './CardShell'
 import { borderRadius, colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
@@ -408,6 +409,20 @@ export function TerminalCard({ node }: TerminalCardProps) {
     }
   }, [node.id, updateContent])
 
+  // ── Move to dock (canvas→strip migration) ───────────────────────────────
+
+  const handleMoveToDock = useCallback(() => {
+    if (actionInFlight.current) return
+    actionInFlight.current = true
+    // canvasToStrip attaches the live session to the strip, then removes this
+    // card with preserveSession — the PTY must survive the surface change.
+    if (useCanvasStore.getState().focusedTerminalId === node.id) {
+      setFocusedTerminal(null)
+    }
+    canvasToStrip(node)
+    actionInFlight.current = false
+  }, [node, setFocusedTerminal])
+
   const handlePinLatestBlock = useCallback(() => {
     const block = pickPinnableBlock(sessionBlocks)
     if (!block) return
@@ -444,30 +459,56 @@ export function TerminalCard({ node }: TerminalCardProps) {
       onClose={handleClose}
       onActivateContentClick={handleActivateContentClick}
       headerActions={
-        sessionBlocks.length > 0 ? (
-          <button
-            type="button"
-            data-testid="terminal-pin-block"
-            onClick={(e) => {
-              e.stopPropagation()
-              handlePinLatestBlock()
-            }}
-            title="Pin latest block to canvas"
-            className="canvas-card__action-btn flex items-center justify-center"
-            style={{
-              width: 24,
-              height: 24,
-              fontSize: 11,
-              borderRadius: borderRadius.tool,
-              color: colors.text.muted,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            ⊕
-          </button>
-        ) : null
+        <>
+          {node.content && !sessionDead ? (
+            <button
+              type="button"
+              data-testid="terminal-move-to-dock"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleMoveToDock()
+              }}
+              title="Move to dock terminal strip"
+              className="canvas-card__action-btn flex items-center justify-center"
+              style={{
+                width: 24,
+                height: 24,
+                fontSize: 11,
+                borderRadius: borderRadius.tool,
+                color: colors.text.muted,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              ⇥
+            </button>
+          ) : null}
+          {sessionBlocks.length > 0 ? (
+            <button
+              type="button"
+              data-testid="terminal-pin-block"
+              onClick={(e) => {
+                e.stopPropagation()
+                handlePinLatestBlock()
+              }}
+              title="Pin latest block to canvas"
+              className="canvas-card__action-btn flex items-center justify-center"
+              style={{
+                width: 24,
+                height: 24,
+                fontSize: 11,
+                borderRadius: borderRadius.tool,
+                color: colors.text.muted,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              ⊕
+            </button>
+          ) : null}
+        </>
       }
       titleExtra={
         <>
