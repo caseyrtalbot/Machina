@@ -3,12 +3,69 @@ import type { KeyboardEvent } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { AgentPicker } from './AgentPicker'
 import type { AgentIdentity } from '@shared/agent-identity'
+import type { Thread } from '@shared/thread-types'
+import type { AdapterId, AgentAdapter } from '@shared/session-types'
+import { ADAPTERS, identityForAdapter } from '@shared/agent-adapters'
 import { DEFAULT_NATIVE_MODEL, NATIVE_MODEL_OPTIONS } from '@shared/machina-native-tools'
 import { formatModelLabel } from '@shared/format-model-label'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 const MIN_INPUT_HEIGHT = 22
 const MAX_INPUT_HEIGHT = 200
+
+/** Honest copy for raw threads (workstation step 1, OQ3): no template source
+ * exists yet for ad-hoc raw sessions, so structured sends are disabled. */
+const RAW_INPUT_COPY = 'No structured view for raw sessions. Interact via the terminal.'
+
+/** Reverse of identityForAdapter: the registry adapter behind a CLI thread
+ * identity; null for 'machina-native' (no adapter runs the native agent). */
+function cliAdapterFor(agent: AgentIdentity): AgentAdapter | null {
+  const id = (Object.keys(ADAPTERS) as readonly AdapterId[]).find(
+    (a) => identityForAdapter(a) === agent
+  )
+  return id === undefined ? null : ADAPTERS[id]
+}
+
+interface ModelChoices {
+  readonly value: string
+  readonly choices: ReadonlyArray<{ readonly value: string; readonly label: string }>
+}
+
+/**
+ * Model-picker contents per thread kind. Native threads keep the fixed
+ * NATIVE_MODEL_OPTIONS. CLI threads offer the adapter's spike-verified roster
+ * behind a 'default' entry: the persisted DEFAULT_NATIVE_MODEL filler (and
+ * any off-roster value) displays as 'default' because the main-side trust
+ * rule runs the adapter default for it — showing the filler's own name would
+ * lie about the model actually used. Adapters with an empty/absent roster
+ * (gemini — no auth to verify ids; raw — no model concept) get no picker.
+ */
+function modelChoicesFor(thread: Thread): ModelChoices | null {
+  if (thread.agent === 'machina-native') {
+    const known = (NATIVE_MODEL_OPTIONS as readonly string[]).includes(thread.model)
+    return {
+      value: thread.model,
+      choices: [
+        ...(known ? [] : [{ value: thread.model, label: formatModelLabel(thread.model) }]),
+        ...NATIVE_MODEL_OPTIONS.map((m) => ({ value: m, label: formatModelLabel(m) }))
+      ]
+    }
+  }
+  const models = cliAdapterFor(thread.agent)?.models ?? []
+  if (models.length === 0) return null
+  const explicit = (models as readonly string[]).includes(thread.model)
+  return {
+    value: explicit ? thread.model : DEFAULT_NATIVE_MODEL,
+    choices: [
+      // Picking 'default' persists the filler, which the IPC boundary maps
+      // to "no flag, adapter default" — the supported revert path.
+      { value: DEFAULT_NATIVE_MODEL, label: 'default' },
+      // CLI rosters are the aliases/ids the user would type at the CLI
+      // (fable, gpt-5.5) — shown verbatim, not through formatModelLabel.
+      ...models.map((m) => ({ value: m, label: m }))
+    ]
+  }
+}
 
 export function ThreadInputBar() {
   const activeId = useThreadStore((s) => s.activeThreadId)
@@ -26,6 +83,10 @@ export function ThreadInputBar() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
+  // Raw threads have no structured send path in step 1 (no invocation
+  // template source until step 8) — input is disabled with honest copy.
+  const isRaw = activeThread?.agent === 'cli-raw'
+  const modelChoices = activeThread !== undefined ? modelChoicesFor(activeThread) : null
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -36,6 +97,8 @@ export function ThreadInputBar() {
   }, [text])
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // Belt-and-braces with the disabled textarea: raw threads never send.
+    if (isRaw) return
     if (text === '' && e.key === '/') {
       e.preventDefault()
       setPickerOpen(true)
@@ -95,11 +158,12 @@ export function ThreadInputBar() {
           ref={ref}
           value={text}
           rows={1}
+          disabled={isRaw}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Ask anything about your vault…"
+          placeholder={isRaw ? RAW_INPUT_COPY : 'Ask anything about your vault…'}
           className="thread-input-textarea"
           style={{
             flex: 1,
@@ -116,12 +180,12 @@ export function ThreadInputBar() {
             lineHeight: 1.55
           }}
         />
-        {activeThread?.agent === 'machina-native' && activeId && (
+        {modelChoices !== null && activeId && (
           <select
             data-testid="thread-model-select"
             aria-label="Model"
             title="Model for this thread's next turn"
-            value={activeThread.model}
+            value={modelChoices.value}
             disabled={inFlight}
             onChange={(e) => void setThreadModel(activeId, e.target.value)}
             style={{
@@ -140,12 +204,9 @@ export function ThreadInputBar() {
               lineHeight: '16px'
             }}
           >
-            {(NATIVE_MODEL_OPTIONS as readonly string[]).includes(activeThread.model) ? null : (
-              <option value={activeThread.model}>{formatModelLabel(activeThread.model)}</option>
-            )}
-            {NATIVE_MODEL_OPTIONS.map((m) => (
-              <option key={m} value={m}>
-                {formatModelLabel(m)}
+            {modelChoices.choices.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
               </option>
             ))}
           </select>

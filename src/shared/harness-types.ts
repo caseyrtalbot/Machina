@@ -11,12 +11,17 @@
  * generator (harness-service.ts) and the renderer runner (harness-run.ts)
  * import from this module.
  */
-import type { AgentIdentity } from './agent-identity'
 import { HARNESS_PROTECTED_GLOBS } from './constants'
 
 // Re-exported so harness consumers have one import surface; the constant
 // itself lives in constants.ts (landed with step 3's watcher auto-reject).
 export { HARNESS_PROTECTED_GLOBS, isHarnessProtectedPath } from './constants'
+
+// Re-based on AdapterId in workstation Phase 2 step 1 (the adapter registry
+// owns the mapping now, including 'raw' → 'cli-raw'); kept here as a
+// re-export so harness consumers keep one import surface. HARNESS_ADAPTERS
+// itself stays CLI-only until step 8.
+export { identityForAdapter } from './agent-adapters'
 
 /** Adapters a harness can bind to — CLI back-ends only (contracts §5). */
 export const HARNESS_ADAPTERS = ['claude', 'codex', 'gemini'] as const
@@ -24,18 +29,6 @@ export type HarnessAdapter = (typeof HARNESS_ADAPTERS)[number]
 
 export function isHarnessAdapter(value: unknown): value is HarnessAdapter {
   return typeof value === 'string' && (HARNESS_ADAPTERS as readonly string[]).includes(value)
-}
-
-/** Map a harness adapter onto the thread-spawner identity that runs it. */
-export function identityForAdapter(adapter: HarnessAdapter): AgentIdentity {
-  switch (adapter) {
-    case 'claude':
-      return 'cli-claude'
-    case 'codex':
-      return 'cli-codex'
-    case 'gemini':
-      return 'cli-gemini'
-  }
 }
 
 /**

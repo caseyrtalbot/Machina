@@ -39,6 +39,13 @@ export interface CLIAgentSpec {
    * canvas card. Reserved for Move 5's `BlockCard`.
    */
   readonly richInputAnchor?: 'top' | 'bottom'
+  /**
+   * True when there is nothing to detect: the agent has no probeable binary
+   * and is available by construction (only `raw` today — workstation Phase 2
+   * step 1). Specs carrying this flag are kept OUT of `CLI_AGENTS`, so the
+   * installation prober and command-detection heuristics never consult them.
+   */
+  readonly alwaysAvailable?: true
 }
 
 /**
@@ -80,9 +87,27 @@ export const CLI_AGENTS = [
   }
 ] as const satisfies readonly CLIAgentSpec[]
 
+/**
+ * The `raw` fallback adapter's spec (workstation Phase 2 step 1, PLAN Q8).
+ * Deliberately NOT in `CLI_AGENTS`: raw has no binary — the whole command
+ * line comes from an invocation template (OQ3, harness-supplied in step 8),
+ * so there is nothing to probe and raw is always available. The probe fields
+ * are inert placeholders that no code path consults (`alwaysAvailable`
+ * short-circuits detection by keeping raw out of the probeable array).
+ */
+export const RAW_AGENT_SPEC: CLIAgentSpec = {
+  id: 'raw',
+  displayName: 'Raw CLI',
+  brandColor: '#8a8f98',
+  cliBinary: '',
+  versionFlag: '',
+  detectVersionRegex: /(?!)/,
+  alwaysAvailable: true
+}
+
 /** Returns the spec for `id`, or `null` if no agent is registered under it. */
 export function getAgentSpec(id: string): CLIAgentSpec | null {
-  return CLI_AGENTS.find((a) => a.id === id) ?? null
+  return CLI_AGENTS.find((a) => a.id === id) ?? (id === RAW_AGENT_SPEC.id ? RAW_AGENT_SPEC : null)
 }
 
 /**

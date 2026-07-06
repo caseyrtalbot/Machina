@@ -6,10 +6,11 @@ import { withTimeout } from '../utils/ipc-timeout'
 /**
  * AgentTransport (2.2): one command-side interface over the two agent
  * back-ends — the in-app Anthropic SDK agent ('machina-native') and the CLI
- * thread spawner ('cli-claude' / 'cli-codex' / 'cli-gemini'; gemini stays in
- * the CLI registry without growing its surface). thread-store routes every
- * agent-specific call through `transportFor(agent)` instead of branching on
- * `agent !== 'machina-native'` at each call site.
+ * thread spawner ('cli-claude' / 'cli-codex' / 'cli-gemini' / 'cli-raw';
+ * gemini stays in the CLI registry without growing its surface, raw is the
+ * plain-PTY fallback whose send affordance the UI disables). thread-store
+ * routes every agent-specific call through `transportFor(agent)` instead of
+ * branching on `agent !== 'machina-native'` at each call site.
  *
  * Events deliberately stay out of this interface: both back-ends push results
  * over main→renderer IPC events (`agent-native:event`, `thread:cli-message`),
@@ -97,6 +98,10 @@ const cliTransport: AgentTransport = {
       threadId: thread.id,
       identity: thread.agent,
       cwd: vaultPath,
+      // Model pick (workstation step 1): sent like agentId. The persisted
+      // DEFAULT_NATIVE_MODEL filler resolves to "adapter default, no flag"
+      // at the IPC boundary (resolveModelPick), so it is always safe to send.
+      model: thread.model,
       // Harness attribution (workstation step 6): the slug rides the spawn so
       // turn windows and commit trailers carry it. Absent → identity.
       ...(thread.agentId !== undefined ? { agentId: thread.agentId } : {})
@@ -110,6 +115,10 @@ const cliTransport: AgentTransport = {
       identity: thread.agent,
       text,
       cwd: ctx.vaultPath,
+      // Re-sent per turn like agentId: the spawner's model map is in-memory,
+      // so a relaunched app's spawn-on-demand path needs the persisted pick
+      // again. Filler/off-roster values resolve to the adapter default.
+      model: thread.model,
       // Re-sent per turn: the spawner map is in-memory, so a relaunched app's
       // spawn-on-demand path needs the persisted slug again (step 6).
       ...(thread.agentId !== undefined ? { agentId: thread.agentId } : {})
@@ -118,8 +127,15 @@ const cliTransport: AgentTransport = {
       ? { ok: true }
       : {
           ok: false,
+          // cli-raw refuses sends by design (no invocation template source
+          // until step 8) — "install the CLI" would be a false diagnosis.
+          // Reachable despite the disabled input bar: appendUserMessage
+          // targets the active thread, and e.g. harness-run's shell-prompt
+          // wait lets the user switch onto a raw thread before the send.
           message:
-            'Message not delivered: the CLI session could not be started. Check that the agent CLI is installed, then try again.'
+            thread.agent === 'cli-raw'
+              ? 'Message not delivered: raw sessions have no structured input. Interact via the terminal.'
+              : 'Message not delivered: the CLI session could not be started. Check that the agent CLI is installed, then try again.'
         }
   },
 

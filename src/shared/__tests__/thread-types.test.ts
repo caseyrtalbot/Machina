@@ -38,9 +38,15 @@ describe('thread types', () => {
 })
 
 describe('AgentIdentity', () => {
-  it('covers machina-native and the three CLI agents', () => {
-    const ids: AgentIdentity[] = ['machina-native', 'cli-claude', 'cli-codex', 'cli-gemini']
-    expect(ids).toHaveLength(4)
+  it('covers machina-native, the three CLI agents, and the raw fallback', () => {
+    const ids: AgentIdentity[] = [
+      'machina-native',
+      'cli-claude',
+      'cli-codex',
+      'cli-gemini',
+      'cli-raw'
+    ]
+    expect(ids).toHaveLength(5)
     expect(AGENT_IDENTITIES).toEqual(ids)
   })
 

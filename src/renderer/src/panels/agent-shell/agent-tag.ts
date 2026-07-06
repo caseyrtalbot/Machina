@@ -10,5 +10,7 @@ export function agentTag(a: AgentIdentity): string {
       return 'codex'
     case 'cli-gemini':
       return 'gemini'
+    case 'cli-raw':
+      return 'raw'
   }
 }

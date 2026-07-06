@@ -2,9 +2,14 @@
 /**
  * Handler-level tests for the cli-thread:* IPC handlers (workstation step 1):
  * the per-turn cwd comes from the renderer request — main performs no
- * vault-path config read on this path.
+ * vault-path config read on this path — and the model-flag trust rule lives
+ * here at the IPC boundary (Phase 2 step 1): only an explicit pick that is in
+ * the adapter's roster AND passes the charset check is forwarded; anything
+ * else forwards undefined, with an audit note for explicit-but-rejected picks.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
+import type { AuditEntry } from '@shared/agent-types'
 
 const state = vi.hoisted(() => ({
   handlers: new Map<string, (args: never) => unknown>(),
@@ -14,7 +19,8 @@ const state = vi.hoisted(() => ({
     close: vi.fn(),
     cancel: vi.fn().mockReturnValue(true)
   },
-  readAppConfigValue: vi.fn()
+  readAppConfigValue: vi.fn(),
+  auditEntries: [] as unknown[]
 }))
 
 vi.mock('../../typed-ipc', () => ({
@@ -23,13 +29,29 @@ vi.mock('../../typed-ipc', () => ({
   })
 }))
 
-vi.mock('../../services/cli-thread-spawner', () => ({
-  CliThreadSpawner: class {
-    spawn = state.spawner.spawn
-    input = state.spawner.input
-    close = state.spawner.close
-    cancel = state.spawner.cancel
+vi.mock('../../services/cli-thread-spawner', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/cli-thread-spawner')>()
+  return {
+    ...actual,
+    CliThreadSpawner: class {
+      spawn = state.spawner.spawn
+      input = state.spawner.input
+      close = state.spawner.close
+      cancel = state.spawner.cancel
+    }
   }
+})
+
+vi.mock('../../services/audit-logger', () => ({
+  AuditLogger: class {
+    log(entry: unknown): void {
+      state.auditEntries.push(entry)
+    }
+  }
+}))
+
+vi.mock('electron', () => ({
+  app: { getPath: vi.fn(() => '/nonexistent-test-userdata') }
 }))
 
 vi.mock('../shell', () => ({
@@ -52,6 +74,7 @@ function invoke<T>(channel: string, args: unknown): Promise<T> {
 describe('cli-thread IPC handlers', () => {
   beforeEach(() => {
     state.handlers.clear()
+    state.auditEntries.length = 0
     vi.clearAllMocks()
     registerCliThreadIpc()
   })
@@ -69,6 +92,7 @@ describe('cli-thread IPC handlers', () => {
       'cli-claude',
       'fix the tests',
       '/repos/project',
+      undefined,
       undefined
     )
   })
@@ -89,6 +113,136 @@ describe('cli-thread IPC handlers', () => {
       identity: 'cli-codex',
       cwd: '/repos/other'
     })
-    expect(state.spawner.spawn).toHaveBeenCalledWith('th_2', 'cli-codex', '/repos/other', undefined)
+    expect(state.spawner.spawn).toHaveBeenCalledWith(
+      'th_2',
+      'cli-codex',
+      '/repos/other',
+      undefined,
+      undefined
+    )
+  })
+})
+
+describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
+  beforeEach(() => {
+    state.handlers.clear()
+    state.auditEntries.length = 0
+    vi.clearAllMocks()
+    registerCliThreadIpc()
+  })
+
+  it('forwards an explicit roster model on spawn (claude alias)', async () => {
+    await invoke('cli-thread:spawn', {
+      threadId: 'th_1',
+      identity: 'cli-claude',
+      cwd: '/v',
+      model: 'sonnet'
+    })
+    expect(state.spawner.spawn).toHaveBeenCalledWith(
+      'th_1',
+      'cli-claude',
+      '/v',
+      undefined,
+      'sonnet'
+    )
+    expect(state.auditEntries).toEqual([])
+  })
+
+  it('forwards an explicit roster model on input (codex)', async () => {
+    await invoke('cli-thread:input', {
+      threadId: 'th_1',
+      identity: 'cli-codex',
+      text: 'go',
+      cwd: '/v',
+      model: 'gpt-5.5'
+    })
+    expect(state.spawner.input).toHaveBeenCalledWith(
+      'th_1',
+      'cli-codex',
+      'go',
+      '/v',
+      undefined,
+      'gpt-5.5'
+    )
+    expect(state.auditEntries).toEqual([])
+  })
+
+  it('maps the persisted DEFAULT_NATIVE_MODEL filler to undefined with NO audit note', async () => {
+    // Every pre-step-1 CLI thread carries the filler; it is not an explicit
+    // pick, so no flag and no audit noise (set-to-filler regression).
+    await invoke('cli-thread:input', {
+      threadId: 'th_1',
+      identity: 'cli-codex',
+      text: 'go',
+      cwd: '/v',
+      model: DEFAULT_NATIVE_MODEL
+    })
+    expect(state.spawner.input).toHaveBeenCalledWith(
+      'th_1',
+      'cli-codex',
+      'go',
+      '/v',
+      undefined,
+      undefined
+    )
+    expect(state.auditEntries).toEqual([])
+  })
+
+  it('rejects a cross-adapter model (claude model on codex): undefined + audit note', async () => {
+    await invoke('cli-thread:input', {
+      threadId: 'th_1',
+      identity: 'cli-codex',
+      text: 'go',
+      cwd: '/v',
+      model: 'sonnet'
+    })
+    expect(state.spawner.input).toHaveBeenCalledWith(
+      'th_1',
+      'cli-codex',
+      'go',
+      '/v',
+      undefined,
+      undefined
+    )
+    expect(state.auditEntries).toHaveLength(1)
+    const entry = state.auditEntries[0] as AuditEntry
+    expect(entry.tool).toBe('cli-thread:input')
+    expect(entry.decision).toBe('denied')
+    expect(entry.args).toMatchObject({ identity: 'cli-codex', requestedModel: 'sonnet' })
+  })
+
+  it('rejects an off-roster model on spawn: undefined + audit note', async () => {
+    await invoke('cli-thread:spawn', {
+      threadId: 'th_1',
+      identity: 'cli-claude',
+      cwd: '/v',
+      model: 'gpt-5.5-codex'
+    })
+    expect(state.spawner.spawn).toHaveBeenCalledWith(
+      'th_1',
+      'cli-claude',
+      '/v',
+      undefined,
+      undefined
+    )
+    expect(state.auditEntries).toHaveLength(1)
+    expect((state.auditEntries[0] as AuditEntry).tool).toBe('cli-thread:spawn')
+  })
+
+  it('gemini ships an empty roster: any pick resolves to undefined + audit note', async () => {
+    await invoke('cli-thread:spawn', {
+      threadId: 'th_1',
+      identity: 'cli-gemini',
+      cwd: '/v',
+      model: 'gemini-2.5-pro'
+    })
+    expect(state.spawner.spawn).toHaveBeenCalledWith(
+      'th_1',
+      'cli-gemini',
+      '/v',
+      undefined,
+      undefined
+    )
+    expect(state.auditEntries).toHaveLength(1)
   })
 })

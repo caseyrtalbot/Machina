@@ -242,6 +242,58 @@ describe('blockToMessage (structured codex --json)', () => {
   })
 })
 
+describe('blockToMessage (gemini/raw passthrough — no parseEvent on the adapter)', () => {
+  const geminiSpec = getAgentSpec('gemini')!
+
+  it('gemini output is NEVER structured-extracted, even when it looks like JSONL', () => {
+    // Registry dispatch regression guard (Phase-1 step-6 lost-reply lesson):
+    // the gemini adapter has no parseEvent, so JSON-looking lines must stay
+    // plain passthrough — body empty, raw output intact on cli_command.
+    const out = [claudeText('should not be extracted'), claudeInit].join('\n') + '\n'
+    let block = startedBlock('s1', `gemini -p 'hi'`)
+    block = appendOutput(block, out)
+    block = completed(block, 0)
+
+    const msg = blockToMessage(block, geminiSpec)
+
+    expect(msg.body).toBe('')
+    expect(msg.toolCalls?.length).toBe(1)
+    expect(msg.toolCalls?.[0].call.kind).toBe('cli_command')
+    if (msg.toolCalls?.[0].result?.ok) {
+      expect(msg.toolCalls[0].result.output).toEqual({ output: out, exitCode: 0 })
+    } else {
+      throw new Error('expected ok cli_command result')
+    }
+  })
+
+  it('gemini blocks emit no interim deltas while running', () => {
+    const emitted: CliAgentThreadMessageEvent[] = []
+    const bridge = new CliAgentThreadBridge({ onMessage: (e) => emitted.push(e) })
+    bridge.bind('s1', 'thread-G')
+    let block = startedBlock('s1', `gemini -p 'hi'`)
+    block = appendOutput(block, claudeText('partial') + '\n')
+    bridge.observe('s1', block)
+    expect(emitted).toEqual([])
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+    expect(emitted).toHaveLength(1)
+    expect(emitted[0].message.body).toBe('')
+  })
+
+  it('raw sessions (unknown binary) never emit thread messages at all', () => {
+    // A cli-raw thread's PTY runs arbitrary commands; detectAgentFromCommand
+    // matches no CLIAgentSpec, so the bridge is pure passthrough for it.
+    const emitted: CliAgentThreadMessageEvent[] = []
+    const bridge = new CliAgentThreadBridge({ onMessage: (e) => emitted.push(e) })
+    bridge.bind('s1', 'thread-R')
+    let block = startedBlock('s1', `mytool --json 'hi'`)
+    block = appendOutput(block, claudeText('nope') + '\n')
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+    expect(emitted).toEqual([])
+  })
+})
+
 describe('CliAgentThreadBridge interim streaming', () => {
   function recording(): {
     bridge: CliAgentThreadBridge

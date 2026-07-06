@@ -273,6 +273,10 @@ export interface IpcChannels {
       // Optional harness slug (workstation step 3, the step 6 seam): flows
       // into turn attribution and commit trailers. Absent → identity.
       agentId?: string
+      // Optional explicit model pick (workstation Phase 2 step 1). Validated
+      // at the IPC boundary (roster + charset — resolveModelPick); absent,
+      // unknown, or the DEFAULT_NATIVE_MODEL filler ⇒ adapter default, no flag.
+      model?: string
     }
     response: { ok: true; sessionId: string } | { ok: false; error: string }
   }
@@ -286,6 +290,9 @@ export interface IpcChannels {
       cwd: string
       // Optional harness slug (workstation step 3, the step 6 seam).
       agentId?: string
+      // Optional explicit model pick (workstation Phase 2 step 1) — same
+      // trust rule as cli-thread:spawn.
+      model?: string
     }
     response: { ok: boolean }
   }

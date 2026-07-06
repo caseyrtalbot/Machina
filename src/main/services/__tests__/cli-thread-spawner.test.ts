@@ -1,11 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import {
-  CliThreadSpawner,
-  formatCliInvocation,
-  isCliAgentIdentity,
-  specIdForIdentity
-} from '../cli-thread-spawner'
+import { CliThreadSpawner, isCliAgentIdentity, specIdForIdentity } from '../cli-thread-spawner'
 import { CliAgentThreadBridge } from '../cli-agent-thread-bridge'
 
 interface FakePtyService {
@@ -46,89 +41,18 @@ function installed(id: string, installed = true) {
 const CLAUDE_BASE = 'claude --print --verbose --output-format stream-json'
 const CODEX_FLAGS = '--json --skip-git-repo-check'
 
-describe('formatCliInvocation', () => {
-  it('formats a first-turn claude invocation with structured output flags', () => {
-    expect(formatCliInvocation('cli-claude', 'list files')).toBe(`${CLAUDE_BASE} 'list files'`)
-  })
-
-  it('formats a first-turn codex invocation with JSONL output', () => {
-    expect(formatCliInvocation('cli-codex', 'list files')).toBe(
-      `codex exec ${CODEX_FLAGS} 'list files'`
-    )
-  })
-
-  it('formats a gemini one-shot invocation (no structured mode)', () => {
-    expect(formatCliInvocation('cli-gemini', 'list files')).toBe(`gemini -p 'list files'`)
-  })
-
-  it('resumes claude by captured session id on later turns', () => {
-    expect(
-      formatCliInvocation('cli-claude', 'go on', {
-        resumeSessionId: '206caf50-df65-4a64-adf2-0749f4637bf7',
-        continueConversation: true
-      })
-    ).toBe(`${CLAUDE_BASE} --resume 206caf50-df65-4a64-adf2-0749f4637bf7 'go on'`)
-  })
-
-  it('falls back to claude --continue when no session id was captured', () => {
-    expect(formatCliInvocation('cli-claude', 'go on', { continueConversation: true })).toBe(
-      `${CLAUDE_BASE} --continue 'go on'`
-    )
-  })
-
-  it('resumes codex by captured thread id on later turns', () => {
-    expect(
-      formatCliInvocation('cli-codex', 'go on', {
-        resumeSessionId: '019eb1da-decb-7052-a145-1ac71e4bc80b',
-        continueConversation: true
-      })
-    ).toBe(`codex exec resume ${CODEX_FLAGS} 019eb1da-decb-7052-a145-1ac71e4bc80b 'go on'`)
-  })
-
-  it('falls back to codex resume --last when no thread id was captured', () => {
-    expect(formatCliInvocation('cli-codex', 'go on', { continueConversation: true })).toBe(
-      `codex exec resume ${CODEX_FLAGS} --last 'go on'`
-    )
-  })
-
-  it('gemini ignores continuity options (gated per agent)', () => {
-    expect(
-      formatCliInvocation('cli-gemini', 'go on', {
-        resumeSessionId: '019eb1da-decb-7052-a145-1ac71e4bc80b',
-        continueConversation: true
-      })
-    ).toBe(`gemini -p 'go on'`)
-  })
-
-  it('rejects a shell-unsafe resume id and falls back to --continue', () => {
-    expect(
-      formatCliInvocation('cli-claude', 'x', {
-        resumeSessionId: `abc; rm -rf /'`,
-        continueConversation: true
-      })
-    ).toBe(`${CLAUDE_BASE} --continue 'x'`)
-  })
-
-  it('escapes embedded single quotes safely', () => {
-    expect(formatCliInvocation('cli-claude', "what's up")).toBe(`${CLAUDE_BASE} 'what'\\''s up'`)
-  })
-
-  it('preserves multi-line prompts inside the quoted argument', () => {
-    expect(formatCliInvocation('cli-claude', 'line 1\nline 2')).toBe(
-      `${CLAUDE_BASE} 'line 1\nline 2'`
-    )
-  })
-
-  it('throws on a non-CLI agent identity', () => {
-    expect(() => formatCliInvocation('machina-native', 'x')).toThrow(/cli/i)
-  })
-})
+// NOTE (workstation Phase 2 step 1): the pure invocation formatting that used
+// to be tested here (formatCliInvocation) moved to @shared/agent-adapters,
+// where tests/shared/agent-adapters.test.ts pins the golden byte-exact
+// invocation table. The spawner tests below still assert the exact command
+// strings written to the PTY, so the delegation itself stays regression-locked.
 
 describe('specIdForIdentity', () => {
   it('strips the cli- prefix to match the registry id', () => {
     expect(specIdForIdentity('cli-claude')).toBe('claude')
     expect(specIdForIdentity('cli-codex')).toBe('codex')
     expect(specIdForIdentity('cli-gemini')).toBe('gemini')
+    expect(specIdForIdentity('cli-raw')).toBe('raw')
   })
 })
 
@@ -408,11 +332,185 @@ describe('CliThreadSpawner turn registry (workstation step 3)', () => {
   })
 })
 
+describe('CliThreadSpawner adapter delegation (workstation Phase 2 step 1)', () => {
+  it('resumes claude via the adapter when the bridge captured a session id', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => '206caf50-df65-4a64-adf2-0749f4637bf7'
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    spawner.sendUserMessage('thread-A', 'cli-claude', 'go on')
+    expect(pty.writeAgentInput).toHaveBeenCalledWith(
+      'sess-xyz',
+      `${CLAUDE_BASE} --resume 206caf50-df65-4a64-adf2-0749f4637bf7 'go on'\r`,
+      'batched'
+    )
+  })
+
+  it('falls back to codex resume --last after a first turn with no captured id', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('codex')]
+    })
+    await spawner.input('thread-A', 'cli-codex', 'first', '/v')
+    await spawner.input('thread-A', 'cli-codex', 'second', '/v')
+    expect(pty.writeAgentInput).toHaveBeenLastCalledWith(
+      'sess-xyz',
+      `codex exec resume ${CODEX_FLAGS} --last 'second'\r`,
+      'batched'
+    )
+  })
+
+  it('throws on a non-CLI agent identity when a session is somehow bound', async () => {
+    const { shell } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    expect(() => spawner.sendUserMessage('thread-A', 'machina-native', 'x')).toThrow(/cli/i)
+  })
+})
+
+describe('CliThreadSpawner model threading (workstation Phase 2 step 1)', () => {
+  function modelSpawner() {
+    const { shell, pty } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude'), installed('codex')]
+    })
+    return { spawner, pty }
+  }
+
+  it('a model passed to spawn flows into the next invocation as --model', async () => {
+    const { spawner, pty } = modelSpawner()
+    await spawner.spawn('thread-A', 'cli-claude', '/v', undefined, 'sonnet')
+    spawner.sendUserMessage('thread-A', 'cli-claude', 'list files')
+    expect(pty.writeAgentInput).toHaveBeenCalledWith(
+      'sess-xyz',
+      `${CLAUDE_BASE} --model sonnet 'list files'\r`,
+      'batched'
+    )
+  })
+
+  it('a model passed to input flows into the codex invocation as -m', async () => {
+    const { spawner, pty } = modelSpawner()
+    await spawner.input('thread-A', 'cli-codex', 'list files', '/v', undefined, 'gpt-5.5')
+    expect(pty.writeAgentInput).toHaveBeenCalledWith(
+      'sess-xyz',
+      `codex exec --json --skip-git-repo-check -m gpt-5.5 'list files'\r`,
+      'batched'
+    )
+  })
+
+  it('undefined model (the filler/invalid resolution) emits NO flag', async () => {
+    const { spawner, pty } = modelSpawner()
+    await spawner.input('thread-A', 'cli-claude', 'list files', '/v', undefined, undefined)
+    expect(pty.writeAgentInput).toHaveBeenCalledWith(
+      'sess-xyz',
+      `${CLAUDE_BASE} 'list files'\r`,
+      'batched'
+    )
+  })
+
+  it('a later input without a model clears the stored pick (back to adapter default)', async () => {
+    const { spawner, pty } = modelSpawner()
+    await spawner.input('thread-A', 'cli-claude', 'first', '/v', undefined, 'sonnet')
+    await spawner.input('thread-A', 'cli-claude', 'second', '/v')
+    expect(pty.writeAgentInput).toHaveBeenLastCalledWith(
+      'sess-xyz',
+      `${CLAUDE_BASE} --continue 'second'\r`,
+      'batched'
+    )
+  })
+})
+
+describe('CliThreadSpawner raw adapter (workstation Phase 2 step 1)', () => {
+  it('spawn skips the installed-binary check for cli-raw (nothing to probe)', async () => {
+    const { shell } = fakeServices()
+    const detect = vi.fn(async () => [])
+    const bindSpy = vi.fn()
+    const bridge = { bind: bindSpy } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({ shellService: shell as never, bridge, detect })
+    const result = await spawner.spawn('thread-R', 'cli-raw', '/v')
+    expect(result.ok).toBe(true)
+    expect(detect).not.toHaveBeenCalled()
+    expect(shell.create).toHaveBeenCalledWith('/v', undefined, undefined, undefined, 'cli-raw')
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-R')
+  })
+
+  it('sendUserMessage refuses on cli-raw: no template source exists in step 1', async () => {
+    // Writing a formatted invocation is impossible (the raw adapter throws
+    // without an invocationTemplate) and writing anything else would run a
+    // broken command as the user — so the spawner returns false and nothing
+    // reaches the PTY or the turn registry.
+    const { shell, pty } = fakeServices()
+    const registry = {
+      turnStarted: vi.fn(),
+      threadClosed: vi.fn()
+    }
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [],
+      registry
+    })
+    await spawner.spawn('thread-R', 'cli-raw', '/v')
+    expect(spawner.sendUserMessage('thread-R', 'cli-raw', 'hello')).toBe(false)
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
+    expect(registry.turnStarted).not.toHaveBeenCalled()
+  })
+
+  it('input on a raw thread spawns the PTY but reports ok=false (send is disabled)', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => []
+    })
+    const res = await spawner.input('thread-R', 'cli-raw', 'hello', '/v')
+    expect(res.ok).toBe(false)
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
+  })
+})
+
 describe('isCliAgentIdentity', () => {
-  it('accepts the three CLI agent identities', () => {
+  it('accepts the four CLI agent identities', () => {
     expect(isCliAgentIdentity('cli-claude')).toBe(true)
     expect(isCliAgentIdentity('cli-codex')).toBe(true)
     expect(isCliAgentIdentity('cli-gemini')).toBe(true)
+    expect(isCliAgentIdentity('cli-raw')).toBe(true)
   })
 
   it('rejects machina-native', () => {

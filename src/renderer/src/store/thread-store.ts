@@ -90,7 +90,11 @@ interface ThreadState {
   /** Permanently delete an archived thread (restore first — thread:delete targets live threads). */
   deleteArchivedThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
-  /** Switch the model used by a native thread's next turn. No-op for CLI threads. */
+  /**
+   * Switch the model used by the thread's next turn. Persisted for every
+   * agent (workstation step 1); the CLI transport re-sends it per turn and
+   * the IPC boundary applies the trust rule (filler/off-roster => default).
+   */
   setThreadModel: (id: string, model: string) => Promise<void>
 
   appendUserMessage: (text: string) => Promise<void>
@@ -429,8 +433,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const v = get().vaultPath
     if (!v) return
     const t = get().threadsById[id]
-    // Model is meaningful (and persisted) only for native threads.
-    if (!t || t.agent !== 'machina-native' || t.model === model) return
+    if (!t || t.model === model) return
     const next: Thread = { ...t, model }
     set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
     await window.api.thread.save(v, next)

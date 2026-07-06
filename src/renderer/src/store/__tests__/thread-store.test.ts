@@ -221,7 +221,7 @@ describe('thread-store', () => {
     expect(history[2]).toEqual({ role: 'assistant', content: 'done reading' })
   })
 
-  it('setThreadModel updates a native thread and persists; CLI threads are ignored', async () => {
+  it('setThreadModel updates and persists for native AND CLI threads (workstation step 1)', async () => {
     useThreadStore.setState({
       vaultPath: '/v',
       threadsById: {
@@ -233,10 +233,27 @@ describe('thread-store', () => {
     expect(useThreadStore.getState().threadsById['a'].model).toBe('claude-opus-4-8')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((window as any).api.thread.save).toHaveBeenCalledTimes(1)
-    await useThreadStore.getState().setThreadModel('b', 'claude-opus-4-8')
+    // CLI threads persist the pick too (was a no-op before workstation step 1).
+    await useThreadStore.getState().setThreadModel('b', 'sonnet')
+    expect(useThreadStore.getState().threadsById['b'].model).toBe('sonnet')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalledTimes(2)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenLastCalledWith(
+      '/v',
+      expect.objectContaining({ id: 'b', model: 'sonnet' })
+    )
+  })
+
+  it('setThreadModel with an unchanged model does not persist', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: { b: { ...sampleThread('b'), agent: 'cli-claude' as const } }
+    })
+    await useThreadStore.getState().setThreadModel('b', 'claude-sonnet-4-6')
     expect(useThreadStore.getState().threadsById['b'].model).toBe('claude-sonnet-4-6')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((window as any).api.thread.save).toHaveBeenCalledTimes(1)
+    expect((window as any).api.thread.save).not.toHaveBeenCalled()
   })
 
   it('clears in-flight and appends a system message when CLI input delivery fails', async () => {
@@ -257,6 +274,24 @@ describe('thread-store', () => {
     expect((window as any).api.thread.save).toHaveBeenCalled()
   })
 
+  it('a failed send into a cli-raw thread explains raw semantics, not a missing CLI', async () => {
+    // The spawner refuses raw sends by design (no invocation template until
+    // step 8) — the system message must not claim the CLI is uninstalled.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: false }) }
+    const rawThread = { ...sampleThread('a'), agent: 'cli-raw' as const }
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: rawThread }
+    })
+    await useThreadStore.getState().appendUserMessage('hello')
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+    const sys = useThreadStore.getState().threadsById['a'].messages.find((m) => m.role === 'system')
+    expect(sys?.body).toContain('Interact via the terminal')
+    expect(sys?.body).not.toContain('installed')
+  })
+
   it('forwards the persisted agentId on cli-thread input (workstation step 6)', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: true }) }
@@ -274,6 +309,22 @@ describe('thread-store', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((window as any).api.cliThread.input).toHaveBeenCalledWith(
       expect.objectContaining({ threadId: 'a', agentId: 'test-fixer' })
+    )
+  })
+
+  it('forwards the thread model on cli-thread input (workstation step 1)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: true }) }
+    const cliThread = { ...sampleThread('a'), agent: 'cli-claude' as const, model: 'sonnet' }
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: cliThread }
+    })
+    await useThreadStore.getState().appendUserMessage('run')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.cliThread.input).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: 'a', model: 'sonnet' })
     )
   })
 
@@ -297,9 +348,11 @@ describe('thread-store', () => {
       '/v',
       expect.objectContaining({ id: 'h1', agentId: 'test-fixer' })
     )
+    // Spawn also carries the thread model (workstation step 1) — the filler
+    // here resolves to "adapter default" at the IPC boundary.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((window as any).api.cliThread.spawn).toHaveBeenCalledWith(
-      expect.objectContaining({ threadId: 'h1', agentId: 'test-fixer' })
+      expect.objectContaining({ threadId: 'h1', agentId: 'test-fixer', model: 'claude-sonnet-4-6' })
     )
   })
 

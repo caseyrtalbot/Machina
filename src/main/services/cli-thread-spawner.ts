@@ -2,25 +2,29 @@
  * CLI thread spawner (Phase 8 Task 8.2).
  *
  * Owns the per-thread shell PTY for `cli-claude` / `cli-codex` / `cli-gemini`
- * threads. Each user message becomes a one-shot non-interactive invocation
- * (`claude --print …` / `codex exec …`) written to the PTY, so the existing
- * shell-hook block protocol captures one Block per turn — which the
+ * / `cli-raw` threads. Each user message becomes a one-shot non-interactive
+ * invocation (`claude --print …` / `codex exec …`) written to the PTY, so the
+ * existing shell-hook block protocol captures one Block per turn — which the
  * CliAgentThreadBridge converts into one ThreadMessage. Subsequent turns
- * resume the agent's own session (see `CliInvocationOptions`).
+ * resume the agent's own session (see `CliInvocationOptions` in
+ * `@shared/session-types`).
  *
- * The detector is injected so the spawner stays trivially testable without
- * shelling out. Pure helpers (`formatCliInvocation`, `isCliAgentIdentity`)
- * sit alongside the stateful service for direct unit testing.
+ * Invocation formatting is delegated to the adapter registry
+ * (`@shared/agent-adapters`, workstation Phase 2 step 1) — the per-adapter
+ * switch that used to live here moved there verbatim. The detector is
+ * injected so the spawner stays trivially testable without shelling out.
  */
 
 import type { AgentIdentity } from '@shared/agent-identity'
 import type { CLIAgentInstallation } from '@shared/cli-agents'
+import type { AdapterId, AgentAdapter } from '@shared/session-types'
+import { ADAPTERS } from '@shared/agent-adapters'
 import { sessionId as brandSessionId } from '@shared/types'
 import type { ShellService } from './shell-service'
 import type { CliAgentThreadBridge } from './cli-agent-thread-bridge'
 import { detectInstalledAgents } from './cli-agent-detector'
 
-const CLI_AGENT_IDENTITIES = ['cli-claude', 'cli-codex', 'cli-gemini'] as const
+const CLI_AGENT_IDENTITIES = ['cli-claude', 'cli-codex', 'cli-gemini', 'cli-raw'] as const
 type CliAgentIdentity = (typeof CLI_AGENT_IDENTITIES)[number]
 
 export function isCliAgentIdentity(value: string): value is CliAgentIdentity {
@@ -32,72 +36,9 @@ export function specIdForIdentity(identity: AgentIdentity): string {
   return identity.startsWith('cli-') ? identity.slice(4) : identity
 }
 
-export interface CliInvocationOptions {
-  /**
-   * Agent-native session id captured from a previous turn's structured
-   * output (claude `session_id` / codex `thread_id`). When set, the
-   * invocation resumes that exact conversation — immune to other CLI runs
-   * in the same cwd (ghost emerge, parallel threads).
-   */
-  readonly resumeSessionId?: string
-  /**
-   * True when a prior turn was already sent for this thread. Degraded
-   * fallback when no session id was captured: claude `--continue` / codex
-   * `resume --last` pick the most recent conversation in the cwd.
-   */
-  readonly continueConversation?: boolean
-}
-
-/** Conservative shape for an id that is safe to interpolate into a shell line. */
-const SAFE_AGENT_SESSION_ID_RE = /^[0-9a-zA-Z-]{8,64}$/
-
-/**
- * Pure: build the shell command that runs the agent CLI in non-interactive
- * one-shot mode for a given prompt. The result is appended with `\r` by the
- * caller before being enqueued through the PTY write queue.
- *
- * claude and codex run with machine-readable output (`stream-json` / `--json`)
- * so the thread bridge can extract assistant text and stream interim deltas;
- * gemini has no structured mode and stays a plain one-shot.
- */
-export function formatCliInvocation(
-  identity: AgentIdentity,
-  prompt: string,
-  opts: CliInvocationOptions = {}
-): string {
-  if (!isCliAgentIdentity(identity)) {
-    throw new Error(`formatCliInvocation: not a CLI agent identity: ${identity}`)
-  }
-  const quoted = singleQuote(prompt)
-  const resumeId =
-    opts.resumeSessionId !== undefined && SAFE_AGENT_SESSION_ID_RE.test(opts.resumeSessionId)
-      ? opts.resumeSessionId
-      : null
-  switch (identity) {
-    case 'cli-claude': {
-      // --verbose is mandatory: `claude --print --output-format stream-json`
-      // exits with an error without it.
-      const base = 'claude --print --verbose --output-format stream-json'
-      if (resumeId !== null) return `${base} --resume ${resumeId} ${quoted}`
-      if (opts.continueConversation === true) return `${base} --continue ${quoted}`
-      return `${base} ${quoted}`
-    }
-    case 'cli-codex': {
-      // --skip-git-repo-check: vaults are not guaranteed to be git repos and
-      // codex exec refuses to run outside one otherwise.
-      const flags = '--json --skip-git-repo-check'
-      if (resumeId !== null) return `codex exec resume ${flags} ${resumeId} ${quoted}`
-      if (opts.continueConversation === true) return `codex exec resume ${flags} --last ${quoted}`
-      return `codex exec ${flags} ${quoted}`
-    }
-    case 'cli-gemini':
-      return `gemini -p ${quoted}`
-  }
-}
-
-/** POSIX single-quote escape: wrap in '...' and replace embedded ' with '\''. */
-function singleQuote(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`
+/** Registry lookup: every CLI agent identity maps 1:1 onto an adapter. */
+function adapterForIdentity(identity: CliAgentIdentity): AgentAdapter {
+  return ADAPTERS[specIdForIdentity(identity) as AdapterId]
 }
 
 type SpawnResult =
@@ -136,6 +77,15 @@ export class CliThreadSpawner {
    * defaults to the adapter identity (`cli-claude` etc.).
    */
   private readonly agentIdByThread = new Map<string, string>()
+  /**
+   * Per-thread explicit model pick (workstation step 1). The value arrives
+   * PRE-VALIDATED from the IPC boundary (`resolveModelPick`: roster
+   * membership + charset) — this map and `formatInvocation` trust it as-is.
+   * `undefined` means "adapter default": it CLEARS the stored pick, because
+   * the IPC boundary resolves every request independently and forwarding
+   * `undefined` is its way of saying "no flag this turn".
+   */
+  private readonly modelByThread = new Map<string, string>()
 
   constructor(private readonly opts: CliThreadSpawnerOptions) {}
 
@@ -143,21 +93,28 @@ export class CliThreadSpawner {
     threadId: string,
     identity: AgentIdentity,
     cwd: string,
-    agentId?: string
+    agentId?: string,
+    model?: string
   ): Promise<SpawnResult> {
     if (!isCliAgentIdentity(identity)) {
       return { ok: false, error: `not a CLI agent: ${identity}` }
     }
     this.cwdByThread.set(threadId, cwd)
     if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
-    const detect = this.opts.detect ?? detectInstalledAgents
-    const installations = await detect()
-    const specId = specIdForIdentity(identity)
-    const inst = installations.find((i) => i.id === specId)
-    if (!inst || !inst.installed) {
-      return {
-        ok: false,
-        error: missingBinaryHint(identity)
+    this.setModel(threadId, model)
+    // `cli-raw` has no binary to probe (RAW_AGENT_SPEC.alwaysAvailable): the
+    // whole command line comes from an invocation template (OQ3), so the
+    // installed-binary check is skipped — a raw session is a plain PTY.
+    if (identity !== 'cli-raw') {
+      const detect = this.opts.detect ?? detectInstalledAgents
+      const installations = await detect()
+      const specId = specIdForIdentity(identity)
+      const inst = installations.find((i) => i.id === specId)
+      if (!inst || !inst.installed) {
+        return {
+          ok: false,
+          error: missingBinaryHint(identity)
+        }
       }
     }
 
@@ -165,6 +122,11 @@ export class CliThreadSpawner {
     this.opts.bridge.bind(sessionId, threadId)
     this.sessionByThread.set(threadId, sessionId)
     return { ok: true, sessionId }
+  }
+
+  private setModel(threadId: string, model: string | undefined): void {
+    if (model !== undefined) this.modelByThread.set(threadId, model)
+    else this.modelByThread.delete(threadId)
   }
 
   /**
@@ -177,12 +139,14 @@ export class CliThreadSpawner {
     identity: AgentIdentity,
     text: string,
     cwd: string,
-    agentId?: string
+    agentId?: string,
+    model?: string
   ): Promise<{ ok: boolean }> {
     this.cwdByThread.set(threadId, cwd)
     if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
+    this.setModel(threadId, model)
     if (!this.hasLiveSession(threadId)) {
-      const spawned = await this.spawn(threadId, identity, cwd, agentId)
+      const spawned = await this.spawn(threadId, identity, cwd, agentId, model)
       if (!spawned.ok) return { ok: false }
     }
     return { ok: this.sendUserMessage(threadId, identity, text) }
@@ -201,12 +165,25 @@ export class CliThreadSpawner {
   sendUserMessage(threadId: string, identity: AgentIdentity, text: string): boolean {
     const sessionId = this.sessionByThread.get(threadId)
     if (!sessionId) return false
+    if (!isCliAgentIdentity(identity)) {
+      throw new Error(`sendUserMessage: not a CLI agent identity: ${identity}`)
+    }
+    // Step-1 raw semantics: ad-hoc raw threads have NO invocation template
+    // source (harness-supplied templates arrive in step 8 — OQ3). Formatting
+    // would throw inside the adapter; writing anything else into the PTY
+    // would run a broken command as the user. Refuse instead: the thread
+    // input surface shows "no structured view — interact via the terminal"
+    // with sending disabled, and this is the main-process backstop for it.
+    if (identity === 'cli-raw') return false
     // Per-thread continuity: resume the agent's own session when the bridge
     // captured its id from structured output; fall back to most-recent-in-cwd
-    // continuation when a turn was sent but no id is known.
-    const command = formatCliInvocation(identity, text, {
+    // continuation when a turn was sent but no id is known. The model pick
+    // (if any) was validated at the IPC boundary — see `modelByThread`.
+    const model = this.modelByThread.get(threadId)
+    const command = adapterForIdentity(identity).formatInvocation(text, {
       resumeSessionId: this.opts.bridge.getAgentSessionId(threadId),
-      continueConversation: this.turnsSent.has(threadId)
+      continueConversation: this.turnsSent.has(threadId),
+      ...(model !== undefined ? { model } : {})
     })
     // Open the attribution window BEFORE the PTY write: headShaAtStart must
     // be captured before the agent can move HEAD, and the first write must
@@ -260,5 +237,9 @@ function missingBinaryHint(identity: CliAgentIdentity): string {
       return 'Codex CLI is not installed. See https://github.com/openai/codex'
     case 'cli-gemini':
       return 'Gemini CLI is not installed. See https://github.com/google-gemini/gemini-cli'
+    case 'cli-raw':
+      // Unreachable: spawn() skips the installed-binary check for raw
+      // (nothing to probe). Kept so the switch stays exhaustive.
+      return 'Raw CLI sessions have no binary to install.'
   }
 }

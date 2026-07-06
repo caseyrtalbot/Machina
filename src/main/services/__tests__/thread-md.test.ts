@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
 import matter from 'gray-matter'
 import { encodeThread, decodeThread } from '../thread-md'
+import { DEFAULT_NATIVE_MODEL } from '../../../shared/machina-native-tools'
 import type { Thread, ThreadMessage } from '../../../shared/thread-types'
 
 const baseThread = (overrides: Partial<Thread> = {}): Thread => ({
@@ -15,6 +16,32 @@ const baseThread = (overrides: Partial<Thread> = {}): Thread => ({
   autoAcceptSession: false,
   messages: [],
   ...overrides
+})
+
+describe('thread-md model persistence (workstation Phase 2 step 1)', () => {
+  it('round-trips a picked model for CLI threads (survives relaunch)', () => {
+    const md = encodeThread(baseThread({ agent: 'cli-claude', model: 'sonnet' }))
+    expect(matter(md).data.model).toBe('sonnet')
+    expect(decodeThread(md).model).toBe('sonnet')
+  })
+
+  it('still persists the model for machina-native threads', () => {
+    const md = encodeThread(baseThread({ agent: 'machina-native', model: 'claude-opus-4-8' }))
+    expect(decodeThread(md).model).toBe('claude-opus-4-8')
+  })
+
+  it('decodes a pre-step-1 CLI thread without a model to the DEFAULT_NATIVE_MODEL filler', () => {
+    // The filler is safe to carry: the IPC trust rule maps it to "adapter
+    // default, no flag" (set-to-filler regression, decision 5).
+    const legacy = matter.stringify('', {
+      agent: 'cli-codex',
+      started: '2026-05-01T00:00:00Z',
+      last_message: '2026-05-01T00:00:00Z',
+      title: 'Sample',
+      dock_state: { tabs: [] }
+    })
+    expect(decodeThread(legacy).model).toBe(DEFAULT_NATIVE_MODEL)
+  })
 })
 
 describe('thread-md agentId persistence (workstation step 6)', () => {

@@ -36,12 +36,13 @@ import {
   type CLIAgentSpec,
   type ToolCall as ParsedToolCall
 } from '@shared/cli-agents'
+import { ADAPTERS } from '@shared/agent-adapters'
+import type { AdapterId, AgentAdapter, AgentStreamEvent } from '@shared/session-types'
 import { TRUNCATION_MARKER, type Block } from '@shared/engine/block-model'
 import type { AssistantMessage, ToolCall, ToolResult } from '@shared/thread-types'
 import { stripTerminalControls } from '@shared/engine/terminal-text'
 
 const HINT_MAX = 300
-const TOOL_PREVIEW_MAX = 200
 
 export interface CliAgentThreadMessageEvent {
   readonly threadId: string
@@ -133,9 +134,8 @@ export class CliAgentThreadBridge {
     binding.streamStates.set(blockId, state)
 
     const finished = block.state.kind === 'completed' || block.state.kind === 'cancelled'
-    const delta = supportsStructuredOutput(agent.id)
-      ? drainStructuredOutput(state, block, agent, finished)
-      : ''
+    const parseEvent = adapterForAgent(agent.id)?.parseEvent
+    const delta = parseEvent ? drainStructuredOutput(state, block, parseEvent, finished) : ''
     if (state.agentSessionId !== null) {
       this.agentSessionIdByThread.set(binding.threadId, state.agentSessionId)
     }
@@ -168,16 +168,22 @@ export class CliAgentThreadBridge {
   }
 }
 
-/** Agents whose invocations emit machine-readable JSONL (see spawner flags). */
-function supportsStructuredOutput(agentId: string): boolean {
-  return agentId === 'claude' || agentId === 'codex'
+/**
+ * Registry lookup keyed by the CLIAgentSpec id. An adapter carrying a
+ * `parseEvent` emits machine-readable JSONL (see spawner flags); an adapter
+ * without one — gemini, raw — gets plain PTY passthrough (the legacy
+ * `toolCallParser` path), byte-for-byte what gemini got before step 1.
+ */
+function adapterForAgent(agentId: string): AgentAdapter | undefined {
+  return (ADAPTERS as Partial<Record<string, AgentAdapter>>)[agentId as AdapterId]
 }
 
 /** Pure: translate a terminal `Block` into an assistant `ThreadMessage`. */
 export function blockToMessage(block: Block, agent: CLIAgentSpec): AssistantMessage {
   const state = newStreamState()
-  if (supportsStructuredOutput(agent.id)) {
-    drainStructuredOutput(state, block, agent, true)
+  const parseEvent = adapterForAgent(agent.id)?.parseEvent
+  if (parseEvent) {
+    drainStructuredOutput(state, block, parseEvent, true)
   }
   return buildFinalMessage(block, agent, state)
 }
@@ -191,7 +197,7 @@ export function blockToMessage(block: Block, agent: CLIAgentSpec): AssistantMess
 function drainStructuredOutput(
   state: StreamState,
   block: Block,
-  agent: CLIAgentSpec,
+  parseEvent: (line: string) => AgentStreamEvent | null,
   final: boolean
 ): string {
   if (state.degraded) return ''
@@ -212,17 +218,12 @@ function drainStructuredOutput(
   }
   const before = state.extracted
   for (const raw of lines.slice(state.consumedLines, completeCount)) {
-    const line = raw.trim()
-    if (!line.startsWith('{') || !line.endsWith('}')) continue
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(line)
-    } catch {
-      continue
-    }
-    if (!isRecord(parsed)) continue
+    // The shared parseEvent owns the JSON-line gating (trim, {..} shape,
+    // parse, record check). Non-null — including an all-empty event for a
+    // parsed-but-unmatched codex record — means "structured output seen".
+    const event = parseEvent(raw)
+    if (event === null) continue
     state.sawStructured = true
-    const event = agent.id === 'claude' ? extractClaudeEvent(parsed) : extractCodexEvent(parsed)
     if (event.agentSessionId !== null) state.agentSessionId = event.agentSessionId
     for (const text of event.texts) appendText(state, text)
     // claude's terminal `result` line repeats the final text — use it only
@@ -241,75 +242,6 @@ function appendText(state: StreamState, text: string): void {
   if (segment.length === 0) return
   state.extracted = state.extracted.length > 0 ? `${state.extracted}\n\n${segment}` : segment
   state.sawAssistantText = true
-}
-
-interface AgentEvent {
-  readonly agentSessionId: string | null
-  readonly texts: readonly string[]
-  readonly tools: readonly ParsedToolCall[]
-  readonly resultText: string | null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function previewOf(value: unknown): string {
-  try {
-    const json = JSON.stringify(value) ?? ''
-    return json.length > TOOL_PREVIEW_MAX ? json.slice(0, TOOL_PREVIEW_MAX) : json
-  } catch {
-    return ''
-  }
-}
-
-/** One line of `claude --print --verbose --output-format stream-json`. */
-function extractClaudeEvent(obj: Record<string, unknown>): AgentEvent {
-  const agentSessionId = typeof obj.session_id === 'string' ? obj.session_id : null
-  const texts: string[] = []
-  const tools: ParsedToolCall[] = []
-  let resultText: string | null = null
-  if (obj.type === 'assistant' && isRecord(obj.message) && Array.isArray(obj.message.content)) {
-    for (const part of obj.message.content) {
-      if (!isRecord(part)) continue
-      if (part.type === 'text' && typeof part.text === 'string') {
-        texts.push(part.text)
-      } else if (part.type === 'tool_use' && typeof part.name === 'string') {
-        tools.push({ name: part.name, inputPreview: previewOf(part.input) })
-      }
-    }
-  } else if (obj.type === 'result' && typeof obj.result === 'string') {
-    resultText = obj.result
-  }
-  return { agentSessionId, texts, tools, resultText }
-}
-
-/** One line of `codex exec --json` (experimental JSONL event stream). */
-function extractCodexEvent(obj: Record<string, unknown>): AgentEvent {
-  if (obj.type === 'thread.started' && typeof obj.thread_id === 'string') {
-    return { agentSessionId: obj.thread_id, texts: [], tools: [], resultText: null }
-  }
-  if (obj.type === 'item.completed' && isRecord(obj.item)) {
-    const item = obj.item
-    const itemType =
-      typeof item.type === 'string'
-        ? item.type
-        : typeof item.item_type === 'string'
-          ? item.item_type
-          : null
-    if (itemType === 'agent_message' && typeof item.text === 'string') {
-      return { agentSessionId: null, texts: [item.text], tools: [], resultText: null }
-    }
-    if (itemType !== null && itemType !== 'agent_message' && itemType !== 'reasoning') {
-      return {
-        agentSessionId: null,
-        texts: [],
-        tools: [{ name: itemType, inputPreview: previewOf(item) }],
-        resultText: null
-      }
-    }
-  }
-  return { agentSessionId: null, texts: [], tools: [], resultText: null }
 }
 
 function interimDeltaMessage(block: Block, delta: string): AssistantMessage {

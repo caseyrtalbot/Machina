@@ -102,5 +102,24 @@ function AgentIcon({ agent, size }: { readonly agent: AgentIdentity; readonly si
           <path d="M512 256.5c-137.5 8.4-247.1 118-255.5 255.5h-1C247.1 374.5 137.5 264.9 0 256.5v-1c137.5-8.4 247.1-118 255.5-255.5h1c8.4 137.5 118 247.1 255.5 255.5z" />
         </svg>
       )
+    case 'cli-raw':
+      // Terminal-prompt glyph: raw is an unknown agent CLI run as a plain PTY.
+      return (
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          width={size}
+          height={size}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={common}
+        >
+          <polyline points="5 7 10 12 5 17" />
+          <line x1="12.5" y1="17" x2="19" y2="17" />
+        </svg>
+      )
   }
 }

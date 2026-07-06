@@ -55,13 +55,16 @@ function unescapeBody(body: string): string {
 export function encodeThread(t: Thread): string {
   // autoAcceptSession is intentionally omitted — it's a session-only flag.
   // Persisting it caused dangerous bypass to survive restarts (silent note edits).
-  // `model` is stored only for native threads — CLI threads don't use it.
   const fm = {
     agent: t.agent,
     // Harness attribution id (workstation step 6) — persisted so the slug
     // keeps flowing into turn attribution after a relaunch.
     ...(t.agentId !== undefined ? { agent_id: t.agentId } : {}),
-    ...(t.agent === 'machina-native' ? { model: t.model } : {}),
+    // Persisted for ALL agents since workstation Phase 2 step 1: a CLI
+    // thread's picked model must survive relaunch. Threads that never picked
+    // carry the DEFAULT_NATIVE_MODEL filler, which the IPC trust rule maps
+    // to "adapter default, no flag" — so persisting it is safe.
+    model: t.model,
     started: t.started,
     last_message: t.lastMessage,
     title: t.title,

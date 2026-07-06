@@ -170,11 +170,18 @@ export interface WorkstationSession {
 
 export interface AgentAdapter {
   readonly id: AdapterId
-  /** Generalizes formatCliInvocation (cli-thread-spawner.ts:64-97) per adapter. */
+  /**
+   * Absorbs formatCliInvocation (was cli-thread-spawner.ts:63-96). opts carries
+   * resume/continue state, an optional pre-validated `model`, and — raw only —
+   * the `invocationTemplate` (OQ3).
+   */
   formatInvocation(prompt: string, opts: CliInvocationOptions): string
-  /** Structured-event parser; absent = raw PTY projection only (gemini today). */
+  /** Structured-event parser; absent = raw PTY projection (the BRIDGE contract — nuance below). */
   parseEvent?(line: string): AgentStreamEvent | null
+  /** Spike-verified ids/aliases only. Absent (raw) = no model concept; empty (gemini) = none verifiable. */
   readonly models?: readonly string[]
+  /** RESERVED — OQ1 deferral seam (§4). Phase 2 never sets or reads it. */
+  readonly permissionHooks?: 'adapter-native'
 }
 ```
 
@@ -184,6 +191,41 @@ target shape, not Phase 1 work. (Nuance recorded: gemini does have a heuristic p
 today — `geminiToolCallParser`, `cli-agent-parsers.ts` — but the bridge treats it as
 non-structured; "absent parser = raw projection" describes the bridge contract, not the
 file.) `CLI_AGENT_IDENTITIES` maps 1:1 onto `AdapterId` minus `raw`.
+
+**Status 2026-07-06 (Phase 2 step 1, v1.2):** LANDED — the shapes above are code.
+`src/shared/session-types.ts` carries them verbatim (plus the `CliInvocationOptions` and
+`AgentStreamEvent` types they reference); `src/shared/agent-adapters.ts` (pure,
+renderer-importable, like `cli-agents.ts`) exports `ADAPTERS: Record<AdapterId,
+AgentAdapter>`. The spawner's `formatCliInvocation` switch and the bridge's
+`extractClaudeEvent`/`extractCodexEvent` are deleted — both now dispatch through the
+registry (the bridge routes on `parseEvent` presence via its `adapterForAgent` lookup).
+What landed, point by point:
+
+- **Name-collision cross-reference** (seam-map trap, recorded in the `session-types.ts`
+  header): `src/shared/cli-agent-session-types.ts` is a different, unrelated module — the
+  CLI-agent *presence* wire types for the external-process session listener (Move 8).
+  `session-types.ts` types workstation terminal sessions and the adapter seam.
+- **`formatInvocation(prompt, opts incl. model?)`**: pure, trusts its input — the model
+  flag is emitted whenever `opts.model` is set. Validation lives at the IPC boundary
+  (`resolveRequestedModel` in `src/main/ipc/cli-thread.ts`, backed by the shared
+  `resolveModelPick`); see the v1.2 changelog entry for the full trust rule.
+- **`raw` semantics (OQ3, recorded)**: the whole command line comes from a single-line
+  template string carrying the literal `{prompt}` placeholder; the prompt is
+  `singleQuote`-escaped into every occurrence; a missing, multiline, or placeholder-less
+  template is a structured error. No parser, no resume, no models. In step 1 ad-hoc raw
+  threads have no template source: picking raw spawns a plain PTY and the thread input
+  surface disables sending with honest "no structured view" copy — harness-supplied
+  templates arrive in step 8.
+- **`permissionHooks` (OQ1, recorded)**: reserved optional capability field — the seam
+  for adapter-native pre-write enforcement, deferred to a dedicated follow-on phase.
+  Phase 2 never sets or reads it (§4).
+- **Gemini nuance, restated**: the heuristic parser still exists in
+  `cli-agent-parsers.ts`; "absent `parseEvent` = raw projection" is the *bridge*
+  contract, not a claim about that file. Adapters without `parseEvent` (gemini, raw) get
+  byte-for-byte plain PTY passthrough — the legacy `toolCallParser` path.
+- **Identity mapping, superseded**: `AGENT_IDENTITIES` gained `'cli-raw'` (appended), so
+  `CLI_AGENT_IDENTITIES` now maps 1:1 onto `AdapterId` *including* `raw`;
+  `identityForAdapter` moved to `agent-adapters.ts` (re-exported by `harness-types.ts`).
 
 **Projection** is not a new subsystem — it names the existing seam:
 
@@ -212,7 +254,10 @@ permission level: it can self-commit, `git reset --hard`, forge or strip trailer
 files, or edit `.gitignore`. Phase 1 delivers accident containment + visibility; a
 `headMoved` tripwire (HEAD captured at turn start vs turn end) detects crude history
 rewrites and surfaces a banner + audit entry. Adapter-native permission hooks (Claude Code
-`--permission-prompt-tool` routed into `HitlGate`) are the Phase 2+ enforcement path.
+`--permission-prompt-tool` routed into `HitlGate`) remain the future enforcement path,
+**deferred out of Phase 2's step list to a dedicated follow-on** (OQ1, recorded at step 1,
+v1.2): the reserved optional `AgentAdapter.permissionHooks` field (§3) is the seam; Phase 2
+never sets or reads it, and containment stays post-persistence via the approvals queue.
 
 ```
 CLI turn window (CliTurnRegistry — NEW primitive; the bridge tracks nothing per-thread)
@@ -381,6 +426,43 @@ double-built the same files with contradictory shapes. Canonical order:
 Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
+
+- **v1.2 (2026-07-06, Phase 2 step 1 landing)** — §3 promoted from "Phase 2 target" to
+  LANDED: `session-types.ts` plus the adapter registry (`agent-adapters.ts`, pure,
+  renderer-importable) replace the spawner's `formatCliInvocation` switch and the
+  bridge's extract functions; `AgentAdapter` gains spike-verified `models` rosters and
+  the reserved optional `permissionHooks` field (OQ1 deferred to a dedicated follow-on —
+  §4 amended accordingly; OQ3 raw template semantics recorded in §3).
+  **Model-flag trust rule:** a flag is emitted ONLY for an explicit user pick passing
+  BOTH membership in `adapter.models` AND a conservative charset regex
+  (`/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/`); absent, unknown, or the persisted
+  `DEFAULT_NATIVE_MODEL` filler every pre-step-1 CLI thread carries ⇒ no flag, adapter
+  default — and an explicit-but-rejected pick additionally writes an audit note
+  (decision `denied`; the turn itself still proceeds on the default, and the entry's
+  error text says so). Validation sits at the IPC boundary (`resolveRequestedModel` in
+  `src/main/ipc/cli-thread.ts` → shared `resolveModelPick`); `formatInvocation` is pure
+  and trusts its input. `cli-thread:spawn` / `cli-thread:input` request shapes gain
+  optional `model?: string` (shape edit precedented by Phase 1 step 1's `cwd`).
+  **Spike-verified flag syntax (2026-07-06; installed CLIs claude 2.1.201 / codex-cli
+  0.142.5 / gemini 0.27.0):** claude `--model <m>` on the base flags BEFORE
+  `--resume`/`--continue` (roster `fable`/`opus`/`sonnet`/`haiku`; model+resume
+  coexistence real-run verified); codex `-m <m>` after `--json --skip-git-repo-check`
+  in both `codex exec` and `codex exec resume`, before the resume id (roster
+  `gpt-5.5`/`gpt-5.4`, both real-run verified; negative result recorded:
+  `gpt-5.5-codex` REJECTED — API 400 on a ChatGPT-account codex — deliberately
+  excluded); gemini `-m` parse-verified only — the dev machine has no gemini auth, so
+  no id could be real-run verified and gemini ships `models: []` (the picker offers
+  nothing, the flag is never emitted; the roster grows when ids become verifiable).
+  Residual for the step-1 exit bar: codex continue-with-model (`-m` before `--last`) is
+  string-construction-verified only. **Persistence:** `thread-md.ts` `encodeThread` now
+  writes `model` for ALL agents (was machina-native only) so a CLI thread's pick
+  survives relaunch; decode keeps the `DEFAULT_NATIVE_MODEL` fallback, which the filler
+  rule maps to "no flag". **raw fallback:** `'cli-raw'` APPENDED to `AGENT_IDENTITIES`;
+  `RAW_AGENT_SPEC` is `alwaysAvailable` and kept out of the probeable `CLI_AGENTS`
+  (nothing to probe, detection never runs for raw); raw spawn skips the
+  installed-binary check and opens a plain PTY, `sendUserMessage` refuses on raw until
+  harness-supplied templates arrive (step 8, OQ3), and the thread input surface shows
+  the honest no-structured-view copy with sending disabled.
 
 - **v1.1.5 (2026-07-06, pre-Phase-2 hardening)** — §5 hardening: `createHarness`
   refuses (structured error, no harness content written, empty slug dir removed

@@ -3,7 +3,15 @@ import type { AgentIdentity } from '@shared/agent-identity'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
 
-const AGENTS: readonly AgentIdentity[] = ['machina-native', 'cli-claude', 'cli-codex', 'cli-gemini']
+// 'cli-raw' appended in workstation step 1: picking it spawns a plain PTY
+// (no structured view — the thread input surface disables sending).
+const AGENTS: readonly AgentIdentity[] = [
+  'machina-native',
+  'cli-claude',
+  'cli-codex',
+  'cli-gemini',
+  'cli-raw'
+]
 
 export function AgentPicker({
   onPick,

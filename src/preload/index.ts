@@ -144,14 +144,20 @@ const api = {
       typedInvoke('thread:write-config', { vaultPath, config })
   },
   cliThread: {
-    spawn: (req: { threadId: string; identity: AgentIdentity; cwd: string; agentId?: string }) =>
-      typedInvoke('cli-thread:spawn', req),
+    spawn: (req: {
+      threadId: string
+      identity: AgentIdentity
+      cwd: string
+      agentId?: string
+      model?: string
+    }) => typedInvoke('cli-thread:spawn', req),
     input: (req: {
       threadId: string
       identity: AgentIdentity
       text: string
       cwd: string
       agentId?: string
+      model?: string
     }) => typedInvoke('cli-thread:input', req),
     close: (threadId: string) => typedInvoke('cli-thread:close', { threadId }),
     cancel: (threadId: string) => typedInvoke('cli-thread:cancel', { threadId })
