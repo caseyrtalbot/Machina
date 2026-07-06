@@ -25,8 +25,9 @@ Playwright probes: `git.status`/`diff`/`commitApproved` (both trailers in `git l
 `revertAgent` (restore + Machina-Reverts) on a real dirtied repo, non-repo structured
 no-ops, and per-turn snapshot granularity (2 turns sent ⇒ exactly 2 pre-agent snapshot
 commits). **The next work is step 3 (gate parity); step 4 (dock shell) remains
-parallel-safe.** Section "What step 2 changed under you" below lists the seams step 3
-consumes.
+parallel-safe — `HANDOFF-PARALLEL-STEPS-3-4.md` is the two-session work order with the
+coordination contract.** Section "What step 2 changed under you" below lists the seams
+step 3 consumes.
 
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
