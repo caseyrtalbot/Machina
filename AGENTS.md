@@ -26,7 +26,7 @@ Single test: `npx vitest run path/to/file.test.ts`
 
 ## Architecture
 
-Electron app with three process boundaries plus shared pure logic:
+Electron app with three process boundaries:
 
 | Process | Entry | Source |
 |---------|-------|--------|
@@ -92,7 +92,7 @@ Automated canvas changes (folder map, ontology, agents) use optimistic concurren
 
 ### MCP Server
 
-Nine tools total. Reads: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`. Writes: `vault.write_file`, `vault.create_file`, `canvas.apply_plan`, gated by `TimeoutHitlGate` + `WriteRateLimiter` with 30s auto-deny. Raw vault-derived read results (`vault.read_file`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`) use Spotlighting trust markers; structured JSON reads (`search.query`, `graph.get_neighbors`) do not. `mcp-cli.ts` is headless stdio and registers reads only. The in-process `mcp-lifecycle.ts` server is built but not transport-connected in production. Safety details live in `docs/architecture/safety-subsystem.md`.
+Twelve tools: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot` (reads); `vault.write_file`, `vault.create_file`, `canvas.apply_plan` (writes gated by TimeoutHitlGate + WriteRateLimiter). The three `vault.*` tools are also registered under `workspace.*` aliases (same handlers; the invoked name flows into the Spotlighting envelope and gate prompt). Auto-denies after 30s with no user response. Tools that return raw vault-derived content (`vault.read_file`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`) wrap results in Spotlighting trust markers; structured-JSON tools (`search.query`, `graph.get_neighbors`) do not. `mcp-cli.ts` provides headless stdio mode and registers reads only (7 tools — no writes, no gate). The in-process MCP server in `mcp-lifecycle.ts` is built but not transport-connected in production. See `docs/architecture/safety-subsystem.md` for the full safety story (HITL gate, audit, Spotlighting, PathGuard) and known gaps.
 
 ### Terminal Webview Isolation
 
@@ -100,11 +100,11 @@ Terminal runs in an Electron `<webview>` with its own preload (`src/preload/term
 
 ### Block Protocol (structured shell sessions)
 
-Shell hooks (`resources/shell-hooks/te.{zsh,bash,fish}`) emit OSC `1337;te-...` markers only when `TE_SESSION_ID` is set by `PtyService`. `BlockDetector` parses PTY markers in pure engine code; `BlockWatcher` folds them through immutable block-model transitions and emits `block:update` IPC. Renderer flow: module-level `window.api.on.blockUpdate` subscription in `block-store` -> `terminal-block` cards. Secret spans from `scanSecrets` are masked by render offsets with per-card click-to-reveal. See `docs/architecture/block-protocol.md`.
+Shell hooks (`resources/shell-hooks/te.{zsh,bash,fish}`) emit OSC `1337;te-…` markers around prompts and commands so the engine can convert the raw PTY stream into structured `Block` records (prompt + command + output + exit + cwd). `PtyService` exports `TE_SESSION_ID` so hooks activate inside thought-engine PTYs only. `BlockDetector` (`src/shared/engine/block-detector.ts`, pure) parses markers; `BlockWatcher` (`src/main/services/block-watcher.ts`) folds events into `Block` snapshots via the immutable transitions in `src/shared/engine/block-model.ts`. Each transition fires a `block:update` IPC event (`window.api.on.blockUpdate`). The renderer consumes these via a module-level `window.api.on.blockUpdate` subscription in `block-store` (per-session ordered list), and projects entries onto the canvas via the `terminal-block` card type. Secret spans flagged by `scanSecrets` are masked at render time using `block.outputText` offsets and `block-output-segments`; a per-card click-to-reveal toggle un-masks for that one card only. Wire format and degraded-mode behavior in `docs/architecture/block-protocol.md`. Hooks no-op when `TE_SESSION_ID` is unset, so they're safe in shared rc files.
 
 ### PTY Write Arbitration
 
-All PTY writes go through a per-session `PtyWriteQueue` with single-flight drain. `PtyWrite` is `bytes | agent-input`, exposed as `write`, `sendRawKeys`, and `writeAgentInput`; use `writeAgentInput` for agent-originated text so future policy can distinguish it from human keystrokes.
+All `PtyService` writes route through a per-session `PtyWriteQueue` (`src/main/services/pty-write-queue.ts`) with single-flight drain. `PtyWrite` is a discriminated union of `bytes | agent-input`, exposed as `write` / `sendRawKeys` / `writeAgentInput`. Use `writeAgentInput` for agent-originated input — keeps it distinguishable from human keystrokes for future policy gating.
 
 ### Coordinated Quit (2-phase)
 
@@ -116,11 +116,11 @@ before-quit → preventDefault → typedSend('app:will-quit')
 
 ### Key Subsystems
 
-- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds in `RELATIONSHIP_KINDS`, each with provenance) → ghost-index.ts. search-engine.ts uses MiniSearch weights: title x10, tags x5, body x1. Runs in vault-worker.ts.
-- **Canvas** (`panels/canvas/`): React DOM pan/zoom via `translate(x,y) scale(zoom)` in `CanvasSurface.tsx`; Pixi.js is only for the graph renderer. 12 `CanvasNodeType` card types include `terminal-block`, which projects a `block-store` entry and can be pinned from `TerminalCard`. Click-to-focus, click-again-to-interact.
+- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds with provenance: `connection`, `cluster`, `tension`, `appears_in`, `related`, `co-occurrence`, `derived_from` — `RELATIONSHIP_KINDS` in `src/shared/types.ts`) → ghost-index.ts. search-engine.ts: MiniSearch (title x10, tags x5, body x1). All runs in vault-worker.ts Web Worker.
+- **Canvas** (`panels/canvas/`): React DOM with a CSS-transform pan-zoom layer (`CanvasSurface.tsx`: `translate(x,y) scale(zoom)`), **not** Pixi — Pixi.js drives only the graph view (`panels/graph/graph-renderer.ts`). 12 card types (`CanvasNodeType` in `src/shared/canvas-types.ts`): `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `project-folder`, `terminal-block`. Click-to-focus, click-again-to-interact. `terminal-block` cards project an entry in `block-store`; pinned via the `+` action on a `TerminalCard`.
 - **Ontology** (`engine/ontology-*`): Tag-first grouping with link-analysis fallback, computed in ontology-worker.ts. `GroupProvenance` tracks source (user tags, links, AI).
-- **Agents**: Two paths outside the MCP safety subsystem. (1) Native Anthropic SDK agent via `machina-native-agent.ts`, using `messages.stream` and `NATIVE_TOOLS`; it has PathGuard (`resolveInVault`) on note ops, per-write HITL approval except under `autoAccept` until the per-run write limiter trips, append-only audit logging on successful writes, no read-time Spotlighting. `write_note`/`edit_note` share final-write mechanics with `VaultQueryFacade.writeFile` via `writeStampedNote` (`src/main/utils/note-write.ts`), stamping `modified_by`/`modified_at`, suppressing watcher self-echo through optional `DocumentManager.registerExternalWrite`, preserving note bodies verbatim even when they start with `---`, and keeping facade vs note-tools audit entries separate with no double-log. Canvas writes use a strict id regex (`CANVAS_ID_RE`, fast first reject) and then route through PathGuard (`resolveInVault`) for the symlink/traversal backstop. IPC: `window.api.agentNative`. (2) CLI thread PTYs via `cli-thread-spawner.ts` running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print "<prompt>"`; IPC `window.api.thread`; trusted to the user's level. `vault-git.ts:commitPreAgentSnapshot` provides pre-run rollback snapshots (wired to CLI threads in plan item 1.8); `pty-monitor.ts` → `agent:get-states` / `agent:states-changed` keeps PTY agent badging alive. See `docs/architecture/adr/0001-native-agent-stays-on-anthropic-sdk.md`.
-- **Block Protocol**: Shell hooks → OSC markers → `BlockDetector` → `BlockWatcher` → `block:update` IPC → renderer `block-store` → DOM `terminal-block` cards.
+- **Agents**: Two paths. (1) In-app Anthropic SDK agent via `machina-native-agent.ts` (`@anthropic-ai/sdk` `messages.stream` with a tool loop over `NATIVE_TOOLS` / `machina-native-tools.ts`). IPC: `window.api.agentNative`. (2) CLI thread spawner via `cli-thread-spawner.ts` — owns a per-thread PTY running `cli-claude` / `cli-codex` / `cli-gemini` as `<binary> --print "<prompt>"`. IPC: `window.api.thread`. Both run outside the MCP safety subsystem, but not equally: path (1) carries its own guards — PathGuard (`resolveInVault`) on note ops, per-write HITL approval (skipped under autoAccept, but forced when the per-run write-velocity limiter trips), and append-only audit logging on every successful write; no read-time Spotlighting. `write_note`/`edit_note` route their final write through the shared `writeStampedNote` helper (`src/main/utils/note-write.ts`) — the single safe-write mechanics now also used by `VaultQueryFacade.writeFile` — so native writes stamp `modified_by`/`modified_at` provenance and suppress the vault-watcher self-echo via `DocumentManager.registerExternalWrite` (injected as an optional `documentManager` `ToolContext` field); the body is preserved verbatim (a leading `---` is never re-parsed). Canvas writes use a strict id regex (`CANVAS_ID_RE`, fast first reject) and then route through PathGuard (`resolveInVault`) for the symlink/traversal backstop. Path (2) is trusted to the user's level (no PathGuard, no pre-write gate); its workspace writes are contained after the fact by the post-persistence approvals gate — `cli-turn-registry.ts` attributes each turn's writes, `agent-write-watcher.ts` routes them into the approval queue, and resolving from the tray commits with `Machina-Agent`/`Machina-Session` trailers (`git-service.ts:commitApproved`), reverts via git (`discard`), or undoes an agent wholesale (`revertAgent`); the pre-run snapshot (`commitPreAgentSnapshot`) was retired in workstation step 5 after the G1–G8 evidence gate (`docs/architecture/workstation/03-snapshot-retirement-evidence.md`). PTY agent monitoring stays live via `pty-monitor.ts` → `agent:get-states` / `agent:states-changed`. See `docs/architecture/safety-subsystem.md`; the decision to keep path (1) on `@anthropic-ai/sdk` (no Claude Agent SDK migration) is recorded in `docs/architecture/adr/0001-native-agent-stays-on-anthropic-sdk.md`.
+- **Block Protocol**: shell hooks → OSC markers → `BlockDetector` → `BlockWatcher` → `block:update` IPC → renderer `block-store` → `terminal-block` `BlockCard` (DOM, not Pixi). See dedicated subsection above and `docs/architecture/block-protocol.md`.
 - **System Artifacts**: Structured markdown in `.machina/artifacts/{sessions,patterns,tensions}/`. Schemas in `system-artifacts.ts`.
 - **Web Workers**: vault-worker (parse+graph), graph-physics-worker (D3-force), ontology-worker (grouping+layout), project-map-worker (filesystem→canvas).
 
@@ -153,13 +153,13 @@ Tiptap 3 with markdown round-tripping. Extensions: slash commands, bubble menu, 
 
 ### Design System
 
-Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). Dark-only UI with a runtime-selectable accent: `ACCENT_PRESETS` in `design/accent-presets.ts` (default `ember`, `#ff8c5a`) plus a `custom` hex, stored as `accentId`/`customAccentHex` in `settings-store` and applied via `applyAccentCssVars`. `EnvironmentSettings` exposes opacity, header darkness, blur, grid-dot visibility, font sizes, `density`, `radii`, `backgroundTint`, and `canvasGrid`. OKLCH remains for per-artifact colors.
+Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). **Dark-only**, with a runtime-selectable accent: `ACCENT_PRESETS` in `design/accent-presets.ts` (default `ember`, `#ff8c5a`) plus a `custom` hex, stored as `accentId`/`customAccentHex` in `settings-store` and applied via `applyAccentCssVars` (`design/apply-accent.ts`). `EnvironmentSettings` (`design/themes.ts`) exposes opacity, header darkness, blur, grid-dot visibility, font sizes, `density`, `radii`, `backgroundTint`, and `canvasGrid`. OKLCH palette is used for per-artifact colors via `getArtifactColor(type)`.
 
 - Import from `design/tokens.ts` — never hardcode hex or px
-- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc. resolve at startup; only accent vars are reapplied (via `applyAccentCssVars`) when the user changes accent
+- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc. — resolved at startup; only accent vars are reapplied (via `applyAccentCssVars`) when the user changes accent
 - `getArtifactColor(type)` for per-type colors
 - Animation keyframes prefixed `te-`
-- For Pixi, mermaid, or other non-CSS consumers needing hex values, read CSS vars via `getComputedStyle`; note accent vars can change at runtime when the user picks a new accent
+- For Pixi / mermaid / other non-CSS consumers that need a resolved hex, read CSS vars via `getComputedStyle`; note accent vars can change at runtime when the user picks a new accent
 
 ## Type Conventions
 
@@ -187,4 +187,10 @@ Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) 
 
 ## Compact Instructions
 
-When compacting context, preserve IPC contracts and process ownership, active plan paths/status, process-boundary and data-flow decisions, verification evidence, error corrections/root causes, and design token/theme decisions.
+Always preserve across context compaction:
+- IPC channel contracts and process ownership (main vs renderer vs preload)
+- Active plan file paths, current step, and completion status
+- Process boundary and data flow decisions
+- Verification evidence (test output, build results, type-check results)
+- Error corrections and root causes, especially IPC or Electron-specific
+- Design system token values and theme decisions
