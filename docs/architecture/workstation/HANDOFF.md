@@ -30,9 +30,9 @@ commits). **Steps 3 (gate parity) and 4 (dock shell) are both SHIPPED** — see 
 first at `5f5c641`, step 5 rebased onto it and landed only after all of G1–G8 passed
 on fresh evidence). The pre-run snapshot is RETIRED — the approvals gate owns CLI
 rollback now; the gate checklist, parity ledger, and full P1/P2 transcripts live in
-`03-snapshot-retirement-evidence.md`. Remaining Phase-1 work: the tracer-bullet run
-recorded with Casey confirming on the running app, then delete
-`HANDOFF-PARALLEL-STEPS-5-6.md`.
+`03-snapshot-retirement-evidence.md`. **The Phase-1 tracer bullet PASSED with Casey
+confirming on the running app (2026-07-06)** — see "Definition of done" below;
+`HANDOFF-PARALLEL-STEPS-5-6.md` deleted per its own instructions. Phase 1 is COMPLETE.
 
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
@@ -344,12 +344,23 @@ Repo gotchas the step-1 team hit (they will bite you too):
 - Surgical scope: every changed line traces to the step's spec. Files under 800 lines
   (thread-store.ts is already at 825 — do not grow it; the specs route around it).
 
-## Definition of done for Phase 1
+## Definition of done for Phase 1 — **MET (2026-07-06, Casey-confirmed)**
 
 The tracer bullet, on a real repo, in one sitting: open repo → spawn terminal → create
 test-fixer harness → run it → watch the turn in the tray → approve the diff → see the
 `Machina-Agent: test-fixer` trailer commit → `revertAgent` cleanly undoes it. All
 invariants in PLAN.md hold at every step boundary.
+
+**Tracer-bullet run record**: Casey ran the full path manually on the running dev app
+(2026-07-06), on a real repo with a deliberately broken test: palette create (six
+entries, verify.sh 0555, duplicate-create refused), palette run (cli-claude thread
+fixed the failing test), tray approve, `Machina-Agent: test-fixer` +
+`Machina-Session` trailers on the approved commit, then
+`window.api.git.revertAgent('test-fixer')` from the DevTools console returned
+`ok: true` and produced a `Machina-Reverts` commit restoring the pre-agent tree.
+All checks reported good. (revertAgent still has no UI affordance — console/IPC only;
+candidate Phase-2 surface.) This confirmation followed the earlier automated
+transcripts (step-6 smoke 11/11; step-5 P1/P2 in `03-snapshot-retirement-evidence.md`).
 
 ## Machinery you inherit (verified working, don't rebuild)
 

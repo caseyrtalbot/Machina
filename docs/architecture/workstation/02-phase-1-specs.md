@@ -356,7 +356,7 @@ whose first message contains the composed harness prompt and receives a reply th
 the stock `claude --print` invocation; a harness-run write lands in the approvals tray
 attributed `test-fixer` and its approved commit carries the slug trailer.
 
-## Tracer-bullet exit bar (Phase 1 done)
+## Tracer-bullet exit bar (Phase 1 done) — **MET** (2026-07-06, Casey-confirmed on the running app; run record in HANDOFF.md "Definition of done")
 
 On a real repo (e.g. `strength-engine`), in one sitting: open the repo (step 1) → spawn
 a terminal in it (step 4) → create the test-fixer harness (step 6) → run it, watch the
