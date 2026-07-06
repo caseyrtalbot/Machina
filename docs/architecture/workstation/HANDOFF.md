@@ -47,6 +47,11 @@ confirming on the running app (2026-07-06)** — see "Definition of done" below;
    step 3's landing commit); next are steps 5–6. Line numbers in the specs were
    verified at `7735644`/`ec6fa6d` and later steps have since moved code — re-verify
    with `rg` before editing.
+5. **04-phase-2-specs.md** — the Phase 2 work queue (8 steps, canonical order; spec
+   pass 2026-07-06 from a 4-designer + 2-judge workflow over four disk-verified
+   investigation dossiers). Phase 1 is COMPLETE — new sessions start here. Pre-Phase-2
+   hardening already landed: AGENTS.md regen unparked (`c7d463f`), symlinked-parent
+   harness refusal + contracts v1.1.5 (`660dc56`).
 
 ## What step 1 changed under you (`76d0699`)
 

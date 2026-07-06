@@ -108,6 +108,10 @@ PTY); budget stack + kill switch + circuit breakers; harness linter; per-agent r
 Exit bar: create a non-template agent from blank in <5 min; kill switch halts a runaway
 loop; harness linter flags a broken scope contract.
 
+Implementation specs: `04-phase-2-specs.md` (8 steps, canonical order; spec pass
+2026-07-06 — records the "runaway loop := runaway turn/agent" exit-bar interpretation
+and the adapter-native-hooks deferral).
+
 ### Phase 3 — Loops + the lens
 
 Loop scheduler (trigger × prompt × agent, per-loop policy, queue-by-default); global
