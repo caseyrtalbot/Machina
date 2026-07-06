@@ -147,6 +147,13 @@ and remains wired at spawn until Phase 1 step 5 retires it. Interim hardening: a
 it per turn in `CliThreadSpawner.input()` — **not** `sendUserMessage`, which has no cwd
 (adversarial correction) — to close the PTY-lifetime granularity gap found in audit §3.
 
+**Status 2026-07-06 (step 5, v1.1.4):** `commitPreAgentSnapshot` is RETIRED — both call
+sites (spawn + per-turn) removed after the G1–G8 evidence gate passed on fresh runs
+(`03-snapshot-retirement-evidence.md`). The `<TE_DIR>/no-auto-commit` opt-out retired with
+it: no automatic commits remain, so the paragraph above about its scope is historical.
+`isAutoCommitOptedOut` is deleted from `git-service.ts`; `isGitRepo` and the §2 substrate
+are unchanged.
+
 ## 3. Session, adapter, projection (shared types)
 
 ```ts
@@ -283,6 +290,10 @@ Contract points (each traceable to a verified finding):
 - **Never-regress rule**: `commitPreAgentSnapshot` stays wired (spawn + per-turn) until
   approve/reject + `revertAgent` are proven on a real repo against the step 5 evidence
   checklist. No window where neither mechanism covers rollback.
+  **Status 2026-07-06 (step 5, v1.1.4):** satisfied and closed — the G1–G8 evidence gate
+  passed on fresh runs at the landing HEAD (`03-snapshot-retirement-evidence.md`, all
+  boxes checked; parity ledger records the never-covered cases honestly), and the
+  snapshot was retired in the same step. Rollback coverage never gapped.
 
 ## 5. Agent harness folder (on-disk schema)
 
@@ -371,6 +382,17 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.1.4 (2026-07-06, step 5 landing)** — the §2/§4 never-regress rule is discharged:
+  `commitPreAgentSnapshot` retired (spawn-site + per-turn call sites removed from
+  `CliThreadSpawner`, function deleted from `git-service.ts`) after the G1–G8 evidence
+  gate passed on fresh runs at the landing HEAD — see
+  `03-snapshot-retirement-evidence.md` (gate checklist + parity ledger: non-repo,
+  gitignored paths, out-of-root, agent-runs-git). Deliberate deviation recorded: the
+  `<TE_DIR>/no-auto-commit` opt-out and `isAutoCommitOptedOut` are retired with the
+  snapshot (it was scoped to automatic commits only, and none remain);
+  commitApproved/revertAgent/discard were always explicit user actions and are
+  unaffected. Two gates were unit-uncovered and gained tests in the evidence commit:
+  G2 (approve→revertAgent tree equality) and G8 (per-turn approve/reject isolation).
 - **v1.1.3 (2026-07-06, step 6 landing)** — two clarifications/deviations found
   while implementing the test-fixer harness: §6 `harness:create`'s success `root`
   is the CREATED HARNESS DIRECTORY (absolute path), not the workspace root — the

@@ -19,7 +19,6 @@ import { sessionId as brandSessionId } from '@shared/types'
 import type { ShellService } from './shell-service'
 import type { CliAgentThreadBridge } from './cli-agent-thread-bridge'
 import { detectInstalledAgents } from './cli-agent-detector'
-import { commitPreAgentSnapshot } from './git-service'
 
 const CLI_AGENT_IDENTITIES = ['cli-claude', 'cli-codex', 'cli-gemini'] as const
 type CliAgentIdentity = (typeof CLI_AGENT_IDENTITIES)[number]
@@ -151,10 +150,6 @@ export class CliThreadSpawner {
     }
     this.cwdByThread.set(threadId, cwd)
     if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
-    // Rollback safety: snapshot the vault before the agent can touch it.
-    // Never blocks the spawn — returns a structured no-op on non-repo,
-    // opt-out, nothing-to-commit, or git failure.
-    commitPreAgentSnapshot(cwd, threadId)
     const detect = this.opts.detect ?? detectInstalledAgents
     const installations = await detect()
     const specId = specIdForIdentity(identity)
@@ -189,11 +184,6 @@ export class CliThreadSpawner {
     if (!this.hasLiveSession(threadId)) {
       const spawned = await this.spawn(threadId, identity, cwd, agentId)
       if (!spawned.ok) return { ok: false }
-    } else {
-      // Per-turn rollback granularity: spawn() only snapshots when the PTY is
-      // (re)created, so a live session must snapshot here — exactly one
-      // snapshot per turn, never two (contracts §2, interim hardening).
-      commitPreAgentSnapshot(cwd, threadId)
     }
     return { ok: this.sendUserMessage(threadId, identity, text) }
   }
@@ -219,8 +209,8 @@ export class CliThreadSpawner {
       continueConversation: this.turnsSent.has(threadId)
     })
     // Open the attribution window BEFORE the PTY write: headShaAtStart must
-    // be captured (post pre-agent snapshot) before the agent can move HEAD,
-    // and the first write must never land ahead of its turn window.
+    // be captured before the agent can move HEAD, and the first write must
+    // never land ahead of its turn window.
     const cwd = this.cwdByThread.get(threadId)
     if (this.opts.registry !== undefined && cwd !== undefined) {
       this.opts.registry.turnStarted({

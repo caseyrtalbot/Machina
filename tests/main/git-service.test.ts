@@ -14,9 +14,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 
 import {
-  commitPreAgentSnapshot,
   isGitRepo,
-  isAutoCommitOptedOut,
   headSha,
   status,
   diff,
@@ -24,7 +22,6 @@ import {
   revertAgent,
   discard
 } from '../../src/main/services/git-service'
-import { TE_DIR } from '../../src/shared/constants'
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), 'machina-git-service-test-'))
@@ -50,10 +47,6 @@ function initGitRepo(dir: string): void {
 
 function git(dir: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd: dir, encoding: 'utf-8' }).trim()
-}
-
-function lastCommitMessage(dir: string): string {
-  return git(dir, 'log', '-1', '--pretty=%B')
 }
 
 /** Write + commit a file directly (plain user commit, no trailers). */
@@ -100,51 +93,6 @@ describe('git-service', () => {
     it('returns true when .git directory exists', () => {
       initGitRepo(vaultRoot)
       expect(isGitRepo(vaultRoot)).toBe(true)
-    })
-  })
-
-  describe('isAutoCommitOptedOut', () => {
-    it('returns false by default', () => {
-      expect(isAutoCommitOptedOut(vaultRoot)).toBe(false)
-    })
-
-    it('returns true when .te/no-auto-commit exists', () => {
-      mkdirSync(join(vaultRoot, TE_DIR), { recursive: true })
-      writeFileSync(join(vaultRoot, TE_DIR, 'no-auto-commit'), '')
-      expect(isAutoCommitOptedOut(vaultRoot)).toBe(true)
-    })
-  })
-
-  describe('commitPreAgentSnapshot', () => {
-    it('returns not-a-git-repo when vault is not a git repo', () => {
-      const result = commitPreAgentSnapshot(vaultRoot, 'abcd1234-...')
-      expect(result).toEqual({ committed: false, reason: 'not-a-git-repo' })
-    })
-
-    it('returns opted-out when .te/no-auto-commit is present', () => {
-      initGitRepo(vaultRoot)
-      mkdirSync(join(vaultRoot, TE_DIR), { recursive: true })
-      writeFileSync(join(vaultRoot, TE_DIR, 'no-auto-commit'), '')
-
-      const result = commitPreAgentSnapshot(vaultRoot, 'abcd1234-...')
-      expect(result).toEqual({ committed: false, reason: 'opted-out' })
-    })
-
-    it('returns nothing-to-commit on a clean repo', () => {
-      initGitRepo(vaultRoot)
-      const result = commitPreAgentSnapshot(vaultRoot, 'abcd1234-...')
-      expect(result).toEqual({ committed: false, reason: 'nothing-to-commit' })
-    })
-
-    it('commits dirty changes with a session-scoped message', () => {
-      initGitRepo(vaultRoot)
-      writeFileSync(join(vaultRoot, 'note.md'), '# hello')
-
-      const result = commitPreAgentSnapshot(vaultRoot, 'abcd1234-efgh-5678')
-      expect(result.committed).toBe(true)
-
-      const msg = lastCommitMessage(vaultRoot)
-      expect(msg).toBe('pre-agent snapshot (abcd1234)')
     })
   })
 

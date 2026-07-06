@@ -105,7 +105,7 @@ Its writes are guarded in depth, summarized here at a high level:
 
 ### CLI agent threads
 
-`src/main/services/cli-thread-spawner.ts` spawns `claude`, `codex`, or `gemini` CLIs in per-thread PTYs with session continuity (resume support). These run at the user's own trust level: the CLIs bring their own permission models, so Machina does not re-gate them. `vault-git.ts:commitPreAgentSnapshot` takes a git snapshot before each thread starts, so a CLI agent session can be rolled back. `pty-monitor.ts` keeps live agent state (`agent:get-states` / `agent:states-changed`) for presence badges.
+`src/main/services/cli-thread-spawner.ts` spawns `claude`, `codex`, or `gemini` CLIs in per-thread PTYs with session continuity (resume support). These run at the user's own trust level: the CLIs bring their own permission models, so Machina does not pre-gate them. Their workspace writes are contained after the fact: each turn's filesystem writes are attributed (`cli-turn-registry.ts` + `agent-write-watcher.ts`) and queued for review in the approvals tray — approving records a commit with `Machina-Agent`/`Machina-Session` trailers, rejecting reverts the files via git, and `git-service.ts:revertAgent` undoes an agent's approved commits wholesale. `pty-monitor.ts` keeps live agent state (`agent:get-states` / `agent:states-changed`) for presence badges.
 
 ### MCP server
 
