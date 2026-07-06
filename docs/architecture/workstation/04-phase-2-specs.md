@@ -50,8 +50,9 @@ Cross-step rules:
   end (parallel-session rule).
 - **Doc reconciliation is part of each step, not the phase close** (judge hazard): a step
   that adds a subsystem (health model, binding registry, breaker, linter) updates
-  CLAUDE.md's relevant section in the same commit and regenerates AGENTS.md via Codex
-  (never hand-edit; regen is unparked as of `c7d463f`). Phase close adds a full
+  CLAUDE.md's relevant section in the same commit and syncs AGENTS.md with
+  `npm run sync:agents` (a deterministic byte-identical mirror — never hand-edit, never
+  Codex; the Codex regen was retired at step 1 as pure ceremony). Phase close adds a full
   doc-reconciliation pass (overview, safety-subsystem, HANDOFF).
 - **Parallel-session map** (dependency-graph lens, judge-verified, tightened by the
   verify pass): **only 1∥2 and 4∥7 are parallel-safe** (disjoint files; only append-only
