@@ -44,8 +44,18 @@ describe('atomicWrite', () => {
     await writeFile(blocker, 'x', 'utf-8')
     await expect(atomicWrite(join(blocker, 'note.md'), 'content')).rejects.toThrow()
 
+    // The scan sees the SHARED os.tmpdir(), so a parallel suite's in-flight
+    // atomicWrite can stage a te-write-* file between the two snapshots. A
+    // real leak persists forever (that is the bug this test guards); a racing
+    // suite's staging file disappears within milliseconds. Settle-and-recheck
+    // keeps the assertion deterministic under parallel test runs.
     const after = await listStagedTmpFiles()
-    const leaked = after.filter((name) => !before.includes(name))
+    let leaked = after.filter((name) => !before.includes(name))
+    for (let attempt = 0; attempt < 20 && leaked.length > 0; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 25))
+      const remaining = await listStagedTmpFiles()
+      leaked = leaked.filter((name) => remaining.includes(name))
+    }
     expect(leaked).toEqual([])
   })
 })
