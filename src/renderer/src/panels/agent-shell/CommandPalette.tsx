@@ -8,6 +8,7 @@ import {
   zIndex
 } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
+import { useHarnessStore } from '../../store/harness-store'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { searchVault } from '../../engine/vault-search'
 import type { SearchHit } from '@shared/engine/search-engine'
@@ -58,6 +59,14 @@ export function CommandPalette({
   const [prevQ, setPrevQ] = useState(q)
   const inputRef = useRef<HTMLInputElement>(null)
   const createThread = useThreadStore((s) => s.createThread)
+  const harnessSummaries = useHarnessStore((s) => s.summaries)
+
+  // Refresh harness summaries on palette open (workstation step 6): the item
+  // list below subscribes to the store, so a completed refresh re-renders the
+  // open palette with the current on-disk harnesses.
+  useEffect(() => {
+    if (open) void useHarnessStore.getState().refresh()
+  }, [open])
 
   if (open !== prevOpen) {
     setPrevOpen(open)
@@ -72,8 +81,8 @@ export function CommandPalette({
   }
 
   const items = useMemo(
-    () => (open ? buildPaletteItems({ closePalette: onClose }) : []),
-    [open, onClose]
+    () => (open ? buildPaletteItems({ closePalette: onClose, harnesses: harnessSummaries }) : []),
+    [open, onClose, harnessSummaries]
   )
   const index = useMemo(() => (open ? buildIndex(items) : null), [open, items])
 

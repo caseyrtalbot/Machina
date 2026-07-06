@@ -371,6 +371,19 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.1.3 (2026-07-06, step 6 landing)** — two clarifications/deviations found
+  while implementing the test-fixer harness: §6 `harness:create`'s success `root`
+  is the CREATED HARNESS DIRECTORY (absolute path), not the workspace root — the
+  renderer surfaces "where did this land" without recomposing TE_DIR paths. The
+  renderer-side agentId forwarding (§4/§7 "agentId(slug) → turn registry") is
+  implemented as a persisted optional `Thread.agentId` (`agent_id` thread-file
+  frontmatter) re-sent on every `cli-thread:spawn`/`input`, so harness
+  attribution survives an app relaunch instead of silently degrading to adapter
+  identity on the spawn-on-demand path. `HARNESS_PROTECTED_GLOBS` remains the
+  step-3 constant in `constants.ts`; `harness-types.ts` re-exports it (one
+  authority, two import surfaces). Behavior is otherwise exactly as specced —
+  §5 on-disk schema verbatim, refuse-to-emit before any write, no-overwrite
+  absolute, verify.sh last at 0o555.
 - **v1.1.2 (2026-07-05, step 3 landing)** — deviations found while implementing gate
   parity, reviewed by a 3-lens workflow + independent fix verification + Codex cold
   read: §4 headMoved hardened from tip-compare to an IMMUTABLE `headShaAtStart` +

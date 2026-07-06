@@ -143,6 +143,67 @@ only after the evidence gate passes on fresh runs.
    sanctioned touches only). **Manual migration acceptance (tick-counter,
    Casey observing) is still open.**
 
+## What step 6 changed under you (test-fixer harness)
+
+1. **The harness surface is four new modules + one IPC file.**
+   `src/shared/harness-types.ts` (slug regex, `HarnessScope`,
+   `validateHarnessScope` superset check, Result-typed frontmatter parser,
+   pure `buildHarnessPrompt`, re-exports `HARNESS_PROTECTED_GLOBS` from
+   constants.ts where step 3 landed it), `src/shared/harness-templates.ts`
+   (the one 'test-fixer' template; `<dir>` placeholders in allowedGlobs are
+   materialized to `<TE_DIR>/agents/<slug>` at create time),
+   `src/main/services/harness-service.ts` (create/list),
+   `src/main/ipc/harness.ts` (root resolved main-side; null root ⇒
+   `{ ok:false, error:'no-workspace' }` / `[]`), renderer
+   `store/harness-store.ts` + `store/harness-run.ts`. Channels + preload
+   `harness` namespace appended at file end per the standing rule.
+2. **Create-order is load-bearing**: slug → template → scope validation
+   (refuse-to-emit, BEFORE any write) → non-recursive `mkdir` (the
+   no-overwrite check: EEXIST = structured error, never touch) → five
+   entries → verify.sh LAST + chmod 0o555 → on any failure the partial dir
+   is removed so the slot stays reusable. `harness:create`'s ok `root` is
+   the created harness directory (absolute), not the workspace root.
+3. **The frontmatter parser is deliberately not YAML.** It reads exactly the
+   subset the generator emits (`key: value` + one `budgets` flow mapping,
+   inline comments stripped). Hand-edited SKILL.md files it cannot read are
+   skipped by `harness:list` (skip-not-throw), not errors.
+4. **Thread.agentId is a persisted optional field** (`agent_id` in thread
+   frontmatter, thread-md.ts): `createThread(agent, model, title, agentId?)`
+   overlays + saves it, and `agent-transport.ts` re-sends it on EVERY
+   cli-thread:spawn/input so harness attribution survives relaunch
+   (spawn-on-demand path). Absent → spawner defaults to adapter identity —
+   zero spawner/registry changes, exactly the step-3 seam.
+5. **Palette wiring**: `buildPaletteItems` takes an optional `harnesses`
+   snapshot; CommandPalette subscribes to harness-store and refreshes it on
+   palette open. Create failures surface via `notifyError` (toast), success
+   via `showToast`.
+6. **harness-run waits for the fresh PTY's first prompt before the first
+   turn** (`waitForNewShellPrompt`, block-store as the readiness signal,
+   10s timeout then proceed-anyway). The scripted createThread→
+   appendUserMessage path types the invocation into a shell that has not
+   finished rc init; the te preexec hook isn't live yet, the block's
+   command is mis-derived from the prompt echo, `detectAgentFromCommand`
+   fails, and the reply is silently never mirrored. Humans never hit this
+   (they type seconds after spawn). Write attribution is unaffected either
+   way (PTY-alive window).
+7. **Environmental find with daily-driver impact**: the INSTALLED
+   `~/.te.zsh` on Casey's machine was a stale pre-`cmd=` version — its
+   command-start marker carried no command, so block commands were derived
+   from output echo at command-end, which included the prompt line and
+   broke the bridge's agent detection (cli-thread replies lost). Fixed
+   during the step-6 smoke by installing the current bundled hook (old file
+   backed up at `~/.te.zsh.pre-step6-backup`). The bash/fish hooks were NOT
+   checked — if cli replies misbehave under those shells, run the app's
+   "Set up shell hooks" again.
+8. **Smoke note for later steps**: Playwright probes drive the BUILT app, so
+   TE_DIR is `.machina` there; `npm run dev` uses `.machina-dev`. The
+   exit-bar transcript for step 6 (including the tray-approved
+   `Machina-Agent: test-fixer` commit on a throwaway repo) is recorded in
+   02-phase-1-specs.md step 6. The throwaway repo carried a repo-local
+   `.claude/settings.json` allowlist (`npm test`/`sh`/`node`) so headless
+   `claude --print` never blocked on an interactive permission prompt — in
+   real use the user answers those in the dock terminal.
+
 ## What step 3 changed under you (gate parity)
 
 1. **The attribution primitive is `getCliTurnRegistry()`**

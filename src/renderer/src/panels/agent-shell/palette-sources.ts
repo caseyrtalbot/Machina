@@ -2,9 +2,15 @@ import MiniSearch from 'minisearch'
 import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 import type { SearchHit } from '@shared/engine/search-engine'
+import type { HarnessSummary } from '@shared/harness-types'
+import { TE_DIR } from '@shared/constants'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeStatusStore } from '../../store/claude-status-store'
+import { useHarnessStore } from '../../store/harness-store'
+import { runHarness } from '../../store/harness-run'
+import { notifyError } from '../../utils/error-logger'
+import { showToast } from '../../components/Toast'
 import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
 import { openStripTerminal, openStripTerminalInFolder } from './terminal-migration'
 
@@ -28,6 +34,12 @@ interface IndexDoc {
 
 interface PaletteSourcesOptions {
   readonly closePalette: () => void
+  /**
+   * Harness summaries snapshot (workstation step 6). The palette passes the
+   * subscribed harness-store state so the item list rebuilds when a refresh
+   * lands; absent (tests, note-hit mapping) means no run items.
+   */
+  readonly harnesses?: readonly HarnessSummary[]
 }
 
 export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
@@ -197,8 +209,43 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
         if (!path) return
         openArtifactInEditor(path, path.split('/').pop() ?? path)
       }
+    },
+    // Harness create (workstation step 6). Phase 1 ships one template; the
+    // default slug is the template id. Failures (duplicate create, invalid
+    // slug) are expected Result errors and surface as a toast — never an
+    // overwrite.
+    {
+      id: 'action:harness-create:test-fixer',
+      kind: 'action',
+      title: 'Create test-fixer harness',
+      subtitle: `harness template · ${TE_DIR}/agents/test-fixer`,
+      run: async () => {
+        opts.closePalette()
+        const res = await window.api.harness.create('test-fixer', 'test-fixer')
+        if (!res.ok) {
+          notifyError('harness-create', new Error(res.error), `Harness create failed: ${res.error}`)
+          return
+        }
+        showToast(`Harness created: ${res.root}`)
+        void useHarnessStore.getState().refresh()
+      }
     }
   )
+
+  // One run item per on-disk harness (step 6): reads the harness files,
+  // composes the prompt, and starts a CLI thread attributed to the slug.
+  for (const h of opts.harnesses ?? []) {
+    items.push({
+      id: `action:harness-run:${h.slug}`,
+      kind: 'action',
+      title: `Run harness: ${h.name}`,
+      subtitle: `harness · ${h.adapter} · ${h.description}`,
+      run: async () => {
+        opts.closePalette()
+        await runHarness(h)
+      }
+    })
+  }
 
   return items
 }

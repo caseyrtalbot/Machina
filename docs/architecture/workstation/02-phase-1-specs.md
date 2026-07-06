@@ -277,7 +277,25 @@ same commit: safety-subsystem.md:61,:99, overview.md:108, CLAUDE.md agents bulle
 commitPreAgentSnapshot src tests` zero; check + build green; a real-repo session log
 shows zero 'pre-agent snapshot' commits with reject/approve/revert all exercised.
 
-## Step 6 — test-fixer harness template
+## Step 6 — test-fixer harness template — **DONE** (2026-07-06)
+
+Landed with full gate green (3157 unit tests, build, e2e 17 passed / 1 fixme-skipped)
+and the exit bar smoke-verified on the built app via a Playwright probe against a
+throwaway repo (built app ⇒ TE_DIR resolves `.machina`; dev runs use `.machina-dev` —
+same code path): palette create ⇒ all six entries with verify.sh mode 0555; duplicate
+create ⇒ "already exists" toast, files byte-identical; palette run ⇒ cli-claude thread
+titled by the slug carrying `agent_id: test-fixer`, first message = the composed
+prompt (rules + scope + state + verify instruction), reply received through stock
+`claude --print` (the agent actually fixed the seeded failing test); the harness-run
+write landed in the approvals tray attributed `test-fixer` and the tray-approved
+commit carries the `Machina-Agent: test-fixer` trailer. Deviations (harness:create
+root semantics, persisted thread agentId) are in contracts §8 (v1.1.3). Two smoke
+findings worth knowing: harness-run waits for the fresh PTY's first prompt (via
+block-store) before sending the first turn — typing into a half-initialized shell
+loses the reply (see HANDOFF step-6 §6/§7); and the smoke exposed a STALE INSTALLED
+`~/.te.zsh` on this machine (predating the `cmd=` command-start key), which silently
+broke agent-reply detection for ALL cli threads — fixed by re-installing the bundled
+hook (the app's "Set up shell hooks" flow).
 
 **New:** `src/shared/harness-types.ts` (HarnessAdapter/identityForAdapter,
 HarnessFrontmatter + Result-typed parser, HarnessScope, **HARNESS_PROTECTED_GLOBS with

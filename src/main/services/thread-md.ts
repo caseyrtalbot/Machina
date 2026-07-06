@@ -58,6 +58,9 @@ export function encodeThread(t: Thread): string {
   // `model` is stored only for native threads — CLI threads don't use it.
   const fm = {
     agent: t.agent,
+    // Harness attribution id (workstation step 6) — persisted so the slug
+    // keeps flowing into turn attribution after a relaunch.
+    ...(t.agentId !== undefined ? { agent_id: t.agentId } : {}),
     ...(t.agent === 'machina-native' ? { model: t.model } : {}),
     started: t.started,
     last_message: t.lastMessage,
@@ -99,6 +102,7 @@ export function decodeThread(md: string): Thread {
   return {
     id: '',
     agent: data.agent,
+    ...(typeof data.agent_id === 'string' ? { agentId: data.agent_id } : {}),
     model: data.model ?? DEFAULT_NATIVE_MODEL,
     started: data.started,
     lastMessage: data.last_message,

@@ -4,6 +4,12 @@ import type { DockTab, TerminalStripState } from './dock-types'
 export interface Thread {
   readonly id: string
   readonly agent: AgentIdentity
+  /**
+   * Attribution id forwarded on cli-thread:spawn/input (workstation step 6):
+   * the harness slug for harness-run threads. Absent → the spawner defaults
+   * to the adapter identity. Persisted so attribution survives relaunch.
+   */
+  readonly agentId?: string
   readonly model: string
   readonly started: string
   lastMessage: string

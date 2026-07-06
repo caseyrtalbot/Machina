@@ -96,7 +96,10 @@ const cliTransport: AgentTransport = {
     const result = await window.api.cliThread.spawn({
       threadId: thread.id,
       identity: thread.agent,
-      cwd: vaultPath
+      cwd: vaultPath,
+      // Harness attribution (workstation step 6): the slug rides the spawn so
+      // turn windows and commit trailers carry it. Absent → identity.
+      ...(thread.agentId !== undefined ? { agentId: thread.agentId } : {})
     })
     return result.ok ? { ok: true } : { ok: false, error: result.error }
   },
@@ -106,7 +109,10 @@ const cliTransport: AgentTransport = {
       threadId: thread.id,
       identity: thread.agent,
       text,
-      cwd: ctx.vaultPath
+      cwd: ctx.vaultPath,
+      // Re-sent per turn: the spawner map is in-memory, so a relaunched app's
+      // spawn-on-demand path needs the persisted slug again (step 6).
+      ...(thread.agentId !== undefined ? { agentId: thread.agentId } : {})
     })
     return res.ok
       ? { ok: true }

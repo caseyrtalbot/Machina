@@ -17,6 +17,19 @@ const baseThread = (overrides: Partial<Thread> = {}): Thread => ({
   ...overrides
 })
 
+describe('thread-md agentId persistence (workstation step 6)', () => {
+  it('round-trips agent_id for harness threads and omits it otherwise', () => {
+    const harness = decodeThread(
+      encodeThread(baseThread({ agent: 'cli-claude', agentId: 'test-fixer' }))
+    )
+    expect(harness.agentId).toBe('test-fixer')
+
+    const adHoc = encodeThread(baseThread({ agent: 'cli-claude' }))
+    expect(matter(adHoc).data.agent_id).toBeUndefined()
+    expect(decodeThread(adHoc).agentId).toBeUndefined()
+  })
+})
+
 describe('thread-md auto-accept persistence', () => {
   it('does not write auto_accept_session to frontmatter when toggled on', () => {
     const md = encodeThread(baseThread({ autoAcceptSession: true }))

@@ -257,6 +257,52 @@ describe('thread-store', () => {
     expect((window as any).api.thread.save).toHaveBeenCalled()
   })
 
+  it('forwards the persisted agentId on cli-thread input (workstation step 6)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: true }) }
+    const harnessThread = {
+      ...sampleThread('a'),
+      agent: 'cli-claude' as const,
+      agentId: 'test-fixer'
+    }
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: harnessThread }
+    })
+    await useThreadStore.getState().appendUserMessage('run')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.cliThread.input).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: 'a', agentId: 'test-fixer' })
+    )
+  })
+
+  it('createThread overlays and persists the agentId, and spawn carries it', async () => {
+    const created = { ...sampleThread('h1'), agent: 'cli-claude' as const }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.create = vi.fn().mockResolvedValue(created)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = {
+      spawn: vi.fn().mockResolvedValue({ ok: true, sessionId: 's1' })
+    }
+    useThreadStore.setState({ vaultPath: '/v' })
+    const t = await useThreadStore
+      .getState()
+      .createThread('cli-claude', 'claude-sonnet-4-6', 'test-fixer', 'test-fixer')
+    expect(t.agentId).toBe('test-fixer')
+    expect(useThreadStore.getState().threadsById['h1'].agentId).toBe('test-fixer')
+    // Persisted (thread.save) so attribution survives relaunch.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalledWith(
+      '/v',
+      expect.objectContaining({ id: 'h1', agentId: 'test-fixer' })
+    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.cliThread.spawn).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: 'h1', agentId: 'test-fixer' })
+    )
+  })
+
   it('keeps in-flight set when CLI input delivery succeeds', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: true }) }

@@ -21,6 +21,7 @@ import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { registerPdfIndexIpc, setPdfIndexSearchEngine } from './ipc/pdf-index'
 import { initApprovalsForRoot, registerGitIpc, stopApprovals } from './ipc/git'
+import { registerHarnessIpc } from './ipc/harness'
 import { registerEmbeddingsIpc, setEmbedderService } from './ipc/embeddings'
 import { EmbedderService } from './services/embedder-service'
 import { TE_DIR } from '../shared/constants'
@@ -447,6 +448,7 @@ app.whenReady().then(() => {
   registerPdfIndexIpc()
   registerEmbeddingsIpc()
   registerGitIpc()
+  registerHarnessIpc()
 
   // No-ops unless a publish feed is configured (see auto-update.ts).
   void initAutoUpdates({

@@ -333,6 +333,19 @@ export interface IpcChannels {
   // Editor-center file open. Guard-checked: null when the pick is cancelled
   // or the chosen file sits outside the workspace root.
   'fs:select-file': { request: void; response: string | null }
+
+  // --- Agent harness (workstation contracts §5/§6, step 6) ---
+  // No `root` in either request: main resolves it from
+  // WorkspaceService.current(). Result-style responses: duplicate/invalid
+  // slug are expected failures, not throws.
+  'harness:create': {
+    request: { template: string; slug: string }
+    response: import('./harness-types').HarnessCreateResult
+  }
+  'harness:list': {
+    request: void
+    response: import('./harness-types').HarnessSummary[]
+  }
 }
 
 export type AgentNativeApprovalPreview =

@@ -223,6 +223,12 @@ const api = {
     list: () => typedInvoke('approvals:list'),
     resolve: (id: string, approve: boolean, message?: string) =>
       typedInvoke('approvals:resolve', { id, approve, message })
+  },
+  // Agent harness (workstation contracts §5/§6, step 6). No root in either
+  // call — main resolves it from the current workspace.
+  harness: {
+    create: (template: string, slug: string) => typedInvoke('harness:create', { template, slug }),
+    list: () => typedInvoke('harness:list')
   }
 }
 

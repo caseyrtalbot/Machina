@@ -70,7 +70,18 @@ interface ThreadState {
    * state survives restart.
    */
   selectThread: (id: string, opts?: { reveal?: boolean }) => Promise<void>
-  createThread: (agent: AgentIdentity, model: string, title?: string) => Promise<Thread>
+  /**
+   * `agentId` (workstation step 6): attribution id for harness runs — the
+   * harness slug. Persisted on the thread and forwarded by the CLI transport
+   * on cli-thread:spawn/input. Absent for ad-hoc threads (attribution
+   * defaults to the adapter identity main-side).
+   */
+  createThread: (
+    agent: AgentIdentity,
+    model: string,
+    title?: string,
+    agentId?: string
+  ) => Promise<Thread>
   archiveThread: (id: string) => Promise<void>
   unarchiveThread: (id: string) => Promise<void>
   deleteThread: (id: string) => Promise<void>
@@ -286,10 +297,15 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     )
   },
 
-  createThread: async (agent, model, title) => {
+  createThread: async (agent, model, title, agentId) => {
     const v = get().vaultPath
     if (!v) throw new Error('vault not set')
-    const t = await window.api.thread.create(v, agent, model, title)
+    const created = await window.api.thread.create(v, agent, model, title)
+    // Overlay the attribution id BEFORE the transport starts (spawn carries
+    // it) and persist it so it survives relaunch (spawn-on-demand re-sends it
+    // on the next cli-thread:input).
+    const t: Thread = agentId !== undefined ? { ...created, agentId } : created
+    if (agentId !== undefined) await window.api.thread.save(v, t)
     set((s) => ({
       threadsById: { ...s.threadsById, [t.id]: t },
       dockTabsByThreadId: { ...s.dockTabsByThreadId, [t.id]: t.dockState.tabs.slice() },
