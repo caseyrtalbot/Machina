@@ -19,7 +19,7 @@ import { sessionId as brandSessionId } from '@shared/types'
 import type { ShellService } from './shell-service'
 import type { CliAgentThreadBridge } from './cli-agent-thread-bridge'
 import { detectInstalledAgents } from './cli-agent-detector'
-import { commitPreAgentSnapshot } from './vault-git'
+import { commitPreAgentSnapshot } from './git-service'
 
 const CLI_AGENT_IDENTITIES = ['cli-claude', 'cli-codex', 'cli-gemini'] as const
 type CliAgentIdentity = (typeof CLI_AGENT_IDENTITIES)[number]
@@ -164,6 +164,11 @@ export class CliThreadSpawner {
     if (!this.hasLiveSession(threadId)) {
       const spawned = await this.spawn(threadId, identity, cwd)
       if (!spawned.ok) return { ok: false }
+    } else {
+      // Per-turn rollback granularity: spawn() only snapshots when the PTY is
+      // (re)created, so a live session must snapshot here — exactly one
+      // snapshot per turn, never two (contracts §2, interim hardening).
+      commitPreAgentSnapshot(cwd, threadId)
     }
     return { ok: this.sendUserMessage(threadId, identity, text) }
   }

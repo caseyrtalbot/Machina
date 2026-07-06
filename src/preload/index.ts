@@ -15,6 +15,7 @@ import type { AgentIdentity } from '../shared/agent-identity'
 import type { VaultMachinaConfig } from '../shared/thread-storage-types'
 import type { IpcEventData } from '../shared/ipc-channels'
 import type { DockTab } from '../shared/dock-types'
+import type { CommitApprovedOpts } from '../shared/git-types'
 
 const api = {
   config: {
@@ -193,7 +194,9 @@ const api = {
     agentNativeEvent: (callback: (data: IpcEventData<'agent-native:event'>) => void) =>
       typedOn('agent-native:event', callback),
     agentNativeDockAction: (callback: (data: IpcEventData<'agent-native:dock-action'>) => void) =>
-      typedOn('agent-native:dock-action', callback)
+      typedOn('agent-native:dock-action', callback),
+    approvalsChanged: (callback: (data: { pending: number }) => void) =>
+      typedOn('approvals:changed', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path }),
@@ -201,6 +204,19 @@ const api = {
   },
   lifecycle: {
     quitReady: () => typedInvoke('app:quit-ready')
+  },
+  // Git substrate + approval queue (workstation contracts §6). No paths take
+  // a root — main resolves it from the current workspace.
+  git: {
+    status: () => typedInvoke('git:status'),
+    diff: (paths?: string[]) => typedInvoke('git:diff', { paths }),
+    commitApproved: (opts: CommitApprovedOpts) => typedInvoke('git:commit-approved', opts),
+    revertAgent: (agentId: string) => typedInvoke('git:revert-agent', { agentId })
+  },
+  approvals: {
+    list: () => typedInvoke('approvals:list'),
+    resolve: (id: string, approve: boolean, message?: string) =>
+      typedInvoke('approvals:resolve', { id, approve, message })
   }
 }
 

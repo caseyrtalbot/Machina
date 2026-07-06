@@ -7,9 +7,9 @@ import {
   specIdForIdentity
 } from '../cli-thread-spawner'
 import { CliAgentThreadBridge } from '../cli-agent-thread-bridge'
-import { commitPreAgentSnapshot } from '../vault-git'
+import { commitPreAgentSnapshot } from '../git-service'
 
-vi.mock('../vault-git', () => ({
+vi.mock('../git-service', () => ({
   commitPreAgentSnapshot: vi.fn().mockReturnValue({ committed: false, reason: 'not-a-git-repo' })
 }))
 
@@ -276,6 +276,74 @@ describe('CliThreadSpawner', () => {
     expect(res.ok).toBe(true)
     expect(shell.create).toHaveBeenCalledTimes(1)
     expect(pty.writeAgentInput).toHaveBeenCalledWith('sess-xyz', `${CLAUDE_BASE} 'hi'\r`, 'batched')
+  })
+
+  it('input on a live session snapshots once per turn before sending', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    vi.mocked(commitPreAgentSnapshot).mockClear()
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    expect(commitPreAgentSnapshot).toHaveBeenCalledTimes(1)
+    // Second turn on the live session: exactly one more snapshot, input-site.
+    const res = await spawner.input('thread-A', 'cli-claude', 'go on', '/v')
+    expect(res.ok).toBe(true)
+    expect(commitPreAgentSnapshot).toHaveBeenCalledTimes(2)
+    expect(commitPreAgentSnapshot).toHaveBeenLastCalledWith('/v', 'thread-A')
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    // Spec: snapshot BEFORE send — the turn's snapshot must precede its writeAgentInput.
+    const snapshotOrders = vi.mocked(commitPreAgentSnapshot).mock.invocationCallOrder
+    const sendOrders = pty.writeAgentInput.mock.invocationCallOrder
+    expect(Math.max(...snapshotOrders)).toBeLessThan(Math.max(...sendOrders))
+  })
+
+  it('input on a fresh spawn snapshots exactly once (spawn-site only, no double)', async () => {
+    const { shell } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    vi.mocked(commitPreAgentSnapshot).mockClear()
+    const res = await spawner.input('thread-A', 'cli-claude', 'first turn', '/v')
+    expect(res.ok).toBe(true)
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(commitPreAgentSnapshot).toHaveBeenCalledTimes(1)
+    expect(commitPreAgentSnapshot).toHaveBeenCalledWith('/v', 'thread-A')
+  })
+
+  it('input after PTY death snapshots exactly once via the respawn path', async () => {
+    const { shell, pty } = fakeServices()
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude')]
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    // The PTY died: the next turn takes the respawn path, not the live path.
+    pty.getActiveSessions.mockReturnValue([])
+    shell.create.mockReturnValue('sess-new')
+    vi.mocked(commitPreAgentSnapshot).mockClear()
+    const res = await spawner.input('thread-A', 'cli-claude', 'retry', '/v')
+    expect(res.ok).toBe(true)
+    expect(shell.create).toHaveBeenCalledTimes(2)
+    expect(commitPreAgentSnapshot).toHaveBeenCalledTimes(1)
+    expect(commitPreAgentSnapshot).toHaveBeenCalledWith('/v', 'thread-A')
   })
 
   it('input returns ok=false when the respawn fails (CLI not installed)', async () => {

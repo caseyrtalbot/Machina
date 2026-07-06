@@ -304,6 +304,25 @@ export interface IpcChannels {
     request: { query: string; k?: number }
     response: import('./engine/search-engine').SearchHit[]
   }
+
+  // --- Git substrate + approval queue (workstation contracts §6) ---
+  // No `root` in any request: main resolves it from WorkspaceService.current()
+  // so the renderer can never point git at an arbitrary path.
+  'git:status': { request: void; response: import('./git-types').GitStatusResult }
+  'git:diff': { request: { paths?: string[] }; response: string }
+  'git:commit-approved': {
+    request: import('./git-types').CommitApprovedOpts
+    response: import('./git-types').GitOpResult
+  }
+  'git:revert-agent': {
+    request: { agentId: string }
+    response: import('./git-types').GitOpResult
+  }
+  'approvals:list': { request: void; response: import('./git-types').PendingChange[] }
+  'approvals:resolve': {
+    request: { id: string; approve: boolean; message?: string }
+    response: import('./git-types').GitOpResult
+  }
 }
 
 export type AgentNativeApprovalPreview =
@@ -387,6 +406,10 @@ export interface IpcEvents {
   // CliAgentThreadBridge when a session bound to a thread finishes a block;
   // the renderer mirrors `message` into `threadId`'s message list.
   'thread:cli-message': { threadId: string; message: import('./thread-types').ThreadMessage }
+
+  // Approval queue mutation (main -> renderer): pending item count for the
+  // approvals tray badge. Fired on every queue change (contracts §6).
+  'approvals:changed': { pending: number }
 }
 
 export type IpcChannel = keyof IpcChannels

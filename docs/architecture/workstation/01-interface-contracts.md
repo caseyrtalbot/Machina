@@ -94,20 +94,38 @@ export interface GitService {
   diff(root: string, paths?: readonly string[]): string
   commitApproved(root: string, opts: CommitApprovedOpts): GitOpResult
   /**
-   * Enumerate commits via `git log --format=%(trailers:key=Machina-Agent,valueonly)` with
-   * EXACT value match in JS (no --grep injection/prefix collisions); one revert commit
-   * carrying Machina-Reverts (never Machina-Agent, so reverts are not re-enumerated).
+   * Enumerate commits via `git log --format=%H%x1f%(trailers:key=Machina-Agent,valueonly)`
+   * with EXACT value match in JS (no --grep injection/prefix collisions); ONE sequencer
+   * run (`revert --no-commit <newest..oldest>`) so a conflict OR a failed final commit
+   * aborts the whole sequence cleanly; one revert commit whose Machina-Reverts trailer
+   * VALUE is the space-separated reverted shas (v1.1.1 — the agentId alone cannot prevent
+   * re-reverting, because the original commits keep their Machina-Agent trailers forever;
+   * shas already listed in any Machina-Reverts trailer are excluded from later reverts).
+   * The agentId stays readable in the revert commit subject.
    */
   revertAgent(root: string, agentId: string): GitOpResult
-  /** Reject flow. Tracked → `git restore --source=HEAD`; untracked → trash (recoverable), not rm. */
-  discard(root: string, paths: readonly string[]): Promise<GitOpResult>
+  /**
+   * Reject flow. Tracked → `git restore --source=HEAD`; untracked → the INJECTED
+   * removeFile callback (v1.1.1: required third parameter; the IPC layer binds
+   * `shell.trashItem` so deletion stays recoverable — no non-recoverable default exists).
+   * Fails closed: an ls-files failure returns git-failed rather than trashing tracked files.
+   */
+  discard(root: string, paths: readonly string[], removeFile: (absPath: string) => Promise<void>): Promise<GitOpResult>
 }
 ```
 
 Guards, all structured-error not throw: `SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/`
 on agentId/threadId (blocks trailer forgery/format injection); paths must be relative,
-non-`-`-leading, and resolve inside root; a message first-line starting with `Machina-` is
-neutralized. `.machina/no-auto-commit` (TE_DIR-resolved) gates **automatic** commits only
+non-`-`-leading, and resolve inside root **after following symlinks** (v1.1.1 — lexical
+containment alone let `link/secret` under a symlinked directory escape the workspace);
+every validated path reaches git pinned as a `:(literal)` pathspec (v1.1.1 — a bare `*`
+or `:/` after `--` is still wildmatch/magic and would expand to the whole repo in
+add/commit/restore/diff); a message first-line starting with `Machina-` is neutralized.
+`diff` routes explicit paths on index/HEAD membership rather than porcelain status so
+gitignored-but-present files still synthesize via `--no-index` (a write to an ignored
+`.env` must never diff empty), and its `DIFF_MAX_BYTES` truncation marker embeds a sha256
+of the full text so the queue's stale-diff comparison stays sound past the cutoff; a
+failed diff yields a visible `[diff unavailable]` marker, never a silent empty string. `.machina/no-auto-commit` (TE_DIR-resolved) gates **automatic** commits only
 (`commitPreAgentSnapshot`); commitApproved/revertAgent/discard are explicit user actions
 and proceed regardless.
 
@@ -236,6 +254,12 @@ Contract points (each traceable to a verified finding):
 - **TOCTOU guard**: `resolve()` recomputes the diff; a mismatch with the reviewed snapshot
   returns `stale-diff`, refreshes the item, and forces re-review. Narrowed, not closed
   (recompute→commit is not atomic) — residual risk documented.
+- **Workspace binding (v1.1.1)**: each item records the root it was captured against;
+  `resolve()` in a different active workspace returns `workspace-changed` with the item
+  retained (checked BEFORE the stale-diff recompute so the snapshot never refreshes
+  against the wrong workspace's files). Failed approves/rejects (e.g. `git-failed`)
+  also retain the item so the user can retry; only successful resolution (or the
+  non-repo approve-acknowledge) removes it.
 - **Watcher policy — its OWN ignore set, explicitly NOT vault-watcher's**
   (`DEFAULT_IGNORE_PATTERNS` ignores TE_DIR and every dotpath, which would blind the
   `verify.sh` auto-reject and all dotfile writes). Excluded: `.git`, `node_modules`,
@@ -347,6 +371,16 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.1.1 (2026-07-05, step 2 landing)** — deviations discovered while implementing and
+  adversarially reviewing the git substrate, folded back in the same commit: §2
+  Machina-Reverts trailer value is the reverted shas (agentId-only semantics could not
+  prevent re-reverts — proven by test); `discard` takes a required injected `removeFile`
+  (trash-backed at the IPC layer); path guards harden to post-symlink containment +
+  `:(literal)` pathspecs (two review blockers: symlink escape, pathspec wildmatch/magic);
+  `diff` routes on index/HEAD membership, sha256-stamped truncation marker, visible
+  failure marker; §4 queue items are workspace-bound (`workspace-changed`) and retained
+  on failed resolves. Behavior is otherwise as specced; `status()` returns entries with
+  `isRepo` composed at the IPC layer per the §6 `git:status` response shape.
 - **v1.1 (2026-07-05)** — after 4-lens adversarial verification + 6-designer spec pass +
   completeness critique (11 agents): §2 shapes hardened (SAFE_ID_RE, trailer enumeration
   via `trailers:valueonly`, Machina-Reverts, `--no-index` diffs for new files, recoverable
