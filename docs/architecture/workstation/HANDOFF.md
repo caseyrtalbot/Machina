@@ -26,9 +26,10 @@ Playwright probes: `git.status`/`diff`/`commitApproved` (both trailers in `git l
 no-ops, and per-turn snapshot granularity (2 turns sent ⇒ exactly 2 pre-agent snapshot
 commits). **Steps 3 (gate parity) and 4 (dock shell) are both SHIPPED** — see their
 "What step N changed under you" sections below. **The next work is step 5 (retire the
-pre-run snapshot — evidence gate G1–G8 first) and step 6 (test-fixer template).** The
-pre-run snapshot is STILL WIRED (spawn + per-turn) — step 5 retires it only after the
-evidence gate passes on fresh runs.
+pre-run snapshot — evidence gate G1–G8 first) and step 6 (test-fixer template);
+`HANDOFF-PARALLEL-STEPS-5-6.md` is the two-session work order with the coordination
+contract.** The pre-run snapshot is STILL WIRED (spawn + per-turn) — step 5 retires it
+only after the evidence gate passes on fresh runs.
 
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
