@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { execFileSync } from 'child_process'
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs'
 import { rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -725,6 +725,50 @@ describe('ApprovalQueue with real git-service', () => {
     expect(rejected).toEqual({ ok: true })
     expect(existsSync(join(root, 'scratch.txt'))).toBe(false)
     expect(queue.list()).toEqual([])
+    const status = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf-8' })
+    expect(status.trim()).toBe('')
+  })
+
+  it('per-turn granularity: approve turn 1, reject turn 2, turn-1 commit intact', async () => {
+    // Step-5 evidence gate G8: the queue must give at least the per-turn
+    // granularity the retired per-turn snapshot gave — resolving one turn
+    // never disturbs another turn's already-approved commit.
+    root = mkdtempSync(join(tmpdir(), 'machina-approval-queue-'))
+    initRepo(root)
+    const { queue } = makeRealQueue()
+
+    // Turn 1 creates a file; approve lands it as a trailer commit.
+    writeFileSync(join(root, 'turn1.txt'), 'turn one\n')
+    queue.recordWrites({
+      turnId: 'turn-1',
+      threadId: 'th-00000001',
+      agentId: 'fixer',
+      paths: ['turn1.txt']
+    })
+    const approved = await queue.resolve('pc_turn-1', true, 'feat: turn one')
+    expect(approved.ok).toBe(true)
+    const turn1Sha = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf-8'
+    }).trim()
+
+    // Turn 2 creates another file; reject discards it.
+    writeFileSync(join(root, 'turn2.txt'), 'turn two\n')
+    queue.recordWrites({
+      turnId: 'turn-2',
+      threadId: 'th-00000001',
+      agentId: 'fixer',
+      paths: ['turn2.txt']
+    })
+    const rejected = await queue.resolve('pc_turn-2', false)
+    expect(rejected).toEqual({ ok: true })
+
+    // Turn 1's commit and content are untouched; turn 2's file is gone.
+    expect(
+      execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf-8' }).trim()
+    ).toBe(turn1Sha)
+    expect(readFileSync(join(root, 'turn1.txt'), 'utf-8')).toBe('turn one\n')
+    expect(existsSync(join(root, 'turn2.txt'))).toBe(false)
     const status = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf-8' })
     expect(status.trim()).toBe('')
   })

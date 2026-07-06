@@ -551,6 +551,33 @@ describe('git-service', () => {
       initGitRepo(vaultRoot)
       expect(revertAgent(vaultRoot, 'bad id!')).toEqual({ ok: false, reason: 'invalid-agent-id' })
     })
+
+    it('approve-then-revertAgent restores the exact pre-agent tree (modified + created)', () => {
+      // Step-5 evidence gate G2: the flow that replaces the pre-agent snapshot
+      // (approve → revertAgent) must land a tree byte-identical to the
+      // pre-agent state — the same guarantee `git reset --hard HEAD~1` gave.
+      initGitRepo(vaultRoot)
+      userCommit(vaultRoot, 'doc.md', 'original content\n', 'add doc')
+      const preAgentTree = git(vaultRoot, 'rev-parse', 'HEAD^{tree}')
+
+      // Agent modifies a tracked file AND creates a new one; user approves both.
+      writeFileSync(join(vaultRoot, 'doc.md'), 'agent rewrite\n')
+      writeFileSync(join(vaultRoot, 'new.txt'), 'agent addition\n')
+      const approved = commitApproved(vaultRoot, {
+        agentId: 'fixer',
+        threadId: 'th-00000001',
+        paths: ['doc.md', 'new.txt'],
+        message: 'feat: agent change'
+      })
+      expect(approved.ok).toBe(true)
+
+      const reverted = revertAgent(vaultRoot, 'fixer')
+      expect(reverted.ok).toBe(true)
+      expect(git(vaultRoot, 'rev-parse', 'HEAD^{tree}')).toBe(preAgentTree)
+      expect(readFileSync(join(vaultRoot, 'doc.md'), 'utf-8')).toBe('original content\n')
+      expect(existsSync(join(vaultRoot, 'new.txt'))).toBe(false)
+      expect(git(vaultRoot, 'status', '--porcelain')).toBe('')
+    })
   })
 
   describe('discard', () => {
