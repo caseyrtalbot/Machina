@@ -72,12 +72,18 @@ src e2e` hits only the fallback map + its test; `rg 'setActiveVault|onVaultReady
 dev-smoke: existing vault loads unchanged; a coding repo opens, boots, and
 `workspace.current()` shows `coding`.
 
-## Step 2 — Git substrate (GitService + ApprovalQueue + channels)
+## Step 2 — Git substrate — **DONE** (`3198ddd`, 2026-07-05)
 
 Everything gate parity consumes, landed first so step 3 is purely producers. Queue is
-functional but empty until step 3. Depends on step 1 only for
-`WorkspaceService.current()` as root resolution (if landing before step 1 for any
-reason, bridge via a `getActiveVaultRoot()` export from filesystem.ts).
+functional but empty until step 3. Shipped as specced with the deviations recorded in
+contracts **v1.1.1** (§8 changelog): Machina-Reverts trailer value = reverted shas with
+exclusion semantics; `discard(root, paths, removeFile)` takes the injected trash-backed
+callback as a required third arg; path guards harden to post-symlink containment +
+`:(literal)` pathspecs; diff routes on index/HEAD membership with a sha256-stamped
+truncation marker; queue items are workspace-root-bound (`workspace-changed`) and
+retained on failed resolves. Step 3 consumes `getApprovalQueue()` from
+`src/main/ipc/git.ts` and `ApprovalQueue.recordWrites({ turnId, threadId, agentId,
+paths, flags?, description? })`.
 
 **New:** `src/shared/git-types.ts` — the v1.1 §2/§4 shapes verbatim: GitFileState (5
 states incl. untracked→'added', renamed+origPath), GitStatusResult { isRepo, entries },

@@ -4,20 +4,29 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the three docs it points at, and you can start building without
 asking questions.
 
-## Where things stand (2026-07-05, post step 1)
+## Where things stand (2026-07-05, post step 2)
 
 The vision is locked and the design is verified. Phase 0 (seam audit + interface
 contracts) shipped to main. The Phase 0 docs were then adversarially re-verified by an
 11-agent workflow (4 verification lenses over 52 claims, 6 independent step designers, 1
 completeness critic); every confirmed error was folded back into the docs, so what you
-are reading is the corrected v1.1 state.
+are reading is the corrected state (contracts now v1.1.1).
 
-**Step 1 (workspace generalization) is SHIPPED** at `76d0699` — full gate green
-(`npm run check` 2841 tests, build, `npm run test:e2e` 17 passed / 1 fixme-skipped),
+**Step 1 (workspace generalization) is SHIPPED** at `76d0699` — full gate green,
 smoke-verified on the built app (coding repo boots with `capabilities: ['coding']`,
-existing vault with `['knowledge']`). **The next work is step 2 (git substrate); step 4
-(dock shell) is parallel-safe now that step 1 has landed.** Section "What step 1 changed
-under you" below lists the seams steps 2–6 now consume.
+existing vault with `['knowledge']`).
+
+**Step 2 (git substrate) is SHIPPED** at `3198ddd` — implemented by a 10-agent workflow
+(4 sequential implementers, full-gate agent, 4-lens review: spec compliance, adversarial
+git plumbing, test quality, Codex cold read; all 9 blocker/major findings fixed with
+mutation-verified tests). Full gate green (`npm run check` 2909 tests, build,
+`npm run test:e2e` 17 passed / 1 fixme-skipped). Smoke-verified on the built app via
+Playwright probes: `git.status`/`diff`/`commitApproved` (both trailers in `git log`)/
+`revertAgent` (restore + Machina-Reverts) on a real dirtied repo, non-repo structured
+no-ops, and per-turn snapshot granularity (2 turns sent ⇒ exactly 2 pre-agent snapshot
+commits). **The next work is step 3 (gate parity); step 4 (dock shell) remains
+parallel-safe.** Section "What step 2 changed under you" below lists the seams step 3
+consumes.
 
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
@@ -28,10 +37,10 @@ under you" below lists the seams steps 2–6 now consume.
 3. **01-interface-contracts.md** — the typed contracts (v1.1). Section 4 is the
    load-bearing one: read its framing before touching anything agent-related.
 4. **02-phase-1-specs.md** — six implementation specs in canonical order, one commit
-   each. This is your work queue. Step 1 is DONE (`76d0699`); step 2 (git substrate) is
-   next, and step 4 (dock shell) can run in parallel with 2–3. Line numbers in the
-   specs were verified at `7735644`/`ec6fa6d` and step 1 has since moved code —
-   re-verify with `rg` before editing.
+   each. This is your work queue. Steps 1–2 are DONE (`76d0699`, `3198ddd`); step 3
+   (gate parity) is next, and step 4 (dock shell) can run in parallel with 3. Line
+   numbers in the specs were verified at `7735644`/`ec6fa6d` and steps 1–2 have since
+   moved code — re-verify with `rg` before editing.
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -59,6 +68,31 @@ under you" below lists the seams steps 2–6 now consume.
    `workspace.*` aliases (invoked name flows into Spotlighting + gate prompts) — 12
    tools in the gated app server (`MCP_TOOL_COUNT`), 7 read-only in `mcp-cli`. Known
    accepted gap: `VaultQueryFacade`'s internal audit lines still say `vault.*`.
+
+## What step 2 changed under you (`3198ddd`)
+
+1. **`git-service.ts` replaced `vault-git.ts`** (git mv, history preserved; the
+   snapshot trio is byte-identical). New exports: `headSha`, `status` (entries only —
+   `isRepo` is composed at the IPC layer per §6), `diff`, `commitApproved`,
+   `revertAgent`, `discard(root, paths, removeFile)` — discard REQUIRES the injected
+   removeFile; the IPC layer binds `shell.trashItem`. All paths reach git as
+   `:(literal)` pathspecs after a post-symlink containment check — pass plain relative
+   paths, the service does the pinning.
+2. **`getApprovalQueue()` in `src/main/ipc/git.ts`** is the lazy singleton step 3 wires
+   the watcher/registry into — same instance the `approvals:*` handlers serve. The one
+   AuditLogger lives at `userData/audit` (outside any watch root). Step 3's producer
+   API: `recordWrites({ turnId, threadId, agentId, paths, flags?, description? })`
+   (coalesces into `pc_<turnId>`, flags OR-merge, diff recomputed over the merged set)
+   and `enqueueGateConfirm(opts, 30_000)` (the QueueHitlGate seam — auto-deny AND
+   remove on timeout).
+3. **Queue items are workspace-root-bound**: resolve in a different active workspace
+   returns `workspace-changed`, item retained; failed approve/reject also retains the
+   item. Checked before the stale-diff recompute.
+4. **Machina-Reverts trailer value = the reverted shas** (not the agentId — see
+   contracts v1.1.1 §8 for why); the agentId lives in the revert commit subject.
+5. **Per-turn snapshot lives in `CliThreadSpawner.input()`** behind the
+   `hasLiveSession` branch (the respawn path snapshots inside `spawn()` — exactly one
+   snapshot per turn, ordering-tested). Step 5's retirement removes both call sites.
 
 Repo gotchas the step-1 team hit (they will bite you too):
 
