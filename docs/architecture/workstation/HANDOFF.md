@@ -4,7 +4,7 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the three docs it points at, and you can start building without
 asking questions.
 
-## Where things stand (2026-07-06, Phase 2 steps 1–2 shipped)
+## Where things stand (2026-07-07, Phase 2 steps 1–4 + 7 shipped)
 
 The vision is locked and the design is verified. Phase 0 (seam audit + interface
 contracts) shipped to main. The Phase 0 docs were then adversarially re-verified by an
@@ -43,20 +43,33 @@ authority) at `4047d35` (contracts v1.2.2). All landed with the full gate (3345
 tests at step 3, build, full e2e executed); step 3 additionally ran the built-app
 tamper probe green (see its DONE block in 04-phase-2-specs.md).
 
+**Steps 4 (two-projection agent view) and 7 (harness linter) SHIPPED 2026-07-07**
+as the sanctioned parallel pair: built by two isolated worktree sessions off
+`3e8baee`, merged linearly (step 4 at `61f8ce3`, contracts v1.2.3; step 7 at
+`065d312`, contracts v1.2.4), then hardened by a post-merge adversarial review
+(per-step Claude lenses + Codex cold read + merge spotcheck) whose blocker/major
+findings landed in a same-day follow-up fix commit — see "What step 4/7 changed
+under you" below. Full gate on the final tree: `npm run check` 3421 tests green,
+build green, full e2e 21 passed / 1 known fixme-skip INCLUDING both new built-app
+probes executed green (`e2e/agent-projection.spec.ts`, `e2e/harness-lint.spec.ts`).
+
 **Next work order for the incoming team(s):**
 
-- **Steps 4 and 7 are now the sanctioned parallel pair** (disjoint files; only
-  append-only hotspot ends collide). Step 5 (per-agent revert UI) is UNBLOCKED —
-  its hard gate was step 3's binding. Step 6 follows 2+3 (both landed) but collides
-  with 7 on `harness-service.ts` listHarnesses — sequential vs 7. Step 8 follows 7
-  (and consumes 1).
+- **Next = steps 5 and 6** (both unblocked: 5's hard gate was step 3's binding; 6
+  follows 2+3 and its designed collision with 7 is now resolved by 7 having landed
+  first — step 6 MUST restructure `listHarnesses` around step 7's `inspectHarness`
+  composition, not the pre-step-7 shape). Step 8 follows 7 (landed) and consumes 1,
+  but needs the OQ7 call first.
 - **Blocked on Casey, do not land without the call**: OQ8 (workspace-switch PTY
   visibility graft — severable from step 6; step 6 lands green without it), OQ7
   (gallery roster — before step 8). Also pending Casey: the step-2 exit-bar dev-app
   observation (degraded banner + Retry while a simulated failure is driven), the
   step-3 harness-identity chip observation on a bound thread in the running app, the
-  step-4 tick-counter acceptance, and dependabot triage (`npm audit --omit=dev`
-  reports 1 moderate production vuln as of 2026-07-06).
+  Phase-1 step-4 tick-counter acceptance, the Phase-2 step-4 one-click thread↔raw
+  flip on a live harness run (scrollback both ways), the Phase-2 step-7
+  hand-broken-harness observation (greyed with reason, run disabled, in the running
+  app), and dependabot triage (`npm audit --omit=dev` reports 1 moderate production
+  vuln — js-yaml via gray-matter — re-confirmed 2026-07-07).
 - Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
   leave it alone, do not commit or delete it.
 
@@ -79,8 +92,10 @@ tamper probe green (see its DONE block in 04-phase-2-specs.md).
    hardening already landed: AGENTS.md regen unparked (`c7d463f`), symlinked-parent
    harness refusal + contracts v1.1.5 (`660dc56`). **Steps 1 (`18cc29d`), 2
    (`be07439`), and 3 (`4047d35`) are DONE — each step header carries a dated DONE
-   block with its recorded deviations. Next = 4∥7 (parallel-safe pair); 5 and 6 are
-   unblocked but sequential (6 collides with 7 on harness-service.ts).**
+   block with its recorded deviations. Steps 4 (`61f8ce3`) and 7 (`065d312`) are
+   DONE (2026-07-07, parallel worktree sessions + post-merge review fix commit).
+   Next = 5 and 6 (6 restructures listHarnesses around 7's inspectHarness), then 8
+   after the OQ7 call.**
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -422,6 +437,80 @@ tamper probe green (see its DONE block in 04-phase-2-specs.md).
    turns open — observed in the probe, attribution unaffected).
 7. **Step 5 is unblocked**: `git:revert-agent` validation is trailer enumeration
    (unknown ⇒ `no-commits-for-agent`, test-pinned) — safe under a one-click UI.
+
+## What Phase 2 step 4 changed under you (`61f8ce3`, contracts v1.2.3)
+
+1. **The renderer `cli-session-store` is the SINGLE sessionId authority**
+   (`src/renderer/src/store/cli-session-store.ts`): seeded from the
+   `cli-thread:spawn` response (`agent-transport.start` now keeps the sessionId it
+   used to drop), updated by the new `cli-thread:session-changed` event (fired on
+   the spawn-on-demand respawn path inside `input()`), pull-hydrated by
+   `cli-thread:get-session` (`{ sessionId, live } | null`). The bridge's
+   `metadata.sessionId` path still exists and must NEVER feed the store. Known
+   record-only race: `hydrate()` can overwrite a fresher session-changed binding
+   with a stale pull snapshot — fails toward the dead state, never a respawn.
+2. **The dead-PTY no-respawn rule is a contract point enforced at BOTH layers**
+   (contracts §4 v1.2.3). Adapter: `TerminalDockAdapter` `projection="agent"` is
+   reattach-only — no session ⇒ read-only dead state, no webview mounted, and
+   cwd/vaultPath are OMITTED from the webview URL. Guest: the `reattachOnly` URL
+   param (pure builders in `terminal-webview-src.ts`, names in sync with
+   `TerminalApp.readUrlParams`) makes the connect decision skip the
+   `terminal:create` fallback and report `session-dead`. The decision logic was
+   EXTRACTED to pure `src/renderer/terminal-webview/connect-session.ts` so the
+   no-create assertion is behavioral. Plain terminals keep their stale-session
+   respawn — the rule is agent-projections-only.
+3. **ThreadPanel header has the projection toggle**; a PTY that exits UNDER a live
+   raw view also dead-states (not just stale-at-mount). Raw-view keystrokes are
+   attributed to the thread's turn windows — the interactive-input residual is
+   documented in §4, same trust level as the dock terminal; block-protocol
+   integrity under interleaved human input is test-pinned at line boundaries
+   (mid-byte-stream echo splitting a JSONL record is a known fidelity limit).
+4. **`TerminalApp.tsx` carries a guest-window-scoped `window.__terminalText()`
+   test hook** (post-merge fix): xterm renders to a WebGL canvas with no text DOM,
+   and this is the only way the e2e probe can observe ring-buffer replay. Guest
+   scope only, no user-facing behavior — do not remove it without replacing the
+   probe's replay evidence.
+5. **e2e boot-seeding is race-prone — use the boot-settle guard.** Seeding
+   `lastWorkspacePath` then reloading races the app's first-boot null-write when
+   the SHARED electron-store carries a stale path (this transiently broke
+   watcher-health on the first merged run). All three built-app spec helpers now
+   wait for the initial boot to settle (app shell OR FirstRunScreen) before
+   seeding; new specs must do the same. The PID evidence pattern for PTYs is
+   `lsof -a -d cwd` (PTY shells have an EMPTY argv — `pgrep -f <path>` matches
+   nothing), and the projection probe REQUIRES an installed `claude` binary (it
+   executes one real `--print` echo turn).
+
+## What Phase 2 step 7 changed under you (`065d312`, contracts v1.2.4)
+
+1. **The linter is a two-layer composition, and main is the run-time authority.**
+   Pure content lints in `src/shared/harness-lint.ts` (`lintHarness(files) →
+   Diagnostic[]`, renderer-importable; `Diagnostic` is exactly `{ severity, code,
+   message, file }` with two severities — resist taxonomy creep) composed with
+   main-side fs lints in `harness-service.ts` (`inspectHarness`: presence, verify.sh
+   mode drift masked `0o7777`, handoffs/ presence, symlink-ancestry realpath). Main
+   never reimplements a shared check. **`composeHarnessRun` re-runs the lint
+   composition at run time and refuses on any error-severity diagnostic** (post-merge
+   fix; closes the palette-snapshot TOCTOU) — the palette grey/disable is
+   defense-in-depth, not the boundary.
+2. **`listHarnesses` surfaces instead of hiding**: summaries carry `diagnostics` and
+   `adapter: HarnessAdapter | null`; malformed harnesses render greyed with the first
+   error's reason, run disabled — never vanished. A failed ancestry check returns
+   ONLY the `symlink-ancestry` error with NO content read through the link (name
+   falls back to slug) — outside-workspace content must never reach the palette.
+   Error codes that disable run: scope-protected-globs, scope-unparseable,
+   `scope-fields` (gutted goal/acceptance/rollback), frontmatter-invalid,
+   file-missing, symlink-ancestry, `reserved-slug` (hand-created adapter-identity
+   dir). `<dir>` placeholder leakage and verify.sh mode drift are warnings
+   (containment rationale in the v1.2.4 entry).
+3. **`harness:lint`** (on-demand re-lint, `[]` with no workspace) appended to §6;
+   `harness-store.ts` needed no textual change (diagnostics ride the widened
+   summary); `runHarness` re-checks defensively before creating a thread.
+4. **Step 6 lands on top of this**: restructure `listHarnesses` around the
+   `inspectHarness` composition — do not resurrect the pre-step-7 skip-not-throw
+   shape. v1.1.5 residual #2 (symlink ancestry) is DISCHARGED; recorded residuals
+   that are NOT covered: file-level symlinks inside a harness dir (hand-created;
+   in-app creation is watcher-auto-rejected), dangling agents-dir symlink ⇒ silent
+   `[]`, and the run-time lint reading real fs even when `deps.fs` is injected.
 
 ## Chat-output quality pass (`fb7e17c`) — same landing window
 
