@@ -72,6 +72,16 @@ describe('lintHarness', () => {
     }
   })
 
+  it('scope.json missing a required scalar field (rollback) ⇒ error naming it', () => {
+    const scope = materializeScope(TEMPLATE, DIR) as unknown as Record<string, unknown>
+    delete scope.rollback
+    const diags = lintHarness({ ...cleanInput(), scopeJson: JSON.stringify(scope) })
+    const finding = diags.find((d) => d.code === 'scope-fields')
+    expect(finding).toMatchObject({ severity: 'error', file: 'scope.json' })
+    expect(finding!.message).toContain('rollback')
+    expect(hasLintErrors(diags)).toBe(true)
+  })
+
   it('<dir> placeholder leaked into materialized scope globs ⇒ warning naming the globs', () => {
     const scope = {
       ...materializeScope(TEMPLATE, DIR),

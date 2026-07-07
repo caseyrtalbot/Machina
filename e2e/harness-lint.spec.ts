@@ -40,6 +40,18 @@ async function launchWithWorkspace(
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
 
+  // Let the initial boot SETTLE before seeding. App.tsx's checkSavedVault
+  // writes lastWorkspacePath=null when the stored path is missing (a stale
+  // temp dir from a prior run); that null-write races the config.write below
+  // and can clobber our seed → FirstRunScreen, so the app shell never mounts.
+  // Waiting for the boot to resolve (app shell OR first-run) guarantees the
+  // null-write is done before we seed.
+  await page
+    .locator('[data-testid="approvals-tray-button"]')
+    .or(page.getByRole('button', { name: 'Open Folder' }))
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 })
+
   await app.evaluate(async ({ BrowserWindow }, wsPath) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (win) {
@@ -137,8 +149,11 @@ test.describe.serial('Harness linter (built app)', () => {
       await expect(item).toContainText('missing protected forbiddenGlobs')
 
       // Run disabled: activating the item does nothing — the palette does
-      // not even close (a working run item closes it before starting).
-      await item.click()
+      // not even close (a working run item closes it before starting). Force
+      // the click: the option is aria-disabled, which Playwright's actionability
+      // treats as disabled (a plain click would wait for it to enable and time
+      // out). We WANT to dispatch onto the disabled item and prove it is inert.
+      await item.click({ force: true })
       await expect(paletteInput).toBeVisible()
     } finally {
       await app.close()

@@ -246,20 +246,45 @@ async function inspectHarness(workspaceRoot: string, slug: string): Promise<Harn
   // here): the slug dir must canonicalize to EXACTLY its literal path — one
   // equality covers a symlinked <TE_DIR>, agents dir, or slug dir, because
   // realpath resolves the whole ancestor chain. A redirected harness sits
-  // outside the watcher and the protected-glob auto-reject.
+  // outside the watcher and the protected-glob auto-reject. Checked FIRST and
+  // returned on failure with NO content read: reading SKILL.md/scope.json
+  // through the symlink would leak outside-workspace file content (frontmatter
+  // name/description, scope) into the palette. The entry stays listed (greyed
+  // with the ancestry reason); with no frontmatter read, name falls back to the
+  // slug and adapter is null — fs facts only.
   try {
     const [realDir, realRoot] = await Promise.all([fs.realpath(dir), fs.realpath(workspaceRoot)])
     if (realDir !== path.join(realRoot, TE_DIR, 'agents', slug)) {
-      diagnostics.push(
-        symlinkAncestryDiagnostic(
-          `harness path does not canonicalize to its literal location (symlinked ancestry?): ${slug}`
-        )
-      )
+      return {
+        diagnostics: [
+          symlinkAncestryDiagnostic(
+            `harness path does not canonicalize to its literal location (symlinked ancestry?): ${slug}`
+          )
+        ],
+        frontmatter: null
+      }
     }
   } catch (err) {
-    diagnostics.push(
-      symlinkAncestryDiagnostic(`could not canonicalize harness path: ${String(err)}`)
-    )
+    return {
+      diagnostics: [
+        symlinkAncestryDiagnostic(`could not canonicalize harness path: ${String(err)}`)
+      ],
+      frontmatter: null
+    }
+  }
+
+  // Reserved slug: a hand-created adapter-identity directory (e.g. cli-claude)
+  // lints clean otherwise and would render run-enabled, but harness:run always
+  // refuses it — its trailers would be indistinguishable from the adapter
+  // fallback. Surface it as an error so the palette greys it with a reason
+  // instead of an error toast on run. Reuses isReservedHarnessSlug.
+  if (isReservedHarnessSlug(slug)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'reserved-slug',
+      message: `harness slug collides with an adapter identity (reserved): ${slug}`,
+      file: '.'
+    })
   }
 
   // File presence: harness:run reads SKILL.md/rules.md/scope.json/state.md
@@ -314,7 +339,9 @@ async function inspectHarness(workspaceRoot: string, slug: string): Promise<Harn
   // tamper signal but not a boundary (contracts §5) — warning.
   if (verifySh !== undefined) {
     try {
-      const mode = (await fs.stat(path.join(dir, VERIFY_FILE))).mode & 0o777
+      // 0o7777, not 0o777: a narrower mask hides setuid/setgid/sticky drift
+      // (e.g. 0o4555 would read as an unchanged 0o555).
+      const mode = (await fs.stat(path.join(dir, VERIFY_FILE))).mode & 0o7777
       if (mode !== 0o555) {
         diagnostics.push({
           severity: 'warning',

@@ -384,8 +384,8 @@ with step 2 — sequential.
 
 ## Step 4 — Two-projection agent view (structured thread ⇄ raw PTY)
 
-> **DONE** (2026-07-07, contracts v1.2.3, landed on `wip/p2-step4` for the
-> orchestrator's post-merge reconciliation). Recorded deviations (§8): (1) the
+> **DONE** (2026-07-07, contracts v1.2.3, landed at `61f8ce3`; post-merge
+> review/probe fixes in the same-day follow-up fix commit). Recorded deviations (§8): (1) the
 > webview-guest connect decision (reconnect → reattachOnly dead-stop → create) was
 > EXTRACTED to `src/renderer/terminal-webview/connect-session.ts` instead of edited
 > inline in `TerminalApp.tsx` — the load-bearing "no terminal:create at the webview
@@ -402,11 +402,25 @@ with step 2 — sequential.
 > block-protocol integrity pair (echoed keystrokes interleaved into the running agent
 > block + a user-run non-agent command block mid-turn: turn completes once, reply
 > mirrors, no early close). The built-app Playwright probe
-> (`e2e/agent-projection.spec.ts`) is WRITTEN but NOT executed in this session
-> (parallel-session e2e collision rule) — the orchestrator runs it post-merge; it
-> uses a direct `cli-thread:input` echo turn rather than a harness turn so it does
-> not depend on an installed/authed CLI. Casey-observed one-click flip on a live
-> harness run still pending.
+> (`e2e/agent-projection.spec.ts`) was written in the build session and EXECUTED
+> GREEN post-merge after the orchestrator's review+fix pass repaired its evidence
+> mechanisms (2026-07-07): PID proof now uses `lsof -a -d cwd` (the PTY shell has an
+> empty argv, so the original `pgrep -f <workspace>` matched nothing); ring-buffer
+> replay is read via a guest-scoped `window.__terminalText()` test hook in
+> `TerminalApp.tsx` (xterm renders to a WebGL canvas — no text DOM); and the probe
+> DOES depend on an installed `claude` binary and executes one real `--print` echo
+> turn (the build session's "no installed/authed CLI dependency" claim was wrong —
+> spawn refuses via `detectInstalledAgents` when the binary is absent). All e2e
+> specs also gained a boot-settle guard: seeding `lastWorkspacePath` before the
+> app's first-boot null-write settles loses the race when the shared electron-store
+> carries a stale path (this cross-spec pollution transiently broke
+> `watcher-health.spec.ts` on the first merged run). Post-merge review residuals
+> recorded, not fixed: `cli-session-store.hydrate` can overwrite a fresher
+> session-changed binding with a stale pull snapshot (fails toward dead state,
+> never respawn — a compare-and-set would remove it), and the block-integrity pair
+> interleaves human input only at line boundaries (mid-byte-stream echo that splits
+> a JSONL record is an unexercised fidelity limit). Casey-observed one-click flip
+> on a live harness run still pending.
 
 One click between the structured thread and the live raw PTY (PLAN Q8). The plumbing gap is
 precise (seam map §3): `cli-thread:spawn` RETURNS `sessionId` (`ipc-channels.ts:277`)
@@ -609,7 +623,9 @@ streams to count internal turns.
 
 ## Step 7 — Harness linter
 
-> **DONE** (2026-07-07, contracts v1.2.4, branch `wip/p2-step7`). Recorded deviations
+> **DONE** (2026-07-07, contracts v1.2.4, landed at `065d312` — cherry-picked from
+> `wip/p2-step7`; post-merge review fixes in the same-day follow-up fix commit).
+> Recorded deviations
 > (§8): `harness-store.ts` needed no textual change (diagnostics ride the widened
 > `HarnessSummary`, which also gains `adapter: HarnessAdapter | null` for
 > unreadable-frontmatter entries); presence lints share ONE `file-missing` code with
@@ -624,9 +640,31 @@ streams to count internal turns.
 > the palette disable. `harness:lint` returns `[]` with no workspace (list semantics).
 > Fresh `npm run check` (3372 tests) + `npm run build` green. The built-app probe
 > `e2e/harness-lint.spec.ts` (exit-bar: strip protected globs on disk ⇒ lint violation
-> + palette entry greyed/aria-disabled with reason, run inert) is WRITTEN but NOT
-> executed — parallel sessions share the Electron support dir; the orchestrator runs
-> it post-merge. Casey-observed flagged-harness check in the running app still pending.
+> + palette entry greyed/aria-disabled with reason, run inert) was written in the
+> build session and EXECUTED GREEN post-merge (2026-07-07; two probe fixes: the
+> boot-settle guard against stale shared-electron-store state, and a `force: true`
+> click on the deliberately `aria-disabled` palette option, since Playwright
+> actionability otherwise waits for it to enable). The post-merge adversarial review
+> (Claude lenses + Codex cold read) found and the fix pass closed: (a)
+> `composeHarnessRun` now re-runs the lint composition main-side at run time and
+> refuses on any error-severity diagnostic — the run-time enforcement authority;
+> the palette disable is defense-in-depth against the list-time snapshot, not the
+> boundary (closes the TOCTOU where scope.json is tampered after palette open); (b)
+> a failed symlink-ancestry check now returns ONLY the ancestry error with no
+> content read through the link (name falls back to slug, adapter null — closes an
+> outside-workspace content leak into the palette); (c) new error codes
+> `scope-fields` (scope.json missing required goal/acceptance/rollback scalars —
+> also removed the unsound `as HarnessScope` cast) and `reserved-slug`
+> (hand-created adapter-identity dir now greys with reason instead of erroring at
+> run); (d) verify.sh mode-drift mask widened 0o777 → 0o7777 (setuid/sticky drift
+> visible). Review residuals recorded, not fixed: file-level symlinks inside a
+> harness dir (e.g. verify.sh symlinked outside) escape the dir-ancestry lint —
+> spec-scope was dir ancestry only, and in-app creation of such links is
+> auto-rejected by the watcher; a DANGLING agents-dir symlink still yields a silent
+> `[]` (readdir ENOENT is indistinguishable from no-agents-dir); the run-time lint
+> in `composeHarnessRun` reads real fs even when `deps.fs` is injected (no current
+> caller injects). Casey-observed flagged-harness check in the running app still
+> pending.
 
 The linter's job is everything create-time validation cannot see (seam map §5):
 scope.json is never re-validated after create (hand-edits can strip

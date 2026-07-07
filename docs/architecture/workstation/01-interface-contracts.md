@@ -667,6 +667,27 @@ Implementation detail per step: `02-phase-1-specs.md`.
   `HARNESS_PROTECTED_GLOBS` literals, not scope.json), and the superset check
   independently errors if the protected literals themselves are gone; verify.sh mode
   drift is likewise a warning (defense-in-depth, not a boundary — §5).
+  **Post-merge review amendments (2026-07-07, same landing window; Claude adversarial
+  lenses + Codex cold read):** (a) `harness:run` — `composeHarnessRun` re-runs the
+  lint composition main-side at run time and refuses on any error-severity diagnostic
+  (structured `{ ok:false, error }`); the palette disable is a defense-in-depth twin
+  against the list-time snapshot, NOT the enforcement boundary — closes the TOCTOU
+  where scope.json is tampered after the palette opened. (b) A failed
+  symlink-ancestry check now returns ONLY the ancestry error diagnostic with NO
+  content read through the link (frontmatter unread ⇒ name falls back to slug,
+  adapter null, no content lints) — closes an outside-workspace content leak into
+  the palette; supersedes this entry's earlier "listed with errors" behavior, which
+  still read through the link for display. (c) Two new error codes, both disabling
+  run: `scope-fields` (scope.json missing required scalar goal/acceptance/rollback —
+  the unsound `as HarnessScope` cast in the pure lint was also removed) and
+  `reserved-slug` (a hand-created adapter-identity directory greys with reason
+  instead of erroring at run; reuses `isReservedHarnessSlug`). (d) verify.sh
+  mode-drift mask widened `0o777` → `0o7777` so setuid/setgid/sticky drift (e.g.
+  `0o4555`) is caught. Diagnostic stays exactly four fields, two severities.
+  Recorded residuals (not fixed): file-level symlinks inside a harness dir escape
+  the dir-ancestry lint (in-app creation is watcher-auto-rejected; hand-created
+  ones are undetected); a dangling agents-dir symlink still yields a silent `[]`;
+  the run-time lint reads real fs even when `deps.fs` is injected.
 - **v1.2.3 (2026-07-07, Phase 2 step 4 landing)** — two-projection agent
   view: §3 SessionProjection/WorkstationSession CONSUMED (dated status line added
   there) — the thread surface and the raw PTY are two projections of one
@@ -698,6 +719,17 @@ Implementation detail per step: `02-phase-1-specs.md`.
   `{ sessionId, live } | null` (liveness from the spawner's existing
   `hasLiveSession` probe) rather than a bare sessionId — the store needs liveness to
   render the dead state without a second channel.
+  **Post-merge review amendments (2026-07-07, same landing window):** the built-app
+  probe's evidence mechanisms were repaired (PID proof via `lsof -a -d cwd` — the
+  PTY shell has an empty argv; replay read via a guest-window-scoped
+  `window.__terminalText()` test hook in `TerminalApp.tsx`, xterm's WebGL canvas
+  has no text DOM) and executed green; the reattachOnly plumb-through test was
+  tightened so a hardcoded `reattachOnly: false` at the `connectToSession` call
+  site now fails it. Recorded residuals: `cli-session-store.hydrate` can overwrite
+  a fresher session-changed binding with a stale pull snapshot — fails toward the
+  dead state, never a respawn; a compare-and-set would remove it. The
+  block-integrity test pair interleaves human input only at line boundaries —
+  mid-byte-stream echo that splits a JSONL record is an unexercised fidelity limit.
 - **v1.2.2 (2026-07-06, Phase 2 step 3 landing)** — §4 gains the attribution-authority
   subsection: `HarnessRunRegistry` (write-once threadId→slug, persisted keyed workspace
   root + threadId under userData `harness-bindings.json`; acknowledged residual: a

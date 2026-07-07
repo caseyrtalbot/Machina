@@ -168,7 +168,11 @@ describe('TerminalApp component', () => {
       expect(src).toContain("from './connect-session'")
       expect(src).toContain('await connectToSession(')
       expect(src).toContain('window.terminalApi')
-      expect(src).toContain('reattachOnly')
+      // reattachOnly (from readUrlParams) must flow into the connectToSession
+      // argument object as the variable — a shorthand property, NOT a hardcoded
+      // `reattachOnly: false` at the call site. The negative lookahead `(?!\s*:)`
+      // rejects a literal-valued property, so a refactor that hardcodes it fails.
+      expect(src).toMatch(/connectToSession\(\s*\{[^}]*\breattachOnly\b(?!\s*:)[^}]*\}/)
     })
 
     it('sends session-created to host after creation', () => {

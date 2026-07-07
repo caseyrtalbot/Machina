@@ -10,6 +10,7 @@ import path from 'node:path'
 import { createHarness, lintHarnessOnDisk, listHarnesses } from '../harness-service'
 import { HARNESS_TEMPLATES } from '../../../shared/harness-templates'
 import { HARNESS_PROTECTED_GLOBS } from '../../../shared/harness-types'
+import { hasLintErrors } from '../../../shared/harness-lint'
 
 let root: string
 let extraDirs: string[]
@@ -219,25 +220,34 @@ describe('listHarnesses', () => {
 
     const list = await listHarnesses(root)
     expect(list.map((h) => h.slug)).toEqual(['test-fixer'])
-    expect(list[0].diagnostics).toContainEqual(
+    // Listed with ONLY the ancestry error — no content read through the
+    // symlink: adapter is null (frontmatter never parsed) and no content lints
+    // ran, so the leak surface is closed.
+    expect(list[0].diagnostics).toEqual([
       expect.objectContaining({ severity: 'error', code: 'symlink-ancestry' })
-    )
+    ])
+    expect(list[0].adapter).toBeNull()
   })
 
-  it('surfaces a symlinked slug dir with an ancestry error (used to vanish)', async () => {
+  it('surfaces a symlinked slug dir with an ancestry error and reads no content behind it', async () => {
+    // Behind the symlink sits a valid harness whose frontmatter name differs
+    // from the link name — if inspectHarness read it, the palette would show
+    // "other-name". It must not: name falls back to the slug.
     const otherWorkspace = await makeOutsideDir()
-    await createHarness(otherWorkspace, 'test-fixer', 'test-fixer')
+    await createHarness(otherWorkspace, 'test-fixer', 'other-name')
     await fs.mkdir(path.join(root, '.machina', 'agents'), { recursive: true })
     await fs.symlink(
-      path.join(otherWorkspace, '.machina', 'agents', 'test-fixer'),
+      path.join(otherWorkspace, '.machina', 'agents', 'other-name'),
       path.join(root, '.machina', 'agents', 'test-fixer')
     )
 
     const list = await listHarnesses(root)
     expect(list.map((h) => h.slug)).toEqual(['test-fixer'])
-    expect(list[0].diagnostics).toContainEqual(
+    expect(list[0].diagnostics).toEqual([
       expect.objectContaining({ severity: 'error', code: 'symlink-ancestry' })
-    )
+    ])
+    expect(list[0].name).toBe('test-fixer') // slug fallback, not the behind-name
+    expect(list[0].adapter).toBeNull()
   })
 
   it('surfaces malformed harnesses with skip-reason diagnostics; non-harness entries stay skipped', async () => {
@@ -315,6 +325,16 @@ describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', 
     expect(finding!.message).toContain('0o755')
   })
 
+  it('verify.sh setuid drift (chmod 0o4555) ⇒ warning — the mask sees the high bits', async () => {
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    await fs.chmod(path.join(harnessDir(), 'verify.sh'), 0o4555)
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+    const finding = diags.find((d) => d.code === 'verify-mode')
+    expect(finding).toMatchObject({ severity: 'warning', file: 'verify.sh' })
+    expect(finding!.message).toContain('0o4555')
+  })
+
   it('missing verify.sh ⇒ error diagnostic', async () => {
     await createHarness(root, 'test-fixer', 'test-fixer')
     await fs.rm(path.join(harnessDir(), 'verify.sh'), { force: true })
@@ -333,6 +353,26 @@ describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', 
     expect(diags).toEqual([
       expect.objectContaining({ severity: 'warning', code: 'file-missing', file: 'handoffs/' })
     ])
+  })
+
+  it('a hand-created adapter-identity dir (cli-claude) ⇒ reserved-slug error ⇒ run disabled', async () => {
+    // createHarness refuses the reserved slug, so simulate a hand-placed one by
+    // copying an otherwise-valid harness onto the reserved path.
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    const reservedDir = path.join(root, '.machina', 'agents', 'cli-claude')
+    await fs.cp(harnessDir(), reservedDir, { recursive: true })
+
+    const diags = await lintHarnessOnDisk(root, 'cli-claude')
+    expect(diags).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'reserved-slug', file: '.' })
+    )
+    // The run-disable predicate is now true — the palette greys it instead of
+    // rendering it enabled and refusing at run time.
+    expect(hasLintErrors(diags)).toBe(true)
+
+    // And it is LISTED (greyed-with-reason), not skipped.
+    const list = await listHarnesses(root)
+    expect(list.map((h) => h.slug)).toContain('cli-claude')
   })
 
   it('nonexistent harness ⇒ file-missing error; invalid slug ⇒ invalid-slug error', async () => {

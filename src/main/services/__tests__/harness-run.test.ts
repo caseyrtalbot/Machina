@@ -9,8 +9,9 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { TE_DIR } from '@shared/constants'
-import { buildHarnessPrompt } from '@shared/harness-types'
+import { buildHarnessPrompt, HARNESS_PROTECTED_GLOBS } from '@shared/harness-types'
 import { composeHarnessRun } from '../harness-run'
+import { createHarness } from '../harness-service'
 
 // harness-run defaults to the singleton registry, whose module imports
 // electron; every test here injects its own registry.
@@ -54,7 +55,15 @@ function makeRegistry(result: RecordResult = { ok: true }) {
 
 describe('composeHarnessRun', () => {
   it('happy path: returns the composed prompt and records the binding last', async () => {
-    await writeFixture(path.join(root, TE_DIR, 'agents', SLUG))
+    // A real, lint-clean harness: the run-time lint gate now refuses anything
+    // with error-severity diagnostics, so the happy path needs a valid one.
+    await createHarness(root, 'test-fixer', SLUG)
+    const dir = path.join(root, TE_DIR, 'agents', SLUG)
+    const [skillMd, rulesMd, scopeJson, stateMd] = await Promise.all(
+      ['SKILL.md', 'rules.md', 'scope.json', 'state.md'].map((f) =>
+        fs.readFile(path.join(dir, f), 'utf8')
+      )
+    )
     const registry = makeRegistry()
 
     const result = await composeHarnessRun(root, SLUG, 'th1', { registry })
@@ -63,12 +72,42 @@ describe('composeHarnessRun', () => {
       prompt: buildHarnessPrompt({
         slug: SLUG,
         harnessDir: `${TE_DIR}/agents/${SLUG}`,
-        skillMd: FIXTURE['SKILL.md'],
-        rulesMd: FIXTURE['rules.md'],
-        scopeJson: FIXTURE['scope.json'],
-        stateMd: FIXTURE['state.md']
+        skillMd,
+        rulesMd,
+        scopeJson,
+        stateMd
       })
     })
+    expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th1', SLUG)
+  })
+
+  it('run-time lint authority: scope.json tampered after create ⇒ refuses, no binding (TOCTOU)', async () => {
+    // The renderer enforces the palette disable against the LIST-time snapshot;
+    // a hand-edit stripping the protected globs after the palette opened would
+    // slip past it. Main re-lints at run time and refuses.
+    await createHarness(root, 'test-fixer', SLUG)
+    const scopePath = path.join(root, TE_DIR, 'agents', SLUG, 'scope.json')
+    const scope = JSON.parse(await fs.readFile(scopePath, 'utf8'))
+    scope.forbiddenGlobs = scope.forbiddenGlobs.filter(
+      (g: string) => !(HARNESS_PROTECTED_GLOBS as readonly string[]).includes(g)
+    )
+    await fs.writeFile(scopePath, JSON.stringify(scope, null, 2), 'utf8')
+    const registry = makeRegistry()
+
+    const result = await composeHarnessRun(root, SLUG, 'th1', { registry })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('run-time lint')
+    expect(registry.record).not.toHaveBeenCalled()
+  })
+
+  it('a warning-only harness still runs and records the binding', async () => {
+    await createHarness(root, 'test-fixer', SLUG)
+    // Removing handoffs/ is a WARNING (not read by run) — must not block.
+    await fs.rmdir(path.join(root, TE_DIR, 'agents', SLUG, 'handoffs'))
+    const registry = makeRegistry()
+
+    const result = await composeHarnessRun(root, SLUG, 'th1', { registry })
+    expect(result.ok).toBe(true)
     expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th1', SLUG)
   })
 
@@ -128,7 +167,7 @@ describe('composeHarnessRun', () => {
   })
 
   it('refuses when the registry reports a binding conflict', async () => {
-    await writeFixture(path.join(root, TE_DIR, 'agents', SLUG))
+    await createHarness(root, 'test-fixer', SLUG)
     const registry = makeRegistry({
       ok: false,
       error: 'thread th1 is already bound to harness "other" (bindings are write-once)'

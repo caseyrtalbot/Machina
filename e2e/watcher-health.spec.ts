@@ -38,6 +38,18 @@ async function launchWithWorkspace(
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
 
+  // Let the initial boot SETTLE before seeding. App.tsx's checkSavedVault
+  // writes lastWorkspacePath=null when the stored path is missing (a stale
+  // temp dir from a prior run); that null-write races the config.write below
+  // and can clobber our seed → FirstRunScreen, so the app shell never mounts.
+  // Waiting for the boot to resolve (app shell OR first-run) guarantees the
+  // null-write is done before we seed.
+  await page
+    .locator('[data-testid="approvals-tray-button"]')
+    .or(page.getByRole('button', { name: 'Open Folder' }))
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 })
+
   await app.evaluate(async ({ BrowserWindow }, wsPath) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (win) {

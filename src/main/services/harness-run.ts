@@ -21,7 +21,9 @@ import {
   isValidHarnessSlug
 } from '../../shared/harness-types'
 import { SAFE_ID_RE } from '../../shared/git-types'
+import { hasLintErrors } from '../../shared/harness-lint'
 import { getHarnessRunRegistry } from './harness-run-registry'
+import { lintHarnessOnDisk } from './harness-service'
 
 export type HarnessRunResult =
   | { readonly ok: true; readonly prompt: string }
@@ -91,6 +93,22 @@ export async function composeHarnessRun(
     }
   }
   const [skillMd, rulesMd, scopeJson, stateMd] = contents
+
+  // Run-time lint authority: the palette disable is enforced renderer-side
+  // against the LIST-time snapshot, so a scope.json hand-tampered after the
+  // palette opened (e.g. HARNESS_PROTECTED_GLOBS stripped) would still compose
+  // a prompt and mint a binding. Re-run the same lint composition here — the
+  // same fs∘shared checks harness:list uses, never reimplemented — and refuse
+  // on any error-severity diagnostic. The read loop above already caught a
+  // missing file; this catches tamper the fs reads cannot see.
+  const diagnostics = await lintHarnessOnDisk(workspaceRoot, slug)
+  if (hasLintErrors(diagnostics)) {
+    const firstError = diagnostics.find((d) => d.severity === 'error')
+    return {
+      ok: false,
+      error: `harness "${slug}" failed its run-time lint — run refused: ${firstError?.message} (${firstError?.file})`
+    }
+  }
 
   const prompt = buildHarnessPrompt({
     slug,

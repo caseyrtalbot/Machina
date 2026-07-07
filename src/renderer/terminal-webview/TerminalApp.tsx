@@ -204,6 +204,19 @@ export function TerminalApp() {
     })
     termRef.current = term
 
+    // Test observability only: the terminal renders to a WebGL canvas with no
+    // queryable text DOM, so the two-projection e2e probe reads the replayed
+    // ring-buffer scrollback via xterm's renderer-independent buffer model.
+    // Guest-window scoped; no user-facing behavior, no main-process surface.
+    ;(window as unknown as { __terminalText?: () => string }).__terminalText = () => {
+      const buf = term.buffer.active
+      let out = ''
+      for (let i = 0; i < buf.length; i++) {
+        out += (buf.getLine(i)?.translateToString(true) ?? '') + '\n'
+      }
+      return out
+    }
+
     // ── Addons ──────────────────────────────────────────────────────────
 
     const fitAddon = new FitAddon()

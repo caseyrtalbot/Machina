@@ -146,9 +146,35 @@ function lintScope(scopeJson: string): Diagnostic[] {
 
   const out: Diagnostic[] = []
 
+  // Required scalar fields: a hand-edit that guts goal/acceptance/rollback
+  // leaves allowedGlobs/forbiddenGlobs intact (so the structural guard above
+  // passes) yet composes a broken first-turn prompt. The create-time cast never
+  // re-checked these; the lint does.
+  const missingFields = (['goal', 'acceptance', 'rollback'] as const).filter(
+    (key) => typeof scope[key] !== 'string'
+  )
+  if (missingFields.length > 0) {
+    out.push({
+      severity: 'error',
+      code: 'scope-fields',
+      message: `scope.json is missing required string field(s): ${missingFields.join(', ')}`,
+      file: 'scope.json'
+    })
+  }
+
   // The exit-bar check: re-run the create-time superset validation on the
   // on-disk contract. Reuses validateHarnessScope — never reimplemented.
-  const supersetCheck = validateHarnessScope(scope as HarnessScope)
+  // validateHarnessScope consults only forbiddenGlobs (validated above), so the
+  // argument is built from the validated arrays plus empty placeholders for the
+  // fields it never reads — no unsound `as HarnessScope` cast smuggling
+  // unchecked shapes past the compiler.
+  const supersetCheck = validateHarnessScope({
+    goal: '',
+    acceptance: '',
+    rollback: '',
+    allowedGlobs: scope.allowedGlobs,
+    forbiddenGlobs: scope.forbiddenGlobs
+  })
   if (!supersetCheck.ok) {
     out.push({
       severity: 'error',
