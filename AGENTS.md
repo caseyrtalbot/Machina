@@ -30,7 +30,15 @@ Single test: `npx vitest run path/to/file.test.ts`
 - Mandatory pre-commit gate before every commit: full `npm run check` + build + dependency audit + visual verification. No shortcuts.
 - **Skip-worktree gotcha**: some files may be flagged skip-worktree, so Write/Edit changes are silently ignored by git. Check with `git ls-files -v | grep ^S` and clear with `git update-index --no-skip-worktree <file>`.
 
-## Architecture
+### Conductor worktree hygiene
+
+Conductor (the parallel-agents Mac app) creates git worktrees outside this repo; closing a workspace window does not clean them up (2026-05-03: workspace `gwangju` left a 9.8 MB worktree + local-only branch after its work was already on main). Canonical sources of truth: local `~/Projects/thought-engine` on `main`, remote `caseyrtalbot/Machina` `main` — these must stay 0/0 ahead/behind; anything else is a hygiene failure.
+
+- Push every Conductor branch (`git push -u origin <branch>`) before declaring work done; local-only branches are a data-loss risk.
+- Merge to `main` and push before archiving the workspace, then archive/delete through the Conductor UI (not by closing the window).
+- Verify afterward: `git worktree list && git branch` — expect only the canonical path and `main`. Clean leftovers with `git worktree remove <path>` then `git branch -D <branch>`, but never remove a worktree with unique commits or unstaged changes without showing the diff and getting explicit approval.
+- Never hand-edit a Conductor workspace directory; work in the UI or in this repo, never both.
+- If Casey says "I just made changes in Conductor," run this audit before doing anything else.
 
 Electron app with three process boundaries:
 
@@ -185,6 +193,7 @@ Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) 
 - **Store tests**: Reset via `store.setState(store.getInitialState())` in `beforeEach`.
 - **E2E**: Playwright with `workers:1`, `test.describe.serial`. Test vault at `e2e/fixtures/test-vault/`.
 - **Quality gate**: `npm run check` must pass clean (zero lint errors, zero type errors).
+- **Claude drives DevTools**: Casey is unfamiliar with this project's DevTools/localStorage/CDP workflows (multi-window Electron + xterm-webview + Pixi; his words, 2026-05-01). Never hand him "open DevTools, run X, flip Y in localStorage" steps. Prefer code paths over runtime toggles (build-env feature flag, settings-panel toggle, a `scripts/` CLI that flips `.machina/state.json`, or the `npm run dev:debug` CDP target Claude drives directly). If a localStorage flip is mandatory, auto-set it in code. Frame visual-verify asks in user-visible terms ("click the thread sidebar's +"), not inspector terms.
 
 ## Code Style
 
