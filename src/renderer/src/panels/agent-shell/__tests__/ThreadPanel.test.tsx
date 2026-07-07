@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
+import { useApprovalsStore } from '../../../store/approvals-store'
 import { ThreadPanel } from '../ThreadPanel'
 import type { Thread, ToolCall } from '@shared/thread-types'
 
@@ -17,6 +18,7 @@ const baseThread: Thread = {
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useApprovalsStore.setState(useApprovalsStore.getInitialState())
   useThreadStore.setState({
     vaultPath: '/v',
     threadsById: { t1: { ...baseThread } },
@@ -69,5 +71,28 @@ describe('ThreadPanel in-flight rendering', () => {
     })
     render(<ThreadPanel />)
     expect(document.querySelector('article[data-inflight="true"]')).toBeNull()
+  })
+})
+
+describe('ThreadPanel watcher-health chip (contracts §4 v1.2.1)', () => {
+  const unhealthy = {
+    state: 'down',
+    since: '2026-07-06T00:00:00.000Z',
+    attempts: 0
+  } as const
+
+  it('shows the degraded chip on CLI threads while the watcher is unhealthy', () => {
+    useThreadStore.setState({
+      threadsById: { t1: { ...baseThread, agent: 'cli-claude' } }
+    })
+    useApprovalsStore.setState({ watcherHealth: unhealthy })
+    render(<ThreadPanel />)
+    expect(screen.getByTestId('thread-watcher-chip').textContent).toBe('containment down')
+  })
+
+  it('never shows the chip on machina-native threads (its writes are pre-gated)', () => {
+    useApprovalsStore.setState({ watcherHealth: unhealthy })
+    render(<ThreadPanel />)
+    expect(screen.queryByTestId('thread-watcher-chip')).toBeNull()
   })
 })

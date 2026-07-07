@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import type { PendingChange } from '@shared/git-types'
-import { useApprovalsStore } from '../../store/approvals-store'
+import { isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
 import { flagChips } from './approval-flags'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 
@@ -24,15 +24,22 @@ export function ApprovalsTray() {
   const refresh = useApprovalsStore((s) => s.refresh)
   const resolve = useApprovalsStore((s) => s.resolve)
   const clearNotice = useApprovalsStore((s) => s.clearNotice)
+  const watcherHealth = useApprovalsStore((s) => s.watcherHealth)
+  const retrying = useApprovalsStore((s) => s.retrying)
+  const retryWatcher = useApprovalsStore((s) => s.retryWatcher)
+  const refreshWatcherHealth = useApprovalsStore((s) => s.refreshWatcherHealth)
 
   const [open, setOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
   const popoverRef = useRef<HTMLDivElement | null>(null)
+  const unhealthy = isWatcherUnhealthy(watcherHealth)
 
-  // Initial badge count; afterwards approvals:changed keeps the store live.
+  // Initial badge count + health snapshot; afterwards approvals:changed and
+  // approvals:watcher-health keep the store live.
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void refreshWatcherHealth()
+  }, [refresh, refreshWatcherHealth])
 
   useEffect(() => {
     if (!open) return
@@ -59,7 +66,9 @@ export function ApprovalsTray() {
         onClick={toggle}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        aria-label={`Agent approvals: ${pending} pending`}
+        aria-label={`Agent approvals: ${pending} pending${
+          unhealthy && watcherHealth !== null ? `; write containment ${watcherHealth.state}` : ''
+        }`}
         aria-expanded={open}
         title="Agent approvals"
         style={{
@@ -115,6 +124,24 @@ export function ApprovalsTray() {
             {pending > 99 ? '99+' : pending}
           </span>
         )}
+        {unhealthy && (
+          <span
+            data-testid="approvals-watcher-warning"
+            aria-hidden
+            style={{
+              position: 'absolute',
+              bottom: -3,
+              right: -3,
+              width: 8,
+              height: 8,
+              // Round exception: status dot (knife-edge geometry contract).
+              borderRadius: '50%',
+              background: colors.claude.warning,
+              border: '2px solid var(--color-bg-base)',
+              boxSizing: 'content-box'
+            }}
+          />
+        )}
       </button>
 
       {open && (
@@ -153,6 +180,44 @@ export function ApprovalsTray() {
           >
             Agent approvals · {pending} pending
           </div>
+
+          {unhealthy && watcherHealth !== null && (
+            <div
+              data-testid="approvals-watcher-banner"
+              style={{
+                padding: '10px 14px',
+                borderBottom: `1px solid ${colors.border.subtle}`,
+                background: colors.callout.warning.bg,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  color: colors.text.primary,
+                  fontFamily: typography.fontFamily.body,
+                  fontSize: 12,
+                  lineHeight: 1.5
+                }}
+              >
+                Write containment is not watching. Agent writes since{' '}
+                {new Date(watcherHealth.since).toLocaleTimeString()} are not being captured for
+                review.
+              </div>
+              <button
+                type="button"
+                data-testid="approvals-watcher-retry"
+                disabled={retrying}
+                title="Restart the agent write watcher"
+                onClick={() => void retryWatcher()}
+                style={actionButtonStyle(colors.claude.warning, retrying)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           {notice !== null && (
             <div

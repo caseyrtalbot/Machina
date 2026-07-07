@@ -7,25 +7,31 @@
  * block-store-subscription.test.ts).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import type { GitOpResult, PendingChange, PendingChangeFlags } from '@shared/git-types'
+import type {
+  GitOpResult,
+  PendingChange,
+  PendingChangeFlags,
+  WatcherHealth
+} from '@shared/git-types'
 
 const api = vi.hoisted(() => {
   const stub = {
-    approvals: { list: vi.fn(), resolve: vi.fn() },
-    on: { approvalsChanged: vi.fn() }
+    approvals: { list: vi.fn(), resolve: vi.fn(), watcherStatus: vi.fn(), watcherRetry: vi.fn() },
+    on: { approvalsChanged: vi.fn(), watcherHealth: vi.fn() }
   }
   ;(window as unknown as Record<string, unknown>).api = stub
   return stub
 })
 
 // Imported AFTER the hoisted stub so the subscription guard sees window.api.
-import { useApprovalsStore, noticeForFailure } from '../approvals-store'
+import { useApprovalsStore, noticeForFailure, isWatcherUnhealthy } from '../approvals-store'
 
 const noFlags: PendingChangeFlags = {
   highVelocity: false,
   headMoved: false,
   concurrentTurns: false,
   degradedAttribution: false,
+  gateDegraded: false,
   forbidden: false
 }
 
@@ -42,9 +48,18 @@ const makeItem = (overrides: Partial<PendingChange> = {}): PendingChange => ({
   ...overrides
 })
 
+const makeHealth = (overrides: Partial<WatcherHealth> = {}): WatcherHealth => ({
+  state: 'down',
+  since: '2026-07-06T00:00:00.000Z',
+  attempts: 0,
+  ...overrides
+})
+
 beforeEach(() => {
   api.approvals.list.mockReset()
   api.approvals.resolve.mockReset()
+  api.approvals.watcherStatus.mockReset()
+  api.approvals.watcherRetry.mockReset()
   useApprovalsStore.setState(useApprovalsStore.getInitialState())
 })
 
@@ -183,5 +198,73 @@ describe('useApprovalsStore', () => {
     useApprovalsStore.getState().clearNotice()
 
     expect(useApprovalsStore.getState().notice).toBeNull()
+  })
+})
+
+describe('isWatcherUnhealthy', () => {
+  it('is false for null (unknown), watching, and stopped', () => {
+    expect(isWatcherUnhealthy(null)).toBe(false)
+    expect(isWatcherUnhealthy(makeHealth({ state: 'watching' }))).toBe(false)
+    expect(isWatcherUnhealthy(makeHealth({ state: 'stopped' }))).toBe(false)
+  })
+
+  it('is true for starting, degraded, and down', () => {
+    expect(isWatcherUnhealthy(makeHealth({ state: 'starting' }))).toBe(true)
+    expect(isWatcherUnhealthy(makeHealth({ state: 'degraded' }))).toBe(true)
+    expect(isWatcherUnhealthy(makeHealth({ state: 'down' }))).toBe(true)
+  })
+})
+
+describe('watcher health in the approvals store', () => {
+  it('the approvals:watcher-health subscription sets watcherHealth', () => {
+    // Registered once at import time against the hoisted stub.
+    expect(api.on.watcherHealth).toHaveBeenCalledTimes(1)
+    const onHealth = api.on.watcherHealth.mock.calls[0][0] as (health: WatcherHealth) => void
+
+    const health = makeHealth({ state: 'down', reason: 'watcher error: boom' })
+    onHealth(health)
+
+    expect(useApprovalsStore.getState().watcherHealth).toEqual(health)
+  })
+
+  it('refreshWatcherHealth() pulls the status snapshot', async () => {
+    const health = makeHealth({ state: 'watching' })
+    api.approvals.watcherStatus.mockResolvedValue(health)
+
+    await useApprovalsStore.getState().refreshWatcherHealth()
+
+    expect(useApprovalsStore.getState().watcherHealth).toEqual(health)
+  })
+
+  it('retryWatcher() invokes approvals:watcher-retry and refreshes health', async () => {
+    api.approvals.watcherRetry.mockResolvedValue({ ok: true })
+    api.approvals.watcherStatus.mockResolvedValue(makeHealth({ state: 'watching' }))
+
+    await useApprovalsStore.getState().retryWatcher()
+
+    expect(api.approvals.watcherRetry).toHaveBeenCalledTimes(1)
+    expect(useApprovalsStore.getState().watcherHealth?.state).toBe('watching')
+    expect(useApprovalsStore.getState().retrying).toBe(false)
+  })
+
+  it('retryWatcher() sets retrying while in flight and clears it on failure', async () => {
+    let release: (result: GitOpResult) => void = () => {
+      throw new Error('deferred resolver was not captured')
+    }
+    api.approvals.watcherRetry.mockImplementation(
+      () =>
+        new Promise<GitOpResult>((res) => {
+          release = res
+        })
+    )
+    api.approvals.watcherStatus.mockRejectedValue(new Error('ipc boom'))
+
+    const inFlight = useApprovalsStore.getState().retryWatcher()
+    expect(useApprovalsStore.getState().retrying).toBe(true)
+
+    release({ ok: false, reason: 'watcher-start-failed' })
+    await expect(inFlight).rejects.toThrow('ipc boom')
+
+    expect(useApprovalsStore.getState().retrying).toBe(false)
   })
 })

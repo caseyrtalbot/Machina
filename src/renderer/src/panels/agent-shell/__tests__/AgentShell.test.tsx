@@ -39,7 +39,13 @@ beforeEach(() => {
     },
     approvals: {
       list: vi.fn().mockResolvedValue([]),
-      resolve: vi.fn().mockResolvedValue({ ok: true })
+      resolve: vi.fn().mockResolvedValue({ ok: true }),
+      watcherStatus: vi.fn().mockResolvedValue({
+        state: 'watching',
+        since: '2026-05-01T00:00:00.000Z',
+        attempts: 0
+      }),
+      watcherRetry: vi.fn().mockResolvedValue(undefined)
     },
     on: {
       approvalsChanged: vi.fn().mockReturnValue(() => {}),

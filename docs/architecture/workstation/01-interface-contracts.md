@@ -277,6 +277,7 @@ export interface PendingChangeFlags {
   readonly headMoved: boolean //     agent ran git itself during the turn
   readonly concurrentTurns: boolean // >1 turn window matched — ambiguous attribution
   readonly degradedAttribution: boolean // shell hooks absent; PTY-alive fallback window
+  readonly gateDegraded: boolean //  turn opened while watcher state ∉ {watching} (v1.2.1)
   readonly forbidden: boolean //     touched a HARNESS_PROTECTED_GLOBS path
 }
 export interface PendingChange {
@@ -340,6 +341,73 @@ Contract points (each traceable to a verified finding):
   boxes checked; parity ledger records the never-covered cases honestly), and the
   snapshot was retired in the same step. Rollback coverage never gapped.
 
+### Watcher health (Phase 2 step 2, v1.2.1)
+
+"Containment + visibility" with zero visibility into its own death is a
+self-contradiction (honest-copy principle). The agent-write watcher carries a five-state
+health machine, exposed over IPC (§6):
+
+```ts
+// src/shared/git-types.ts
+export type WatcherState = 'starting' | 'watching' | 'degraded' | 'down' | 'stopped'
+export interface WatcherHealth {
+  readonly state: WatcherState
+  readonly since: string // ISO 8601 — when this state was entered
+  readonly attempts: number // restart attempts in the current backoff cycle
+  readonly reason?: string // human-readable cause for degraded/down
+}
+```
+
+- **States**: `starting` = initial scan in progress; `watching` = healthy; `degraded` =
+  a batch/containment failure was caught (a `handleBatch` throw, a rejected
+  `autoReject`) — events still flow but coverage is suspect, sticky until restart;
+  `down` = the watcher is dead or never came up (post-ready chokidar `error`, ready
+  timeout, init failure) — nothing is being captured; `stopped` = deliberate disarm
+  (workspace switch / shutdown), not a failure and not warned on.
+- **Hardened death paths** (all previously silent): chokidar `error` → audit
+  (`cli-agent:watcher-failure`) + `down` (was console-only); a `handleBatch` throw →
+  caught + audited + `degraded`, later batches keep processing (was an uncaught
+  main-process exception via EventBatcher's timer, or a throw propagating into
+  `stopApprovals` via the stop-time synchronous flush); the voided `autoReject`
+  promise → `.catch` + audit + `degraded`; `start()` races ready vs error vs a 30s
+  timeout and THROWS on failure (was an un-timed await that could hang vault init) —
+  the init catch marks `down` while the workspace stays live.
+- **Restart-preserves-queue rule**: same-root `restartWatcher()` (ipc/git.ts) is a
+  watcher-only rebuild and must NOT call `getApprovalQueue().clear()` — a crash
+  recovery that cleared the queue would silently drop captured-but-unreviewed writes.
+  The clear-on-init in `initApprovalsForRoot` stays load-bearing for root-binding on
+  workspace switch; the two paths are mutation-tested as genuinely separate.
+- **Backoff**: automatic restarts at 1s/5s/30s (30s repeating), cap 5 failed attempts,
+  then down-until-manual; the tray Retry (`approvals:watcher-retry`) resets the cap.
+  A pending backoff timer is cancelled in `stopApprovals` (the reconfigureForVault
+  race: a surviving timer would rearm a restart against a dead root). An already
+  EXECUTING restart is guarded by a generation counter (bumped by `stopApprovals`,
+  `initApprovalsForRoot`, and each `restartWatcher` entry): it revalidates after
+  every await and aborts as `watcher-restart-superseded`, retiring any watcher it
+  built — an in-flight restart overlapping a workspace switch or manual Retry can
+  neither rebind the dead old root (orphaning the live watcher) nor flip a
+  recovered `watching` state back to `down`. Health emissions from a superseded
+  watcher instance are ignored.
+- **Recovery audit entry**: closing a `down` window writes one
+  `approvals:watcher-recovered` entry (decision `error`) recording
+  `gapStartedAt`/`gapEndedAt` — escapes are logged, never silent. A fully-down watcher
+  captures NO writes at all; this entry is the real evidence of the gap, and the flags
+  below cannot be (nothing reached the queue to flag).
+- **Turn-start policy (OQ6, recorded product decision)**: turns opened while state ∉
+  {watching} are **visibly degraded, never blocked** — `CliTurnRegistry.turnStarted`
+  tags `gateDegradedAtStart` via a late-bound gate-health probe, the flag surfaces as
+  `gateDegraded` on the turn's queue item, and active CLI thread panels show a compact
+  containment chip plus a one-time inline notice. UI copy never claims writes are
+  blocked (they never were; right now they are not even captured).
+
+**Flag taxonomy** (three near-synonyms, reconciled):
+
+| Flag | Meaning | Set where |
+| --- | --- | --- |
+| `degradedAttribution` | shell hooks absent; PTY-alive window attribution | `CliTurnRegistry.windowState` per match |
+| `gateDegraded` | turn opened while watcher state ∉ {watching} | `turnStarted` via the gate-health probe |
+| `attributionSuspect` | agentId failed main-side binding validation | step 3 (reserved; not yet landed) |
+
 ## 5. Agent harness folder (on-disk schema)
 
 ```
@@ -396,8 +464,11 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'harness:list':          { request: void; response: HarnessSummary[] }
 'approvals:list':        { request: void; response: PendingChange[] }
 'approvals:resolve':     { request: { id: string; approve: boolean; message?: string }; response: GitOpResult }
+'approvals:watcher-status': { request: void; response: WatcherHealth } // v1.2.1 — pull mirror for late subscribers
+'approvals:watcher-retry':  { request: void; response: GitOpResult }  // v1.2.1 — manual restart; resets the backoff cap
 // IpcEvents
 'approvals:changed':     { pending: number }
+'approvals:watcher-health': WatcherHealth // v1.2.1 — health transitions (tray badge/banner, thread chip)
 ```
 
 Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
@@ -426,6 +497,36 @@ double-built the same files with contradictory shapes. Canonical order:
 Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
+
+- **v1.2.1 (2026-07-06, Phase 2 step 2 landing)** — §4 gains the watcher-health
+  subsection: five-state machine (`WatcherState`/`WatcherHealth` in `git-types.ts`),
+  the three silent death paths hardened (chokidar `error` → audit + down, was
+  console-only at `agent-write-watcher.ts`; `handleBatch` wrapped in try/catch →
+  `cli-agent:watcher-failure` audit + degraded + keep-processing, covering BOTH the
+  EventBatcher setTimeout flush and the stop-time synchronous flush; the voided
+  `autoReject` gains `.catch` → audit + degraded), and `start()` now races
+  ready/error/30s-timeout and throws on failure (init catch in `main/index.ts` calls
+  `markApprovalsWatcherDown`; workspace stays live). Restart-preserves-queue rule
+  recorded and mutation-tested: `restartWatcher()` in `ipc/git.ts` rebuilds the
+  watcher ONLY (never `getApprovalQueue().clear()`); backoff 1s/5s/30s, cap 5, then
+  down-until-manual, pending timer cancelled in `stopApprovals`. Recovery closes with
+  an `approvals:watcher-recovered` audit entry (gap window, decision `error`).
+  Turn-start policy recorded (OQ6): visibly degrade, never block —
+  `PendingChangeFlags.gateDegraded` + the §4 flag-taxonomy table
+  (degradedAttribution / gateDegraded / attributionSuspect); `CliTurn` gains optional
+  `gateDegradedAtStart` set by `turnStarted` via a late-bound `setGateHealthProbe`
+  (deliberate deviation from widening `TurnStartedOpts`: the probe route keeps
+  `cli-thread-spawner.ts` — step 3's surface — untouched and avoids an
+  ipc/git↔registry import cycle). §6 gains `approvals:watcher-status`,
+  `approvals:watcher-retry`, and the `approvals:watcher-health` event. UI: tray
+  warning badge + honest banner ("Write containment is not watching…") + Retry;
+  thread-surface containment chip + one-time inline notice on CLI panels (the notice
+  latches on in-flight ∧ unhealthy, a deliberate superset of turn-START unhealthy: a
+  watcher dying mid-turn is equally uncaptured). `degraded` is sticky until restart
+  (recovery claims need a rebuilt watcher, not one lucky batch). Verification
+  posture: real-chokidar integration test carries the death/recovery evidence;
+  built-app probe (`e2e/watcher-health.spec.ts`) asserts only healthy-boot `watching`
+  and unreadable-dir-fixture `down` with the workspace live.
 
 - **v1.2 (2026-07-06, Phase 2 step 1 landing)** — §3 promoted from "Phase 2 target" to
   LANDED: `session-types.ts` plus the adapter registry (`agent-adapters.ts`, pure,

@@ -5,6 +5,8 @@ import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { colors, borderRadius, transitions, typography, floatingPanel } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
+import { WatcherHealthChip, WatcherHealthNotice } from './WatcherHealthChip'
+import { ThinkingIndicator } from './ThinkingIndicator'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
 
@@ -32,6 +34,7 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
   const pendingTools = useThreadStore((s) =>
     activeId ? (s.pendingToolCallsByThreadId[activeId] ?? null) : null
   )
+  const inFlight = useThreadStore((s) => (t ? s.inFlightByThreadId[t.id] === true : false))
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
@@ -124,6 +127,7 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {t.agent !== 'machina-native' && <WatcherHealthChip />}
           {t.agent === 'machina-native' && (
             <AutoAcceptToggle
               on={t.autoAcceptSession === true}
@@ -135,7 +139,7 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
       </header>
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto' }}>
-          {t.messages.length === 0 && !streaming && !pendingTools?.length ? (
+          {t.messages.length === 0 && !streaming && !pendingTools?.length && !inFlight ? (
             <EmptyState />
           ) : (
             <>
@@ -143,16 +147,18 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
                 const isLastAssistant = i === t.messages.length - 1 && m.role === 'assistant'
                 return (
                   <ThreadMessage
-                    key={i}
+                    key={`${t.id}:${i}`}
                     message={m}
                     streamingBody={isLastAssistant ? (streaming ?? undefined) : undefined}
                   />
                 )
               })}
+              {t.agent !== 'machina-native' && <WatcherHealthNotice key={t.id} threadId={t.id} />}
               <InflightAssistant
                 messages={t.messages}
                 streaming={streaming}
                 pendingTools={pendingTools}
+                inFlight={inFlight}
               />
             </>
           )}
@@ -360,7 +366,8 @@ function LiveDot() {
 function InflightAssistant({
   messages,
   streaming,
-  pendingTools
+  pendingTools,
+  inFlight
 }: {
   readonly messages: ReadonlyArray<{ role: string }>
   readonly streaming: string | null
@@ -368,12 +375,13 @@ function InflightAssistant({
     call: import('@shared/thread-types').ToolCall
     result?: import('@shared/thread-types').ToolResult
   }> | null
+  readonly inFlight: boolean
 }) {
   const last = messages[messages.length - 1]
   if (last?.role === 'assistant') return null
   const hasText = streaming !== null && streaming.length > 0
   const hasTools = pendingTools !== null && pendingTools.length > 0
-  if (!hasText && !hasTools) return null
+  if (!hasText && !hasTools && !inFlight) return null
   return (
     <article
       data-role="assistant"
@@ -392,6 +400,7 @@ function InflightAssistant({
       >
         Machina
       </div>
+      {!hasText && !hasTools && <ThinkingIndicator />}
       {hasText && (
         <div className="thread-prose" style={{ whiteSpace: 'pre-wrap' }}>
           {streaming}

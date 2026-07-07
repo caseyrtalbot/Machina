@@ -65,6 +65,7 @@ const NO_FLAGS: PendingChangeFlags = {
   headMoved: false,
   concurrentTurns: false,
   degradedAttribution: false,
+  gateDegraded: false,
   forbidden: false
 }
 
@@ -78,6 +79,7 @@ function mergeFlags(
     headMoved: base.headMoved || extra.headMoved === true,
     concurrentTurns: base.concurrentTurns || extra.concurrentTurns === true,
     degradedAttribution: base.degradedAttribution || extra.degradedAttribution === true,
+    gateDegraded: base.gateDegraded || extra.gateDegraded === true,
     forbidden: base.forbidden || extra.forbidden === true
   }
 }

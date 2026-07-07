@@ -8,7 +8,7 @@
  * refreshes the list and posts a notice instead of retrying.
  */
 import { create } from 'zustand'
-import type { GitOpResult, PendingChange } from '@shared/git-types'
+import type { GitOpResult, PendingChange, WatcherHealth } from '@shared/git-types'
 
 /** User-facing notice per failed-resolve reason (structured errors only). */
 export function noticeForFailure(reason: string): string {
@@ -26,16 +26,32 @@ export function noticeForFailure(reason: string): string {
   }
 }
 
+/**
+ * Warning-surface visibility (contracts §4 v1.2.1): unhealthy = any state
+ * outside watching/stopped. 'stopped' is deliberate disarm (workspace
+ * switch / shutdown), not a failure. null = health unknown (no event yet).
+ */
+export function isWatcherUnhealthy(health: WatcherHealth | null): boolean {
+  return health !== null && health.state !== 'watching' && health.state !== 'stopped'
+}
+
 interface ApprovalsStore {
   readonly items: readonly PendingChange[]
   readonly pending: number
   readonly notice: string | null
   /** True while a resolve() round-trip is in flight (disables buttons). */
   readonly resolving: string | null
+  /** Agent-write-watcher health mirror; null until the first event/status. */
+  readonly watcherHealth: WatcherHealth | null
+  /** True while a watcher-retry round-trip is in flight (disables Retry). */
+  readonly retrying: boolean
   refresh: () => Promise<void>
   resolve: (id: string, approve: boolean, message?: string) => Promise<GitOpResult>
   setPending: (pending: number) => void
   clearNotice: () => void
+  setWatcherHealth: (health: WatcherHealth) => void
+  refreshWatcherHealth: () => Promise<void>
+  retryWatcher: () => Promise<void>
 }
 
 export const useApprovalsStore = create<ApprovalsStore>((set, get) => ({
@@ -43,6 +59,8 @@ export const useApprovalsStore = create<ApprovalsStore>((set, get) => ({
   pending: 0,
   notice: null,
   resolving: null,
+  watcherHealth: null,
+  retrying: false,
 
   refresh: async () => {
     const items = await window.api.approvals.list()
@@ -65,7 +83,24 @@ export const useApprovalsStore = create<ApprovalsStore>((set, get) => ({
 
   setPending: (pending) => set({ pending }),
 
-  clearNotice: () => set({ notice: null })
+  clearNotice: () => set({ notice: null }),
+
+  setWatcherHealth: (health) => set({ watcherHealth: health }),
+
+  refreshWatcherHealth: async () => {
+    set({ watcherHealth: await window.api.approvals.watcherStatus() })
+  },
+
+  retryWatcher: async () => {
+    set({ retrying: true })
+    try {
+      await window.api.approvals.watcherRetry()
+      // The event stream is the source of truth; this covers a missed event.
+      await get().refreshWatcherHealth()
+    } finally {
+      set({ retrying: false })
+    }
+  }
 }))
 
 // Module-level IPC subscription (same pattern as block-store): every queue
@@ -75,5 +110,12 @@ if (typeof window !== 'undefined' && window.api?.on?.approvalsChanged) {
   window.api.on.approvalsChanged(({ pending }) => {
     useApprovalsStore.getState().setPending(pending)
     void useApprovalsStore.getState().refresh()
+  })
+}
+
+// Watcher health transitions (contracts §4 v1.2.1): same module-level pattern.
+if (typeof window !== 'undefined' && window.api?.on?.watcherHealth) {
+  window.api.on.watcherHealth((health) => {
+    useApprovalsStore.getState().setWatcherHealth(health)
   })
 }

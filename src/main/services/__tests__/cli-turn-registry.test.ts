@@ -362,4 +362,44 @@ describe('CliTurnRegistry', () => {
       expect(nonRepo.headShaAtStart).toBeNull()
     })
   })
+
+  describe('gateDegradedAtStart tagging (contracts §4 v1.2.1, OQ6)', () => {
+    it('tags turns opened while the gate-health probe reports unhealthy', () => {
+      let healthy = false
+      const registry = new CliTurnRegistry({
+        headSha: () => null,
+        isPtyAlive: () => true,
+        isGateHealthy: () => healthy,
+        now: () => 0
+      })
+
+      const degraded = registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+      expect(degraded.gateDegradedAtStart).toBe(true)
+
+      healthy = true
+      const clean = registry.turnStarted({ threadId: 'th2', agentId: 'claude', cwd: ROOT })
+      expect(clean.gateDegradedAtStart).toBe(false)
+    })
+
+    it('the tag is fixed at turn START — later health changes never rewrite it', () => {
+      let healthy = true
+      const registry = new CliTurnRegistry({
+        headSha: () => null,
+        isPtyAlive: () => true,
+        isGateHealthy: () => healthy,
+        now: () => 0
+      })
+      const turn = registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+      healthy = false
+      const match = registry.activeTurnFor(ROOT, 100)
+      expect(match?.turn.turnId).toBe(turn.turnId)
+      expect(match?.turn.gateDegradedAtStart).toBe(false)
+    })
+
+    it('defaults to healthy (no tag) when the probe is unwired', () => {
+      const h = makeHarness()
+      const turn = h.registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+      expect(turn.gateDegradedAtStart).toBe(false)
+    })
+  })
 })

@@ -23,7 +23,12 @@ import { watch, type FSWatcher } from 'chokidar'
 import { relative, resolve, sep } from 'path'
 import { isHarnessProtectedPath, TE_DIR } from '@shared/constants'
 import type { AuditEntry } from '@shared/agent-types'
-import type { GitOpResult, PendingChange, PendingChangeFlags } from '@shared/git-types'
+import type {
+  GitOpResult,
+  PendingChange,
+  PendingChangeFlags,
+  WatcherState
+} from '@shared/git-types'
 import { EventBatcher, type BatchedEvent } from './event-batcher'
 import { WriteRateLimiter } from './hitl-gate'
 import { isAgentHeadMove, type ActiveTurnMatch } from './cli-turn-registry'
@@ -33,6 +38,11 @@ import type { RecordWritesOpts } from './approval-queue'
 const BATCH_INTERVAL_MS = 50
 /** Contracts §5 default budget: maxWritesPerMinute. */
 const MAX_WRITES_PER_MINUTE = 10
+/**
+ * Cap on awaiting chokidar's initial-scan `ready` (contracts §4 v1.2.1). The
+ * un-timed await could hang vault init forever when the scan never completes.
+ */
+const READY_TIMEOUT_MS = 30_000
 
 /** Universal infra dirs, pruned at ANY depth (nested node_modules/submodules). */
 const EXCLUDED_ANY_DEPTH = new Set(['.git', 'node_modules'])
@@ -123,6 +133,17 @@ export interface AgentWriteWatcherDeps {
   /** GitService.commitsBetween — excuses the queue's own approval commits. */
   readonly commitsBetween: (root: string, from: string, to: string) => readonly string[] | null
   readonly now?: () => number
+  /**
+   * Health-state transitions (contracts §4 v1.2.1). Emitted on change only:
+   * starting/watching from start(), degraded from caught batch/containment
+   * failures, down from a post-ready chokidar error, stopped from stop().
+   * start() FAILURES throw instead of emitting — the caller owns 'down'.
+   */
+  readonly onHealthChange?: (state: WatcherState, reason?: string) => void
+  /** Injectable ready-await cap (tests); defaults to READY_TIMEOUT_MS. */
+  readonly readyTimeoutMs?: number
+  /** Injectable chokidar factory (tests exercise the ready/error/timeout race). */
+  readonly watchFn?: typeof watch
 }
 
 export class AgentWriteWatcher {
@@ -136,6 +157,8 @@ export class AgentWriteWatcher {
   private readonly suppressed = new Map<string, number>()
   /** Turns whose headMoved tripwire already produced its one audit entry. */
   private readonly headMovedAudited = new Set<string>()
+  /** Last emitted health state — transitions emit once (contracts §4 v1.2.1). */
+  private health: WatcherState = 'stopped'
 
   constructor(private readonly deps: AgentWriteWatcherDeps) {}
 
@@ -144,12 +167,18 @@ export class AgentWriteWatcher {
    * Writes landing mid-scan are treated as pre-existing by `ignoreInitial`
    * and silently swallowed — callers that need deterministic coverage from
    * a known point (tests, future health checks) must await this.
+   *
+   * The ready await races error and a timeout (contracts §4 v1.2.1) so a
+   * scan that errors or never completes THROWS instead of hanging vault
+   * init; the caller marks the gate down and the workspace stays live.
    */
   async start(): Promise<void> {
-    await this.stop()
+    await this.teardown()
     this.stopped = false
+    this.setHealth('starting')
     this.batcher = new EventBatcher((events) => this.handleBatch(events), BATCH_INTERVAL_MS)
-    this.watcher = watch(this.deps.root, {
+    const watchFn = this.deps.watchFn ?? watch
+    this.watcher = watchFn(this.deps.root, {
       ignored: (path: string) => isWatcherIgnored(relative(this.deps.root, resolve(path))),
       persistent: true,
       ignoreInitial: true,
@@ -160,21 +189,61 @@ export class AgentWriteWatcher {
     const enqueue = (event: BatchedEvent['event']) => (path: string) => {
       this.batcher?.enqueue(path, event)
     }
+    let ready = false
     this.watcher
       .on('add', enqueue('add'))
       .on('change', enqueue('change'))
       .on('unlink', enqueue('unlink'))
       .on('error', (err) => {
         // An unhandled 'error' on the FSWatcher EventEmitter becomes an
-        // uncaughtException (crash dialog + silently dead gate). Log and
-        // keep whatever chokidar can still deliver.
+        // uncaughtException (crash dialog + silently dead gate). Pre-ready
+        // errors reject the ready race below; post-ready errors mean the
+        // watcher can no longer be trusted to deliver coverage: audit +
+        // down, and the ipc layer restarts with backoff.
         console.error('[agent-write-watcher] watcher error', err)
+        if (!ready) return
+        const message = err instanceof Error ? err.message : String(err)
+        this.auditGateFailure('watcher error', message, [])
+        this.setHealth('down', `watcher error: ${message}`)
       })
     const watcher = this.watcher
-    await new Promise<void>((resolveReady) => watcher.once('ready', () => resolveReady()))
+    const timeoutMs = this.deps.readyTimeoutMs ?? READY_TIMEOUT_MS
+    try {
+      await new Promise<void>((resolveReady, rejectReady) => {
+        const timer = setTimeout(
+          () => rejectReady(new Error(`watcher ready timeout after ${timeoutMs}ms`)),
+          timeoutMs
+        )
+        watcher.once('ready', () => {
+          clearTimeout(timer)
+          resolveReady()
+        })
+        watcher.once('error', (err) => {
+          if (ready) return
+          clearTimeout(timer)
+          rejectReady(err instanceof Error ? err : new Error(String(err)))
+        })
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.auditGateFailure('watcher start failed', message, [])
+      await this.teardown()
+      // Reset silently (no 'stopped' emission): the caller reports 'down',
+      // and a later start() must re-emit 'starting'.
+      this.health = 'stopped'
+      throw err
+    }
+    ready = true
+    this.setHealth('watching')
   }
 
   async stop(): Promise<void> {
+    await this.teardown()
+    this.setHealth('stopped')
+  }
+
+  /** Close batcher + chokidar without emitting a health transition. */
+  private async teardown(): Promise<void> {
     // Disarm FIRST: EventBatcher.stop() synchronously flushes the pending
     // batch, and a final flush during a workspace switch must not route
     // events (worst case: a destructive autoReject) against a stale root.
@@ -187,6 +256,12 @@ export class AgentWriteWatcher {
       await this.watcher.close()
       this.watcher = null
     }
+  }
+
+  private setHealth(state: WatcherState, reason?: string): void {
+    if (this.health === state) return
+    this.health = state
+    this.deps.onHealthChange?.(state, reason)
   }
 
   /**
@@ -203,6 +278,20 @@ export class AgentWriteWatcher {
   /** Exposed for the real-chokidar integration test's deterministic flush. */
   handleBatch(events: readonly BatchedEvent[]): void {
     if (this.stopped) return
+    try {
+      this.routeBatch(events)
+    } catch (err) {
+      // Previously an UNCAUGHT main-process exception (EventBatcher's
+      // setTimeout flush) or a throw propagating into stopApprovals (the
+      // stop()-time synchronous flush). Contracts §4 v1.2.1: audit, degrade
+      // visibly, keep processing later batches.
+      const message = err instanceof Error ? err.message : String(err)
+      this.auditGateFailure('batch processing failed', message, this.relPaths(events))
+      this.setHealth('degraded', `batch processing failed: ${message}`)
+    }
+  }
+
+  private routeBatch(events: readonly BatchedEvent[]): void {
     const now = this.deps.now?.() ?? Date.now()
     const live = events.filter((e) => !this.isSuppressed(relative(this.deps.root, e.path), now))
     if (live.length === 0) return
@@ -217,15 +306,23 @@ export class AgentWriteWatcher {
     if (parts.forbidden.length > 0) {
       const paths = this.relPaths(parts.forbidden)
       if (match !== null) {
-        void this.deps.queue.autoReject(
-          {
-            turnId: match.turn.turnId,
-            threadId: match.turn.threadId,
-            agentId: match.turn.agentId,
-            paths
-          },
-          this.deps.root
-        )
+        // A rejected autoReject promise was previously discarded (`void`) —
+        // an invisible containment failure. Audit + degrade instead.
+        this.deps.queue
+          .autoReject(
+            {
+              turnId: match.turn.turnId,
+              threadId: match.turn.threadId,
+              agentId: match.turn.agentId,
+              paths
+            },
+            this.deps.root
+          )
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err)
+            this.auditGateFailure('auto-reject failed', message, paths)
+            this.setHealth('degraded', `auto-reject failed: ${message}`)
+          })
       } else {
         // No window to attribute the violation to — contain nothing (we
         // cannot name an agent), but never let it pass silently.
@@ -250,7 +347,8 @@ export class AgentWriteWatcher {
         highVelocity: limiter.isExceeded(MAX_WRITES_PER_MINUTE),
         headMoved,
         concurrentTurns: match.concurrent,
-        degradedAttribution: match.degraded
+        degradedAttribution: match.degraded,
+        gateDegraded: match.turn.gateDegradedAtStart === true
       }
       this.deps.queue.recordWrites({
         turnId: match.turn.turnId,
@@ -319,6 +417,22 @@ export class AgentWriteWatcher {
       affectedPaths: [...paths],
       decision: 'error',
       error: reason
+    })
+  }
+
+  /**
+   * The gate's OWN machinery failed (chokidar error, batch throw, rejected
+   * auto-reject, failed start). Same anomaly shape as auditUnattributed:
+   * decision 'error' — nothing was allowed or denied, coverage broke.
+   */
+  private auditGateFailure(reason: string, detail: string, paths: readonly string[]): void {
+    this.deps.audit.log({
+      ts: new Date(this.deps.now?.() ?? Date.now()).toISOString(),
+      tool: 'cli-agent:watcher-failure',
+      args: { reason, detail },
+      affectedPaths: [...paths],
+      decision: 'error',
+      error: `${reason}: ${detail}`
     })
   }
 }

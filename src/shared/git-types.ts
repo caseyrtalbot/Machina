@@ -45,6 +45,8 @@ export interface PendingChangeFlags {
   readonly concurrentTurns: boolean
   /** Shell hooks absent; PTY-alive fallback window. */
   readonly degradedAttribution: boolean
+  /** Turn opened while the agent-write watcher state ∉ {watching} (OQ6). */
+  readonly gateDegraded: boolean
   /** Touched a HARNESS_PROTECTED_GLOBS path. */
   readonly forbidden: boolean
 }
@@ -79,3 +81,24 @@ export const MACHINA_TRAILER_PREFIX = 'Machina-'
 
 /** Blocks trailer forgery / format injection in agentId and threadId. */
 export const SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
+
+/**
+ * Agent-write-watcher health state machine (workstation contracts §4, v1.2.1).
+ * `starting` = chokidar initial scan in progress; `watching` = healthy;
+ * `degraded` = a batch/containment failure was caught (events still flow, but
+ * coverage is suspect until restart); `down` = the watcher is dead or never
+ * came up (nothing is being captured); `stopped` = deliberately disarmed
+ * (workspace switch / shutdown).
+ */
+export type WatcherState = 'starting' | 'watching' | 'degraded' | 'down' | 'stopped'
+
+/** Payload for approvals:watcher-health / approvals:watcher-status. */
+export interface WatcherHealth {
+  readonly state: WatcherState
+  /** ISO 8601 — when this state was entered. */
+  readonly since: string
+  /** Restart attempts in the current backoff cycle (0 while healthy). */
+  readonly attempts: number
+  /** Human-readable cause for degraded/down transitions. */
+  readonly reason?: string
+}

@@ -353,6 +353,18 @@ export interface IpcChannels {
     request: void
     response: import('./harness-types').HarnessSummary[]
   }
+
+  // --- Agent-write-watcher health (workstation contracts §4/§6, step 2) ---
+  // Pull-based mirror of approvals:watcher-health for late subscribers.
+  'approvals:watcher-status': {
+    request: void
+    response: import('./git-types').WatcherHealth
+  }
+  // Manual restart (the tray Retry action); resets the backoff cap.
+  'approvals:watcher-retry': {
+    request: void
+    response: import('./git-types').GitOpResult
+  }
 }
 
 export type AgentNativeApprovalPreview =
@@ -440,6 +452,11 @@ export interface IpcEvents {
   // Approval queue mutation (main -> renderer): pending item count for the
   // approvals tray badge. Fired on every queue change (contracts §6).
   'approvals:changed': { pending: number }
+
+  // Agent-write-watcher health transition (main -> renderer): drives the
+  // tray warning badge/banner and thread-surface degraded chip (contracts
+  // §4/§6, step 2).
+  'approvals:watcher-health': import('./git-types').WatcherHealth
 }
 
 export type IpcChannel = keyof IpcChannels

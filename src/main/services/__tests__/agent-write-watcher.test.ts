@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mkdtemp, mkdir, writeFile, rm, realpath } from 'fs/promises'
+import { EventEmitter } from 'events'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import type { FSWatcher } from 'chokidar'
 import { isHarnessProtectedPath, TE_DIR } from '@shared/constants'
 import type { AuditEntry } from '@shared/agent-types'
 import type { GitOpResult, PendingChange } from '@shared/git-types'
@@ -142,6 +144,7 @@ describe('AgentWriteWatcher.handleBatch', () => {
     recordWrites: ReturnType<typeof vi.fn>
     autoReject: ReturnType<typeof vi.fn>
     auditLog: ReturnType<typeof vi.fn>
+    healthChanges: Array<[string, string | undefined]>
   }
 
   function makeHarness(opts: {
@@ -150,10 +153,15 @@ describe('AgentWriteWatcher.handleBatch', () => {
     isSelfWrite?: (absPath: string) => boolean
     now?: () => number
     commitsBetween?: (root: string, from: string, to: string) => readonly string[] | null
+    recordWrites?: ReturnType<typeof vi.fn<(opts: RecordWritesOpts) => PendingChange>>
+    autoReject?: ReturnType<
+      typeof vi.fn<(opts: RecordWritesOpts, expectedRoot?: string) => Promise<GitOpResult>>
+    >
   }): Harness {
-    const recordWrites = vi.fn((): PendingChange => ({}) as PendingChange)
-    const autoReject = vi.fn(async (): Promise<GitOpResult> => ({ ok: true }))
+    const recordWrites = opts.recordWrites ?? vi.fn((): PendingChange => ({}) as PendingChange)
+    const autoReject = opts.autoReject ?? vi.fn(async (): Promise<GitOpResult> => ({ ok: true }))
     const auditLog = vi.fn()
+    const healthChanges: Array<[string, string | undefined]> = []
     const watcher = new AgentWriteWatcher({
       root: ROOT,
       registry: { activeTurnFor: () => opts.match },
@@ -163,9 +171,10 @@ describe('AgentWriteWatcher.handleBatch', () => {
       headSha: () => (opts.headSha === undefined ? 'sha-start' : opts.headSha),
       // Default: any HEAD delta is unexplained by queue commits.
       commitsBetween: opts.commitsBetween ?? (() => ['unexplained-sha']),
-      now: opts.now
+      now: opts.now,
+      onHealthChange: (state, reason) => healthChanges.push([state, reason])
     })
-    return { watcher, recordWrites, autoReject, auditLog }
+    return { watcher, recordWrites, autoReject, auditLog, healthChanges }
   }
 
   it('records attributed writes with relative paths and all-false flags', () => {
@@ -181,7 +190,8 @@ describe('AgentWriteWatcher.handleBatch', () => {
       highVelocity: false,
       headMoved: false,
       concurrentTurns: false,
-      degradedAttribution: false
+      degradedAttribution: false,
+      gateDegraded: false
     })
     expect(h.autoReject).not.toHaveBeenCalled()
     expect(h.auditLog).not.toHaveBeenCalled()
@@ -317,6 +327,165 @@ describe('AgentWriteWatcher.handleBatch', () => {
     expect(h.autoReject).not.toHaveBeenCalled()
     expect(h.auditLog).not.toHaveBeenCalled()
   })
+
+  it('flags gateDegraded for turns opened while the watcher was unhealthy (OQ6)', () => {
+    const tagged = makeHarness({
+      match: makeMatch({ turn: { ...makeMatch().turn, gateDegradedAtStart: true } })
+    })
+    tagged.watcher.handleBatch([ev('src/foo.ts')])
+    expect((tagged.recordWrites.mock.calls[0][0] as RecordWritesOpts).flags?.gateDegraded).toBe(
+      true
+    )
+
+    const untagged = makeHarness({ match: makeMatch() })
+    untagged.watcher.handleBatch([ev('src/foo.ts')])
+    expect((untagged.recordWrites.mock.calls[0][0] as RecordWritesOpts).flags?.gateDegraded).toBe(
+      false
+    )
+  })
+
+  it('catches a handleBatch throw: audits, degrades, and keeps processing the next batch', () => {
+    const recordWrites = vi.fn((): PendingChange => ({}) as PendingChange)
+    recordWrites.mockImplementationOnce(() => {
+      throw new Error('queue exploded')
+    })
+    const h = makeHarness({ match: makeMatch(), recordWrites })
+
+    // Previously an uncaught main-process exception via EventBatcher's timer.
+    expect(() => h.watcher.handleBatch([ev('src/foo.ts')])).not.toThrow()
+
+    const failure = h.auditLog.mock.calls
+      .map((c) => c[0] as AuditEntry)
+      .find((e) => e.tool === 'cli-agent:watcher-failure')
+    expect(failure).toBeDefined()
+    expect(failure?.decision).toBe('error')
+    expect(failure?.error).toContain('queue exploded')
+    expect(failure?.affectedPaths).toEqual(['src/foo.ts'])
+    expect(h.healthChanges).toContainEqual(['degraded', 'batch processing failed: queue exploded'])
+
+    // Next batch still processes.
+    h.watcher.handleBatch([ev('src/bar.ts')])
+    expect(h.recordWrites).toHaveBeenCalledTimes(2)
+    expect((h.recordWrites.mock.calls[1][0] as RecordWritesOpts).paths).toEqual(['src/bar.ts'])
+  })
+
+  it('catches a rejected autoReject promise: audits + degrades instead of unhandled rejection', async () => {
+    const autoReject = vi.fn(async (): Promise<GitOpResult> => {
+      throw new Error('discard blew up')
+    })
+    const h = makeHarness({ match: makeMatch(), autoReject })
+
+    h.watcher.handleBatch([ev(`${TE_DIR}/agents/a/verify.sh`)])
+
+    await vi.waitFor(() => {
+      const failure = h.auditLog.mock.calls
+        .map((c) => c[0] as AuditEntry)
+        .find((e) => e.tool === 'cli-agent:watcher-failure')
+      expect(failure).toBeDefined()
+      expect(failure?.error).toContain('discard blew up')
+      expect(failure?.affectedPaths).toEqual([`${TE_DIR}/agents/a/verify.sh`])
+    })
+    expect(h.healthChanges).toContainEqual(['degraded', 'auto-reject failed: discard blew up'])
+  })
+})
+
+describe('AgentWriteWatcher.start() ready/error/timeout race (contracts §4 v1.2.1)', () => {
+  class FakeFsWatcher extends EventEmitter {
+    async close(): Promise<void> {
+      // no-op: fake watcher has nothing to release
+    }
+  }
+
+  function makeRaceHarness(readyTimeoutMs: number) {
+    const fake = new FakeFsWatcher()
+    const auditLog = vi.fn()
+    const healthChanges: Array<[string, string | undefined]> = []
+    const watcher = new AgentWriteWatcher({
+      root: ROOT,
+      registry: { activeTurnFor: () => null },
+      queue: {
+        recordWrites: () => ({}) as PendingChange,
+        autoReject: async (): Promise<GitOpResult> => ({ ok: true })
+      },
+      audit: { log: auditLog },
+      isSelfWrite: () => false,
+      headSha: () => null,
+      commitsBetween: () => [],
+      onHealthChange: (state, reason) => healthChanges.push([state, reason]),
+      readyTimeoutMs,
+      watchFn: (() => fake) as unknown as typeof import('chokidar').watch
+    })
+    return { watcher, fake, auditLog, healthChanges }
+  }
+
+  it('resolves on ready: starting → watching', async () => {
+    const h = makeRaceHarness(5_000)
+    const startP = h.watcher.start()
+    await vi.waitFor(() => expect(h.healthChanges).toContainEqual(['starting', undefined]))
+    h.fake.emit('ready')
+    await startP
+    expect(h.healthChanges).toEqual([
+      ['starting', undefined],
+      ['watching', undefined]
+    ])
+    await h.watcher.stop()
+    expect(h.healthChanges[2][0]).toBe('stopped')
+  })
+
+  it('throws on ready timeout instead of hanging vault init', async () => {
+    const h = makeRaceHarness(20)
+    await expect(h.watcher.start()).rejects.toThrow(/ready timeout/)
+    // Never reached watching; the caller owns the 'down' transition.
+    expect(h.healthChanges.map(([s]) => s)).toEqual(['starting'])
+    const failure = h.auditLog.mock.calls
+      .map((c) => c[0] as AuditEntry)
+      .find((e) => e.tool === 'cli-agent:watcher-failure')
+    expect(failure?.error).toContain('ready timeout')
+  })
+
+  it('throws on a pre-ready chokidar error instead of hanging', async () => {
+    const h = makeRaceHarness(5_000)
+    const startP = h.watcher.start()
+    await vi.waitFor(() => expect(h.healthChanges.length).toBeGreaterThan(0))
+    h.fake.emit('error', new Error('EACCES: scan failed'))
+    await expect(startP).rejects.toThrow('EACCES: scan failed')
+    expect(h.healthChanges.map(([s]) => s)).toEqual(['starting'])
+  })
+
+  it('a failed start() can be started again: re-emits starting', async () => {
+    const h = makeRaceHarness(5_000)
+    const firstStart = h.watcher.start()
+    await vi.waitFor(() => expect(h.healthChanges.length).toBeGreaterThan(0))
+    h.fake.emit('error', new Error('first scan failed'))
+    await expect(firstStart).rejects.toThrow('first scan failed')
+
+    const secondStart = h.watcher.start()
+    await vi.waitFor(() =>
+      expect(h.healthChanges.filter(([s]) => s === 'starting')).toHaveLength(2)
+    )
+    h.fake.emit('ready')
+    await secondStart
+    expect(h.healthChanges.at(-1)).toEqual(['watching', undefined])
+    await h.watcher.stop()
+  })
+
+  it('a post-ready chokidar error transitions to down and audits (was console-only)', async () => {
+    const h = makeRaceHarness(5_000)
+    const startP = h.watcher.start()
+    await vi.waitFor(() => expect(h.healthChanges.length).toBeGreaterThan(0))
+    h.fake.emit('ready')
+    await startP
+
+    h.fake.emit('error', new Error('watcher died'))
+
+    expect(h.healthChanges.at(-1)).toEqual(['down', 'watcher error: watcher died'])
+    const failure = h.auditLog.mock.calls
+      .map((c) => c[0] as AuditEntry)
+      .find((e) => e.tool === 'cli-agent:watcher-failure')
+    expect(failure?.decision).toBe('error')
+    expect(failure?.error).toContain('watcher died')
+    await h.watcher.stop()
+  })
 })
 
 describe('AgentWriteWatcher integration (real chokidar)', () => {
@@ -377,4 +546,62 @@ describe('AgentWriteWatcher integration (real chokidar)', () => {
     const stateSeen = recordWrites.mock.calls.some((c) => c[0].paths.includes(statePath))
     expect(stateSeen).toBe(false)
   })
+
+  it(
+    'recovers when the watcher dies underneath: down → restart → post-recovery writes queued',
+    { timeout: 20_000 },
+    async () => {
+      root = await realpath(await mkdtemp(join(tmpdir(), 'agent-write-watcher-')))
+      const recordWrites = vi.fn<(opts: RecordWritesOpts) => PendingChange>(
+        () => ({}) as PendingChange
+      )
+      const auditLog = vi.fn()
+      const healthChanges: Array<[string, string | undefined]> = []
+      const match: ActiveTurnMatch = {
+        ...makeMatch(),
+        turn: { ...makeMatch().turn, cwd: root, headShaAtStart: null }
+      }
+      watcher = new AgentWriteWatcher({
+        root,
+        registry: { activeTurnFor: () => match },
+        queue: {
+          recordWrites,
+          autoReject: async (): Promise<GitOpResult> => ({ ok: true })
+        },
+        audit: { log: auditLog },
+        isSelfWrite: () => false,
+        headSha: () => null,
+        commitsBetween: () => [],
+        onHealthChange: (state, reason) => healthChanges.push([state, reason])
+      })
+      await watcher.start()
+      expect(healthChanges.map(([s]) => s)).toEqual(['starting', 'watching'])
+
+      // Surface the underlying chokidar instance's death the way a real
+      // runtime failure does: an 'error' on the FSWatcher emitter. (Do NOT
+      // close() first — chokidar's close removes all listeners and the emit
+      // would become an uncaught throw; the restart's teardown closes it.)
+      const inner = (watcher as unknown as { watcher: FSWatcher }).watcher
+      inner.emit('error', new Error('simulated watcher death'))
+      expect(healthChanges.at(-1)?.[0]).toBe('down')
+      const failure = auditLog.mock.calls
+        .map((c) => c[0] as AuditEntry)
+        .find((e) => e.tool === 'cli-agent:watcher-failure')
+      expect(failure?.error).toContain('simulated watcher death')
+
+      // Restart (what ipc/git's restartWatcher/backoff drives) and verify
+      // post-recovery coverage: a fresh write reaches the queue.
+      await watcher.start()
+      expect(healthChanges.at(-1)).toEqual(['watching', undefined])
+
+      await writeFile(join(root, 'post-recovery.txt'), 'captured again')
+      await vi.waitFor(
+        () => {
+          const seen = recordWrites.mock.calls.some((c) => c[0].paths.includes('post-recovery.txt'))
+          expect(seen).toBe(true)
+        },
+        { timeout: 15_000, interval: 100 }
+      )
+    }
+  )
 })

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import type { PendingChange, PendingChangeFlags } from '@shared/git-types'
+import type { PendingChange, PendingChangeFlags, WatcherHealth } from '@shared/git-types'
 import { useApprovalsStore } from '../../../store/approvals-store'
 import { ApprovalsTray } from '../ApprovalsTray'
 import { flagChips } from '../approval-flags'
@@ -17,8 +17,25 @@ const noFlags: PendingChangeFlags = {
   headMoved: false,
   concurrentTurns: false,
   degradedAttribution: false,
+  gateDegraded: false,
   forbidden: false
 }
+
+const allFlags: PendingChangeFlags = {
+  highVelocity: true,
+  headMoved: true,
+  concurrentTurns: true,
+  degradedAttribution: true,
+  gateDegraded: true,
+  forbidden: true
+}
+
+const makeHealth = (overrides: Partial<WatcherHealth> = {}): WatcherHealth => ({
+  state: 'down',
+  since: '2026-07-06T00:00:00.000Z',
+  attempts: 0,
+  ...overrides
+})
 
 const makeItem = (overrides: Partial<PendingChange> = {}): PendingChange => ({
   id: 'pc_t1',
@@ -45,7 +62,9 @@ beforeEach(() => {
   useApprovalsStore.setState(useApprovalsStore.getInitialState())
   useApprovalsStore.setState({
     refresh: vi.fn().mockResolvedValue(undefined),
-    resolve: vi.fn().mockResolvedValue({ ok: true })
+    resolve: vi.fn().mockResolvedValue({ ok: true }),
+    refreshWatcherHealth: vi.fn().mockResolvedValue(undefined),
+    retryWatcher: vi.fn().mockResolvedValue(undefined)
   })
 })
 
@@ -89,18 +108,7 @@ describe('ApprovalsTray popover', () => {
   })
 
   it('renders one chip per tripped flag plus the headMoved banner', () => {
-    seed([
-      makeItem({
-        revertible: false,
-        flags: {
-          highVelocity: true,
-          headMoved: true,
-          concurrentTurns: true,
-          degradedAttribution: true,
-          forbidden: true
-        }
-      })
-    ])
+    seed([makeItem({ revertible: false, flags: allFlags })])
     render(<ApprovalsTray />)
     openTray()
 
@@ -110,6 +118,9 @@ describe('ApprovalsTray popover', () => {
     )
     expect(screen.getByTestId('approval-flag-high-velocity').textContent).toBe('High-velocity')
     expect(screen.getByTestId('approval-flag-degraded').textContent).toBe('Attribution degraded')
+    expect(screen.getByTestId('approval-flag-gate-degraded').textContent).toBe(
+      'Containment degraded'
+    )
     expect(screen.getByTestId('approval-flag-concurrent').textContent).toBe('Concurrent turns')
     expect(screen.getByTestId('approval-flag-no-rollback').textContent).toBe('No rollback')
     expect(screen.getByTestId('approval-headmoved-banner')).toBeTruthy()
@@ -129,6 +140,62 @@ describe('ApprovalsTray popover', () => {
     fireEvent.click(screen.getByTestId('approval-approve'))
 
     expect(useApprovalsStore.getState().resolve).toHaveBeenCalledWith('pc_t1', true)
+  })
+})
+
+describe('ApprovalsTray watcher health (contracts §4 v1.2.1)', () => {
+  it('shows no warning badge or banner while watching, stopped, or unknown', () => {
+    for (const health of [
+      null,
+      makeHealth({ state: 'watching' }),
+      makeHealth({ state: 'stopped' })
+    ]) {
+      useApprovalsStore.setState({ watcherHealth: health })
+      const { unmount } = render(<ApprovalsTray />)
+      openTray()
+      expect(screen.queryByTestId('approvals-watcher-warning')).toBeNull()
+      expect(screen.queryByTestId('approvals-watcher-banner')).toBeNull()
+      unmount()
+    }
+  })
+
+  it('shows the warning badge on the trigger even with zero pending items', () => {
+    useApprovalsStore.setState({ watcherHealth: makeHealth({ state: 'down' }) })
+    render(<ApprovalsTray />)
+    expect(screen.queryByTestId('approvals-tray-badge')).toBeNull()
+    expect(screen.getByTestId('approvals-watcher-warning')).toBeTruthy()
+  })
+
+  it.each(['starting', 'degraded', 'down'] as const)(
+    'renders the honest banner + Retry when state is %s',
+    (state) => {
+      useApprovalsStore.setState({ watcherHealth: makeHealth({ state }) })
+      render(<ApprovalsTray />)
+      openTray()
+
+      const banner = screen.getByTestId('approvals-watcher-banner')
+      expect(banner.textContent).toContain('Write containment is not watching.')
+      expect(banner.textContent).toContain('are not being captured for review')
+      expect(screen.getByTestId('approvals-watcher-retry')).toBeTruthy()
+    }
+  )
+
+  it('clicking Retry invokes the store retryWatcher action (approvals:watcher-retry)', () => {
+    useApprovalsStore.setState({ watcherHealth: makeHealth({ state: 'down' }) })
+    render(<ApprovalsTray />)
+    openTray()
+
+    fireEvent.click(screen.getByTestId('approvals-watcher-retry'))
+
+    expect(useApprovalsStore.getState().retryWatcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables Retry while a retry round-trip is in flight', () => {
+    useApprovalsStore.setState({ watcherHealth: makeHealth({ state: 'down' }), retrying: true })
+    render(<ApprovalsTray />)
+    openTray()
+
+    expect(screen.getByTestId<HTMLButtonElement>('approvals-watcher-retry').disabled).toBe(true)
   })
 })
 
@@ -152,6 +219,7 @@ describe('flagChips', () => {
       ['headMoved', 'head-moved', 'History rewritten during turn'],
       ['highVelocity', 'high-velocity', 'High-velocity'],
       ['degradedAttribution', 'degraded', 'Attribution degraded'],
+      ['gateDegraded', 'gate-degraded', 'Containment degraded'],
       ['concurrentTurns', 'concurrent', 'Concurrent turns']
     ]
     for (const [flag, key, label] of cases) {
@@ -162,25 +230,15 @@ describe('flagChips', () => {
     }
   })
 
-  it('emits all six chips together, No rollback first', () => {
-    const chips = flagChips(
-      makeItem({
-        revertible: false,
-        flags: {
-          highVelocity: true,
-          headMoved: true,
-          concurrentTurns: true,
-          degradedAttribution: true,
-          forbidden: true
-        }
-      })
-    )
+  it('emits all seven chips together, No rollback first', () => {
+    const chips = flagChips(makeItem({ revertible: false, flags: allFlags }))
     expect(chips.map((c) => c.key)).toEqual([
       'no-rollback',
       'forbidden',
       'head-moved',
       'high-velocity',
       'degraded',
+      'gate-degraded',
       'concurrent'
     ])
   })

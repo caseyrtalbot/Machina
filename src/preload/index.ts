@@ -208,7 +208,9 @@ const api = {
     agentNativeDockAction: (callback: (data: IpcEventData<'agent-native:dock-action'>) => void) =>
       typedOn('agent-native:dock-action', callback),
     approvalsChanged: (callback: (data: { pending: number }) => void) =>
-      typedOn('approvals:changed', callback)
+      typedOn('approvals:changed', callback),
+    watcherHealth: (callback: (data: IpcEventData<'approvals:watcher-health'>) => void) =>
+      typedOn('approvals:watcher-health', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path }),
@@ -228,7 +230,9 @@ const api = {
   approvals: {
     list: () => typedInvoke('approvals:list'),
     resolve: (id: string, approve: boolean, message?: string) =>
-      typedInvoke('approvals:resolve', { id, approve, message })
+      typedInvoke('approvals:resolve', { id, approve, message }),
+    watcherStatus: () => typedInvoke('approvals:watcher-status'),
+    watcherRetry: () => typedInvoke('approvals:watcher-retry')
   },
   // Agent harness (workstation contracts §5/§6, step 6). No root in either
   // call — main resolves it from the current workspace.

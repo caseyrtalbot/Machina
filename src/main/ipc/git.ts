@@ -14,7 +14,11 @@ import { getWorkspaceService } from '../services/workspace-service'
 import { ApprovalQueue } from '../services/approval-queue'
 import { AgentWriteWatcher } from '../services/agent-write-watcher'
 import { AuditLogger } from '../services/audit-logger'
-import { getCliTurnRegistry, isAgentHeadMove } from '../services/cli-turn-registry'
+import {
+  getCliTurnRegistry,
+  isAgentHeadMove,
+  setGateHealthProbe
+} from '../services/cli-turn-registry'
 import {
   commitApproved,
   commitsBetween,
@@ -27,9 +31,11 @@ import {
   status
 } from '../services/git-service'
 import { getDocumentManager } from './documents'
-import type { GitOpResult } from '@shared/git-types'
+import type { GitOpResult, WatcherHealth, WatcherState } from '@shared/git-types'
 
 const NO_WORKSPACE: GitOpResult = { ok: false, reason: 'no-workspace' }
+/** A newer restart/switch owns the watcher; the caller's attempt is moot. */
+const WATCHER_SUPERSEDED: GitOpResult = { ok: false, reason: 'watcher-restart-superseded' }
 
 function currentRoot(): string | null {
   return getWorkspaceService().current()?.root ?? null
@@ -139,22 +145,105 @@ export function checkHeadMovedAtTurnEnd(turn: {
  * contract), and start a fresh watcher at `root`. Called from
  * reconfigureForVault on every workspace open.
  */
+// ── Watcher health + restart with backoff (step 2, contracts §4 v1.2.1) ────
+
+/** Backoff before automatic restarts; the last delay repeats up to the cap. */
+const WATCHER_RETRY_DELAYS_MS = [1_000, 5_000, 30_000] as const
+/** Failed automatic restarts before down-until-manual (tray Retry resets). */
+const WATCHER_RETRY_CAP = 5
+
+let watcherHealth: WatcherHealth = {
+  state: 'stopped',
+  since: new Date().toISOString(),
+  attempts: 0
+}
+/** Root the watcher is (or should be) bound to — restartWatcher's target. */
+let watcherRoot: string | null = null
 /**
- * Disarm the approvals surface immediately. Called FIRST in
- * reconfigureForVault: WorkspaceService flips the active workspace before the
- * ready callbacks run, and the old watcher must not route batches (worst
- * case: a destructive autoReject discard) while getRoot() already resolves
- * to the new root. The gate is down until initApprovalsForRoot rebinds it —
- * same coverage as a plain app start.
+ * Guards in-flight restarts against overlap (contracts §4 v1.2.1).
+ * cancelWatcherRetry only clears a PENDING timer — a restart already awaiting
+ * stop()/start() keeps running through a workspace switch or manual Retry.
+ * Unguarded, the loser of that race rebinds a watcher to the dead old root
+ * (orphaning the live new one) or flips a recovered 'watching' state back to
+ * 'down' up to 30s later. Bumped by stopApprovals, initApprovalsForRoot, and
+ * every restartWatcher entry; an in-flight restart revalidates after each
+ * await and aborts when superseded.
  */
-export async function stopApprovals(): Promise<void> {
-  await agentWriteWatcher?.stop()
+let watcherGeneration = 0
+let watcherRetryTimer: ReturnType<typeof setTimeout> | null = null
+/** Failed restarts in the current backoff cycle; reset on recovery/manual retry. */
+let watcherRetryAttempts = 0
+/** When the current coverage gap opened — the recovery audit entry's evidence. */
+let watcherDownSince: string | null = null
+
+export function getWatcherHealth(): WatcherHealth {
+  return watcherHealth
 }
 
-export async function initApprovalsForRoot(root: string): Promise<void> {
-  await agentWriteWatcher?.stop()
-  getApprovalQueue().clear()
-  agentWriteWatcher = new AgentWriteWatcher({
+function setWatcherHealth(state: WatcherState, reason?: string): void {
+  watcherHealth = {
+    state,
+    since: new Date().toISOString(),
+    attempts: watcherRetryAttempts,
+    ...(reason === undefined ? {} : { reason })
+  }
+  const window = getMainWindow()
+  if (window) typedSend(window, 'approvals:watcher-health', watcherHealth)
+}
+
+function cancelWatcherRetry(): void {
+  if (watcherRetryTimer !== null) {
+    clearTimeout(watcherRetryTimer)
+    watcherRetryTimer = null
+  }
+}
+
+function scheduleWatcherRetry(): void {
+  if (watcherRetryTimer !== null || watcherRoot === null) return
+  if (watcherRetryAttempts >= WATCHER_RETRY_CAP) return // down until manual Retry
+  const delay =
+    WATCHER_RETRY_DELAYS_MS[Math.min(watcherRetryAttempts, WATCHER_RETRY_DELAYS_MS.length - 1)]
+  watcherRetryTimer = setTimeout(() => {
+    watcherRetryTimer = null
+    void restartWatcher()
+  }, delay)
+}
+
+/**
+ * The gate is down but the workspace stays live (OQ6: visibly degrade, never
+ * block). Broadcasts the state and arms the backoff restart. Exported for
+ * main/index.ts's init-failure catch.
+ */
+export function markApprovalsWatcherDown(reason: string): void {
+  if (watcherDownSince === null) watcherDownSince = new Date().toISOString()
+  setWatcherHealth('down', reason)
+  scheduleWatcherRetry()
+}
+
+/**
+ * Reset the backoff cycle and, when a coverage gap just closed, write the §4
+ * recovery audit entry: escapes are logged, never silent — writes landing
+ * while the watcher was down were captured by NOTHING, and this entry is the
+ * durable record of that window.
+ */
+function noteWatcherRecovered(): void {
+  const gapStartedAt = watcherDownSince
+  watcherRetryAttempts = 0
+  if (gapStartedAt === null) return
+  watcherDownSince = null
+  getAuditLogger().log({
+    ts: new Date().toISOString(),
+    tool: 'approvals:watcher-recovered',
+    args: { gapStartedAt, gapEndedAt: new Date().toISOString() },
+    affectedPaths: [],
+    decision: 'error',
+    error:
+      'agent-write watcher was down during this window; agent writes in the gap were not captured for review'
+  })
+}
+
+function buildWatcher(root: string): AgentWriteWatcher {
+  const watcher: AgentWriteWatcher = new AgentWriteWatcher({
     root,
     registry: getCliTurnRegistry(),
     queue: getApprovalQueue(),
@@ -163,8 +252,92 @@ export async function initApprovalsForRoot(root: string): Promise<void> {
     // misattributed to the agent (timing race accepted per contracts §4).
     isSelfWrite: (absPath) => getDocumentManager().hasPendingWrite(absPath),
     headSha,
-    commitsBetween
+    commitsBetween,
+    onHealthChange: (state, reason) => {
+      // A superseded instance (replaced by a newer restart or workspace
+      // switch) must not steer the shared health state — its late 'stopped'/
+      // 'watching'/'down' emissions would clobber the live watcher's truth.
+      if (agentWriteWatcher !== watcher) return
+      if (state === 'down') {
+        // Post-ready watcher death — coverage untrustworthy; restart w/ backoff.
+        markApprovalsWatcherDown(reason ?? 'watcher error')
+        return
+      }
+      if (state === 'watching') noteWatcherRecovered()
+      setWatcherHealth(state, reason)
+    }
   })
+  return watcher
+}
+
+/**
+ * Watcher-only rebuild against the SAME root (contracts §4 v1.2.1). The queue
+ * is deliberately untouched: clear-on-init is load-bearing for workspace
+ * switches (initApprovalsForRoot) and must NEVER run here — a crash recovery
+ * that cleared the queue would silently drop captured-but-unreviewed writes.
+ */
+export async function restartWatcher(): Promise<GitOpResult> {
+  const root = watcherRoot
+  if (root === null) return NO_WORKSPACE
+  const generation = ++watcherGeneration
+  cancelWatcherRetry()
+  const superseded = (): boolean => generation !== watcherGeneration || watcherRoot !== root
+  await agentWriteWatcher?.stop()
+  // A workspace switch or newer restart overtook us mid-stop: building here
+  // would rebind to a dead root and orphan the live watcher. Abort.
+  if (superseded()) return WATCHER_SUPERSEDED
+  const next = buildWatcher(root)
+  agentWriteWatcher = next
+  try {
+    await next.start()
+  } catch (err) {
+    // Superseded mid-start (the winner's stop() strips 'ready', so this
+    // rejection can land up to readyTimeout AFTER the winner recovered):
+    // report nothing — the current generation owns health/backoff now.
+    if (superseded()) return WATCHER_SUPERSEDED
+    watcherRetryAttempts += 1
+    markApprovalsWatcherDown(err instanceof Error ? err.message : String(err))
+    return { ok: false, reason: 'watcher-start-failed' }
+  }
+  if (superseded()) {
+    // Started successfully but no longer current: retire it (no live orphan).
+    // Its health emissions are already inert via the buildWatcher guard.
+    await next.stop()
+    return WATCHER_SUPERSEDED
+  }
+  return { ok: true }
+}
+
+/**
+ * Disarm the approvals surface immediately. Called FIRST in
+ * reconfigureForVault: WorkspaceService flips the active workspace before the
+ * ready callbacks run, and the old watcher must not route batches (worst
+ * case: a destructive autoReject discard) while getRoot() already resolves
+ * to the new root. The gate is down until initApprovalsForRoot rebinds it —
+ * same coverage as a plain app start.
+ *
+ * Cancels any pending backoff retry FIRST (contracts §4 v1.2.1 risk note): a
+ * timer surviving this call would rearm a restart against a dead root.
+ */
+export async function stopApprovals(): Promise<void> {
+  watcherGeneration += 1 // abort any in-flight restart at its next check
+  cancelWatcherRetry()
+  watcherRoot = null
+  watcherRetryAttempts = 0
+  watcherDownSince = null
+  await agentWriteWatcher?.stop()
+  if (watcherHealth.state !== 'stopped') setWatcherHealth('stopped')
+}
+
+export async function initApprovalsForRoot(root: string): Promise<void> {
+  watcherGeneration += 1 // abort any in-flight restart at its next check
+  cancelWatcherRetry()
+  watcherRoot = root
+  watcherRetryAttempts = 0
+  watcherDownSince = null
+  await agentWriteWatcher?.stop()
+  getApprovalQueue().clear()
+  agentWriteWatcher = buildWatcher(root)
   await agentWriteWatcher.start()
 }
 
@@ -200,4 +373,20 @@ export function registerGitIpc(): void {
   typedHandle('approvals:resolve', async (args) => {
     return getApprovalQueue().resolve(args.id, args.approve, args.message)
   })
+
+  typedHandle('approvals:watcher-status', async () => {
+    return getWatcherHealth()
+  })
+
+  typedHandle('approvals:watcher-retry', async () => {
+    // Manual Retry is the down-until-manual escape hatch: reset the cap.
+    watcherRetryAttempts = 0
+    return restartWatcher()
+  })
+
+  // Turn-start policy (contracts §4 v1.2.1, OQ6): turns opened while the
+  // watcher is not 'watching' are tagged gateDegraded — visibly degrade,
+  // never block. Late-bound probe: a direct import from cli-turn-registry
+  // back into this module would be a cycle.
+  setGateHealthProbe(() => watcherHealth.state === 'watching')
 }

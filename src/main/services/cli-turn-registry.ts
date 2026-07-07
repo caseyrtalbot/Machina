@@ -49,6 +49,12 @@ export interface CliTurn {
   readonly queueCommitShas: readonly string[]
   readonly startedAt: number
   readonly endedAt: number | null
+  /**
+   * Turn opened while the agent-write watcher state ∉ {watching} (contracts §4
+   * v1.2.1, OQ6: visibly degrade, never block). Optional so existing test
+   * literals stay valid; turnStarted always sets it.
+   */
+  readonly gateDegradedAtStart?: boolean
 }
 
 /**
@@ -89,6 +95,12 @@ export interface CliTurnRegistryDeps {
   readonly headSha: (root: string) => string | null
   /** True when the thread's PTY is still alive (degraded-mode window). */
   readonly isPtyAlive: (threadId: string) => boolean
+  /**
+   * True when the agent-write watcher state is 'watching' (contracts §4
+   * v1.2.1). Absent = assume healthy — turns must never be blocked or falsely
+   * flagged when the probe is unwired (tests, early boot).
+   */
+  readonly isGateHealthy?: () => boolean
   /** Injectable clock (ms epoch) for deterministic tests. */
   readonly now?: () => number
 }
@@ -125,7 +137,10 @@ export class CliTurnRegistry {
       headShaAtStart: this.deps.headSha(opts.cwd),
       queueCommitShas: [],
       startedAt: this.now(),
-      endedAt: null
+      endedAt: null,
+      // OQ6 (visibly degrade, never block): the turn proceeds regardless; the
+      // tag just flows into the queue item's gateDegraded flag.
+      gateDegradedAtStart: !(this.deps.isGateHealthy?.() ?? true)
     }
     this.turns.set(opts.threadId, turn)
     this.openInvocations.set(opts.threadId, (this.openInvocations.get(opts.threadId) ?? 0) + 1)
@@ -232,17 +247,29 @@ function isInside(root: string, child: string): boolean {
 // the registry for the bridge's onTurnComplete — a setter breaks the cycle.
 
 let ptyAliveProbe: ((threadId: string) => boolean) | null = null
+let gateHealthProbe: (() => boolean) | null = null
 let singleton: CliTurnRegistry | null = null
 
 export function setPtyAliveProbe(probe: (threadId: string) => boolean): void {
   ptyAliveProbe = probe
 }
 
+/**
+ * Late-bound like the PTY probe: ipc/git.ts owns the watcher-health state but
+ * imports this module (getCliTurnRegistry) — a direct import back would be a
+ * cycle. Wired in registerGitIpc; unwired defaults to healthy (never
+ * false-flag turns before the approvals surface exists).
+ */
+export function setGateHealthProbe(probe: () => boolean): void {
+  gateHealthProbe = probe
+}
+
 export function getCliTurnRegistry(): CliTurnRegistry {
   if (singleton === null) {
     singleton = new CliTurnRegistry({
       headSha,
-      isPtyAlive: (threadId) => ptyAliveProbe?.(threadId) ?? false
+      isPtyAlive: (threadId) => ptyAliveProbe?.(threadId) ?? false,
+      isGateHealthy: () => gateHealthProbe?.() ?? true
     })
   }
   return singleton

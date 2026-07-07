@@ -20,7 +20,12 @@ import { registerThreadIpc } from './ipc/thread-ipc'
 import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { registerPdfIndexIpc, setPdfIndexSearchEngine } from './ipc/pdf-index'
-import { initApprovalsForRoot, registerGitIpc, stopApprovals } from './ipc/git'
+import {
+  initApprovalsForRoot,
+  markApprovalsWatcherDown,
+  registerGitIpc,
+  stopApprovals
+} from './ipc/git'
 import { registerHarnessIpc } from './ipc/harness'
 import { registerEmbeddingsIpc, setEmbedderService } from './ipc/embeddings'
 import { EmbedderService } from './services/embedder-service'
@@ -226,11 +231,13 @@ async function reconfigureForVault(vaultPath: string): Promise<void> {
 
   // Gate parity (step 3): re-bind the agent write watcher + approval queue
   // to the new root. A watcher failure must not fail vault init — the gate
-  // degrades to no-visibility (as before step 3), not to a blocked workspace.
+  // goes visibly DOWN (health broadcast + backoff restart, step 2 contracts
+  // §4 v1.2.1), never a blocked workspace.
   try {
     await initApprovalsForRoot(vaultPath)
   } catch (err) {
     console.error('[approvals] failed to start agent write watcher', err)
+    markApprovalsWatcherDown(err instanceof Error ? err.message : String(err))
   }
 }
 

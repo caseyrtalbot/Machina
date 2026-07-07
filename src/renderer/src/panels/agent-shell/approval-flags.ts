@@ -39,6 +39,13 @@ export function flagChips(item: PendingChange): readonly FlagChip[] {
       color: colors.claude.warning
     })
   }
+  if (item.flags.gateDegraded) {
+    chips.push({
+      key: 'gate-degraded',
+      label: 'Containment degraded',
+      color: colors.claude.warning
+    })
+  }
   if (item.flags.concurrentTurns) {
     chips.push({ key: 'concurrent', label: 'Concurrent turns', color: colors.claude.warning })
   }
