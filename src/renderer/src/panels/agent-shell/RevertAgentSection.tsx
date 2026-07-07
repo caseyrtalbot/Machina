@@ -147,7 +147,9 @@ export function RevertAgentSection({ requestedAgentId = null }: RevertAgentSecti
                 ? 'Not a git repository — nothing to revert from.'
                 : list.reason === 'no-workspace'
                   ? 'No workspace open.'
-                  : `Agent commits unavailable: ${list.reason}`}
+                  : list.reason === 'git-failed'
+                    ? 'Agent commits unavailable — git log failed. This is an error, not "nothing to revert": agent commits may still exist. Retry, or check git directly.'
+                    : `Agent commits unavailable: ${list.reason}`}
             </div>
           )}
 

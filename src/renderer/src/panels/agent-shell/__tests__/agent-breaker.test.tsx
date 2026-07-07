@@ -60,7 +60,7 @@ describe('AgentBreakerNotices (tray rows)', () => {
 
   it('renders a concurrentTurns notice with manual-kill guidance, not a kill claim', async () => {
     status.mockResolvedValue({
-      trips: [trip({ action: 'notice', reason: 'head-moved' })],
+      trips: [trip({ action: 'notice', reason: 'velocity' })],
       signalsDegraded: false
     })
     render(<AgentBreakerNotices />)
@@ -68,6 +68,22 @@ describe('AgentBreakerNotices (tray rows)', () => {
     const row = screen.getByTestId('breaker-notice')
     expect(row.textContent).toContain('ambiguous')
     expect(row.textContent).toContain('Kill control')
+    expect(screen.getByTestId('breaker-notice-badge').textContent).toBe('breaker notice')
+  })
+
+  it('renders a head-moved notice with user-git-op copy, never a concurrent-turns claim (v1.2.7)', async () => {
+    // headMoved is notice-class since v1.2.7: the ambiguity is user-vs-agent
+    // git activity, not concurrent turns — the copy must say so.
+    status.mockResolvedValue({
+      trips: [trip({ action: 'notice', reason: 'head-moved' })],
+      signalsDegraded: false
+    })
+    render(<AgentBreakerNotices />)
+    await act(async () => {})
+    const row = screen.getByTestId('breaker-notice')
+    expect(row.textContent).toContain('your own git activity')
+    expect(row.textContent).toContain('Kill control')
+    expect(row.textContent).not.toContain('concurrent turns')
     expect(screen.getByTestId('breaker-notice-badge').textContent).toBe('breaker notice')
   })
 

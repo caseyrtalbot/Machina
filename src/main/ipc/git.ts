@@ -261,8 +261,9 @@ function buildWatcher(root: string): AgentWriteWatcher {
     commitsBetween,
     // Step 6 (contracts §5 v1.2.6): per-thread limiter threshold from the
     // bound harness's bind-time budgets snapshot. In-memory registry read —
-    // the mirror was loaded by the harness:run/attribution path before any
-    // bound turn can write; an unloaded/unbound thread reads undefined and
+    // initApprovalsForRoot loads the mirror before the watcher starts and
+    // the turn-start listener (ipc/cli-thread.ts) re-guarantees it on every
+    // turn open (v1.2.7); an unloaded/unbound thread reads undefined and
     // the watcher applies the default.
     getWriteBudget: (threadId) =>
       getHarnessRunRegistry().get(root, threadId)?.budgets?.maxWritesPerMinute,
@@ -353,6 +354,14 @@ export async function initApprovalsForRoot(root: string): Promise<void> {
   watcherDownSince = null
   await agentWriteWatcher?.stop()
   getApprovalQueue().clear()
+  // v1.2.7: the watcher's getWriteBudget provider reads the bindings mirror
+  // SYNCHRONOUSLY — load it (and run the root's one-time backfill) before
+  // any batch can route, so bound threads never fall back to the default
+  // threshold on a fresh launch. Degrade-not-fail: a throwing registry
+  // leaves budget reads unbound; it must never block workspace init.
+  await getHarnessRunRegistry()
+    .ensureRootReady(root)
+    .catch(() => undefined)
   agentWriteWatcher = buildWatcher(root)
   await agentWriteWatcher.start()
 }
@@ -379,17 +388,33 @@ export function registerGitIpc(): void {
   typedHandle('git:revert-agent', async (args) => {
     const root = currentRoot()
     if (root === null) return NO_WORKSPACE
-    return revertAgent(root, args.agentId)
+    // A tray revert during a LIVE turn must not read as agent activity
+    // (v1.2.7): suppress the watcher's echo of the gate's own writes BEFORE
+    // the tree changes (the discard wrapper's pattern)…
+    const result = revertAgent(root, args.agentId, (paths) => {
+      agentWriteWatcher?.suppress(paths)
+    })
+    // …and excuse the revert commit sha on every open turn window (the
+    // noteQueueCommit pattern, root-scoped) so the headMoved tripwire never
+    // blames a healthy agent for the user's revert.
+    if (result.ok && result.sha !== undefined) {
+      getCliTurnRegistry().noteGateCommitForRoot(root, result.sha)
+    }
+    return result
   })
 
   // Read path for the per-agent revert UI (step 5, contracts §2/§6 v1.2.5).
   // Non-repo is a structured reason (not an empty list) so the tray renders
   // the honest "nothing to revert from" state instead of a false empty.
+  // v1.2.7 extends the rule to git FAILURES: a failed log walk is a
+  // structured 'git-failed', never "no unreverted agent commits".
   typedHandle('git:list-agent-commits', async () => {
     const root = currentRoot()
     if (root === null) return { ok: false as const, reason: 'no-workspace' }
     if (!isGitRepo(root)) return { ok: false as const, reason: 'not-a-git-repo' }
-    return { ok: true as const, agents: listAgentCommits(root) }
+    const agents = listAgentCommits(root)
+    if (agents === null) return { ok: false as const, reason: 'git-failed' }
+    return { ok: true as const, agents }
   })
 
   typedHandle('approvals:list', async () => {

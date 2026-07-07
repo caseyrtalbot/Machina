@@ -444,8 +444,12 @@ describe('CliTurnRegistry', () => {
 
 describe('invocation counting + onTurnStarted callback (step 6)', () => {
   it('reports a per-thread running count on every turnStarted, including the current send', () => {
-    const infos: Array<{ threadId: string; agentId: string; cwd: string; invocationCount: number }> =
-      []
+    const infos: Array<{
+      threadId: string
+      agentId: string
+      cwd: string
+      invocationCount: number
+    }> = []
     const registry = new CliTurnRegistry({
       headSha: () => null,
       isPtyAlive: () => true,

@@ -190,20 +190,33 @@ export function checkMaxTurnsOnTurnStarted(
 }
 
 export function registerCliThreadIpc(): void {
-  // Breaker wiring (step 6). The listener is deferred one microtask ON
-  // PURPOSE: turnStarted runs synchronously inside sendUserMessage BEFORE
-  // the PTY write, and a synchronous maxTurns kill would close the session
-  // out from under the in-flight send — the invocation goes out, then the
-  // PTY dies. Budget lookup is the in-memory binding snapshot (loaded by the
-  // attribution/run path before any bound turn opens).
+  // Breaker wiring (step 6). The check is deferred past the send ON PURPOSE:
+  // turnStarted runs synchronously inside sendUserMessage BEFORE the PTY
+  // write, and a synchronous maxTurns kill would close the session out from
+  // under the in-flight send — the invocation goes out, then the PTY dies.
+  // (The await below always yields at least one microtask.)
+  //
+  // v1.2.7 (post-merge review): the bindings mirror is in-memory and
+  // lazily loaded, and NOTHING on the no-agentId-forwarded path loaded it —
+  // after a relaunch with stripped frontmatter, budgets silently
+  // disengaged. Load it here on EVERY turn open. Degrade-not-fail stands: a
+  // throwing registry leaves the lookup unbound (default threshold, no
+  // maxTurns) and the turn is never blocked; noteTurnStarted still resets
+  // the episode either way.
   setTurnStartedListener((info) => {
-    void Promise.resolve().then(() =>
+    void (async () => {
+      try {
+        await getHarnessRunRegistry().ensureRootReady(info.cwd)
+      } catch {
+        // Registry failure (backfill scan, mirror persist) — enforcement
+        // degrades to unbound for this turn; never a blocked or killed turn.
+      }
       checkMaxTurnsOnTurnStarted(
         info,
         (cwd, threadId) => getHarnessRunRegistry().get(cwd, threadId)?.budgets,
         getAgentCircuitBreaker()
       )
-    )
+    })()
   })
   setBreakerEmit((event) => {
     const window = getMainWindow()

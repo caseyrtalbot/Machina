@@ -118,16 +118,21 @@ export interface GitService {
    * re-reverting, because the original commits keep their Machina-Agent trailers forever;
    * shas already listed in any Machina-Reverts trailer are excluded from later reverts).
    * The agentId stays readable in the revert commit subject.
+   * v1.2.7 — `onWillRevert(paths)` fires with the union of to-be-touched paths BEFORE
+   * any tree change (the IPC layer suppresses the watcher on them and excuses the
+   * revert sha on open turn windows), and the final commit is PATHSPEC-LIMITED to
+   * those paths so user-staged bystander files are never swept in.
    */
-  revertAgent(root: string, agentId: string): GitOpResult
+  revertAgent(root: string, agentId: string, onWillRevert?: (paths: readonly string[]) => void): GitOpResult
   /**
    * v1.2.5 — read-only twin of revertAgent's enumeration (the SAME single git-log
    * trailer walk, factored into a shared reader): every unreverted agent-attributed
    * commit grouped by exact Machina-Agent trailer value; shas named in any
    * Machina-Reverts trailer are excluded, so the list refreshes past a revert.
-   * Non-repo and git failure → [] (list semantics, matching status()).
+   * Non-repo → [] (nothing to enumerate). v1.2.7: git-log FAILURE → null — a failed
+   * walk is a structured error at the IPC layer ('git-failed'), never a false empty.
    */
-  listAgentCommits(root: string): readonly AgentCommits[]
+  listAgentCommits(root: string): readonly AgentCommits[] | null
   /**
    * Reject flow. Tracked → `git restore --source=HEAD`; untracked → the INJECTED
    * removeFile callback (v1.1.1: required third parameter; the IPC layer binds
@@ -648,11 +653,14 @@ killed, turn window dropped with zero linger) + audit
   autoRejects within one turn;
 - **head-moved** = the agent-ran-git tripwire (the watcher's once-per-turn
   audit is the signal; the turn-END tripwire in ipc/git.ts audits + flags but
-  does not feed the breaker — the turn is over and the PTY idle);
+  does not feed the breaker — the turn is over and the PTY idle). NOTICE
+  class since v1.2.7 (negative rule 3): never a kill on its own — the
+  episode escalates only on a later kill-class signal;
 - **max-turns** = invocation count exceeded the bound budget (surfaced by
   `CliTurnRegistry.onTurnStarted` → `checkMaxTurnsOnTurnStarted` in
-  ipc/cli-thread.ts, deferred one microtask so a kill never races the
-  in-flight send).
+  ipc/cli-thread.ts, deferred past the in-flight send; since v1.2.7 the
+  listener awaits `ensureRootReady` so the budget lookup never reads an
+  unloaded mirror).
 
 Signal seam: no subscribe API exists on the queue, so
 `AgentWriteWatcherDeps.breaker` is an injected port
@@ -667,10 +675,18 @@ maxTurns budget re-trips per send by design).
 trips on watcher-degraded state alone — health is consumed only for status
 honesty (`AgentBreakerStatus.signalsDegraded`: the velocity/forbidden/
 headMoved sources have no coverage right now); a dead watcher must not kill
-healthy agents. (2) It NEVER auto-kills on signals from writes flagged
-`concurrentTurns` — ambiguous attribution could kill the wrong agent; the
-trip degrades to a tray notice (`action: 'notice'`, audited decision `error`,
-kill left manual); a later unambiguous signal may escalate to the one kill.
+healthy agents — and health is never a SUPPRESSOR either: threshold-reaching
+signals still trip while degraded (v1.2.7 companion pin). (2) It NEVER
+auto-kills on signals from writes flagged `concurrentTurns` — ambiguous
+attribution could kill the wrong agent; the trip degrades to a tray notice
+(`action: 'notice'`, audited decision `error`, kill left manual); a later
+unambiguous signal may escalate to the one kill. (3) It NEVER kills on a
+bare headMoved signal (v1.2.7, orchestrator decision): the user's own
+`git commit`/`pull`/`checkout` during a writing turn is indistinguishable
+from agent git activity, so headMoved joins the notice-latch class — notice
++ audit + tray row on the first signal, escalation to the single kill only
+on a later unambiguous kill-class signal in the same episode. The watcher's
+head-moved audit entry and the queue's `headMoved` flag are unchanged.
 
 **Kill switch** = the existing hard-kill path surfaced: a Kill button on CLI
 thread headers (`agent-breaker-kill-switch.tsx`, liveness from the
@@ -712,7 +728,7 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'cli-thread:get-session': { request: { threadId: string }; response: { sessionId: string; live: boolean } | null } // v1.2.3 — pull mirror of the spawner binding (invoke, not an event; appended per the parallel-session rule)
 // IpcEvents (v1.2.3)
 'cli-thread:session-changed': { threadId: string; sessionId: string } // v1.2.3 — spawn-on-demand respawn rebinding; feeds cli-session-store
-'git:list-agent-commits': { request: void; response: AgentCommitsResult } // v1.2.5 — read path for the revert UI; null root ⇒ { ok:false, reason:'no-workspace' }, non-repo ⇒ 'not-a-git-repo' (the tray renders the honest "nothing to revert from" state, never a false empty)
+'git:list-agent-commits': { request: void; response: AgentCommitsResult } // v1.2.5 — read path for the revert UI; null root ⇒ { ok:false, reason:'no-workspace' }, non-repo ⇒ 'not-a-git-repo' (the tray renders the honest "nothing to revert from" state, never a false empty); v1.2.7 — git-log failure ⇒ 'git-failed' (a failure is never rendered as the empty state either)
 'agent:breaker-status':  { request: void; response: AgentBreakerStatus } // v1.2.6 — pull mirror of tripped breakers + signalsDegraded (tray notice rows, kill-switch chip)
 // IpcEvents (v1.2.6)
 'agent:breaker-tripped': BreakerTripEvent // v1.2.6 — trip broadcast: action 'killed' (containment applied) or 'notice' (concurrentTurns ambiguity, kill left manual)
@@ -745,6 +761,66 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.2.7 (2026-07-07, post-merge review hardening — Phase 2 steps 5+6)** —
+  fixes from the adversarial review of `24d53e1`, applied as one hardening
+  pass (two fix agents: git surface + breaker seam).
+  **Breaker/§5:** (1) headMoved DEGRADED from kill to the notice-latch class
+  (**ORCHESTRATOR DECISION**, recorded as such): a bare unexcused HEAD move
+  during a writing turn is indistinguishable from the user's own
+  `git commit`/`pull`/`checkout`, so it now produces notice + audit + tray
+  row on the first signal and the episode escalates to its single kill only
+  on a later unambiguous kill-class signal (velocity/forbidden/max-turns) —
+  negative rule 3; "exactly one kill per episode" holds; the step-3
+  head-moved audit entry and queue flag are unchanged; named negative test:
+  single window, unexcused HEAD move, NO kill. (2) Budget enforcement no
+  longer disengages on an unloaded bindings mirror: the turn-start listener
+  awaits `HarnessRunRegistry.ensureRootReady(cwd)` before the budget lookup
+  on EVERY turn open (still deferred past the in-flight send; registry
+  errors degrade to unbound — never a blocked turn), and
+  `initApprovalsForRoot` loads the mirror before the watcher starts so the
+  synchronous `getWriteBudget` reads are covered too. (3) Test hardening:
+  the maxTurns wiring is pinned BEHAVIORALLY through the real
+  `registerCliThreadIpc` registration path against a real persisted mirror
+  (deleting the `setTurnStartedListener` registration now fails the suite —
+  mutation-verified), and the degraded-health rule gains its companion
+  positive (threshold signals with an unhealthy probe still trip; health is
+  honesty, never a suppressor — mutation-verified).
+  **Git surface/§2/§6:** (4) `revertAgent` gains `onWillRevert(paths)` —
+  fired with the union of to-be-touched paths BEFORE any tree change — and
+  the `git:revert-agent` handler uses it to suppress the watcher's echo of
+  the gate's own revert writes and excuses the revert commit sha on every
+  open turn window via `CliTurnRegistry.noteGateCommitForRoot` (a
+  root-scoped `noteQueueCommit`), so a tray revert during a live turn never
+  trips the head-moved channel against a healthy agent. (5) `revertAgent`'s
+  final commit is PATHSPEC-LIMITED to the reverted paths (commitApproved
+  discipline): user-staged bystander files stay staged and untouched;
+  `--allow-empty --only` keeps the net-zero and zero-paths marker-commit
+  cases without sweeping the index (a bare `--` would). (6)
+  `listAgentCommits` returns null on a failed git-log walk and
+  `git:list-agent-commits` surfaces it as `{ ok:false, reason:'git-failed' }`
+  — the v1.2.5 "never a false empty" rule now covers git failures, with
+  honest RevertAgentSection copy. (7) `readTrailerLog` is injection-hardened:
+  the Machina-Reverts field precedes the agent field (a `\x1f` smuggled into
+  a trailer value can only push content AWAY from the exclusion set),
+  exclusion-set tokens must be full 40-hex shas, and listed agent ids must
+  pass SAFE_ID_RE (closing the listed-but-unrevertable asymmetry); the
+  `%s`-last subject rejoin is now test-pinned. (8) **Turn attribution is
+  PATH identity, not string identity** (§4 `CliTurnRegistry`): `isInside`
+  realpath-canonicalizes both sides (memoized) before comparing. The
+  watcher roots at the canonical workspace path (WorkspaceService
+  realpaths: `/var/...` → `/private/var/...` on macOS), but the per-turn
+  cwd arrives from the caller verbatim — a symlink-aliased cwd silently
+  detached every turn window from the watcher root, routing ALL agent
+  writes to "outside any turn window": no queue capture, no
+  velocity/forbidden signals, no breaker coverage (root cause of the
+  velocity-breaker e2e failure, diagnosed from the audit log). Same rule on
+  `noteGateCommitForRoot`, so revert-sha excusal reaches alias-cwd windows.
+  `e2e/agent-breaker.spec.ts` deliberately keeps its un-realpathed tmpdir
+  root as the regression probe. **E2E probe fix (recorded):**
+  `e2e/agent-breaker.spec.ts`'s dead-PTY polls coerced the post-kill null
+  session to "alive" (`?.live ?? true`) and could never observe a kill —
+  probe defect, not product: `spawner.close` unbinds the session, so
+  get-session null IS the dead state; the predicates now treat it as such.
 - **v1.2.6 (2026-07-07, Phase 2 step 6 landing)** — §5 gains the
   budget-stack + circuit-breaker subsection: budgets ENFORCED
   (`maxWritesPerMinute` = per-THREAD limiter threshold from an injected

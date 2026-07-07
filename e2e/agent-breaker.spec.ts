@@ -20,8 +20,21 @@
  * assertions poll with generous timeouts, and nothing beyond "many files
  * appear quickly" / "output keeps flowing" is load-bearing about the model's
  * reply. The velocity threshold uses the DEFAULT budget (10 writes/min for
- * unbound ad-hoc threads): 40 rapid writes exceed it on several consecutive
- * watcher batches (VELOCITY_TRIP_CONSECUTIVE = 3).
+ * unbound ad-hoc threads): 40 writes STAGGERED ~50ms apart exceed it on many
+ * consecutive watcher batches (VELOCITY_TRIP_CONSECUTIVE = 3). The stagger
+ * is load-bearing (v1.2.7 probe fix): an un-staggered burst can coalesce
+ * into fewer than 3 batches under awaitWriteFinish (~300ms stability) +
+ * 50ms batching, and the trip requires CONSECUTIVE exceeded batches.
+ *
+ * The workspace root is DELIBERATELY passed to cli-thread:input exactly as
+ * mkdtempSync returns it (`/var/folders/...`, a symlink alias of
+ * `/private/var/...`) — do not realpath it. This pins the v1.2.7 turn-
+ * attribution fix: the agent-write watcher roots at the canonical path
+ * (WorkspaceService realpaths), and the turn registry must match the alias
+ * cwd by PATH identity, not string identity. Pre-fix, every write this probe
+ * produced was audited "write outside any turn window", the breaker never
+ * received a velocity signal, and the PTY survived the full 90s poll (the
+ * 2026-07-07 e2e failure — root-caused from the audit log).
  */
 import {
   test,
@@ -105,10 +118,18 @@ function shellPidsFor(workspace: string): number[] {
   if (cwdRoot.length === 0) return []
 
   const rootSet = new Set(cwdRoot)
-  const psOut = execSync(`ps -o pid=,ppid=,comm= -p ${cwdRoot.join(',')}`, {
-    encoding: 'utf-8',
-    stdio: ['ignore', 'pipe', 'ignore']
-  })
+  // Same guard as the lsof call above: `ps -p` exits non-zero when ANY listed
+  // pid is already gone (the exact race a successful breaker/manual kill
+  // creates between lsof and ps) but still prints the survivors to stdout.
+  let psOut = ''
+  try {
+    psOut = execSync(`ps -o pid=,ppid=,comm= -p ${cwdRoot.join(',')}`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+  } catch (err) {
+    psOut = (err as { stdout?: Buffer | string }).stdout?.toString() ?? ''
+  }
   const shells: number[] = []
   for (const line of psOut.split('\n')) {
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)
@@ -183,13 +204,14 @@ test.describe.serial('Agent circuit breaker (built app)', () => {
 
     const { app, page } = await launchWithWorkspace(root)
     try {
-      // One explicit bash instruction: 40 writes in a tight loop far exceeds
-      // the default 10-writes/min limiter on several consecutive batches.
+      // One explicit bash instruction: 40 staggered writes (~50ms apart, ~2s
+      // total) exceed the default 10-writes/min limiter from write #11 on,
+      // spreading across MANY consecutive watcher batches (the trip needs 3).
       const threadId = await startTurn(
         page,
         root,
         'breaker probe',
-        'Run exactly this bash command and nothing else: for i in $(seq 1 40); do echo x > "runaway-$i.txt"; done'
+        'Run exactly this bash command and nothing else: for i in $(seq 1 40); do echo x > "runaway-$i.txt"; sleep 0.05; done'
       )
 
       // The PTY spawned and is live before the loop lands.
@@ -201,11 +223,19 @@ test.describe.serial('Agent circuit breaker (built app)', () => {
       expect(shellPidsFor(root).length).toBeGreaterThan(0)
 
       // Velocity trip ⇒ main kills the PTY (spawner.close). Poll the
-      // main-side authority first, then the OS-level evidence.
+      // main-side authority first, then the OS-level evidence. PROBE FIX
+      // (v1.2.7): spawner.close UNBINDS the session, so a killed thread's
+      // get-session returns null — null IS the dead state. The original
+      // predicate (`?.live ?? true`) coerced null to alive and could never
+      // observe the kill.
       await expect
-        .poll(async () => (await getThreadSession(page, threadId))?.live ?? true, {
-          timeout: 90_000
-        })
+        .poll(
+          async () => {
+            const session = await getThreadSession(page, threadId)
+            return session !== null && session.live
+          },
+          { timeout: 90_000 }
+        )
         .toBe(false)
       await expect.poll(() => shellPidsFor(root).length, { timeout: 15_000 }).toBe(0)
 
@@ -279,11 +309,16 @@ test.describe.serial('Agent circuit breaker (built app)', () => {
       await page.locator('[data-testid="agent-kill-switch"]').click({ timeout: 15_000 })
 
       // Hard stop: main-side authority reports dead, and the OS agrees —
-      // no shell remains in the workspace cwd.
+      // no shell remains in the workspace cwd. Same probe fix as above:
+      // close() unbinds the session, so null IS the dead state.
       await expect
-        .poll(async () => (await getThreadSession(page, threadId))?.live ?? true, {
-          timeout: 15_000
-        })
+        .poll(
+          async () => {
+            const session = await getThreadSession(page, threadId)
+            return session !== null && session.live
+          },
+          { timeout: 15_000 }
+        )
         .toBe(false)
       await expect.poll(() => shellPidsFor(root).length, { timeout: 15_000 }).toBe(0)
       // The kill switch drops with the dead PTY (reattach-only semantics:

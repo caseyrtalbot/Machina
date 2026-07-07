@@ -386,17 +386,30 @@ interface TrailerLog {
   readonly reverted: ReadonlySet<string>
 }
 
+/** Only full 40-hex shas may enter the Machina-Reverts exclusion set (v1.2.7). */
+const FULL_SHA_RE = /^[0-9a-f]{40}$/
+
 /**
  * The one bounded git-log trailer walk (contracts §2, v1.2.5): shared by
  * revertAgent and listAgentCommits so both enumerate agent commits — and the
  * Machina-Reverts exclusions — identically. `%s` is the LAST field so a
  * subject containing the field separator re-joins intact. Null on failure.
+ *
+ * Injection-proof by construction (v1.2.7): trailer VALUES are the only
+ * attacker-elastic fields, and a forged value carrying `\x1f` shifts every
+ * later field. The Machina-Reverts field therefore comes BEFORE the agent
+ * field — a separator smuggled into a Machina-Agent value can only push
+ * content AWAY from the exclusion set (into the subject), never into it —
+ * and each token is validated before use: exclusion-set entries must be full
+ * 40-hex shas, agent ids must pass SAFE_ID_RE (every app-minted id did at
+ * commit time; revertAgent refuses non-conforming ids anyway). Direct
+ * Machina-Reverts forgery remains the accepted §4 shell-access residual.
  */
 function readTrailerLog(root: string): TrailerLog | null {
   const log = runGit(root, [
     'log',
     '-z',
-    `--format=%H%x1f%aI%x1f%(trailers:key=${TRAILER_AGENT},valueonly)%x1f%(trailers:key=${TRAILER_REVERTS},valueonly)%x1f%s`
+    `--format=%H%x1f%aI%x1f%(trailers:key=${TRAILER_REVERTS},valueonly)%x1f%(trailers:key=${TRAILER_AGENT},valueonly)%x1f%s`
   ])
   if (!log.ok) return null
 
@@ -404,16 +417,16 @@ function readTrailerLog(root: string): TrailerLog | null {
   const reverted = new Set<string>()
   for (const record of log.stdout.split('\0')) {
     const fields = record.split('\x1f')
-    const [sha, date, agentField, revertsField] = fields
+    const [sha, date, revertsField, agentField] = fields
     if (sha === undefined || sha.length === 0 || agentField === undefined) continue
     records.push({
       sha,
       date: date ?? '',
       subject: fields.slice(4).join('\x1f'),
-      agentIds: agentField.split('\n').filter((v) => v.length > 0)
+      agentIds: agentField.split('\n').filter((v) => SAFE_ID_RE.test(v))
     })
     for (const value of (revertsField ?? '').split(/\s+/)) {
-      if (value.length > 0) reverted.add(value)
+      if (FULL_SHA_RE.test(value)) reverted.add(value)
     }
   }
   return { records, reverted }
@@ -425,12 +438,14 @@ function readTrailerLog(root: string): TrailerLog | null {
  * value. Ids are trailer-sourced, so commits from a since-deleted harness
  * (or an adapter identity) stay listed and revertable. Shas newest first
  * within each group; group order follows each agent's newest commit.
- * Non-repo and git failure → [] (list semantics, matching status()).
+ * Non-repo → [] (nothing to enumerate). Git-log FAILURE → null (v1.2.7): a
+ * failed walk is NOT "no unreverted agent commits" — the IPC layer surfaces
+ * it as a structured error instead of the false empty v1.2.5 forbids.
  */
-export function listAgentCommits(root: string): readonly AgentCommits[] {
+export function listAgentCommits(root: string): readonly AgentCommits[] | null {
   if (!isGitRepo(root)) return []
   const log = readTrailerLog(root)
-  if (log === null) return []
+  if (log === null) return null
 
   const groups = new Map<string, { shas: string[]; lastSubject: string; lastDate: string }>()
   for (const record of log.records) {
@@ -464,8 +479,21 @@ export function listAgentCommits(root: string): readonly AgentCommits[] {
  * reverted shas (never Machina-Agent), so already-reverted commits are
  * excluded from a later revertAgent instead of being re-enumerated. On
  * conflict the whole sequence is aborted and the working tree is left clean.
+ *
+ * v1.2.7 hardening (post-merge review):
+ *   - `onWillRevert(paths)` fires with the union of paths the revert will
+ *     touch BEFORE the tree changes — the IPC layer suppresses the watcher's
+ *     echo of the gate's own writes on exactly these paths, so a revert
+ *     during a live turn is never attributed to the agent;
+ *   - the final commit is PATHSPEC-LIMITED to those same paths (the
+ *     commitApproved discipline): user-staged bystander files stay staged
+ *     and untouched instead of being silently swept into the revert commit.
  */
-export function revertAgent(root: string, agentId: string): GitOpResult {
+export function revertAgent(
+  root: string,
+  agentId: string,
+  onWillRevert?: (paths: readonly string[]) => void
+): GitOpResult {
   if (!isGitRepo(root)) return { ok: false, reason: 'not-a-git-repo' }
   if (!SAFE_ID_RE.test(agentId)) return { ok: false, reason: 'invalid-agent-id' }
 
@@ -477,6 +505,28 @@ export function revertAgent(root: string, agentId: string): GitOpResult {
     .map((r) => r.sha)
   if (shas.length === 0) return { ok: false, reason: 'no-commits-for-agent' }
 
+  // Union of paths the reverted commits touched, computed BEFORE any tree
+  // change (fail-safe: a failed walk aborts with the tree untouched).
+  // `--root` covers a root commit; `-z` keeps unusual filenames literal.
+  const touched = new Set<string>()
+  for (const sha of shas) {
+    const tree = runGit(root, [
+      'diff-tree',
+      '--root',
+      '--no-commit-id',
+      '--name-only',
+      '-r',
+      '-z',
+      sha
+    ])
+    if (!tree.ok) return { ok: false, reason: 'git-failed' }
+    for (const p of tree.stdout.split('\0')) {
+      if (p.length > 0) touched.add(p)
+    }
+  }
+  const paths = [...touched].sort()
+  onWillRevert?.(paths)
+
   // git log order is newest-first; one sequencer run so --abort restores everything.
   const revert = runGit(root, ['revert', '--no-commit', '--no-edit', ...shas])
   if (!revert.ok) {
@@ -484,14 +534,23 @@ export function revertAgent(root: string, agentId: string): GitOpResult {
     return { ok: false, reason: 'revert-conflict' }
   }
 
+  // Pathspec-limited (v1.2.7): commits exactly the reverted paths' state.
+  // --allow-empty keeps the net-zero case (mutually cancelling commits)
+  // minting its Machina-Reverts marker commit, still without touching the
+  // index entries of anything the user staged. --only is explicit for the
+  // ZERO-paths edge (a forged empty agent commit): a bare `--` means "no
+  // pathspec" and would sweep the staged index; --only with no paths mints
+  // the empty marker commit instead (verified empirically).
   const commit = runGit(root, [
     'commit',
     '--no-verify',
     '--allow-empty',
+    '--only',
     '-m',
     `Revert agent changes (${agentId})`,
     '-m',
-    `${TRAILER_REVERTS}: ${shas.join(' ')}`
+    `${TRAILER_REVERTS}: ${shas.join(' ')}`,
+    ...(paths.length > 0 ? ['--', ...literalPathspecs(paths)] : [])
   ])
   if (!commit.ok) {
     // Commit failed AFTER the reverse patches were applied: abort rewinds the

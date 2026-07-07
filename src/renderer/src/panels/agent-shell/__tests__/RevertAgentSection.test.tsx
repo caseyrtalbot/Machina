@@ -133,6 +133,19 @@ describe('RevertAgentSection', () => {
     expect(screen.queryByTestId('revert-agent-arm-test-fixer')).toBeNull()
   })
 
+  it('renders a git failure as an honest error state, never the empty state (v1.2.7)', async () => {
+    // A failed git log is NOT "no unreverted agent commits" — the copy must
+    // say enumeration failed, not suggest there is nothing to revert.
+    listAgentCommits.mockResolvedValue({ ok: false, reason: 'git-failed' })
+    render(<RevertAgentSection />)
+    await expand()
+
+    expect(screen.queryByTestId('revert-agent-empty')).toBeNull()
+    const error = screen.getByTestId('revert-agent-error')
+    expect(error.textContent).toContain('git log failed')
+    expect(error.textContent).toContain('not "nothing to revert"')
+  })
+
   it('shows the empty state when no unreverted agent commits exist', async () => {
     listAgentCommits.mockResolvedValue({ ok: true, agents: [] })
     render(<RevertAgentSection />)

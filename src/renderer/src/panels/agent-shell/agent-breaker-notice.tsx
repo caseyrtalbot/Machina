@@ -83,7 +83,9 @@ export function AgentBreakerNotices() {
             {REASON_LABEL[trip.reason]} — {trip.detail}.{' '}
             {trip.action === 'killed'
               ? 'The agent PTY was stopped as containment. Its writes are already on disk and stay in this queue for review; sending a new message starts a fresh, attributed session.'
-              : 'Attribution was ambiguous (concurrent turns), so nothing was stopped automatically — review the queue and use the Kill control on the responsible thread.'}
+              : trip.reason === 'head-moved'
+                ? 'A HEAD move alone is indistinguishable from your own git activity, so nothing was stopped automatically — review the queue and use the Kill control if this was the agent.'
+                : 'Attribution was ambiguous (concurrent turns), so nothing was stopped automatically — review the queue and use the Kill control on the responsible thread.'}
           </div>
         </div>
       ))}

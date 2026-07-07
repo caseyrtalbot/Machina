@@ -13,7 +13,7 @@
  *   - forbidden-writes: FORBIDDEN_TRIP_PER_TURN protected-glob autoRejects
  *     within one turn (repeated containment hits, not one);
  *   - head-moved: the agent-ran-git tripwire (one audit per turn — one
- *     signal per turn);
+ *     signal per turn); NOTICE class since v1.2.7 — see negative rule 3;
  *   - max-turns: the thread's invocation count exceeded its bound harness
  *     budget (surfaced by CliTurnRegistry via ipc/cli-thread.ts).
  *
@@ -33,6 +33,15 @@
  *      to a tray notice (`action: 'notice'`, audited + broadcast, kill left
  *      manual). A later unambiguous signal may still escalate to a kill —
  *      still exactly one kill per episode.
+ *   3. NEVER kills on a bare headMoved signal (§8 v1.2.7, orchestrator
+ *      decision from the post-merge review): the user's own `git commit` /
+ *      `pull` / `checkout` in their terminal during a writing turn is an
+ *      everyday event this channel cannot distinguish from agent git
+ *      activity. headMoved joins the concurrentTurns notice-latch class —
+ *      notice + audit + tray row on the first signal; the episode escalates
+ *      to its single kill only on a later unambiguous KILL-CLASS signal
+ *      (velocity/forbidden/max-turns). The watcher's head-moved audit entry
+ *      and the queue's headMoved flag are untouched by this degrade.
  *
  * Kill-vs-awaitWriteFinish semantics (recorded, tested): writes still
  * flushing within the watcher's ~300ms awaitWriteFinish window after the
@@ -139,11 +148,18 @@ export class AgentCircuitBreaker {
     }
   }
 
-  /** The agent-ran-git tripwire fired (once per turn from the watcher). */
+  /**
+   * The agent-ran-git tripwire fired (once per turn from the watcher).
+   * Notice class (negative rule 3, §8 v1.2.7): a bare HEAD move is
+   * indistinguishable from the user's own git activity — never a kill on
+   * its own, regardless of `concurrentTurns`.
+   */
   noteHeadMoved(signal: BreakerSignal): void {
     const state = this.stateFor(signal.threadId, signal.agentId)
     if (state.trip?.action === 'killed') return
-    this.trip(state, signal, 'head-moved', `git HEAD moved during turn ${signal.turnId}`)
+    this.trip(state, signal, 'head-moved', `git HEAD moved during turn ${signal.turnId}`, {
+      noticeOnly: true
+    })
   }
 
   /** The thread's invocation count exceeded its bound harness budget. */
@@ -194,9 +210,11 @@ export class AgentCircuitBreaker {
     state: ThreadBreakerState,
     signal: BreakerSignal,
     reason: BreakerReason,
-    detail: string
+    detail: string,
+    opts?: { readonly noticeOnly?: boolean }
   ): void {
-    const action: BreakerAction = signal.concurrentTurns ? 'notice' : 'killed'
+    const action: BreakerAction =
+      signal.concurrentTurns || opts?.noticeOnly === true ? 'notice' : 'killed'
     // Notice-latched episodes stay quiet on further ambiguous signals (no
     // event spam) but may ESCALATE once an unambiguous signal arrives.
     if (state.trip !== null && action === 'notice') return

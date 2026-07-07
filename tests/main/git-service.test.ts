@@ -541,6 +541,93 @@ describe('git-service', () => {
       expect(reverts).toBe(preTamper)
     })
 
+    it('leaves user-staged bystander files staged and OUT of the revert commit (v1.2.7)', () => {
+      // Post-merge review major: the revert commit had no pathspec limiting,
+      // so anything the user had staged was silently folded into the
+      // Machina-Reverts commit — the exact sweep commitApproved defends against.
+      initGitRepo(vaultRoot)
+      agentCommit(vaultRoot, 'alpha', 'a1.txt', 'alpha content')
+      agentCommit(vaultRoot, 'alpha', 'a2.txt', 'more alpha content')
+      writeFileSync(join(vaultRoot, 'user-draft.md'), 'user work in progress\n')
+      git(vaultRoot, 'add', '--', 'user-draft.md')
+
+      const result = revertAgent(vaultRoot, 'alpha')
+      expect(result.ok).toBe(true)
+
+      // The revert commit contains exactly the reverted paths.
+      const committed = git(vaultRoot, 'show', '--name-only', '--format=', 'HEAD')
+        .split('\n')
+        .filter((p) => p.length > 0)
+        .sort()
+      expect(committed).toEqual(['a1.txt', 'a2.txt'])
+
+      // The bystander is still staged, its content untouched.
+      const porcelain = execFileSync('git', ['status', '--porcelain'], {
+        cwd: vaultRoot,
+        encoding: 'utf-8'
+      })
+      expect(porcelain).toContain('A  user-draft.md')
+      expect(readFileSync(join(vaultRoot, 'user-draft.md'), 'utf-8')).toBe(
+        'user work in progress\n'
+      )
+    })
+
+    it('a zero-paths revert (forged empty agent commit) mints the marker without sweeping the index (v1.2.7)', () => {
+      // Edge behind the pathspec limiting: a forged EMPTY commit carrying a
+      // Machina-Agent trailer reverts to zero touched paths. A bare `--`
+      // means "no pathspec" to git commit and would sweep the staged index —
+      // the exact bystander bug again. --only mints the empty marker instead.
+      initGitRepo(vaultRoot)
+      git(
+        vaultRoot,
+        'commit',
+        '--allow-empty',
+        '--no-verify',
+        '-m',
+        'forged',
+        '-m',
+        'Machina-Agent: ghost'
+      )
+      writeFileSync(join(vaultRoot, 'user-draft.md'), 'user work\n')
+      git(vaultRoot, 'add', '--', 'user-draft.md')
+
+      const result = revertAgent(vaultRoot, 'ghost')
+      expect(result.ok).toBe(true)
+
+      // Marker commit exists and contains nothing…
+      const committed = git(vaultRoot, 'show', '--name-only', '--format=', 'HEAD')
+        .split('\n')
+        .filter((p) => p.length > 0)
+      expect(committed).toEqual([])
+
+      // …the bystander is still staged, and the ghost group reads reverted.
+      const porcelain = execFileSync('git', ['status', '--porcelain'], {
+        cwd: vaultRoot,
+        encoding: 'utf-8'
+      })
+      expect(porcelain).toContain('A  user-draft.md')
+      expect(listAgentCommits(vaultRoot)).toEqual([])
+    })
+
+    it('reports the paths the revert will touch BEFORE the tree changes (suppression hook, v1.2.7)', () => {
+      initGitRepo(vaultRoot)
+      agentCommit(vaultRoot, 'alpha', 'a1.txt', 'alpha content')
+
+      let pathsAtCallback: readonly string[] | null = null
+      let a1PresentAtCallback = false
+      const result = revertAgent(vaultRoot, 'alpha', (paths) => {
+        pathsAtCallback = [...paths]
+        // The revert has NOT been applied yet — the IPC layer suppresses the
+        // watcher on these paths before the gate's own writes hit the tree.
+        a1PresentAtCallback = existsSync(join(vaultRoot, 'a1.txt'))
+      })
+
+      expect(result.ok).toBe(true)
+      expect(pathsAtCallback).toEqual(['a1.txt'])
+      expect(a1PresentAtCallback).toBe(true)
+      expect(existsSync(join(vaultRoot, 'a1.txt'))).toBe(false)
+    })
+
     it('approve-then-revertAgent restores the exact pre-agent tree (modified + created)', () => {
       // Step-5 evidence gate G2: the flow that replaces the pre-agent snapshot
       // (approve → revertAgent) must land a tree byte-identical to the
@@ -634,6 +721,82 @@ describe('git-service', () => {
 
     it('returns [] for a non-repo (list semantics)', () => {
       expect(listAgentCommits(vaultRoot)).toEqual([])
+    })
+
+    it('returns null when git log fails — a git failure is never a false empty (v1.2.7)', () => {
+      // A .git DIRECTORY that is not a valid repo: isGitRepo passes, git log
+      // fails. Pre-fix this mapped to [], which the tray rendered as the
+      // dishonest "No unreverted agent commits" while revertables may exist.
+      mkdirSync(join(vaultRoot, '.git'))
+      expect(listAgentCommits(vaultRoot)).toBeNull()
+    })
+
+    it('a forged trailer value carrying \\x1f cannot poison the Machina-Reverts exclusion set (v1.2.7)', () => {
+      // Post-merge review major: readTrailerLog splits positionally on \x1f;
+      // a shell-forged `Machina-Agent: evil\x1f<victim-sha>` shifted the
+      // victim sha into the reverts-field position, immunizing the victim's
+      // commit against listing AND revert.
+      initGitRepo(vaultRoot)
+      const victimSha = agentCommit(vaultRoot, 'victim-agent', 'v.txt', 'victim content')
+
+      writeFileSync(join(vaultRoot, 'evil.txt'), 'evil\n')
+      git(vaultRoot, 'add', '--', 'evil.txt')
+      execFileSync(
+        'git',
+        ['commit', '--no-verify', '-m', 'evil commit', '-m', `Machina-Agent: evil\x1f${victimSha}`],
+        { cwd: vaultRoot, stdio: 'ignore' }
+      )
+
+      const groups = listAgentCommits(vaultRoot)
+      expect(groups).not.toBeNull()
+      const victim = groups!.find((g) => g.agentId === 'victim-agent')
+      expect(victim?.shas).toEqual([victimSha])
+
+      const result = revertAgent(vaultRoot, 'victim-agent')
+      expect(result.ok).toBe(true)
+      expect(existsSync(join(vaultRoot, 'v.txt'))).toBe(false)
+    })
+
+    it('discards non-conforming tokens: only 40-hex shas enter the exclusion set, only SAFE_ID_RE ids are listed (v1.2.7)', () => {
+      initGitRepo(vaultRoot)
+      const legit = agentCommit(vaultRoot, 'alpha', 'a1.txt', 'alpha content')
+
+      // Forged trailers: a junk reverts token and a malformed agent id (space).
+      writeFileSync(join(vaultRoot, 'forged.txt'), 'forged\n')
+      git(vaultRoot, 'add', '--', 'forged.txt')
+      execFileSync(
+        'git',
+        [
+          'commit',
+          '--no-verify',
+          '-m',
+          'forged commit',
+          '-m',
+          `Machina-Agent: bad id!\nMachina-Reverts: not-a-sha deadbeef`
+        ],
+        { cwd: vaultRoot, stdio: 'ignore' }
+      )
+
+      const groups = listAgentCommits(vaultRoot)!
+      // The malformed id (which revertAgent would always refuse) is not listed;
+      // the legit group is intact — junk reverts tokens excluded nothing.
+      expect(groups.map((g) => g.agentId)).toEqual(['alpha'])
+      expect(groups[0].shas).toEqual([legit])
+    })
+
+    it('a subject containing the field separator re-joins intact (%s is the last field)', () => {
+      initGitRepo(vaultRoot)
+      writeFileSync(join(vaultRoot, 's.txt'), 'content')
+      const result = commitApproved(vaultRoot, {
+        agentId: 'alpha',
+        threadId: 'th-00000001',
+        paths: ['s.txt'],
+        message: 'weird\x1fsubject'
+      })
+      expect(result.ok).toBe(true)
+
+      const groups = listAgentCommits(vaultRoot)!
+      expect(groups[0].lastSubject).toBe('weird\x1fsubject')
     })
   })
 

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { AgentCommitsResult } from '../../src/shared/git-types'
@@ -91,6 +91,17 @@ describe('git:list-agent-commits handler', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'te-lac-nonrepo-'))
     wsCtl.root = tempRoot
     expect(await invokeListAgentCommits()).toEqual({ ok: false, reason: 'not-a-git-repo' })
+  })
+
+  it('returns a structured git-failed error when git log fails — never a false empty (v1.2.7)', async () => {
+    // A .git DIRECTORY that is not a valid repo: isGitRepo passes, git log
+    // fails. Pre-fix the handler wrapped this as { ok:true, agents: [] } and
+    // the tray rendered "No unreverted agent commits" — the exact false empty
+    // the v1.2.5 contract forbids for non-repo.
+    tempRoot = mkdtempSync(join(tmpdir(), 'te-lac-gitfail-'))
+    mkdirSync(join(tempRoot, '.git'))
+    wsCtl.root = tempRoot
+    expect(await invokeListAgentCommits()).toEqual({ ok: false, reason: 'git-failed' })
   })
 
   it('enumerates agent groups against the MAIN-resolved root (request carries nothing)', async () => {

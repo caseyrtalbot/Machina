@@ -22,7 +22,8 @@
  * Dependencies (head sha capture, PTY liveness, clock) are injected so the
  * registry unit-tests without git or PTYs.
  */
-import { resolve, sep } from 'path'
+import { sep } from 'path'
+import { canonicalizePath } from '../utils/paths'
 import { headSha } from './git-service'
 
 /** Closed turns remain attributable this long after turnEnded. */
@@ -237,6 +238,20 @@ export class CliTurnRegistry {
   }
 
   /**
+   * Record a commit the GATE itself made that is not tied to one thread — a
+   * step-5 wholesale revert (v1.2.7). Excuses `sha` on EVERY turn window
+   * under `root` (same containment predicate as activeTurnFor), so the
+   * headMoved tripwire never reads the gate's own revert commit as an agent
+   * HEAD move. Baselines stay immutable — this is excusal, not rebaselining.
+   */
+  noteGateCommitForRoot(root: string, sha: string): void {
+    for (const [threadId, turn] of this.turns) {
+      if (!isInside(root, turn.cwd)) continue
+      this.turns.set(threadId, { ...turn, queueCommitShas: [...turn.queueCommitShas, sha] })
+    }
+  }
+
+  /**
    * The turn window that owns a filesystem event under `root` right now, or
    * null. Most-recent `startedAt` wins when several qualify (`concurrent`
    * reports the ambiguity).
@@ -284,10 +299,35 @@ export class CliTurnRegistry {
   }
 }
 
-/** True when `child` is `root` or a descendant of it (path-segment safe). */
+/**
+ * Memoized realpath canonicalization for the containment identity checks
+ * below. The registry sees a handful of distinct strings per run (workspace
+ * roots + per-turn cwds), so the map stays tiny; memoization keeps the
+ * per-batch `activeTurnFor` walk off the filesystem.
+ */
+const canonicalMemo = new Map<string, string>()
+function canonical(path: string): string {
+  const hit = canonicalMemo.get(path)
+  if (hit !== undefined) return hit
+  const result = canonicalizePath(path)
+  canonicalMemo.set(path, result)
+  return result
+}
+
+/**
+ * True when `child` is `root` or a descendant of it (path-segment safe).
+ * PATH identity, not string identity (v1.2.7): both sides are realpath-
+ * canonicalized before comparison. WorkspaceService canonicalizes the root
+ * it hands the agent-write watcher (`/var/...` → `/private/var/...` on
+ * macOS), but the turn cwd arrives from the caller verbatim — comparing raw
+ * strings silently detached every turn window from the watcher root on any
+ * symlink-aliased workspace path, routing all agent writes to
+ * "outside any turn window": no queue capture, no velocity/forbidden
+ * signals, no breaker coverage.
+ */
 function isInside(root: string, child: string): boolean {
-  const r = resolve(root)
-  const c = resolve(child)
+  const r = canonical(root)
+  const c = canonical(child)
   return c === r || c.startsWith(r + sep)
 }
 

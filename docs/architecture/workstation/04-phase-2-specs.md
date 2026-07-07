@@ -599,6 +599,24 @@ Collides with 2/3/6 on ApprovalsTray and with 7 on palette-sources — sequentia
 > — the orchestrator runs all e2e sequentially post-merge). Casey-observed
 > acceptance still pending: pressing kill on a running agent visibly stops
 > output in the running app.
+>
+> **AMENDED (2026-07-07, post-merge review hardening, §8 v1.2.7):**
+> **ORCHESTRATOR DECISION — headMoved is DEGRADED from kill to the
+> notice-latch class.** The post-merge adversarial review found the
+> single-signal headMoved kill to be an unrecorded wrongful-kill channel:
+> the user's own `git commit`/`pull`/`checkout` in their terminal during a
+> writing turn is an everyday event `isAgentHeadMove` cannot distinguish
+> from agent git activity. headMoved now behaves like concurrentTurns:
+> notice + audit + tray row on the first signal; escalation to the single
+> kill only on a later unambiguous kill-class signal in the same episode.
+> The step-3 audit/flag path is unchanged; "exactly one kill per episode"
+> holds; the trip matrix gained the named user-git-op negative test (single
+> window, unexcused HEAD move, NO kill). Also hardened in the same pass:
+> the turn-start budget lookup awaits `ensureRootReady` (budgets no longer
+> silently disengage on an unloaded mirror after relaunch), the maxTurns
+> wiring is pinned behaviorally through the real registration path, and the
+> e2e probe's dead-PTY predicate was fixed (it coerced the post-kill null
+> session to "alive" — the spec had never been executed pre-merge).
 
 Make the parsed-but-decorative budgets real (seam map §4: `MAX_WRITES_PER_MINUTE` is a
 module constant at `agent-write-watcher.ts:35` — whose misleading "Contracts §5 default
