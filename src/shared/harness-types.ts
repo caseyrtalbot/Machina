@@ -12,6 +12,7 @@
  * import from this module.
  */
 import { HARNESS_PROTECTED_GLOBS } from './constants'
+import { AGENT_IDENTITIES } from './agent-identity'
 
 // Re-exported so harness consumers have one import surface; the constant
 // itself lives in constants.ts (landed with step 3's watcher auto-reject).
@@ -40,6 +41,17 @@ export const HARNESS_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,40}$/
 
 export function isValidHarnessSlug(slug: string): boolean {
   return HARNESS_SLUG_RE.test(slug)
+}
+
+/**
+ * Adapter-identity names are reserved: a harness slug byte-equal to an agent
+ * identity (e.g. 'cli-claude') would make its commit trailers
+ * indistinguishable from the adapter-identity fallback every ad-hoc or
+ * degraded turn gets, corrupting revertAgent scope. Refused at create/run and
+ * skipped by the binding backfill.
+ */
+export function isReservedHarnessSlug(slug: string): boolean {
+  return (AGENT_IDENTITIES as readonly string[]).includes(slug)
 }
 
 /** Per-task scope contract — the curriculum 14.36 shape (contracts §5). */

@@ -243,7 +243,8 @@ describe('CliThreadSpawner turn registry (workstation step 3)', () => {
     expect(registry.turnStarted).toHaveBeenCalledWith({
       threadId: 'thread-A',
       agentId: 'cli-claude',
-      cwd: '/v'
+      cwd: '/v',
+      attributionSuspect: false
     })
   })
 
@@ -262,7 +263,8 @@ describe('CliThreadSpawner turn registry (workstation step 3)', () => {
     expect(registry.turnStarted).toHaveBeenCalledWith({
       threadId: 'thread-A',
       agentId: 'test-fixer',
-      cwd: '/v'
+      cwd: '/v',
+      attributionSuspect: false
     })
   })
 
@@ -281,7 +283,8 @@ describe('CliThreadSpawner turn registry (workstation step 3)', () => {
     expect(registry.turnStarted).toHaveBeenLastCalledWith({
       threadId: 'thread-A',
       agentId: 'test-fixer',
-      cwd: '/v'
+      cwd: '/v',
+      attributionSuspect: false
     })
   })
 
@@ -315,6 +318,101 @@ describe('CliThreadSpawner turn registry (workstation step 3)', () => {
     spawner.close('thread-A')
     expect(registry.threadClosed).toHaveBeenCalledTimes(1)
     expect(registry.threadClosed).toHaveBeenCalledWith('thread-A')
+  })
+
+  it('the suspect tag from a degraded resolution reaches turnStarted', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    // Degraded resolution at the IPC boundary: agentId undefined + suspect.
+    const res = await spawner.input(
+      'thread-A',
+      'cli-claude',
+      'go',
+      '/v',
+      undefined,
+      undefined,
+      true
+    )
+    expect(res.ok).toBe(true)
+    expect(registry.turnStarted).toHaveBeenCalledWith({
+      threadId: 'thread-A',
+      agentId: 'cli-claude',
+      cwd: '/v',
+      attributionSuspect: true
+    })
+  })
+
+  it('a degraded resolution clears a stale slug; a later clean turn stays on adapter identity', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    // Turn 1: validated slug. Turn 2: validation degraded (undefined+suspect)
+    // — the stored slug must NOT survive as the attribution. Turn 3: clean
+    // ad-hoc absent field — the slug stays cleared and the tag drops.
+    await spawner.input('thread-A', 'cli-claude', 'first', '/v', 'test-fixer')
+    await spawner.input('thread-A', 'cli-claude', 'second', '/v', undefined, undefined, true)
+    expect(registry.turnStarted).toHaveBeenLastCalledWith({
+      threadId: 'thread-A',
+      agentId: 'cli-claude',
+      cwd: '/v',
+      attributionSuspect: true
+    })
+    await spawner.input('thread-A', 'cli-claude', 'third', '/v')
+    expect(registry.turnStarted).toHaveBeenLastCalledWith({
+      threadId: 'thread-A',
+      agentId: 'cli-claude',
+      cwd: '/v',
+      attributionSuspect: false
+    })
+  })
+
+  it('an absent agentId WITHOUT the suspect tag keeps a slug bound earlier in-session', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    await spawner.input('thread-A', 'cli-claude', 'first', '/v', 'test-fixer')
+    await spawner.input('thread-A', 'cli-claude', 'second', '/v', undefined, undefined, false)
+    expect(registry.turnStarted).toHaveBeenLastCalledWith({
+      threadId: 'thread-A',
+      agentId: 'test-fixer',
+      cwd: '/v',
+      attributionSuspect: false
+    })
+  })
+
+  it('a suspect tag passed to spawn flows into the next sendUserMessage turn window', async () => {
+    const { shell } = fakeServices()
+    const registry = fakeRegistry()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: registryBridge(),
+      detect: async () => [installed('claude')],
+      registry
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v', undefined, undefined, true)
+    spawner.sendUserMessage('thread-A', 'cli-claude', 'go')
+    expect(registry.turnStarted).toHaveBeenCalledWith({
+      threadId: 'thread-A',
+      agentId: 'cli-claude',
+      cwd: '/v',
+      attributionSuspect: true
+    })
   })
 
   it('a spawner without a registry option still sends and closes without throwing', async () => {

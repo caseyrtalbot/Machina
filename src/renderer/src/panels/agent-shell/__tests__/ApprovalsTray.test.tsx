@@ -18,6 +18,7 @@ const noFlags: PendingChangeFlags = {
   concurrentTurns: false,
   degradedAttribution: false,
   gateDegraded: false,
+  attributionSuspect: false,
   forbidden: false
 }
 
@@ -27,6 +28,7 @@ const allFlags: PendingChangeFlags = {
   concurrentTurns: true,
   degradedAttribution: true,
   gateDegraded: true,
+  attributionSuspect: true,
   forbidden: true
 }
 
@@ -219,6 +221,7 @@ describe('flagChips', () => {
       ['headMoved', 'head-moved', 'History rewritten during turn'],
       ['highVelocity', 'high-velocity', 'High-velocity'],
       ['degradedAttribution', 'degraded', 'Attribution degraded'],
+      ['attributionSuspect', 'attribution-suspect', 'Attribution suspect'],
       ['gateDegraded', 'gate-degraded', 'Containment degraded'],
       ['concurrentTurns', 'concurrent', 'Concurrent turns']
     ]
@@ -230,7 +233,7 @@ describe('flagChips', () => {
     }
   })
 
-  it('emits all seven chips together, No rollback first', () => {
+  it('emits all eight chips together, No rollback first', () => {
     const chips = flagChips(makeItem({ revertible: false, flags: allFlags }))
     expect(chips.map((c) => c.key)).toEqual([
       'no-rollback',
@@ -238,6 +241,7 @@ describe('flagChips', () => {
       'head-moved',
       'high-velocity',
       'degraded',
+      'attribution-suspect',
       'gate-degraded',
       'concurrent'
     ])

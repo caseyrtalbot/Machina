@@ -406,7 +406,60 @@ export interface WatcherHealth {
 | --- | --- | --- |
 | `degradedAttribution` | shell hooks absent; PTY-alive window attribution | `CliTurnRegistry.windowState` per match |
 | `gateDegraded` | turn opened while watcher state ∉ {watching} | `turnStarted` via the gate-health probe |
-| `attributionSuspect` | agentId failed main-side binding validation | step 3 (reserved; not yet landed) |
+| `attributionSuspect` | agentId failed main-side binding validation | `turnStarted`, from the IPC-boundary resolution (v1.2.2 — LANDED) |
+
+### Attribution authority (Phase 2 step 3, v1.2.2)
+
+Frontmatter-persisted `agent_id` was renderer/disk-supplied end-to-end, and
+`<TE_DIR>/threads` is watcher-ignored by design — a one-line frontmatter edit silently
+reassigned every future commit trailer and corrupted `revertAgent` scope. Main is now the
+binding authority:
+
+- **HarnessRunRegistry** (`src/main/services/harness-run-registry.ts`): a **write-once
+  threadId→slug binding**, persisted under userData (`harness-bindings.json`, atomic
+  writes) keyed workspace root + threadId. A binding is minted ONLY inside `harness:run`
+  (`composeHarnessRun`, `src/main/services/harness-run.ts`) after main's own validation —
+  slug format (adapter-identity names like `cli-claude` are reserved: a colliding slug's
+  trailers would be indistinguishable from the degrade fallback, corrupting `revertAgent`
+  scope), threadId format (SAFE_ID — enforces the registry-key precondition at the mint
+  boundary), the v1.1.5 realpath-equality re-check, all four harness files readable — so
+  a forged renderer request can never record a binding for an unvalidated harness;
+  re-binding to a different slug is refused forever (same-slug re-record is idempotent). Acknowledged residual: a
+  user-level agent could theoretically reach userData and edit the mirror — same class
+  as trailer forgery; this is accident containment, not a security boundary.
+- **Degrade-not-fail** (`resolveRequestedAgentId`, `src/main/ipc/cli-thread.ts`, wired
+  into BOTH `cli-thread:spawn` and `cli-thread:input`): an absent agentId is the unbound
+  ad-hoc case — no lookup, no audit, adapter identity as today. A forwarded agentId that
+  is malformed, mismatches the thread's binding, arrives on an unbound thread, or cannot
+  be resolved because the registry itself threw (reason `registry-error`)
+  degrades to adapter identity + a `cli-agent:attribution-mismatch` audit entry
+  (decision `denied`; mismatch includes the `boundSlug`) + the turn tagged
+  `attributionSuspect` — flowing `turnStarted` → `ActiveTurnMatch` →
+  `PendingChangeFlags` → tray chip exactly as `gateDegraded` does. The turn is NEVER
+  blocked.
+- **One-time trust-on-upgrade backfill** (`ensureRootReady`): on a root's first touch,
+  every existing thread whose persisted `agent_id` is a valid non-reserved slug naming a
+  real (realpath-checked) harness dir gets a binding backfilled, each audited
+  `cli-agent:binding-backfill`; an `agent_id` naming no harness dir gets NO binding and
+  degrades + flags on its next send. The root is then marked in a **persistent**
+  `backfilledRoots` set (even when zero threads matched) — re-running backfill on every
+  open would re-trust tampered frontmatter after each relaunch and defeat the step.
+  After the mark, ANY forwarded agentId on an unbound thread flags. The thread scan is
+  per-file tolerant (`listThreadAgentIdsTolerant`): one crafted or corrupt file in the
+  watcher-ignored threads dir is skipped (stays unbound), never a scan failure — a
+  throwing registry on the turn path degrades (`registry-error`), it does not fail turns.
+- **Supersedes v1.1.3's frontmatter-persistence-as-attribution-source**: v1.1.3 made
+  `Thread.agentId` (`agent_id` frontmatter) the relaunch-surviving attribution source,
+  re-sent on every spawn/input. The transport still re-sends it, but it is now demoted
+  to **display-only** input — decode is kept for UI titles and transport forwarding,
+  and main validates every forwarded value against the binding.
+- **`git:revert-agent` validation = trailer enumeration, NOT registry membership**
+  (explicit deviation from the item-3 dossier's req 4): the git-log trailer walk is the
+  authority — an unknown-but-well-formed id yields `no-commits-for-agent` — so commits
+  from pre-binding history, deleted harnesses, or a wiped userData stay revertable.
+  No code change was needed: `git-service.ts` already enumerates trailers; a test pins
+  it. Post-binding, forged slugs can no longer *enter* trailers via Machina's own path;
+  forged-by-shell trailers remain the accepted §4 forgery residual.
 
 ## 5. Agent harness folder (on-disk schema)
 
@@ -462,6 +515,9 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'harness:create':        { request: { template: string; slug: string }
                            response: { ok: true; root: string } | { ok: false; error: string } } // Result-style: duplicate/invalid slug are expected failures
 'harness:list':          { request: void; response: HarnessSummary[] }
+'harness:run':           { request: { slug: string; threadId: string } // v1.2.2 — main-side composition; records the write-once binding
+                           response: { ok: true; prompt: string } | { ok: false; error: string } }
+'harness:binding':       { request: { threadId: string }; response: { slug: string } | null } // v1.2.2 — recorded deviation: the main-binding-sourced identity chip needs a read path
 'approvals:list':        { request: void; response: PendingChange[] }
 'approvals:resolve':     { request: { id: string; approve: boolean; message?: string }; response: GitOpResult }
 'approvals:watcher-status': { request: void; response: WatcherHealth } // v1.2.1 — pull mirror for late subscribers
@@ -497,6 +553,43 @@ double-built the same files with contradictory shapes. Canonical order:
 Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
+
+- **v1.2.2 (2026-07-06, Phase 2 step 3 landing)** — §4 gains the attribution-authority
+  subsection: `HarnessRunRegistry` (write-once threadId→slug, persisted keyed workspace
+  root + threadId under userData `harness-bindings.json`; acknowledged residual: a
+  user-level agent could reach userData — same class as trailer forgery, accident
+  containment not a boundary), minted only inside the new `harness:run` after main's own
+  validation (slug format + the v1.1.5 realpath-equality re-check + all four harness
+  files readable — the re-check discharges v1.1.5 residual #1, dated status line added
+  there). `resolveRequestedAgentId` (`ipc/cli-thread.ts`) validates every forwarded
+  agentId at BOTH spawn and input with degrade-not-fail semantics: malformed / mismatch
+  (audits the `boundSlug`) / unbound-thread / registry-error ⇒ adapter identity +
+  `cli-agent:attribution-mismatch` (decision `denied`) + `attributionSuspect` — the flag
+  taxonomy row flips to LANDED (set at `turnStarted` from the IPC-boundary resolution;
+  a degraded resolution also clears any stale in-session slug in the spawner so the
+  requested slug is never attributed). Legacy threads get the **one-time
+  trust-on-upgrade backfill** with a persistent per-root `backfilledRoots` marker (each
+  binding audited `cli-agent:binding-backfill`; re-running per open would re-trust
+  tampered frontmatter after every relaunch); zero-match roots still mark. Supersedes
+  v1.1.3's frontmatter-persistence-as-attribution-source: `agent_id` is demoted to
+  display-only (decode kept for UI titles + transport forwarding, now main-validated).
+  Recorded deviations from the step's dossier: (1) renderer run sequence — the renderer
+  creates the thread WITHOUT agentId (the createThread-time spawn never forwards an
+  unbound agentId), calls `harness:run { slug, threadId }`, persists `agentId = slug`
+  via the sanctioned `thread-store.setThreadAgentId` only on ok, and keeps the
+  shell-prompt wait + send renderer-side (moving the send into main would re-open the
+  Phase-1 step-6 lost-reply failure); on refusal it deletes the just-created thread and
+  notifies — net "no thread created", satisfying the realpath-regression test intent;
+  (2) `harness:binding` read channel added (§6) — the main-binding-sourced
+  harness-identity chip (`HarnessIdentityChip` on CLI thread headers) is impossible
+  without a read path; (3) backfill is one-time PER WORKSPACE ROOT, persistently marked
+  (above); (4) `git:revert-agent` needed NO code change — validation is trailer
+  enumeration, not registry membership (explicit deviation from the item-3 dossier's
+  req 4): the existing git-log trailer walk (`no-commits-for-agent` on unknown ids) is
+  the authority, so pre-binding history, deleted harnesses, and a wiped userData stay
+  revertable; a test pins it; (5) bindings for deleted threads are not
+  garbage-collected — harmless orphans (revert validation is trailer-based), accepted
+  residual. §6 gains `harness:run` and `harness:binding`.
 
 - **v1.2.1 (2026-07-06, Phase 2 step 2 landing)** — §4 gains the watcher-health
   subsection: five-state machine (`WatcherState`/`WatcherHealth` in `git-types.ts`),
@@ -587,6 +680,13 @@ Implementation detail per step: `02-phase-1-specs.md`.
   gate is not a security boundary. Residuals for Phase 2: the
   verify.sh/SKILL.md read/exec path must re-run the same check at read time,
   and the harness linter should flag symlinks in the agents ancestry.
+  **Status 2026-07-06 (Phase 2 step 3, v1.2.2):** residual #1 (read/exec-time
+  re-check) is DISCHARGED — `composeHarnessRun`
+  (`src/main/services/harness-run.ts`) re-runs the realpath-equality check at
+  read/compose time before any harness file is read, and the backfill's
+  `harnessDirExists` applies the same check; nothing execs verify.sh yet, so
+  the read-time check covers the whole current surface. Residual #2 (linter
+  flags symlinks in the agents ancestry) remains for step 7.
 
 - **v1.1.4 (2026-07-06, step 5 landing)** — the §2/§4 never-regress rule is discharged:
   `commitPreAgentSnapshot` retired (spawn-site + per-turn call sites removed from

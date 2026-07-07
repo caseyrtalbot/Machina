@@ -10,7 +10,10 @@ const state = vi.hoisted(() => ({
   handlers: new Map<string, (args: never) => unknown>(),
   current: vi.fn<() => { root: string } | null>(() => null),
   createHarness: vi.fn(),
-  listHarnesses: vi.fn()
+  listHarnesses: vi.fn(),
+  composeHarnessRun: vi.fn(),
+  ensureRootReady: vi.fn(),
+  registryGet: vi.fn()
 }))
 
 vi.mock('../../typed-ipc', () => ({
@@ -26,6 +29,17 @@ vi.mock('../../services/workspace-service', () => ({
 vi.mock('../../services/harness-service', () => ({
   createHarness: state.createHarness,
   listHarnesses: state.listHarnesses
+}))
+
+vi.mock('../../services/harness-run', () => ({
+  composeHarnessRun: state.composeHarnessRun
+}))
+
+vi.mock('../../services/harness-run-registry', () => ({
+  getHarnessRunRegistry: () => ({
+    ensureRootReady: state.ensureRootReady,
+    get: state.registryGet
+  })
 }))
 
 import { registerHarnessIpc } from '../harness'
@@ -65,5 +79,39 @@ describe('harness IPC handlers', () => {
 
     await invoke('harness:list', undefined)
     expect(state.listHarnesses).toHaveBeenCalledWith('/ws')
+  })
+
+  it('harness:run runs the backfill first and forwards to composeHarnessRun', async () => {
+    state.current.mockReturnValue({ root: '/ws' })
+    state.ensureRootReady.mockResolvedValue(undefined)
+    state.composeHarnessRun.mockResolvedValue({ ok: true, prompt: 'P' })
+
+    const result = await invoke('harness:run', { slug: 'test-fixer', threadId: 'th1' })
+    expect(result).toEqual({ ok: true, prompt: 'P' })
+    expect(state.ensureRootReady).toHaveBeenCalledWith('/ws')
+    expect(state.composeHarnessRun).toHaveBeenCalledWith('/ws', 'test-fixer', 'th1')
+  })
+
+  it('harness:run folds a throwing registry into the structured-error contract', async () => {
+    state.current.mockReturnValue({ root: '/ws' })
+    state.ensureRootReady.mockRejectedValue(new Error('scan exploded'))
+
+    const result = await invoke<{ ok: boolean; error?: string }>('harness:run', {
+      slug: 'test-fixer',
+      threadId: 'th1'
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('scan exploded')
+    expect(state.composeHarnessRun).not.toHaveBeenCalled()
+  })
+
+  it('harness:binding returns the binding slug, and null when the registry throws', async () => {
+    state.current.mockReturnValue({ root: '/ws' })
+    state.ensureRootReady.mockResolvedValue(undefined)
+    state.registryGet.mockReturnValue({ slug: 'test-fixer', workspaceRoot: '/ws' })
+    expect(await invoke('harness:binding', { threadId: 'th1' })).toEqual({ slug: 'test-fixer' })
+
+    state.ensureRootReady.mockRejectedValue(new Error('mirror unreadable'))
+    expect(await invoke('harness:binding', { threadId: 'th1' })).toBeNull()
   })
 })

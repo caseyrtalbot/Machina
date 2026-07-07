@@ -500,6 +500,46 @@ describe('git-service', () => {
       expect(revertAgent(vaultRoot, 'bad id!')).toEqual({ ok: false, reason: 'invalid-agent-id' })
     })
 
+    it('returns no-commits-for-agent for an id that never appears in any trailer', () => {
+      // Trailer enumeration IS the id validation (contracts §4 v1.2.2):
+      // registry membership is deliberately not consulted, so a well-formed
+      // but never-committed id gets the structured error, not a throw.
+      initGitRepo(vaultRoot)
+      agentCommit(vaultRoot, 'alpha', 'a1.txt', 'alpha one')
+      expect(revertAgent(vaultRoot, 'ghost')).toEqual({ ok: false, reason: 'no-commits-for-agent' })
+      expect(existsSync(join(vaultRoot, 'a1.txt'))).toBe(true)
+    })
+
+    it('post-tamper commits carry adapter identity, so the forged slug scopes to nothing (v1.2.2)', () => {
+      // The frontmatter-tamper repro's revert half: pre-tamper turns committed
+      // as the bound slug; after the tamper, binding validation degrades the
+      // turn to adapter identity, so the forged slug never enters a trailer.
+      initGitRepo(vaultRoot)
+      const preTamper = agentCommit(vaultRoot, 'agent-x', 'x1.txt', 'bound turn')
+      // Tampered turn: attribution fell back to the adapter identity.
+      agentCommit(vaultRoot, 'cli-claude', 'x2.txt', 'post-tamper turn')
+
+      expect(revertAgent(vaultRoot, 'agent-y')).toEqual({
+        ok: false,
+        reason: 'no-commits-for-agent'
+      })
+      expect(existsSync(join(vaultRoot, 'x1.txt'))).toBe(true)
+      expect(existsSync(join(vaultRoot, 'x2.txt'))).toBe(true)
+
+      // revertAgent('agent-x') still finds exactly the pre-tamper commit.
+      const result = revertAgent(vaultRoot, 'agent-x')
+      expect(result.ok).toBe(true)
+      expect(existsSync(join(vaultRoot, 'x1.txt'))).toBe(false)
+      expect(existsSync(join(vaultRoot, 'x2.txt'))).toBe(true)
+      const reverts = git(
+        vaultRoot,
+        'log',
+        '-1',
+        '--format=%(trailers:key=Machina-Reverts,valueonly)'
+      )
+      expect(reverts).toBe(preTamper)
+    })
+
     it('approve-then-revertAgent restores the exact pre-agent tree (modified + created)', () => {
       // Step-5 evidence gate G2: the flow that replaces the pre-agent snapshot
       // (approve → revertAgent) must land a tree byte-identical to the

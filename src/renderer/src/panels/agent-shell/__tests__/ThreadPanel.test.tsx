@@ -26,7 +26,9 @@ beforeEach(() => {
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(window as any).api = {
-    agentNative: { toolDecision: vi.fn().mockResolvedValue(undefined) }
+    agentNative: { toolDecision: vi.fn().mockResolvedValue(undefined) },
+    // CLI-thread headers mount HarnessIdentityChip; unbound keeps it hidden.
+    harness: { binding: vi.fn().mockResolvedValue(null) }
   }
 })
 

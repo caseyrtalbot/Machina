@@ -348,7 +348,8 @@ export class AgentWriteWatcher {
         headMoved,
         concurrentTurns: match.concurrent,
         degradedAttribution: match.degraded,
-        gateDegraded: match.turn.gateDegradedAtStart === true
+        gateDegraded: match.turn.gateDegradedAtStart === true,
+        attributionSuspect: match.attributionSuspect
       }
       this.deps.queue.recordWrites({
         turnId: match.turn.turnId,

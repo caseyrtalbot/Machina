@@ -256,6 +256,32 @@ describe('thread-store', () => {
     expect((window as any).api.thread.save).not.toHaveBeenCalled()
   })
 
+  it('setThreadAgentId attaches the slug and persists (workstation step 3)', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: { b: { ...sampleThread('b'), agent: 'cli-claude' as const } }
+    })
+    await useThreadStore.getState().setThreadAgentId('b', 'test-fixer')
+    expect(useThreadStore.getState().threadsById['b'].agentId).toBe('test-fixer')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).toHaveBeenCalledWith(
+      '/v',
+      expect.objectContaining({ id: 'b', agentId: 'test-fixer' })
+    )
+  })
+
+  it('setThreadAgentId with an unchanged agentId does not persist', async () => {
+    useThreadStore.setState({
+      vaultPath: '/v',
+      threadsById: {
+        b: { ...sampleThread('b'), agent: 'cli-claude' as const, agentId: 'test-fixer' }
+      }
+    })
+    await useThreadStore.getState().setThreadAgentId('b', 'test-fixer')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.thread.save).not.toHaveBeenCalled()
+  })
+
   it('clears in-flight and appends a system message when CLI input delivery fails', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: false }) }

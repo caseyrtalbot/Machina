@@ -6,6 +6,7 @@ import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { colors, borderRadius, transitions, typography, floatingPanel } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
 import { WatcherHealthChip, WatcherHealthNotice } from './WatcherHealthChip'
+import { HarnessIdentityChip } from './HarnessIdentityChip'
 import { ThinkingIndicator } from './ThinkingIndicator'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
@@ -127,6 +128,9 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {t.agent !== 'machina-native' && (
+            <HarnessIdentityChip threadId={t.id} agentId={t.agentId} />
+          )}
           {t.agent !== 'machina-native' && <WatcherHealthChip />}
           {t.agent === 'machina-native' && (
             <AutoAcceptToggle

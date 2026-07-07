@@ -93,7 +93,8 @@ describe('cli-thread IPC handlers', () => {
       'fix the tests',
       '/repos/project',
       undefined,
-      undefined
+      undefined,
+      false
     )
   })
 
@@ -118,7 +119,8 @@ describe('cli-thread IPC handlers', () => {
       'cli-codex',
       '/repos/other',
       undefined,
-      undefined
+      undefined,
+      false
     )
   })
 })
@@ -143,7 +145,8 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       'cli-claude',
       '/v',
       undefined,
-      'sonnet'
+      'sonnet',
+      false
     )
     expect(state.auditEntries).toEqual([])
   })
@@ -162,7 +165,8 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       'go',
       '/v',
       undefined,
-      'gpt-5.5'
+      'gpt-5.5',
+      false
     )
     expect(state.auditEntries).toEqual([])
   })
@@ -183,7 +187,8 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       'go',
       '/v',
       undefined,
-      undefined
+      undefined,
+      false
     )
     expect(state.auditEntries).toEqual([])
   })
@@ -202,7 +207,8 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       'go',
       '/v',
       undefined,
-      undefined
+      undefined,
+      false
     )
     expect(state.auditEntries).toHaveLength(1)
     const entry = state.auditEntries[0] as AuditEntry
@@ -223,7 +229,8 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       'cli-claude',
       '/v',
       undefined,
-      undefined
+      undefined,
+      false
     )
     expect(state.auditEntries).toHaveLength(1)
     expect((state.auditEntries[0] as AuditEntry).tool).toBe('cli-thread:spawn')
@@ -241,7 +248,8 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       'cli-gemini',
       '/v',
       undefined,
-      undefined
+      undefined,
+      false
     )
     expect(state.auditEntries).toHaveLength(1)
   })

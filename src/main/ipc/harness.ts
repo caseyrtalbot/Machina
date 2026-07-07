@@ -10,6 +10,8 @@
 import { typedHandle } from '../typed-ipc'
 import { getWorkspaceService } from '../services/workspace-service'
 import { createHarness, listHarnesses } from '../services/harness-service'
+import { composeHarnessRun } from '../services/harness-run'
+import { getHarnessRunRegistry } from '../services/harness-run-registry'
 
 function currentRoot(): string | null {
   return getWorkspaceService().current()?.root ?? null
@@ -26,5 +28,36 @@ export function registerHarnessIpc(): void {
     const root = currentRoot()
     if (root === null) return []
     return listHarnesses(root)
+  })
+
+  typedHandle('harness:run', async (args) => {
+    const root = currentRoot()
+    if (root === null) return { ok: false as const, error: 'no-workspace' }
+    try {
+      // Backfill precedes the first bind after upgrade: a legacy thread's
+      // frontmatter slug must already hold its binding before record() runs.
+      await getHarnessRunRegistry().ensureRootReady(root)
+      return await composeHarnessRun(root, args.slug, args.threadId)
+    } catch (err) {
+      // A throwing registry (backfill scan, mirror persist) stays inside the
+      // structured-error contract — nothing throws across the boundary.
+      return { ok: false as const, error: `harness run failed: ${String(err)}` }
+    }
+  })
+
+  typedHandle('harness:binding', async (args) => {
+    const root = currentRoot()
+    if (root === null) return null
+    // ensureRootReady loads the persisted mirror (registry.get is in-memory
+    // only) — without it a post-relaunch chip read would miss every binding.
+    const registry = getHarnessRunRegistry()
+    try {
+      await registry.ensureRootReady(root)
+    } catch {
+      // Display-only read path: a throwing registry reads as unbound.
+      return null
+    }
+    const binding = registry.get(root, args.threadId)
+    return binding === undefined ? null : { slug: binding.slug }
   })
 }

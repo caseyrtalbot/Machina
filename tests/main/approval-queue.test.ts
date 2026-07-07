@@ -147,6 +147,27 @@ describe('ApprovalQueue add/recordWrites/list', () => {
     expect(merged.flags.highVelocity).toBe(true)
   })
 
+  it('attributionSuspect OR-merges onto the queue item and never untrips (v1.2.2)', () => {
+    // The final link of the suspect chain: the tray chip renders from the
+    // QUEUE ITEM's flags, not from the watcher's recordWrites arguments.
+    const h = makeHarness()
+    h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['a.txt'],
+      flags: { attributionSuspect: true }
+    })
+    const merged = h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['b.txt']
+    })
+    expect(merged.flags.attributionSuspect).toBe(true)
+    expect(h.queue.list()[0]?.flags.attributionSuspect).toBe(true)
+  })
+
   it('distinct turns produce distinct items', () => {
     const h = makeHarness()
     recordTurn(h, 't1')

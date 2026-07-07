@@ -55,6 +55,14 @@ export interface CliTurn {
    * literals stay valid; turnStarted always sets it.
    */
   readonly gateDegradedAtStart?: boolean
+  /**
+   * The turn's requested agentId failed main-side binding validation
+   * (contracts §4 v1.2.2): malformed, binding mismatch, or forwarded on an
+   * unbound thread. Attribution already fell back to adapter identity; this
+   * tag flows into the queue item's attributionSuspect flag. Optional so
+   * existing test literals stay valid; turnStarted always sets it.
+   */
+  readonly attributionSuspect?: boolean
 }
 
 /**
@@ -82,12 +90,16 @@ export interface ActiveTurnMatch {
   readonly concurrent: boolean
   /** Attributed via the PTY-alive fallback (no block events for the thread). */
   readonly degraded: boolean
+  /** The turn's requested agentId failed binding validation (v1.2.2). */
+  readonly attributionSuspect: boolean
 }
 
 export interface TurnStartedOpts {
   readonly threadId: string
   readonly agentId: string
   readonly cwd: string
+  /** Set by the IPC boundary when binding validation degraded (v1.2.2). */
+  readonly attributionSuspect?: boolean
 }
 
 export interface CliTurnRegistryDeps {
@@ -140,7 +152,8 @@ export class CliTurnRegistry {
       endedAt: null,
       // OQ6 (visibly degrade, never block): the turn proceeds regardless; the
       // tag just flows into the queue item's gateDegraded flag.
-      gateDegradedAtStart: !(this.deps.isGateHealthy?.() ?? true)
+      gateDegradedAtStart: !(this.deps.isGateHealthy?.() ?? true),
+      attributionSuspect: opts.attributionSuspect === true
     }
     this.turns.set(opts.threadId, turn)
     this.openInvocations.set(opts.threadId, (this.openInvocations.get(opts.threadId) ?? 0) + 1)
@@ -205,7 +218,8 @@ export class CliTurnRegistry {
     return {
       turn: best.turn,
       concurrent: qualifying.length > 1,
-      degraded: best.degraded
+      degraded: best.degraded,
+      attributionSuspect: best.turn.attributionSuspect === true
     }
   }
 

@@ -47,7 +47,12 @@ type SpawnResult =
 
 /** The slice of CliTurnRegistry the spawner drives (workstation step 3). */
 export interface SpawnerTurnRegistry {
-  turnStarted(opts: { threadId: string; agentId: string; cwd: string }): unknown
+  turnStarted(opts: {
+    threadId: string
+    agentId: string
+    cwd: string
+    attributionSuspect?: boolean
+  }): unknown
   threadClosed(threadId: string): void
 }
 
@@ -86,6 +91,13 @@ export class CliThreadSpawner {
    * `undefined` is its way of saying "no flag this turn".
    */
   private readonly modelByThread = new Map<string, string>()
+  /**
+   * Per-thread attribution-suspect tag (contracts §4 v1.2.2). Arrives
+   * PRE-RESOLVED from the IPC boundary (`resolveRequestedAgentId`) on every
+   * spawn/input — suspect=false clears, so a thread is only tagged while its
+   * latest request actually failed binding validation.
+   */
+  private readonly attributionSuspectByThread = new Map<string, boolean>()
 
   constructor(private readonly opts: CliThreadSpawnerOptions) {}
 
@@ -94,13 +106,14 @@ export class CliThreadSpawner {
     identity: AgentIdentity,
     cwd: string,
     agentId?: string,
-    model?: string
+    model?: string,
+    attributionSuspect?: boolean
   ): Promise<SpawnResult> {
     if (!isCliAgentIdentity(identity)) {
       return { ok: false, error: `not a CLI agent: ${identity}` }
     }
     this.cwdByThread.set(threadId, cwd)
-    if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
+    this.setAttribution(threadId, agentId, attributionSuspect)
     this.setModel(threadId, model)
     // `cli-raw` has no binary to probe (RAW_AGENT_SPEC.alwaysAvailable): the
     // whole command line comes from an invocation template (OQ3), so the
@@ -130,6 +143,24 @@ export class CliThreadSpawner {
   }
 
   /**
+   * Apply the IPC boundary's resolved attribution (contracts §4 v1.2.2).
+   * `agentId === undefined` with the suspect tag means validation DEGRADED:
+   * the requested slug must not be attributed, so a stale slug stored by a
+   * previous validated turn is cleared. Undefined WITHOUT the tag is the
+   * ad-hoc absent-field case and never clears a slug bound earlier
+   * in-session (bound harness threads re-send their agentId every turn).
+   */
+  private setAttribution(
+    threadId: string,
+    agentId: string | undefined,
+    attributionSuspect: boolean | undefined
+  ): void {
+    if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
+    else if (attributionSuspect === true) this.agentIdByThread.delete(threadId)
+    this.attributionSuspectByThread.set(threadId, attributionSuspect === true)
+  }
+
+  /**
    * Deliver a user message, respawning the PTY first when no live session is
    * bound. `sessionByThread` is in-memory only, so every persisted CLI thread
    * arrives here dead after an app relaunch.
@@ -140,13 +171,14 @@ export class CliThreadSpawner {
     text: string,
     cwd: string,
     agentId?: string,
-    model?: string
+    model?: string,
+    attributionSuspect?: boolean
   ): Promise<{ ok: boolean }> {
     this.cwdByThread.set(threadId, cwd)
-    if (agentId !== undefined) this.agentIdByThread.set(threadId, agentId)
+    this.setAttribution(threadId, agentId, attributionSuspect)
     this.setModel(threadId, model)
     if (!this.hasLiveSession(threadId)) {
-      const spawned = await this.spawn(threadId, identity, cwd, agentId, model)
+      const spawned = await this.spawn(threadId, identity, cwd, agentId, model, attributionSuspect)
       if (!spawned.ok) return { ok: false }
     }
     return { ok: this.sendUserMessage(threadId, identity, text) }
@@ -193,7 +225,8 @@ export class CliThreadSpawner {
       this.opts.registry.turnStarted({
         threadId,
         agentId: this.agentIdByThread.get(threadId) ?? identity,
-        cwd
+        cwd,
+        attributionSuspect: this.attributionSuspectByThread.get(threadId) === true
       })
     }
     this.opts.shellService.getPtyService().writeAgentInput(sessionId, `${command}\r`, 'batched')

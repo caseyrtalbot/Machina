@@ -1,12 +1,13 @@
 /**
- * Run a harness (workstation step 6): read the four prompt-composition files
- * in ONE fs:read-files-batch, compose the first-turn prompt, create a CLI
- * thread titled by the slug with the slug as its attribution agentId, and
- * send the prompt as the first user message. Zero spawner/transport changes —
- * this is the existing adapter path end-to-end.
+ * Run a harness (workstation step 3 split): MAIN owns binding + composition —
+ * `harness:run` validates the slug (realpath re-check), composes the
+ * first-turn prompt from the four harness files, and records the write-once
+ * thread↔slug binding. The renderer owns send timing: create the thread,
+ * wait for the fresh PTY's shell to draw its prompt, then send main's prompt.
+ * Moving the send into main would re-open the Phase-1 step-6 lost-reply
+ * failure — the readiness wait needs block-store.
  */
-import { TE_DIR } from '@shared/constants'
-import { buildHarnessPrompt, identityForAdapter, type HarnessSummary } from '@shared/harness-types'
+import { identityForAdapter, type HarnessSummary } from '@shared/harness-types'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { useThreadStore } from './thread-store'
 import { useBlockStore } from './block-store'
@@ -44,53 +45,47 @@ export async function runHarness(
   opts?: { readonly shellReadyTimeoutMs?: number }
 ): Promise<void> {
   const store = useThreadStore.getState()
-  const root = store.vaultPath
-  if (!root) {
+  if (!store.vaultPath) {
     notifyError('harness-run', new Error('no workspace open'))
     return
   }
 
-  const harnessDir = `${TE_DIR}/agents/${summary.slug}`
-  const abs = (file: string): string => `${root}/${harnessDir}/${file}`
-  const files = ['SKILL.md', 'rules.md', 'scope.json', 'state.md'] as const
-
-  // One batch, exactly four files. A failed read creates no thread — a
-  // harness prompt missing its rules or scope must never reach an agent.
-  const results = await window.api.fs.readFilesBatch(files.map(abs))
-  const byPath = new Map(results.map((r) => [r.path, r]))
-  const contents: string[] = []
-  for (const file of files) {
-    const r = byPath.get(abs(file))
-    if (!r || r.content === null) {
-      notifyError(
-        'harness-run',
-        new Error(r?.error ?? 'read failed'),
-        `Harness "${summary.slug}" is unreadable (${file}) — run not started.`
-      )
-      return
-    }
-    contents.push(r.content)
-  }
-  const [skillMd, rulesMd, scopeJson, stateMd] = contents
-
-  const prompt = buildHarnessPrompt({
-    slug: summary.slug,
-    harnessDir,
-    skillMd,
-    rulesMd,
-    scopeJson,
-    stateMd
-  })
-
   // Model mirrors what AgentPicker passes for CLI threads (unused by the CLI
-  // invocation itself). The slug is both the title and the attribution id.
+  // invocation itself). Created WITHOUT an agentId: attribution is assigned
+  // by main recording the binding inside harness:run, so the createThread
+  // spawn never forwards an unbound agentId.
   const sessionsBefore = new Set(Object.keys(useBlockStore.getState().blocksBySession))
-  await store.createThread(
+  const t = await store.createThread(
     identityForAdapter(summary.adapter),
     DEFAULT_NATIVE_MODEL,
-    summary.slug,
     summary.slug
   )
+
+  // A rejected invoke (registry threw main-side — not a structured refusal)
+  // must not orphan the just-created thread + PTY: fold it into the same
+  // refusal cleanup.
+  let run: Awaited<ReturnType<typeof window.api.harness.run>>
+  try {
+    run = await window.api.harness.run(summary.slug, t.id)
+  } catch (err) {
+    run = { ok: false, error: String(err) }
+  }
+  if (!run.ok) {
+    notifyError(
+      'harness-run',
+      new Error(run.error),
+      `Harness "${summary.slug}" could not start — run not started.`
+    )
+    // A refused run leaves nothing behind: delete the just-created thread so
+    // the net effect is "no thread created".
+    await useThreadStore.getState().deleteThread(t.id)
+    return
+  }
+
+  // Display + future input forwarding only — main validated and bound the
+  // slug above; every later turn re-validates the forwarded value against it.
+  await useThreadStore.getState().setThreadAgentId(t.id, summary.slug)
+
   await waitForNewShellPrompt(sessionsBefore, opts?.shellReadyTimeoutMs)
-  await useThreadStore.getState().appendUserMessage(prompt)
+  await useThreadStore.getState().appendUserMessage(run.prompt)
 }

@@ -32,6 +32,7 @@ const noFlags: PendingChangeFlags = {
   concurrentTurns: false,
   degradedAttribution: false,
   gateDegraded: false,
+  attributionSuspect: false,
   forbidden: false
 }
 

@@ -33,6 +33,7 @@ function makeMatch(overrides: Partial<ActiveTurnMatch> = {}): ActiveTurnMatch {
     },
     concurrent: false,
     degraded: false,
+    attributionSuspect: false,
     ...overrides
   }
 }
@@ -191,7 +192,8 @@ describe('AgentWriteWatcher.handleBatch', () => {
       headMoved: false,
       concurrentTurns: false,
       degradedAttribution: false,
-      gateDegraded: false
+      gateDegraded: false,
+      attributionSuspect: false
     })
     expect(h.autoReject).not.toHaveBeenCalled()
     expect(h.auditLog).not.toHaveBeenCalled()
@@ -215,6 +217,13 @@ describe('AgentWriteWatcher.handleBatch', () => {
     const call = h.recordWrites.mock.calls[0][0] as RecordWritesOpts
     expect(call.flags?.concurrentTurns).toBe(true)
     expect(call.flags?.degradedAttribution).toBe(true)
+  })
+
+  it('flows attributionSuspect through from the ActiveTurnMatch (v1.2.2)', () => {
+    const h = makeHarness({ match: makeMatch({ attributionSuspect: true }) })
+    h.watcher.handleBatch([ev('src/foo.ts')])
+    const call = h.recordWrites.mock.calls[0][0] as RecordWritesOpts
+    expect(call.flags?.attributionSuspect).toBe(true)
   })
 
   it('routes forbidden paths to autoReject with only the forbidden relative paths', () => {

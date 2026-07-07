@@ -402,4 +402,40 @@ describe('CliTurnRegistry', () => {
       expect(turn.gateDegradedAtStart).toBe(false)
     })
   })
+
+  describe('attributionSuspect tagging (contracts §4 v1.2.2)', () => {
+    it('turnStarted stores the tag from opts and defaults it to false', () => {
+      const h = makeHarness()
+      h.setNow(0)
+      const suspect = h.registry.turnStarted({
+        threadId: 'th1',
+        agentId: 'claude',
+        cwd: ROOT,
+        attributionSuspect: true
+      })
+      expect(suspect.attributionSuspect).toBe(true)
+
+      const clean = h.registry.turnStarted({ threadId: 'th2', agentId: 'claude', cwd: ROOT })
+      expect(clean.attributionSuspect).toBe(false)
+    })
+
+    it('activeTurnFor exposes the tag on the match', () => {
+      const h = makeHarness()
+      h.setNow(0)
+      h.registry.turnStarted({
+        threadId: 'th1',
+        agentId: 'claude',
+        cwd: ROOT,
+        attributionSuspect: true
+      })
+      const tagged = h.registry.activeTurnFor(ROOT, 100)
+      expect(tagged?.attributionSuspect).toBe(true)
+
+      h.registry.threadClosed('th1')
+      h.setNow(200)
+      h.registry.turnStarted({ threadId: 'th2', agentId: 'claude', cwd: ROOT })
+      const untagged = h.registry.activeTurnFor(ROOT, 300)
+      expect(untagged?.attributionSuspect).toBe(false)
+    })
+  })
 })

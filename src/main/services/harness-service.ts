@@ -28,6 +28,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { TE_DIR } from '../../shared/constants'
 import {
+  isReservedHarnessSlug,
   isValidHarnessSlug,
   parseHarnessFrontmatter,
   validateHarnessScope,
@@ -54,6 +55,12 @@ export async function createHarness(
 ): Promise<HarnessCreateResult> {
   if (!isValidHarnessSlug(slug)) {
     return { ok: false, error: `invalid harness slug: ${JSON.stringify(slug)}` }
+  }
+  if (isReservedHarnessSlug(slug)) {
+    return {
+      ok: false,
+      error: `harness slug collides with an adapter identity (reserved): ${slug}`
+    }
   }
   const template = HARNESS_TEMPLATES[templateId]
   if (template === undefined) {

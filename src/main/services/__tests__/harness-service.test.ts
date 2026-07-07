@@ -94,6 +94,15 @@ describe('createHarness', () => {
     await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
   })
 
+  it('rejects an adapter-identity-colliding slug with no directory created', async () => {
+    // 'cli-claude' trailers would be indistinguishable from the adapter
+    // fallback every ad-hoc/degraded turn gets — reserved (v1.2.2).
+    const result = await createHarness(root, 'test-fixer', 'cli-claude')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('reserved')
+    await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
+  })
+
   it('rejects an unknown template with no directory created', async () => {
     const result = await createHarness(root, 'nonexistent-template', 'test-fixer')
     expect(result.ok).toBe(false)

@@ -39,6 +39,15 @@ export function flagChips(item: PendingChange): readonly FlagChip[] {
       color: colors.claude.warning
     })
   }
+  if (item.flags.attributionSuspect) {
+    // Error, not warning: a forwarded agentId that failed main-side binding
+    // validation is an identity-forgery signal (contracts §4, step 3).
+    chips.push({
+      key: 'attribution-suspect',
+      label: 'Attribution suspect',
+      color: colors.claude.error
+    })
+  }
   if (item.flags.gateDegraded) {
     chips.push({
       key: 'gate-degraded',

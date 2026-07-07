@@ -96,6 +96,12 @@ interface ThreadState {
    * the IPC boundary applies the trust rule (filler/off-roster => default).
    */
   setThreadModel: (id: string, model: string) => Promise<void>
+  /**
+   * Attach the harness slug after main records the binding (workstation
+   * step 3). Display + transport forwarding only — attribution authority is
+   * main's HarnessRunRegistry, which validates the forwarded value per turn.
+   */
+  setThreadAgentId: (id: string, agentId: string) => Promise<void>
 
   appendUserMessage: (text: string) => Promise<void>
   appendAssistantStreamChunk: (threadId: string, runId: string, chunk: string) => void
@@ -435,6 +441,16 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const t = get().threadsById[id]
     if (!t || t.model === model) return
     const next: Thread = { ...t, model }
+    set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
+    await window.api.thread.save(v, next)
+  },
+
+  setThreadAgentId: async (id, agentId) => {
+    const v = get().vaultPath
+    if (!v) return
+    const t = get().threadsById[id]
+    if (!t || t.agentId === agentId) return
+    const next: Thread = { ...t, agentId }
     set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
     await window.api.thread.save(v, next)
   },

@@ -47,6 +47,8 @@ export interface PendingChangeFlags {
   readonly degradedAttribution: boolean
   /** Turn opened while the agent-write watcher state ∉ {watching} (OQ6). */
   readonly gateDegraded: boolean
+  /** agentId failed main-side binding validation (v1.2.2). */
+  readonly attributionSuspect: boolean
   /** Touched a HARNESS_PROTECTED_GLOBS path. */
   readonly forbidden: boolean
 }

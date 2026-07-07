@@ -57,8 +57,11 @@ export function encodeThread(t: Thread): string {
   // Persisting it caused dangerous bypass to survive restarts (silent note edits).
   const fm = {
     agent: t.agent,
-    // Harness attribution id (workstation step 6) — persisted so the slug
-    // keeps flowing into turn attribution after a relaunch.
+    // agent_id is DISPLAY-ONLY since v1.2.2 (workstation Phase 2 step 3):
+    // attribution authority is main's HarnessRunRegistry. The persisted slug
+    // feeds UI titles + transport forwarding, which main re-validates every
+    // turn — `<TE_DIR>/threads` is watcher-ignored, so this field is
+    // tamperable and must never be trusted for attribution.
     ...(t.agentId !== undefined ? { agent_id: t.agentId } : {}),
     // Persisted for ALL agents since workstation Phase 2 step 1: a CLI
     // thread's picked model must survive relaunch. Threads that never picked
@@ -105,6 +108,8 @@ export function decodeThread(md: string): Thread {
   return {
     id: '',
     agent: data.agent,
+    // Display-only decode (v1.2.2): forwarded values are validated main-side
+    // against the binding registry — never attribute from this field.
     ...(typeof data.agent_id === 'string' ? { agentId: data.agent_id } : {}),
     model: data.model ?? DEFAULT_NATIVE_MODEL,
     started: data.started,

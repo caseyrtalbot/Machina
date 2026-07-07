@@ -238,7 +238,9 @@ const api = {
   // call — main resolves it from the current workspace.
   harness: {
     create: (template: string, slug: string) => typedInvoke('harness:create', { template, slug }),
-    list: () => typedInvoke('harness:list')
+    list: () => typedInvoke('harness:list'),
+    run: (slug: string, threadId: string) => typedInvoke('harness:run', { slug, threadId }),
+    binding: (threadId: string) => typedInvoke('harness:binding', { threadId })
   }
 }
 

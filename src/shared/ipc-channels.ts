@@ -365,6 +365,22 @@ export interface IpcChannels {
     request: void
     response: import('./git-types').GitOpResult
   }
+
+  // --- Harness run + binding (workstation contracts §4/§6, step 3) ---
+  // No `root` in either request: main resolves it from
+  // WorkspaceService.current(). harness:run composes the first-turn prompt
+  // MAIN-SIDE and records the write-once thread↔slug binding only after
+  // main's own validation; the renderer keeps the send timing.
+  'harness:run': {
+    request: { slug: string; threadId: string }
+    response: { ok: true; prompt: string } | { ok: false; error: string }
+  }
+  // Read path for the main-binding-sourced harness-identity chip. Null when
+  // the thread is unbound or bound under a different workspace root.
+  'harness:binding': {
+    request: { threadId: string }
+    response: { slug: string } | null
+  }
 }
 
 export type AgentNativeApprovalPreview =
