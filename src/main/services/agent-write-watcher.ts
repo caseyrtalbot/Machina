@@ -36,8 +36,14 @@ import type { RecordWritesOpts } from './approval-queue'
 
 /** Mirrors vault-watcher's batching interval. */
 const BATCH_INTERVAL_MS = 50
-/** Contracts §5 default budget: maxWritesPerMinute. */
-const MAX_WRITES_PER_MINUTE = 10
+/**
+ * Fallback maxWritesPerMinute for threads with NO bound harness budget
+ * (ad-hoc threads, pre-step-6 bindings, backfills). Bound threads take their
+ * threshold from the harness budgets snapshot via the injected
+ * `getWriteBudget` provider (step 6, contracts §5 v1.2.6) — this constant is
+ * the default, not a contract value read from any harness.
+ */
+export const DEFAULT_MAX_WRITES_PER_MINUTE = 10
 /**
  * Cap on awaiting chokidar's initial-scan `ready` (contracts §4 v1.2.1). The
  * un-timed await could hang vault init forever when the scan never completes.
@@ -117,6 +123,35 @@ export function partitionBatch(
   return { selfWrites, forbidden, attributed, unattributed }
 }
 
+/**
+ * The circuit breaker's watcher-sourced signal port (step 6, contracts §5
+ * v1.2.6). Structural — the watcher never imports the breaker module (which
+ * carries electron singleton wiring); ipc/git.ts injects the singleton.
+ * Every signal carries the batch's `concurrentTurns` ambiguity flag: the
+ * breaker never auto-kills on ambiguous attribution.
+ */
+export interface AgentBreakerPort {
+  noteVelocity(signal: {
+    threadId: string
+    agentId: string
+    turnId: string
+    concurrentTurns: boolean
+    exceeded: boolean
+  }): void
+  noteForbiddenAutoReject(signal: {
+    threadId: string
+    agentId: string
+    turnId: string
+    concurrentTurns: boolean
+  }): void
+  noteHeadMoved(signal: {
+    threadId: string
+    agentId: string
+    turnId: string
+    concurrentTurns: boolean
+  }): void
+}
+
 export interface AgentWriteWatcherDeps {
   readonly root: string
   readonly registry: {
@@ -144,6 +179,16 @@ export interface AgentWriteWatcherDeps {
   readonly readyTimeoutMs?: number
   /** Injectable chokidar factory (tests exercise the ready/error/timeout race). */
   readonly watchFn?: typeof watch
+  /**
+   * Per-thread write-rate threshold from the bound harness's bind-time
+   * budgets snapshot (step 6, contracts §5 v1.2.6). Undefined (unbound
+   * ad-hoc thread, provider unwired) ⇒ DEFAULT_MAX_WRITES_PER_MINUTE. The
+   * limiter stays keyed PER THREAD: concurrent threads bound to one slug
+   * each get the full threshold (per-thread-per-slug semantics).
+   */
+  readonly getWriteBudget?: (threadId: string) => number | undefined
+  /** Circuit-breaker signal port (step 6); absent = signals unwired. */
+  readonly breaker?: AgentBreakerPort
 }
 
 export class AgentWriteWatcher {
@@ -323,6 +368,14 @@ export class AgentWriteWatcher {
             this.auditGateFailure('auto-reject failed', message, paths)
             this.setHealth('degraded', `auto-reject failed: ${message}`)
           })
+        // Breaker signal (step 6): one observation per forbidden batch —
+        // repeated protected-path hits within a turn escalate to a kill.
+        this.deps.breaker?.noteForbiddenAutoReject({
+          threadId: match.turn.threadId,
+          agentId: match.turn.agentId,
+          turnId: match.turn.turnId,
+          concurrentTurns: match.concurrent
+        })
       } else {
         // No window to attribute the violation to — contain nothing (we
         // cannot name an agent), but never let it pass silently.
@@ -342,9 +395,20 @@ export class AgentWriteWatcher {
       if (headMoved && !this.headMovedAudited.has(match.turn.turnId)) {
         this.headMovedAudited.add(match.turn.turnId)
         this.auditHeadMoved(match.turn)
+        // Breaker signal (step 6): once per turn, aligned with the audit.
+        this.deps.breaker?.noteHeadMoved({
+          threadId: match.turn.threadId,
+          agentId: match.turn.agentId,
+          turnId: match.turn.turnId,
+          concurrentTurns: match.concurrent
+        })
       }
+      // Per-thread threshold from the bound harness's bind-time budgets
+      // snapshot; DEFAULT for unbound/ad-hoc threads (step 6).
+      const threshold =
+        this.deps.getWriteBudget?.(match.turn.threadId) ?? DEFAULT_MAX_WRITES_PER_MINUTE
       const flags: Partial<PendingChangeFlags> = {
-        highVelocity: limiter.isExceeded(MAX_WRITES_PER_MINUTE),
+        highVelocity: limiter.isExceeded(threshold),
         headMoved,
         concurrentTurns: match.concurrent,
         degradedAttribution: match.degraded,
@@ -357,6 +421,17 @@ export class AgentWriteWatcher {
         agentId: match.turn.agentId,
         paths,
         flags
+      })
+      // Breaker signal (step 6): one velocity observation per attributed
+      // batch — consecutive exceeded observations trip, a single one only
+      // flags. Sent AFTER recordWrites so a kill can never race the queue
+      // item that documents the writes that caused it.
+      this.deps.breaker?.noteVelocity({
+        threadId: match.turn.threadId,
+        agentId: match.turn.agentId,
+        turnId: match.turn.turnId,
+        concurrentTurns: match.concurrent,
+        exceeded: flags.highVelocity === true
       })
     }
 

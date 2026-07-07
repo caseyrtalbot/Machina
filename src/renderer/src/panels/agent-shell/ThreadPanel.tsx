@@ -8,6 +8,7 @@ import { colors, borderRadius, transitions, typography, floatingPanel } from '..
 import { AgentBadge } from './agent-badge'
 import { WatcherHealthChip, WatcherHealthNotice } from './WatcherHealthChip'
 import { HarnessIdentityChip } from './HarnessIdentityChip'
+import { AgentKillSwitch } from './agent-breaker-kill-switch'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { TerminalDockAdapter } from './dock-adapters/TerminalDockAdapter'
 
@@ -151,6 +152,9 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
           {t.agent !== 'machina-native' && (
             <HarnessIdentityChip threadId={t.id} agentId={t.agentId} />
           )}
+          {/* Kill switch + breaker-tripped chip (Phase 2 step 6): the hard
+              kill (cli-thread:close), distinct from the input bar's Stop. */}
+          {t.agent !== 'machina-native' && <AgentKillSwitch threadId={t.id} />}
           {t.agent !== 'machina-native' && <WatcherHealthChip />}
           {t.agent === 'machina-native' && (
             <AutoAcceptToggle

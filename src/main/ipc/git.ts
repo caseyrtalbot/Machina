@@ -20,6 +20,11 @@ import {
   setGateHealthProbe
 } from '../services/cli-turn-registry'
 import {
+  getAgentCircuitBreaker,
+  setBreakerSignalHealthProbe
+} from '../services/agent-circuit-breaker'
+import { getHarnessRunRegistry } from '../services/harness-run-registry'
+import {
   commitApproved,
   commitsBetween,
   diff,
@@ -254,6 +259,16 @@ function buildWatcher(root: string): AgentWriteWatcher {
     isSelfWrite: (absPath) => getDocumentManager().hasPendingWrite(absPath),
     headSha,
     commitsBetween,
+    // Step 6 (contracts §5 v1.2.6): per-thread limiter threshold from the
+    // bound harness's bind-time budgets snapshot. In-memory registry read —
+    // the mirror was loaded by the harness:run/attribution path before any
+    // bound turn can write; an unloaded/unbound thread reads undefined and
+    // the watcher applies the default.
+    getWriteBudget: (threadId) =>
+      getHarnessRunRegistry().get(root, threadId)?.budgets?.maxWritesPerMinute,
+    // Step 6: escalation port — velocity / forbidden / headMoved signals
+    // flow to the circuit breaker (kill + audit + event on trip).
+    breaker: getAgentCircuitBreaker(),
     onHealthChange: (state, reason) => {
       // A superseded instance (replaced by a newer restart or workspace
       // switch) must not steer the shared health state — its late 'stopped'/
@@ -400,4 +415,11 @@ export function registerGitIpc(): void {
   // never block. Late-bound probe: a direct import from cli-turn-registry
   // back into this module would be a cycle.
   setGateHealthProbe(() => watcherHealth.state === 'watching')
+
+  // Breaker signal-source honesty (step 6, contracts §5 v1.2.6): when the
+  // watcher is not watching, the breaker's velocity/forbidden/headMoved
+  // sources have no coverage — status reports signalsDegraded instead of
+  // pretending. Health is NEVER a trip input (a dead watcher must not kill
+  // healthy agents). Same late-bound pattern as setGateHealthProbe.
+  setBreakerSignalHealthProbe(() => watcherHealth.state === 'watching')
 }

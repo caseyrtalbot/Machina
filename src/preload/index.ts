@@ -214,7 +214,9 @@ const api = {
       typedOn('approvals:watcher-health', callback),
     cliThreadSessionChanged: (
       callback: (data: IpcEventData<'cli-thread:session-changed'>) => void
-    ) => typedOn('cli-thread:session-changed', callback)
+    ) => typedOn('cli-thread:session-changed', callback),
+    agentBreakerTripped: (callback: (data: IpcEventData<'agent:breaker-tripped'>) => void) =>
+      typedOn('agent:breaker-tripped', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path }),
@@ -247,6 +249,11 @@ const api = {
     run: (slug: string, threadId: string) => typedInvoke('harness:run', { slug, threadId }),
     binding: (threadId: string) => typedInvoke('harness:binding', { threadId }),
     lint: (slug: string) => typedInvoke('harness:lint', { slug })
+  },
+  // Agent circuit breaker (workstation contracts §5/§6, Phase 2 step 6).
+  // Appended at the api end per the parallel-session rule.
+  breaker: {
+    status: () => typedInvoke('agent:breaker-status')
   }
 }
 

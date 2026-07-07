@@ -601,6 +601,88 @@ names, stray files) stay skipped. Error severity disables run everywhere — the
 renders broken harnesses greyed with the reason (never vanished), and `runHarness`
 re-checks defensively. Warnings inform but never disable.
 
+### Budget stack + circuit breakers (Phase 2 step 6, v1.2.6)
+
+Budgets are ENFORCED with defined semantics (they were parsed-but-decorative
+before this step):
+
+- **`maxWritesPerMinute` = the write-rate-limiter threshold, PER THREAD.**
+  `WriteRateLimiter` is keyed per thread, so N concurrent threads bound to one
+  slug each get the full threshold — per-thread-per-slug semantics, documented
+  honestly rather than building aggregate accounting (per-slug aggregation is
+  Phase 3's loop scheduler; a concurrent-same-slug test pins current behavior).
+  The watcher takes the threshold from an injected per-thread budgets provider
+  (`AgentWriteWatcherDeps.getWriteBudget`, wired in ipc/git.ts from the binding
+  snapshot); unbound/ad-hoc threads get the default 10
+  (`DEFAULT_MAX_WRITES_PER_MINUTE` — a fallback constant, not a value read from
+  any harness).
+- **`maxTurns` = CLI invocations per thread**, counted at
+  `CliTurnRegistry.turnStarted` (OQ2 — agent-internal iterations are invisible
+  in the `--print` model and gemini/raw have no structured stream; Phase-3
+  loops are the primary consumer). Counts are in-memory per app run (registry
+  lifetime) and deliberately survive `threadClosed`: a kill must not refill the
+  budget. Budget N allows exactly N invocations; the N+1th trips.
+- **Budgets SNAPSHOT at bind time** (`HarnessBinding.budgets`, the step-3
+  reserved field, persisted in the userData mirror): SKILL.md frontmatter is
+  agent-writable — `HARNESS_PROTECTED_GLOBS` covers only verify.sh and
+  rules.md — so a running agent can edit its own budgets mid-run.
+  Snapshot-at-bind is the mitigation: post-bind edits affect the NEXT run only
+  (write-once covers the snapshot; a same-slug re-record never refreshes it).
+  Widening the protected globs to SKILL.md is REJECTED for now (it would
+  auto-reject the agent's legitimate state.md-sibling workflow and user edits
+  alike) — accepted residual with the tamper channel named. Trust-on-upgrade
+  backfills mint bindings WITHOUT budgets (frontmatter is the tamper channel
+  the backfill only half-trusts): legacy threads run under the default
+  threshold with no maxTurns enforcement.
+
+**Circuit breaker** (`src/main/services/agent-circuit-breaker.ts`, keyed
+threadId/agentId; shared types in `src/shared/agent-breaker-types.ts`). Trip
+inputs → trip action = kill (`spawner.close` via a late-bound callback — PTY
+killed, turn window dropped with zero linger) + audit
+(`cli-agent:breaker-tripped`) + the `agent:breaker-tripped` event:
+
+- **velocity** = `VELOCITY_TRIP_CONSECUTIVE` (3) CONSECUTIVE limiter-exceeded
+  batch observations, never one window (one burst flags `highVelocity`; only
+  a sustained burst trips; a non-exceeded batch resets the count);
+- **forbidden-writes** = `FORBIDDEN_TRIP_PER_TURN` (3) HARNESS_PROTECTED_GLOBS
+  autoRejects within one turn;
+- **head-moved** = the agent-ran-git tripwire (the watcher's once-per-turn
+  audit is the signal; the turn-END tripwire in ipc/git.ts audits + flags but
+  does not feed the breaker — the turn is over and the PTY idle);
+- **max-turns** = invocation count exceeded the bound budget (surfaced by
+  `CliTurnRegistry.onTurnStarted` → `checkMaxTurnsOnTurnStarted` in
+  ipc/cli-thread.ts, deferred one microtask so a kill never races the
+  in-flight send).
+
+Signal seam: no subscribe API exists on the queue, so
+`AgentWriteWatcherDeps.breaker` is an injected port
+(`noteVelocity`/`noteForbiddenAutoReject`/`noteHeadMoved`) invoked from the
+existing flag-assembly and autoReject sites — the same injected-dependency
+style as step 2's `onHealthChange`, wired in ipc/git.ts. Kill runs EXACTLY
+ONCE per trip episode (per-thread latch; the episode resets when the thread's
+next turn opens — an explicit user send is re-engagement, so a still-breached
+maxTurns budget re-trips per send by design).
+
+**Negative rules (contract points, test-pinned):** (1) the breaker NEVER
+trips on watcher-degraded state alone — health is consumed only for status
+honesty (`AgentBreakerStatus.signalsDegraded`: the velocity/forbidden/
+headMoved sources have no coverage right now); a dead watcher must not kill
+healthy agents. (2) It NEVER auto-kills on signals from writes flagged
+`concurrentTurns` — ambiguous attribution could kill the wrong agent; the
+trip degrades to a tray notice (`action: 'notice'`, audited decision `error`,
+kill left manual); a later unambiguous signal may escalate to the one kill.
+
+**Kill switch** = the existing hard-kill path surfaced: a Kill button on CLI
+thread headers (`agent-breaker-kill-switch.tsx`, liveness from the
+cli-session-store) drives `cli-thread:close`; distinct from the input bar's
+Stop (Ctrl+C leaves the shell alive). **Kill-vs-awaitWriteFinish semantics
+(recorded, tested):** writes flushing within the watcher's ~300ms
+awaitWriteFinish window after the kill arrive after `threadClosed` dropped
+the window with zero linger — they become audited-unattributed writes
+(`cli-agent:unattributed-write`), documented and never silent. UI copy stays
+inside the §4 framing: breakers contain accidents faster; they never claim
+prevention — the tripping writes are already on disk and stay in the queue.
+
 ## 6. IPC channels (names reserved; registration follows the 4-step pattern)
 
 New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcEvents`:
@@ -631,6 +713,9 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 // IpcEvents (v1.2.3)
 'cli-thread:session-changed': { threadId: string; sessionId: string } // v1.2.3 — spawn-on-demand respawn rebinding; feeds cli-session-store
 'git:list-agent-commits': { request: void; response: AgentCommitsResult } // v1.2.5 — read path for the revert UI; null root ⇒ { ok:false, reason:'no-workspace' }, non-repo ⇒ 'not-a-git-repo' (the tray renders the honest "nothing to revert from" state, never a false empty)
+'agent:breaker-status':  { request: void; response: AgentBreakerStatus } // v1.2.6 — pull mirror of tripped breakers + signalsDegraded (tray notice rows, kill-switch chip)
+// IpcEvents (v1.2.6)
+'agent:breaker-tripped': BreakerTripEvent // v1.2.6 — trip broadcast: action 'killed' (containment applied) or 'notice' (concurrentTurns ambiguity, kill left manual)
 ```
 
 Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
@@ -660,6 +745,52 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.2.6 (2026-07-07, Phase 2 step 6 landing)** — §5 gains the
+  budget-stack + circuit-breaker subsection: budgets ENFORCED
+  (`maxWritesPerMinute` = per-THREAD limiter threshold from an injected
+  budgets provider, default 10 for unbound/ad-hoc — per-thread-per-slug
+  semantics documented honestly, per-slug aggregation deferred to Phase 3;
+  `maxTurns` = CLI invocations per thread counted at
+  `CliTurnRegistry.turnStarted` per OQ2, in-memory per app run, surviving
+  threadClosed so a kill never refills the budget), **budgets snapshot at
+  bind** (`HarnessBinding.budgets` — the step-3 reserved field — persisted in
+  the userData mirror; write-once covers the snapshot, post-bind SKILL.md
+  edits affect the next run only; widening HARNESS_PROTECTED_GLOBS to
+  SKILL.md rejected, accepted residual with the tamper channel named;
+  backfilled bindings carry NO budgets — legacy threads run under the default
+  threshold with no maxTurns enforcement). New breaker contract
+  (`agent-circuit-breaker.ts`, types in `agent-breaker-types.ts`): trip
+  inputs velocity (3 CONSECUTIVE limiter-exceeded batches, never one) /
+  repeated forbidden autoRejects (3 per turn) / headMoved (watcher signal,
+  once per turn) / maxTurns breach; trip action = cli-thread hard kill via a
+  late-bound spawner.close callback + `cli-agent:breaker-tripped` audit +
+  `agent:breaker-tripped` event, EXACTLY ONE kill per episode (per-thread
+  latch, reset on the thread's next turn). Negative rules as contract points:
+  never trip on watcher-degraded state alone (health feeds only
+  `AgentBreakerStatus.signalsDegraded` honesty), never auto-kill on
+  `concurrentTurns`-flagged signals (degrade to a tray notice, decision
+  `error`; a later unambiguous signal may escalate to the one kill).
+  Kill-vs-awaitWriteFinish recorded + tested: post-kill flush-window writes
+  become audited-unattributed (zero-linger threadClosed trade). Kill switch =
+  the existing hard-kill surfaced on CLI thread headers
+  (`agent-breaker-kill-switch.tsx` → `cli-thread:close`); tray gains the
+  breaker notice rows (`agent-breaker-notice.tsx`, mount-only insertion in
+  ApprovalsTray). §6 gains `agent:breaker-status` + the
+  `agent:breaker-tripped` event (appended at the list end). `HarnessSummary`
+  gains optional `budgets` (what the next run would snapshot; absent when
+  frontmatter is unreadable). Recorded deviations: (1) the OQ8
+  workspace-switch visibility graft is EXCLUDED — not ratified by Casey as of
+  2026-07-07; the spec marks it severable, and it becomes its own follow-up
+  commit after the call; (2) the kill switch lives in the ThreadPanel header
+  only (the spec offered ThreadInputBar OR header) — ThreadInputBar is
+  untouched, keeping Stop (interrupt) and Kill (hard stop) visually distinct;
+  (3) the turn-END headMoved tripwire does not feed the breaker (the spec
+  names the watcher's flag-assembly/autoReject sites as the signal seam; at
+  turn end the PTY is idle and the audit + flag already record it); (4)
+  breaker shared types live in a new `agent-breaker-types.ts` rather than
+  git-types.ts (zero collision with the parallel step 5); (5) a notice-latched
+  episode stays quiet on further ambiguous signals (no event spam) but
+  escalates to the single kill on an unambiguous one.
 - **v1.2.5 (2026-07-07, Phase 2 step 5 landing)** — per-agent revert UI +
   list-agent-commits. §2 GitService gains `listAgentCommits(root)` — the single
   git-log trailer walk was factored out of `revertAgent` into a shared reader so

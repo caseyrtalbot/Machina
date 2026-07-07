@@ -102,6 +102,20 @@ export interface TurnStartedOpts {
   readonly attributionSuspect?: boolean
 }
 
+/** Surfaced to the step-6 breaker wiring on every turn open (contracts §5). */
+export interface TurnStartedInfo {
+  readonly threadId: string
+  readonly agentId: string
+  readonly cwd: string
+  /**
+   * CLI invocations sent for this thread so far, INCLUDING this one (OQ2:
+   * the maxTurns unit). In-memory per app run — a relaunch resets counts,
+   * same lifetime as every other registry fact. Deliberately NOT reset by
+   * threadClosed: a breaker kill must not refill the budget.
+   */
+  readonly invocationCount: number
+}
+
 export interface CliTurnRegistryDeps {
   /** GitService.headSha — null for non-repo roots. */
   readonly headSha: (root: string) => string | null
@@ -113,6 +127,14 @@ export interface CliTurnRegistryDeps {
    * flagged when the probe is unwired (tests, early boot).
    */
   readonly isGateHealthy?: () => boolean
+  /**
+   * Fired on every turnStarted with the thread's running invocation count
+   * (step 6, contracts §5 v1.2.6): the breaker wiring in ipc/cli-thread.ts
+   * checks it against the bound harness's maxTurns budget. Injected-callback
+   * style (same as step 2's onHealthChange) — the registry never learns
+   * budgets or kills anything itself.
+   */
+  readonly onTurnStarted?: (info: TurnStartedInfo) => void
   /** Injectable clock (ms epoch) for deterministic tests. */
   readonly now?: () => number
 }
@@ -134,6 +156,12 @@ export class CliTurnRegistry {
    * over-attribution, never silent escape.
    */
   private readonly openInvocations = new Map<string, number>()
+  /**
+   * Total invocations sent per thread this app run (step 6, the maxTurns
+   * unit — OQ2). Survives threadClosed on purpose: a breaker kill or PTY
+   * death must not refill the thread's budget.
+   */
+  private readonly invocationCounts = new Map<string, number>()
   private seq = 0
 
   constructor(private readonly deps: CliTurnRegistryDeps) {}
@@ -157,6 +185,14 @@ export class CliTurnRegistry {
     }
     this.turns.set(opts.threadId, turn)
     this.openInvocations.set(opts.threadId, (this.openInvocations.get(opts.threadId) ?? 0) + 1)
+    const invocationCount = (this.invocationCounts.get(opts.threadId) ?? 0) + 1
+    this.invocationCounts.set(opts.threadId, invocationCount)
+    this.deps.onTurnStarted?.({
+      threadId: opts.threadId,
+      agentId: opts.agentId,
+      cwd: opts.cwd,
+      invocationCount
+    })
     return turn
   }
 
@@ -262,10 +298,20 @@ function isInside(root: string, child: string): boolean {
 
 let ptyAliveProbe: ((threadId: string) => boolean) | null = null
 let gateHealthProbe: (() => boolean) | null = null
+let turnStartedListener: ((info: TurnStartedInfo) => void) | null = null
 let singleton: CliTurnRegistry | null = null
 
 export function setPtyAliveProbe(probe: (threadId: string) => boolean): void {
   ptyAliveProbe = probe
+}
+
+/**
+ * Late-bound like the probes above: ipc/cli-thread.ts owns the breaker/budget
+ * wiring but transitively reaches this module — a setter breaks the cycle.
+ * Unwired = no-op (tests, early boot); turns are never blocked either way.
+ */
+export function setTurnStartedListener(listener: (info: TurnStartedInfo) => void): void {
+  turnStartedListener = listener
 }
 
 /**
@@ -283,7 +329,8 @@ export function getCliTurnRegistry(): CliTurnRegistry {
     singleton = new CliTurnRegistry({
       headSha,
       isPtyAlive: (threadId) => ptyAliveProbe?.(threadId) ?? false,
-      isGateHealthy: () => gateHealthProbe?.() ?? true
+      isGateHealthy: () => gateHealthProbe?.() ?? true,
+      onTurnStarted: (info) => turnStartedListener?.(info)
     })
   }
   return singleton

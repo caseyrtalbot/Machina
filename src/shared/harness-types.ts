@@ -85,13 +85,29 @@ export function validateHarnessScope(
   return { ok: true }
 }
 
+/**
+ * Harness budgets (contracts §5, ENFORCED since Phase 2 step 6):
+ * `maxWritesPerMinute` is the write-rate-limiter threshold, PER THREAD
+ * (per-thread-per-slug semantics — N concurrent threads bound to one slug
+ * each get the full threshold; per-slug aggregation is Phase 3's loop
+ * scheduler); `maxTurns` is CLI invocations per thread, counted at
+ * `CliTurnRegistry.turnStarted` (OQ2 — agent-internal iterations are
+ * invisible in the --print model). Budgets SNAPSHOT into the thread's
+ * binding at harness:run time; post-bind SKILL.md edits affect the next
+ * run only.
+ */
+export interface HarnessBudgets {
+  readonly maxTurns: number
+  readonly maxWritesPerMinute: number
+}
+
 /** SKILL.md frontmatter (contracts §5; Phase 1 uses template defaults). */
 export interface HarnessFrontmatter {
   readonly name: string
   readonly description: string
   readonly adapter: HarnessAdapter
   readonly permissionMode: 'queue-all-writes'
-  readonly budgets: { readonly maxTurns: number; readonly maxWritesPerMinute: number }
+  readonly budgets: HarnessBudgets
 }
 
 /**
@@ -108,6 +124,12 @@ export interface HarnessSummary {
   readonly description: string
   readonly adapter: HarnessAdapter | null
   readonly diagnostics: readonly import('./harness-lint').Diagnostic[]
+  /**
+   * Frontmatter budgets (step 6, v1.2.6) — what the NEXT run would snapshot
+   * at bind. Absent when the frontmatter is unreadable (such entries always
+   * carry an error diagnostic, which disables run).
+   */
+  readonly budgets?: HarnessBudgets
 }
 
 /** harness:create response (contracts §6). `root` = the created harness dir. */

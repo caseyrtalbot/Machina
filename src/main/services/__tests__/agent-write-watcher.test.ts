@@ -9,7 +9,7 @@ import { isHarnessProtectedPath, TE_DIR } from '@shared/constants'
 import type { AuditEntry } from '@shared/agent-types'
 import type { GitOpResult, PendingChange } from '@shared/git-types'
 import type { BatchedEvent } from '../event-batcher'
-import type { ActiveTurnMatch } from '../cli-turn-registry'
+import { CliTurnRegistry, type ActiveTurnMatch } from '../cli-turn-registry'
 import type { RecordWritesOpts } from '../approval-queue'
 import { isWatcherIgnored, partitionBatch, AgentWriteWatcher } from '../agent-write-watcher'
 
@@ -613,4 +613,178 @@ describe('AgentWriteWatcher integration (real chokidar)', () => {
       )
     }
   )
+})
+
+// ── Step 6 (contracts §5 v1.2.6): per-thread budget thresholds + breaker port ──
+
+describe('budget thresholds and breaker signals (step 6)', () => {
+  interface BudgetHarness {
+    watcher: AgentWriteWatcher
+    recordWrites: ReturnType<typeof vi.fn>
+    breaker: {
+      noteVelocity: ReturnType<typeof vi.fn>
+      noteForbiddenAutoReject: ReturnType<typeof vi.fn>
+      noteHeadMoved: ReturnType<typeof vi.fn>
+    }
+  }
+
+  function makeBudgetHarness(opts: {
+    matchFor: () => ActiveTurnMatch | null
+    getWriteBudget?: (threadId: string) => number | undefined
+    headSha?: string | null
+  }): BudgetHarness {
+    const recordWrites = vi.fn((): PendingChange => ({}) as PendingChange)
+    const breaker = {
+      noteVelocity: vi.fn(),
+      noteForbiddenAutoReject: vi.fn(),
+      noteHeadMoved: vi.fn()
+    }
+    const watcher = new AgentWriteWatcher({
+      root: ROOT,
+      registry: { activeTurnFor: () => opts.matchFor() },
+      queue: {
+        recordWrites,
+        autoReject: vi.fn(async (): Promise<GitOpResult> => ({ ok: true }))
+      },
+      audit: { log: vi.fn() },
+      isSelfWrite: () => false,
+      headSha: () => (opts.headSha === undefined ? 'sha-start' : opts.headSha),
+      commitsBetween: () => ['unexplained-sha'],
+      getWriteBudget: opts.getWriteBudget,
+      breaker
+    })
+    return { watcher, recordWrites, breaker }
+  }
+
+  function matchForThread(threadId: string, concurrent = false): ActiveTurnMatch {
+    return makeMatch({
+      turn: { ...makeMatch().turn, threadId, turnId: `turn-${threadId}` },
+      concurrent
+    })
+  }
+
+  it('the limiter trips at the HARNESS budget, not the default constant', () => {
+    const h = makeBudgetHarness({
+      matchFor: () => matchForThread('th1'),
+      getWriteBudget: () => 3
+    })
+    h.watcher.handleBatch([ev('a.ts'), ev('b.ts')])
+    expect((h.recordWrites.mock.calls[0][0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    h.watcher.handleBatch([ev('c.ts')])
+    expect((h.recordWrites.mock.calls[1][0] as RecordWritesOpts).flags?.highVelocity).toBe(true)
+  })
+
+  it('an undefined budget (unbound/ad-hoc thread) falls back to the default of 10', () => {
+    const h = makeBudgetHarness({
+      matchFor: () => matchForThread('th1'),
+      getWriteBudget: () => undefined
+    })
+    h.watcher.handleBatch(Array.from({ length: 9 }, (_, i) => ev(`f${i}.ts`)))
+    expect((h.recordWrites.mock.calls[0][0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    h.watcher.handleBatch([ev('f9.ts')])
+    expect((h.recordWrites.mock.calls[1][0] as RecordWritesOpts).flags?.highVelocity).toBe(true)
+  })
+
+  it('concurrent same-slug threads EACH get the full threshold (per-thread-per-slug, documented)', () => {
+    // Two threads bound to the same harness slug: budget 5 each. 4+4 writes
+    // (8 > 5 in aggregate) must not flag either thread — the limiter is
+    // keyed per thread; per-slug aggregation is Phase 3's loop scheduler.
+    let active = matchForThread('th-a')
+    const h = makeBudgetHarness({
+      matchFor: () => active,
+      getWriteBudget: () => 5
+    })
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`a${i}.ts`)))
+    active = matchForThread('th-b')
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`b${i}.ts`)))
+    for (const call of h.recordWrites.mock.calls) {
+      expect((call[0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    }
+  })
+
+  it('sends one velocity observation per attributed batch with the exceeded flag', () => {
+    const h = makeBudgetHarness({
+      matchFor: () => matchForThread('th1'),
+      getWriteBudget: () => 2
+    })
+    h.watcher.handleBatch([ev('a.ts')])
+    h.watcher.handleBatch([ev('b.ts')])
+    expect(h.breaker.noteVelocity).toHaveBeenCalledTimes(2)
+    expect(h.breaker.noteVelocity.mock.calls[0][0]).toMatchObject({
+      threadId: 'th1',
+      agentId: 'agent-a',
+      turnId: 'turn-th1',
+      concurrentTurns: false,
+      exceeded: false
+    })
+    expect(h.breaker.noteVelocity.mock.calls[1][0]).toMatchObject({ exceeded: true })
+  })
+
+  it('signals forbidden autoRejects to the breaker once per forbidden batch', () => {
+    const h = makeBudgetHarness({ matchFor: () => matchForThread('th1') })
+    h.watcher.handleBatch([ev(`${TE_DIR}/agents/a/verify.sh`), ev(`${TE_DIR}/agents/a/rules.md`)])
+    h.watcher.handleBatch([ev(`${TE_DIR}/agents/a/verify.sh`)])
+    expect(h.breaker.noteForbiddenAutoReject).toHaveBeenCalledTimes(2)
+    expect(h.breaker.noteForbiddenAutoReject.mock.calls[0][0]).toMatchObject({
+      threadId: 'th1',
+      turnId: 'turn-th1',
+      concurrentTurns: false
+    })
+  })
+
+  it('signals headMoved to the breaker exactly once per turn, aligned with the audit', () => {
+    const h = makeBudgetHarness({
+      matchFor: () => matchForThread('th1'),
+      headSha: 'sha-other'
+    })
+    h.watcher.handleBatch([ev('a.ts')])
+    h.watcher.handleBatch([ev('b.ts')])
+    expect(h.breaker.noteHeadMoved).toHaveBeenCalledTimes(1)
+  })
+
+  it('flows the concurrentTurns ambiguity flag into every breaker signal', () => {
+    const h = makeBudgetHarness({
+      matchFor: () => matchForThread('th1', true),
+      headSha: 'sha-other'
+    })
+    h.watcher.handleBatch([ev('a.ts'), ev(`${TE_DIR}/agents/a/verify.sh`)])
+    expect(h.breaker.noteVelocity.mock.calls[0][0]).toMatchObject({ concurrentTurns: true })
+    expect(h.breaker.noteForbiddenAutoReject.mock.calls[0][0]).toMatchObject({
+      concurrentTurns: true
+    })
+    expect(h.breaker.noteHeadMoved.mock.calls[0][0]).toMatchObject({ concurrentTurns: true })
+  })
+
+  it('kill-then-flush: writes landing after threadClosed become audited-unattributed (§4 trade)', () => {
+    // The breaker kill runs spawner.close → registry.threadClosed (zero
+    // linger). A write still flushing through awaitWriteFinish arrives with
+    // no qualifying window: audited, never queued, never silent.
+    const registry = new CliTurnRegistry({
+      headSha: () => null,
+      isPtyAlive: () => true
+    })
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.threadClosed('th1')
+
+    const auditLog = vi.fn()
+    const recordWrites = vi.fn((): PendingChange => ({}) as PendingChange)
+    const watcher = new AgentWriteWatcher({
+      root: ROOT,
+      registry,
+      queue: {
+        recordWrites,
+        autoReject: vi.fn(async (): Promise<GitOpResult> => ({ ok: true }))
+      },
+      audit: { log: auditLog },
+      isSelfWrite: () => false,
+      headSha: () => null,
+      commitsBetween: () => []
+    })
+    watcher.handleBatch([ev('late-flush.ts')])
+    expect(recordWrites).not.toHaveBeenCalled()
+    expect(auditLog).toHaveBeenCalledTimes(1)
+    const entry = auditLog.mock.calls[0][0] as AuditEntry
+    expect(entry.tool).toBe('cli-agent:unattributed-write')
+    expect(entry.affectedPaths).toEqual(['late-flush.ts'])
+  })
 })

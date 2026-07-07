@@ -28,7 +28,11 @@ import { app } from 'electron'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { TE_DIR, THREADS_DIR } from '../../shared/constants'
-import { isReservedHarnessSlug, isValidHarnessSlug } from '../../shared/harness-types'
+import {
+  isReservedHarnessSlug,
+  isValidHarnessSlug,
+  type HarnessBudgets
+} from '../../shared/harness-types'
 import type { AuditEntry } from '../../shared/agent-types'
 import { atomicWrite } from '../utils/atomic-write'
 import { AuditLogger } from './audit-logger'
@@ -37,8 +41,17 @@ import { ThreadStorage } from './thread-storage'
 export interface HarnessBinding {
   readonly slug: string
   readonly workspaceRoot: string
-  // Reserved for step 6 (budget stack): snapshot of harness budgets at bind time.
-  readonly budgets?: undefined
+  /**
+   * Snapshot of the harness budgets AT BIND TIME (step 6, contracts §5
+   * v1.2.6). SKILL.md frontmatter is agent-writable (HARNESS_PROTECTED_GLOBS
+   * covers only verify.sh and rules.md), so a running agent could edit its
+   * own budgets mid-run — the snapshot is the mitigation: post-bind edits
+   * affect the NEXT run only. Absent on pre-step-6 bindings and on
+   * trust-on-upgrade backfills (frontmatter is the tamper channel the
+   * backfill only half-trusts): such threads run under the default write
+   * threshold with no maxTurns enforcement.
+   */
+  readonly budgets?: HarnessBudgets
 }
 
 export interface HarnessRunRegistryDeps {
@@ -64,6 +77,23 @@ function bindingKey(workspaceRoot: string, threadId: string): string {
   return `${workspaceRoot}\0${threadId}`
 }
 
+/**
+ * Validate a persisted budgets snapshot (mirror decode is degrade-not-fail:
+ * a malformed snapshot loads as absent — default threshold, no maxTurns —
+ * never a throw).
+ */
+function decodeBudgets(value: unknown): HarnessBudgets | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const budgets = value as Partial<HarnessBudgets>
+  if (!Number.isFinite(budgets.maxTurns) || !Number.isFinite(budgets.maxWritesPerMinute)) {
+    return undefined
+  }
+  return {
+    maxTurns: budgets.maxTurns as number,
+    maxWritesPerMinute: budgets.maxWritesPerMinute as number
+  }
+}
+
 export class HarnessRunRegistry {
   private readonly bindings = new Map<string, HarnessBinding>()
   private readonly backfilledRoots = new Set<string>()
@@ -87,12 +117,16 @@ export class HarnessRunRegistry {
   /**
    * WRITE-ONCE record: an existing binding with the same slug is idempotent
    * ok; a different slug is an error — a binding is never overwritten.
-   * Persists on every successful record.
+   * Persists on every successful record. `budgets` is the bind-time snapshot
+   * (step 6): write-once covers it too — a same-slug re-record never
+   * refreshes an existing binding's snapshot (snapshot-at-BIND, not at
+   * latest run request).
    */
   async record(
     workspaceRoot: string,
     threadId: string,
-    slug: string
+    slug: string,
+    budgets?: HarnessBudgets
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     await this.load()
     const key = bindingKey(workspaceRoot, threadId)
@@ -104,7 +138,11 @@ export class HarnessRunRegistry {
       }
     }
     if (existing === undefined) {
-      this.bindings.set(key, { slug, workspaceRoot })
+      this.bindings.set(key, {
+        slug,
+        workspaceRoot,
+        ...(budgets !== undefined ? { budgets } : {})
+      })
     }
     await this.persist()
     return { ok: true }
@@ -188,7 +226,12 @@ export class HarnessRunRegistry {
           typeof binding.slug === 'string' &&
           typeof binding.workspaceRoot === 'string'
         ) {
-          this.bindings.set(key, { slug: binding.slug, workspaceRoot: binding.workspaceRoot })
+          const budgets = decodeBudgets(binding.budgets)
+          this.bindings.set(key, {
+            slug: binding.slug,
+            workspaceRoot: binding.workspaceRoot,
+            ...(budgets !== undefined ? { budgets } : {})
+          })
         }
       }
     }

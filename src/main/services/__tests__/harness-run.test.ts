@@ -78,7 +78,12 @@ describe('composeHarnessRun', () => {
         stateMd
       })
     })
-    expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th1', SLUG)
+    // Budgets snapshot at bind (step 6): the frontmatter budgets read in
+    // this compose ride the record call.
+    expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th1', SLUG, {
+      maxTurns: 10,
+      maxWritesPerMinute: 10
+    })
   })
 
   it('run-time lint authority: scope.json tampered after create ⇒ refuses, no binding (TOCTOU)', async () => {
@@ -108,7 +113,36 @@ describe('composeHarnessRun', () => {
 
     const result = await composeHarnessRun(root, SLUG, 'th1', { registry })
     expect(result.ok).toBe(true)
-    expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th1', SLUG)
+    expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th1', SLUG, {
+      maxTurns: 10,
+      maxWritesPerMinute: 10
+    })
+  })
+
+  it('budgets snapshot source is THIS run request: a post-edit SKILL.md feeds the NEXT bind only', async () => {
+    // Snapshot-at-bind (step 6, contracts §5 v1.2.6): compose reads the
+    // frontmatter budgets at run time and hands them to record(); the
+    // registry's write-once rule (tested in harness-run-registry.test.ts)
+    // keeps an ALREADY-bound thread on its original snapshot. Here: after a
+    // SKILL.md edit, a fresh thread's bind carries the NEW numbers.
+    await createHarness(root, 'test-fixer', SLUG)
+    const skillPath = path.join(root, TE_DIR, 'agents', SLUG, 'SKILL.md')
+    const skill = await fs.readFile(skillPath, 'utf8')
+    await fs.writeFile(
+      skillPath,
+      skill.replace(
+        'budgets: { maxTurns: 10, maxWritesPerMinute: 10 }',
+        'budgets: { maxTurns: 3, maxWritesPerMinute: 4 }'
+      ),
+      'utf8'
+    )
+    const registry = makeRegistry()
+    const result = await composeHarnessRun(root, SLUG, 'th2', { registry })
+    expect(result.ok).toBe(true)
+    expect(registry.record).toHaveBeenCalledExactlyOnceWith(root, 'th2', SLUG, {
+      maxTurns: 3,
+      maxWritesPerMinute: 4
+    })
   })
 
   it('refuses an unreadable file with no binding recorded', async () => {

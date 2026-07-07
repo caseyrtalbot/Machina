@@ -409,6 +409,15 @@ export interface IpcChannels {
     request: void
     response: import('./git-types').AgentCommitsResult
   }
+
+  // --- Agent circuit breaker (workstation contracts §5/§6, Phase 2 step 6,
+  // v1.2.6) --- Pull mirror of the tripped-breaker state for late subscribers
+  // (tray notice rows, kill-switch chip); the agent:breaker-tripped event is
+  // the push path. Appended at the list end per the parallel-session rule.
+  'agent:breaker-status': {
+    request: void
+    response: import('./agent-breaker-types').AgentBreakerStatus
+  }
 }
 
 export type AgentNativeApprovalPreview =
@@ -507,6 +516,12 @@ export interface IpcEvents {
   // FRESH PTY (the spawn response only covers the explicit cli-thread:spawn
   // call). The renderer cli-session-store applies it as the single authority.
   'cli-thread:session-changed': { threadId: string; sessionId: string }
+
+  // Circuit-breaker trip broadcast (main -> renderer, workstation Phase 2
+  // step 6, v1.2.6): fired once per trip — action 'killed' (PTY closed as
+  // containment) or 'notice' (concurrentTurns ambiguity; kill left manual).
+  // Drives the tray notice row and the thread-header kill-switch chip.
+  'agent:breaker-tripped': import('./agent-breaker-types').BreakerTripEvent
 }
 
 export type IpcChannel = keyof IpcChannels

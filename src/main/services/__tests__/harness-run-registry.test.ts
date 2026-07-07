@@ -308,3 +308,68 @@ describe('listThreadAgentIdsTolerant (the production backfill scan)', () => {
     await fs.rm(root, { recursive: true, force: true })
   })
 })
+
+// ── Step 6 (contracts §5 v1.2.6): budgets snapshot at bind ──
+
+describe('budgets snapshot at bind (step 6)', () => {
+  const BUDGETS = { maxTurns: 5, maxWritesPerMinute: 7 }
+
+  it('records the bind-time budgets snapshot and persists it across a reload', async () => {
+    const h = makeRegistry()
+    expect(await h.registry.record(ROOT, 'th1', 'test-fixer', BUDGETS)).toEqual({ ok: true })
+    expect(h.registry.get(ROOT, 'th1')).toEqual({
+      slug: 'test-fixer',
+      workspaceRoot: ROOT,
+      budgets: BUDGETS
+    })
+
+    // Fresh instance over the same mirror file: the snapshot survives.
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th1')?.budgets).toEqual(BUDGETS)
+  })
+
+  it('a same-slug re-record NEVER refreshes the snapshot (snapshot-at-BIND, write-once)', async () => {
+    const h = makeRegistry()
+    await h.registry.record(ROOT, 'th1', 'test-fixer', BUDGETS)
+    // Post-bind SKILL.md edit → a later run request carries new numbers; the
+    // running thread keeps its bind-time snapshot (edits affect the NEXT run).
+    expect(
+      await h.registry.record(ROOT, 'th1', 'test-fixer', { maxTurns: 99, maxWritesPerMinute: 99 })
+    ).toEqual({ ok: true })
+    expect(h.registry.get(ROOT, 'th1')?.budgets).toEqual(BUDGETS)
+  })
+
+  it('a binding without budgets (pre-step-6, backfill) loads and reads as absent', async () => {
+    const h = makeRegistry()
+    await h.registry.record(ROOT, 'th1', 'test-fixer')
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th1')).toEqual({
+      slug: 'test-fixer',
+      workspaceRoot: ROOT
+    })
+    expect(reloaded.registry.get(ROOT, 'th1')?.budgets).toBeUndefined()
+  })
+
+  it('a malformed budgets snapshot in the mirror degrades to absent, never a throw', async () => {
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        backfilledRoots: [],
+        bindings: {
+          [ROOT + '\u0000' + 'th1']: {
+            slug: 'test-fixer',
+            workspaceRoot: ROOT,
+            budgets: { maxTurns: 'lots', maxWritesPerMinute: null }
+          }
+        }
+      }),
+      'utf8'
+    )
+    const h = makeRegistry()
+    await h.registry.ensureRootReady(ROOT)
+    expect(h.registry.get(ROOT, 'th1')).toEqual({ slug: 'test-fixer', workspaceRoot: ROOT })
+  })
+})

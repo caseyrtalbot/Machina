@@ -67,7 +67,7 @@ vi.mock('../config', () => ({
   readAppConfigValue: state.readAppConfigValue
 }))
 
-import { registerCliThreadIpc } from '../cli-thread'
+import { checkMaxTurnsOnTurnStarted, registerCliThreadIpc } from '../cli-thread'
 
 function invoke<T>(channel: string, args: unknown): Promise<T> {
   const handler = state.handlers.get(channel)
@@ -286,5 +286,46 @@ describe('cli-thread:get-session (workstation Phase 2 step 4)', () => {
     state.spawner.getSessionId.mockReturnValue(undefined)
     const result = await invoke('cli-thread:get-session', { threadId: 'th_none' })
     expect(result).toBeNull()
+  })
+})
+
+// ── Step 6 (contracts §5 v1.2.6): maxTurns breach wiring ──
+
+describe('checkMaxTurnsOnTurnStarted', () => {
+  function makeBreaker() {
+    return { noteTurnStarted: vi.fn(), noteMaxTurns: vi.fn() }
+  }
+  const info = { threadId: 'th1', agentId: 'test-fixer', cwd: '/repo', invocationCount: 11 }
+
+  it('resets the breaker episode on EVERY turn, then trips when the count exceeds the budget', () => {
+    const breaker = makeBreaker()
+    checkMaxTurnsOnTurnStarted(info, () => ({ maxTurns: 10, maxWritesPerMinute: 10 }), breaker)
+    expect(breaker.noteTurnStarted).toHaveBeenCalledExactlyOnceWith({
+      threadId: 'th1',
+      agentId: 'test-fixer'
+    })
+    expect(breaker.noteMaxTurns).toHaveBeenCalledExactlyOnceWith({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      invocationCount: 11,
+      maxTurns: 10
+    })
+  })
+
+  it('budget N allows exactly N invocations — count == maxTurns does not trip', () => {
+    const breaker = makeBreaker()
+    checkMaxTurnsOnTurnStarted(
+      { ...info, invocationCount: 10 },
+      () => ({ maxTurns: 10, maxWritesPerMinute: 10 }),
+      breaker
+    )
+    expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+  })
+
+  it('threads with no bound budgets snapshot are never budget-tripped', () => {
+    const breaker = makeBreaker()
+    checkMaxTurnsOnTurnStarted({ ...info, invocationCount: 999 }, () => undefined, breaker)
+    expect(breaker.noteTurnStarted).toHaveBeenCalledTimes(1)
+    expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
   })
 })

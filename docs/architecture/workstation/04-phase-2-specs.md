@@ -557,6 +557,49 @@ Collides with 2/3/6 on ApprovalsTray and with 7 on palette-sources — sequentia
 
 ## Step 6 — Budget stack + kill switch + circuit breakers
 
+> **DONE** (2026-07-07, contracts v1.2.6, built in the step-6 parallel
+> worktree session off `c54a6d6`; lands SECOND after step 5 per the work
+> order — the rebase session re-runs the full fresh gate on the merged tree
+> and hand-resolves the one ApprovalsTray hunk). Recorded deviations (full
+> statements in the §8 v1.2.6 entry): **the OQ8 workspace-switch visibility
+> graft is EXCLUDED by design** — OQ8 is not ratified as of 2026-07-07, the
+> spec marks it severable, and it becomes its own small follow-up commit
+> after Casey's call; the kill switch lives in the ThreadPanel header ONLY
+> (spec offered ThreadInputBar or header — Stop/interrupt and Kill/hard-stop
+> stay visually distinct, ThreadInputBar untouched); the turn-END headMoved
+> tripwire does not feed the breaker (the spec's signal seam names the
+> watcher sites; at turn end the PTY is idle and audit + flag already record
+> it); breaker shared types live in the new `agent-breaker-types.ts`, not
+> git-types.ts (zero collision surface with parallel step 5);
+> trust-on-upgrade backfills mint bindings WITHOUT budgets (frontmatter is
+> the tamper channel — legacy threads run under the default threshold, no
+> maxTurns); turn counts are in-memory per app run (registry lifetime, per
+> OQ2's counting site) and survive threadClosed so a kill never refills the
+> budget; `HarnessSummary.budgets` is optional (absent = unreadable
+> frontmatter) so no test-literal churn outside step-6 scope; a
+> notice-latched episode suppresses further ambiguous-signal events but
+> escalates to the one kill on an unambiguous signal. Constants:
+> VELOCITY_TRIP_CONSECUTIVE = 3 consecutive limiter-exceeded batches,
+> FORBIDDEN_TRIP_PER_TURN = 3 autoRejects per turn (conservative starts,
+> per-harness thresholds make velocity tunable). The maxTurns listener is
+> deferred one microtask so a kill never races the in-flight send. Tests:
+> trip matrix ⇒ kill exactly once + audit + event; both negative tests
+> (never-trip-on-degraded-alone with the signalsDegraded honesty half,
+> never-kill-on-concurrentTurns ⇒ notice); per-slug threshold vs default;
+> concurrent same-slug per-thread thresholds; budgets snapshot-at-bind
+> (persisted mirror round-trip, same-slug re-record never refreshes,
+> post-edit SKILL.md feeds only the NEXT bind); invocation counting +
+> breach boundary (count == budget does not trip, N+1 does); kill-then-flush
+> ⇒ audited-unattributed; tripped-state renders + manual kill wiring
+> (component tests). Fresh worktree gate: `npm run check` + `npm run build`
+> both green (evidence in the landing session's report). The built-app probe
+> `e2e/agent-breaker.spec.ts` (velocity trip ⇒ PTY dead via lsof-cwd
+> evidence + tray notice row + header chip; manual kill halts a live turn)
+> was WRITTEN but not executed in the worktree (shared Electron support dir
+> — the orchestrator runs all e2e sequentially post-merge). Casey-observed
+> acceptance still pending: pressing kill on a running agent visibly stops
+> output in the running app.
+
 Make the parsed-but-decorative budgets real (seam map §4: `MAX_WRITES_PER_MINUTE` is a
 module constant at `agent-write-watcher.ts:35` — whose misleading "Contracts §5 default
 budget" comment gets fixed in this step (judge graft) — never read from any harness;

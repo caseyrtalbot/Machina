@@ -12,8 +12,20 @@ import {
   specIdForIdentity
 } from '../services/cli-thread-spawner'
 import { AuditLogger } from '../services/audit-logger'
-import { getCliTurnRegistry, setPtyAliveProbe } from '../services/cli-turn-registry'
+import {
+  getCliTurnRegistry,
+  setPtyAliveProbe,
+  setTurnStartedListener,
+  type TurnStartedInfo
+} from '../services/cli-turn-registry'
 import { getHarnessRunRegistry, type HarnessBinding } from '../services/harness-run-registry'
+import {
+  getAgentCircuitBreaker,
+  setBreakerEmit,
+  setBreakerKillCallback,
+  type AgentCircuitBreaker
+} from '../services/agent-circuit-breaker'
+import type { HarnessBudgets } from '@shared/harness-types'
 import { getCliAgentThreadBridge, getShellService } from './shell'
 
 let spawner: CliThreadSpawner | null = null
@@ -38,6 +50,10 @@ function getSpawner(): CliThreadSpawner {
     // degraded-mode window is "this thread's PTY is still alive".
     const bound = spawner
     setPtyAliveProbe((threadId) => bound.hasLiveSession(threadId))
+    // Circuit-breaker kill path (step 6, contracts §5 v1.2.6): the existing
+    // hard-kill — PTY killed, turn window dropped with zero linger. Same
+    // late-bound pattern; the breaker module never imports the spawner.
+    setBreakerKillCallback((threadId) => bound.close(threadId))
   }
   return spawner
 }
@@ -147,7 +163,53 @@ export async function resolveRequestedAgentId(
   return { agentId: requested, attributionSuspect: false }
 }
 
+/**
+ * maxTurns budget check on every turn open (step 6, contracts §5 v1.2.6).
+ * Resets the thread's breaker episode first (an explicit user send is
+ * re-engagement), then trips on breach: invocationCount is the registry's
+ * per-thread total INCLUDING this send, so budget N allows exactly N
+ * invocations and the N+1th trips. Threads with no bound budgets snapshot
+ * (ad-hoc, pre-step-6 bindings, backfills) are never budget-tripped.
+ * Exported for handler-level tests.
+ */
+export function checkMaxTurnsOnTurnStarted(
+  info: TurnStartedInfo,
+  budgetFor: (cwd: string, threadId: string) => HarnessBudgets | undefined,
+  breaker: Pick<AgentCircuitBreaker, 'noteTurnStarted' | 'noteMaxTurns'>
+): void {
+  breaker.noteTurnStarted({ threadId: info.threadId, agentId: info.agentId })
+  const budgets = budgetFor(info.cwd, info.threadId)
+  if (budgets !== undefined && info.invocationCount > budgets.maxTurns) {
+    breaker.noteMaxTurns({
+      threadId: info.threadId,
+      agentId: info.agentId,
+      invocationCount: info.invocationCount,
+      maxTurns: budgets.maxTurns
+    })
+  }
+}
+
 export function registerCliThreadIpc(): void {
+  // Breaker wiring (step 6). The listener is deferred one microtask ON
+  // PURPOSE: turnStarted runs synchronously inside sendUserMessage BEFORE
+  // the PTY write, and a synchronous maxTurns kill would close the session
+  // out from under the in-flight send — the invocation goes out, then the
+  // PTY dies. Budget lookup is the in-memory binding snapshot (loaded by the
+  // attribution/run path before any bound turn opens).
+  setTurnStartedListener((info) => {
+    void Promise.resolve().then(() =>
+      checkMaxTurnsOnTurnStarted(
+        info,
+        (cwd, threadId) => getHarnessRunRegistry().get(cwd, threadId)?.budgets,
+        getAgentCircuitBreaker()
+      )
+    )
+  })
+  setBreakerEmit((event) => {
+    const window = getMainWindow()
+    if (window) typedSend(window, 'agent:breaker-tripped', event)
+  })
+
   typedHandle('cli-thread:spawn', async ({ threadId, identity, cwd, agentId, model }) => {
     const attribution = await resolveRequestedAgentId(
       'cli-thread:spawn',
@@ -208,5 +270,12 @@ export function registerCliThreadIpc(): void {
     const sessionId = spawner.getSessionId(threadId)
     if (sessionId === undefined) return null
     return { sessionId, live: spawner.hasLiveSession(threadId) }
+  })
+
+  // Circuit breaker pull mirror (step 6, contracts §5/§6 v1.2.6): currently
+  // tripped threads + signal-source honesty, for late subscribers (tray
+  // notice rows, kill-switch chip on boot).
+  typedHandle('agent:breaker-status', async () => {
+    return getAgentCircuitBreaker().status()
   })
 }

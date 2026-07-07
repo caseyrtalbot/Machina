@@ -439,3 +439,45 @@ describe('CliTurnRegistry', () => {
     })
   })
 })
+
+// ── Step 6 (contracts §5 v1.2.6): per-thread invocation counting for maxTurns ──
+
+describe('invocation counting + onTurnStarted callback (step 6)', () => {
+  it('reports a per-thread running count on every turnStarted, including the current send', () => {
+    const infos: Array<{ threadId: string; agentId: string; cwd: string; invocationCount: number }> =
+      []
+    const registry = new CliTurnRegistry({
+      headSha: () => null,
+      isPtyAlive: () => true,
+      onTurnStarted: (info) => infos.push(info)
+    })
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th2', agentId: 'claude', cwd: ROOT })
+    expect(infos).toEqual([
+      { threadId: 'th1', agentId: 'test-fixer', cwd: ROOT, invocationCount: 1 },
+      { threadId: 'th1', agentId: 'test-fixer', cwd: ROOT, invocationCount: 2 },
+      { threadId: 'th2', agentId: 'claude', cwd: ROOT, invocationCount: 1 }
+    ])
+  })
+
+  it('threadClosed does NOT reset the count — a breaker kill must not refill the budget', () => {
+    const counts: number[] = []
+    const registry = new CliTurnRegistry({
+      headSha: () => null,
+      isPtyAlive: () => true,
+      onTurnStarted: (info) => counts.push(info.invocationCount)
+    })
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.threadClosed('th1')
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    expect(counts).toEqual([1, 2])
+  })
+
+  it('is a no-op without the callback (unwired: tests, early boot)', () => {
+    const registry = new CliTurnRegistry({ headSha: () => null, isPtyAlive: () => true })
+    expect(() =>
+      registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+    ).not.toThrow()
+  })
+})

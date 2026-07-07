@@ -18,7 +18,9 @@ import { TE_DIR } from '../../shared/constants'
 import {
   buildHarnessPrompt,
   isReservedHarnessSlug,
-  isValidHarnessSlug
+  isValidHarnessSlug,
+  parseHarnessFrontmatter,
+  type HarnessBudgets
 } from '../../shared/harness-types'
 import { SAFE_ID_RE } from '../../shared/git-types'
 import { hasLintErrors } from '../../shared/harness-lint'
@@ -38,7 +40,8 @@ export interface HarnessRunDeps {
     record(
       workspaceRoot: string,
       threadId: string,
-      slug: string
+      slug: string,
+      budgets?: HarnessBudgets
     ): Promise<{ ok: true } | { ok: false; error: string }>
   }
 }
@@ -119,9 +122,18 @@ export async function composeHarnessRun(
     stateMd
   })
 
+  // Budgets snapshot at bind (step 6, contracts §5 v1.2.6): the frontmatter
+  // read ABOVE is the snapshot source — post-bind SKILL.md edits affect the
+  // next run only. The run-time lint just passed with zero errors, so the
+  // frontmatter parses; a parse failure here (racing hand-edit between the
+  // lint and this read) degrades to no snapshot rather than refusing a run
+  // the lint already blessed.
+  const parsedFrontmatter = parseHarnessFrontmatter(skillMd)
+  const budgets = parsedFrontmatter.ok ? parsedFrontmatter.value.budgets : undefined
+
   // Binding recorded LAST — only after every validation above passed.
   const registry = deps.registry ?? getHarnessRunRegistry()
-  const recorded = await registry.record(workspaceRoot, threadId, slug)
+  const recorded = await registry.record(workspaceRoot, threadId, slug, budgets)
   if (!recorded.ok) {
     return { ok: false, error: recorded.error }
   }

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import type { PendingChange } from '@shared/git-types'
 import { isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
+import { AgentBreakerNotices } from './agent-breaker-notice'
 import { flagChips } from './approval-flags'
 import { REVERT_AGENT_EVENT, RevertAgentSection } from './RevertAgentSection'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
@@ -240,6 +241,11 @@ export function ApprovalsTray() {
               </button>
             </div>
           )}
+
+          {/* Breaker-tripped notice rows (workstation Phase 2 step 6):
+              mount-only insertion — all UI/state lives in
+              agent-breaker-notice.tsx; renders nothing with zero trips. */}
+          <AgentBreakerNotices />
 
           {notice !== null && (
             <div

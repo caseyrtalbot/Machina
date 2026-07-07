@@ -204,7 +204,10 @@ describe('listHarnesses', () => {
         name: 'test-fixer',
         description: 'Runs the test suite, fixes the first failure, stops.',
         adapter: 'claude',
-        diagnostics: []
+        diagnostics: [],
+        // Step 6 (v1.2.6): summaries carry the frontmatter budgets - what
+        // the next run would snapshot at bind.
+        budgets: { maxTurns: 10, maxWritesPerMinute: 10 }
       }
     ])
   })

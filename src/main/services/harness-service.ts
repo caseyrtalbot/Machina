@@ -177,7 +177,10 @@ export async function listHarnesses(workspaceRoot: string): Promise<HarnessSumma
       name: frontmatter?.name ?? entry.name,
       description: frontmatter?.description ?? '',
       adapter: frontmatter?.adapter ?? null,
-      diagnostics
+      diagnostics,
+      // Budgets ride the summary (step 6, v1.2.6): what the next run would
+      // snapshot at bind. Omitted when the frontmatter is unreadable.
+      ...(frontmatter !== null ? { budgets: frontmatter.budgets } : {})
     })
   }
   return summaries.sort((a, b) => a.slug.localeCompare(b.slug))
