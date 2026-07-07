@@ -4,12 +4,18 @@ import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { buildPaletteItems, buildIndex, noteHitItems, searchPalette } from '../palette-sources'
 import { openStripTerminal, openStripTerminalInFolder } from '../terminal-migration'
+import { runHarness } from '../../../store/harness-run'
 import type { Thread } from '@shared/thread-types'
+import type { HarnessSummary } from '@shared/harness-types'
 import type { SearchHit } from '@shared/engine/search-engine'
 
 vi.mock('../terminal-migration', () => ({
   openStripTerminal: vi.fn(),
   openStripTerminalInFolder: vi.fn().mockResolvedValue(null)
+}))
+
+vi.mock('../../../store/harness-run', () => ({
+  runHarness: vi.fn().mockResolvedValue(undefined)
 }))
 
 const sampleThread = (id: string, title: string): Thread => ({
@@ -241,5 +247,78 @@ describe('palette-sources — step 4 terminal + editor actions', () => {
     expect(useEditorStore.getState().activeNotePath).toBeNull()
     expect(useEditorStore.getState().openTabs).toEqual([])
     expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
+  })
+})
+
+describe('palette-sources — step 7 harness lint diagnostics', () => {
+  const clean: HarnessSummary = {
+    slug: 'test-fixer',
+    name: 'test-fixer',
+    description: 'Runs the test suite, fixes the first failure, stops.',
+    adapter: 'claude',
+    diagnostics: []
+  }
+  const broken: HarnessSummary = {
+    slug: 'stripped',
+    name: 'stripped',
+    description: 'tampered scope',
+    adapter: 'claude',
+    diagnostics: [
+      {
+        severity: 'error',
+        code: 'scope-protected-globs',
+        message: 'scope contract is missing protected forbiddenGlobs: .machina/agents/*/verify.sh',
+        file: 'scope.json'
+      }
+    ]
+  }
+  const warned: HarnessSummary = {
+    ...clean,
+    slug: 'warned',
+    name: 'warned',
+    diagnostics: [
+      { severity: 'warning', code: 'verify-mode', message: 'mode drifted', file: 'verify.sh' }
+    ]
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders a broken harness greyed with the reason — not vanished', () => {
+    const items = buildPaletteItems({ closePalette: () => {}, harnesses: [broken] })
+    const item = items.find((i) => i.id === 'action:harness-run:stripped')
+    expect(item).toBeDefined()
+    expect(item!.disabledReason).toContain('missing protected forbiddenGlobs')
+    expect(item!.subtitle).toContain('broken harness')
+    expect(item!.subtitle).toContain('missing protected forbiddenGlobs')
+  })
+
+  it('error severity disables run: activating the broken item never calls runHarness', async () => {
+    const close = vi.fn()
+    const items = buildPaletteItems({ closePalette: close, harnesses: [broken] })
+    const item = items.find((i) => i.id === 'action:harness-run:stripped')
+    await item!.run()
+    expect(runHarness).not.toHaveBeenCalled()
+    // The palette stays open — nothing ran.
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('a clean harness stays enabled and runs', async () => {
+    const close = vi.fn()
+    const items = buildPaletteItems({ closePalette: close, harnesses: [clean] })
+    const item = items.find((i) => i.id === 'action:harness-run:test-fixer')
+    expect(item!.disabledReason).toBeUndefined()
+    await item!.run()
+    expect(close).toHaveBeenCalled()
+    expect(runHarness).toHaveBeenCalledWith(clean)
+  })
+
+  it('warning-only diagnostics do not disable run', async () => {
+    const items = buildPaletteItems({ closePalette: () => {}, harnesses: [warned] })
+    const item = items.find((i) => i.id === 'action:harness-run:warned')
+    expect(item!.disabledReason).toBeUndefined()
+    await item!.run()
+    expect(runHarness).toHaveBeenCalledWith(warned)
   })
 })

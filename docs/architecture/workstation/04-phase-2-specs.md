@@ -609,6 +609,25 @@ streams to count internal turns.
 
 ## Step 7 — Harness linter
 
+> **DONE** (2026-07-07, contracts v1.2.4, branch `wip/p2-step7`). Recorded deviations
+> (§8): `harness-store.ts` needed no textual change (diagnostics ride the widened
+> `HarnessSummary`, which also gains `adapter: HarnessAdapter | null` for
+> unreadable-frontmatter entries); presence lints share ONE `file-missing` code with
+> the `file` field disambiguating, and missing rules.md/scope.json/state.md are flagged
+> beyond the spec's enumerated fs lints (harness:run reads all four); invalid-slug dirs
+> and stray files remain skipped (not addressable as harnesses); a symlinked agents dir
+> now LISTS entries with `symlink-ancestry` errors, superseding v1.1.5's silent `[]`
+> skip; `<dir>` placeholder leakage and verify.sh mode drift are WARNING severity
+> (containment unaffected / defense-in-depth per §5) while scope-protected-globs,
+> scope-unparseable, frontmatter-invalid, file-missing, and symlink-ancestry are errors
+> and disable run; `runHarness` gained a defensive error-diagnostics guard mirroring
+> the palette disable. `harness:lint` returns `[]` with no workspace (list semantics).
+> Fresh `npm run check` (3372 tests) + `npm run build` green. The built-app probe
+> `e2e/harness-lint.spec.ts` (exit-bar: strip protected globs on disk ⇒ lint violation
+> + palette entry greyed/aria-disabled with reason, run inert) is WRITTEN but NOT
+> executed — parallel sessions share the Electron support dir; the orchestrator runs
+> it post-merge. Casey-observed flagged-harness check in the running app still pending.
+
 The linter's job is everything create-time validation cannot see (seam map §5):
 scope.json is never re-validated after create (hand-edits can strip
 `HARNESS_PROTECTED_GLOBS` undetected — `validateHarnessScope` has no post-create

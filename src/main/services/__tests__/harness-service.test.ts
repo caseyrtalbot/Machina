@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { createHarness, listHarnesses } from '../harness-service'
+import { createHarness, lintHarnessOnDisk, listHarnesses } from '../harness-service'
 import { HARNESS_TEMPLATES } from '../../../shared/harness-templates'
 import { HARNESS_PROTECTED_GLOBS } from '../../../shared/harness-types'
 
@@ -194,7 +194,7 @@ describe('listHarnesses', () => {
     expect(await listHarnesses(root)).toEqual([])
   })
 
-  it('round-trips a created harness', async () => {
+  it('round-trips a created harness with zero diagnostics', async () => {
     await createHarness(root, 'test-fixer', 'test-fixer')
     const list = await listHarnesses(root)
     expect(list).toEqual([
@@ -202,12 +202,13 @@ describe('listHarnesses', () => {
         slug: 'test-fixer',
         name: 'test-fixer',
         description: 'Runs the test suite, fixes the first failure, stops.',
-        adapter: 'claude'
+        adapter: 'claude',
+        diagnostics: []
       }
     ])
   })
 
-  it('returns [] when the agents dir is a symlink, even one holding valid harnesses', async () => {
+  it('surfaces a symlinked agents dir as error diagnostics on every entry (v1.2.4 — was a silent [])', async () => {
     const otherWorkspace = await makeOutsideDir()
     await createHarness(otherWorkspace, 'test-fixer', 'test-fixer')
     await fs.mkdir(path.join(root, '.machina'))
@@ -216,22 +217,130 @@ describe('listHarnesses', () => {
       path.join(root, '.machina', 'agents')
     )
 
-    expect(await listHarnesses(root)).toEqual([])
+    const list = await listHarnesses(root)
+    expect(list.map((h) => h.slug)).toEqual(['test-fixer'])
+    expect(list[0].diagnostics).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'symlink-ancestry' })
+    )
   })
 
-  it('skips malformed entries instead of throwing', async () => {
+  it('surfaces a symlinked slug dir with an ancestry error (used to vanish)', async () => {
+    const otherWorkspace = await makeOutsideDir()
+    await createHarness(otherWorkspace, 'test-fixer', 'test-fixer')
+    await fs.mkdir(path.join(root, '.machina', 'agents'), { recursive: true })
+    await fs.symlink(
+      path.join(otherWorkspace, '.machina', 'agents', 'test-fixer'),
+      path.join(root, '.machina', 'agents', 'test-fixer')
+    )
+
+    const list = await listHarnesses(root)
+    expect(list.map((h) => h.slug)).toEqual(['test-fixer'])
+    expect(list[0].diagnostics).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'symlink-ancestry' })
+    )
+  })
+
+  it('surfaces malformed harnesses with skip-reason diagnostics; non-harness entries stay skipped', async () => {
     await createHarness(root, 'test-fixer', 'test-fixer')
     const agents = path.join(root, '.machina', 'agents')
-    // Garbage SKILL.md → skipped.
+    // Garbage SKILL.md → listed with a frontmatter-invalid error (the reason
+    // it used to be skipped, surfaced).
     await fs.mkdir(path.join(agents, 'broken'))
     await fs.writeFile(path.join(agents, 'broken', 'SKILL.md'), 'not frontmatter', 'utf8')
-    // Directory without SKILL.md → skipped.
+    // Directory without any harness files → listed with file-missing errors.
     await fs.mkdir(path.join(agents, 'empty'))
-    // Stray file and invalid-slug dir → skipped.
+    // Stray file and invalid-slug dir → still skipped (not addressable as harnesses).
     await fs.writeFile(path.join(agents, 'stray.txt'), 'x', 'utf8')
     await fs.mkdir(path.join(agents, 'Bad.Slug'))
 
     const list = await listHarnesses(root)
-    expect(list.map((h) => h.slug)).toEqual(['test-fixer'])
+    expect(list.map((h) => h.slug)).toEqual(['broken', 'empty', 'test-fixer'])
+
+    const broken = list.find((h) => h.slug === 'broken')!
+    expect(broken.adapter).toBeNull()
+    expect(broken.name).toBe('broken') // falls back to the slug
+    expect(broken.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        code: 'frontmatter-invalid',
+        file: 'SKILL.md'
+      })
+    )
+
+    const empty = list.find((h) => h.slug === 'empty')!
+    expect(empty.diagnostics).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'file-missing', file: 'SKILL.md' })
+    )
+    expect(empty.diagnostics).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'file-missing', file: 'verify.sh' })
+    )
+  })
+})
+
+describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', () => {
+  it('a freshly-created harness lints clean', async () => {
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    expect(await lintHarnessOnDisk(root, 'test-fixer')).toEqual([])
+  })
+
+  it('EXIT BAR: hand-editing scope.json to strip the protected globs ⇒ error diagnostic', async () => {
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    const scopePath = path.join(harnessDir(), 'scope.json')
+    const scope = JSON.parse(await fs.readFile(scopePath, 'utf8'))
+    scope.forbiddenGlobs = scope.forbiddenGlobs.filter(
+      (g: string) => !(HARNESS_PROTECTED_GLOBS as readonly string[]).includes(g)
+    )
+    await fs.writeFile(scopePath, JSON.stringify(scope, null, 2), 'utf8')
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+    expect(diags).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        code: 'scope-protected-globs',
+        file: 'scope.json'
+      })
+    )
+    // And the list carries the same finding — the palette greys off it.
+    const list = await listHarnesses(root)
+    expect(list[0].diagnostics).toEqual(diags)
+  })
+
+  it('verify.sh mode drift (chmod 755) ⇒ warning diagnostic naming the drifted mode', async () => {
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    await fs.chmod(path.join(harnessDir(), 'verify.sh'), 0o755)
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+    const finding = diags.find((d) => d.code === 'verify-mode')
+    expect(finding).toMatchObject({ severity: 'warning', file: 'verify.sh' })
+    expect(finding!.message).toContain('0o755')
+  })
+
+  it('missing verify.sh ⇒ error diagnostic', async () => {
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    await fs.rm(path.join(harnessDir(), 'verify.sh'), { force: true })
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+    expect(diags).toEqual([
+      expect.objectContaining({ severity: 'error', code: 'file-missing', file: 'verify.sh' })
+    ])
+  })
+
+  it('missing handoffs/ ⇒ warning diagnostic', async () => {
+    await createHarness(root, 'test-fixer', 'test-fixer')
+    await fs.rmdir(path.join(harnessDir(), 'handoffs'))
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+    expect(diags).toEqual([
+      expect.objectContaining({ severity: 'warning', code: 'file-missing', file: 'handoffs/' })
+    ])
+  })
+
+  it('nonexistent harness ⇒ file-missing error; invalid slug ⇒ invalid-slug error', async () => {
+    expect(await lintHarnessOnDisk(root, 'no-such-harness')).toEqual([
+      expect.objectContaining({ severity: 'error', code: 'file-missing', file: '.' })
+    ])
+    expect(await lintHarnessOnDisk(root, '../evil')).toEqual([
+      expect.objectContaining({ severity: 'error', code: 'invalid-slug' })
+    ])
   })
 })

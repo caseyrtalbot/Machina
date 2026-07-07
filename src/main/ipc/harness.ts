@@ -9,7 +9,7 @@
  */
 import { typedHandle } from '../typed-ipc'
 import { getWorkspaceService } from '../services/workspace-service'
-import { createHarness, listHarnesses } from '../services/harness-service'
+import { createHarness, lintHarnessOnDisk, listHarnesses } from '../services/harness-service'
 import { composeHarnessRun } from '../services/harness-run'
 import { getHarnessRunRegistry } from '../services/harness-run-registry'
 
@@ -59,5 +59,11 @@ export function registerHarnessIpc(): void {
     }
     const binding = registry.get(root, args.threadId)
     return binding === undefined ? null : { slug: binding.slug }
+  })
+
+  typedHandle('harness:lint', async (args) => {
+    const root = currentRoot()
+    if (root === null) return []
+    return lintHarnessOnDisk(root, args.slug)
   })
 }

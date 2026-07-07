@@ -244,7 +244,8 @@ const api = {
     create: (template: string, slug: string) => typedInvoke('harness:create', { template, slug }),
     list: () => typedInvoke('harness:list'),
     run: (slug: string, threadId: string) => typedInvoke('harness:run', { slug, threadId }),
-    binding: (threadId: string) => typedInvoke('harness:binding', { threadId })
+    binding: (threadId: string) => typedInvoke('harness:binding', { threadId }),
+    lint: (slug: string) => typedInvoke('harness:lint', { slug })
   }
 }
 

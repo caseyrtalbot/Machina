@@ -22,17 +22,25 @@
  *   5. verify.sh is written LAST, then chmod 0o555 (defense-in-depth, not a
  *      boundary — contracts §5).
  *
- * `listHarnesses` is skip-not-throw: malformed entries never break the list.
+ * `listHarnesses` is skip-not-throw for non-harness entries (stray files,
+ * invalid-slug names), but since step 7 (contracts v1.2.4) every valid-slug
+ * directory IS listed, carrying lint diagnostics — malformed harnesses stop
+ * silently vanishing. The main-side fs lints here (file presence, verify.sh
+ * mode drift, handoffs/ presence, symlink-in-ancestry realpath equality —
+ * discharging v1.1.5 residual #2) are COMPOSED with the shared content lints
+ * (`lintHarness`, harness-lint.ts); no shared check is reimplemented here.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { TE_DIR } from '../../shared/constants'
+import { lintHarness, type Diagnostic } from '../../shared/harness-lint'
 import {
   isReservedHarnessSlug,
   isValidHarnessSlug,
   parseHarnessFrontmatter,
   validateHarnessScope,
   type HarnessCreateResult,
+  type HarnessFrontmatter,
   type HarnessSummary
 } from '../../shared/harness-types'
 import { frontmatterFor, HARNESS_TEMPLATES, materializeScope } from '../../shared/harness-templates'
@@ -156,36 +164,182 @@ export async function listHarnesses(workspaceRoot: string): Promise<HarnessSumma
     return [] // no agents dir yet — an empty list, not an error
   }
 
-  // Same symlinked-parent refusal as createHarness, skip-not-throw style: a
-  // redirected agents dir lists nothing rather than laundering outside
-  // content in as harnesses.
-  try {
-    const [realAgents, realRoot] = await Promise.all([
-      fs.realpath(root),
-      fs.realpath(workspaceRoot)
-    ])
-    if (realAgents !== path.join(realRoot, TE_DIR, 'agents')) return []
-  } catch {
-    return []
-  }
-
   const summaries: HarnessSummary[] = []
   for (const entry of entries) {
-    if (!entry.isDirectory() || !isValidHarnessSlug(entry.name)) continue
-    let skillMd: string
-    try {
-      skillMd = await fs.readFile(path.join(root, entry.name, SKILL_FILE), 'utf8')
-    } catch {
-      continue // skip-not-throw: no SKILL.md, not a harness
-    }
-    const parsed = parseHarnessFrontmatter(skillMd)
-    if (!parsed.ok) continue // skip-not-throw: malformed frontmatter
+    // Stray files and invalid-slug names are not addressable as harnesses —
+    // still skipped. Symlinked slug entries ARE listed: the ancestry lint
+    // inside inspectHarness flags them (they used to vanish silently).
+    if (!isValidHarnessSlug(entry.name)) continue
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+    const { diagnostics, frontmatter } = await inspectHarness(workspaceRoot, entry.name)
     summaries.push({
       slug: entry.name,
-      name: parsed.value.name,
-      description: parsed.value.description,
-      adapter: parsed.value.adapter
+      name: frontmatter?.name ?? entry.name,
+      description: frontmatter?.description ?? '',
+      adapter: frontmatter?.adapter ?? null,
+      diagnostics
     })
   }
   return summaries.sort((a, b) => a.slug.localeCompare(b.slug))
+}
+
+/**
+ * Lint one on-disk harness (the `harness:lint` service path, v1.2.4):
+ * main-side fs lints composed with the shared content lints. Also the
+ * engine behind every `listHarnesses` summary's diagnostics.
+ */
+export async function lintHarnessOnDisk(
+  workspaceRoot: string,
+  slug: string
+): Promise<Diagnostic[]> {
+  if (!isValidHarnessSlug(slug)) {
+    return [
+      {
+        severity: 'error',
+        code: 'invalid-slug',
+        message: `invalid harness slug: ${JSON.stringify(slug)}`,
+        file: '.'
+      }
+    ]
+  }
+  const { diagnostics } = await inspectHarness(workspaceRoot, slug)
+  return [...diagnostics]
+}
+
+interface HarnessInspection {
+  readonly diagnostics: readonly Diagnostic[]
+  /** Parsed SKILL.md frontmatter, null when missing or unreadable. */
+  readonly frontmatter: HarnessFrontmatter | null
+}
+
+/** Caller guarantees `slug` passed isValidHarnessSlug. */
+async function inspectHarness(workspaceRoot: string, slug: string): Promise<HarnessInspection> {
+  const dir = path.join(agentsRoot(workspaceRoot), slug)
+  const diagnostics: Diagnostic[] = []
+
+  try {
+    const stat = await fs.stat(dir)
+    if (!stat.isDirectory()) throw new Error('not a directory')
+  } catch {
+    // A dangling symlink at the slug path is an ancestry finding, not a
+    // missing harness — stat followed the link and found nothing.
+    const isLink = await fs.lstat(dir).then(
+      (s) => s.isSymbolicLink(),
+      () => false
+    )
+    return {
+      diagnostics: [
+        isLink
+          ? symlinkAncestryDiagnostic(`${slug} is a symlink with no readable target`)
+          : {
+              severity: 'error',
+              code: 'file-missing',
+              message: `harness directory not found: ${slug}`,
+              file: '.'
+            }
+      ],
+      frontmatter: null
+    }
+  }
+
+  // Symlink-in-ancestry realpath check (v1.1.5 residual #2, discharged
+  // here): the slug dir must canonicalize to EXACTLY its literal path — one
+  // equality covers a symlinked <TE_DIR>, agents dir, or slug dir, because
+  // realpath resolves the whole ancestor chain. A redirected harness sits
+  // outside the watcher and the protected-glob auto-reject.
+  try {
+    const [realDir, realRoot] = await Promise.all([fs.realpath(dir), fs.realpath(workspaceRoot)])
+    if (realDir !== path.join(realRoot, TE_DIR, 'agents', slug)) {
+      diagnostics.push(
+        symlinkAncestryDiagnostic(
+          `harness path does not canonicalize to its literal location (symlinked ancestry?): ${slug}`
+        )
+      )
+    }
+  } catch (err) {
+    diagnostics.push(
+      symlinkAncestryDiagnostic(`could not canonicalize harness path: ${String(err)}`)
+    )
+  }
+
+  // File presence: harness:run reads SKILL.md/rules.md/scope.json/state.md
+  // and verify.sh is the gate — a missing one breaks the run (error).
+  // handoffs/ is not needed to run (warning).
+  const read = (name: string): Promise<string | undefined> =>
+    fs.readFile(path.join(dir, name), 'utf8').then(
+      (content) => content,
+      () => undefined
+    )
+  const [skillMd, rulesMd, scopeJson, verifySh] = await Promise.all([
+    read(SKILL_FILE),
+    read(RULES_FILE),
+    read(SCOPE_FILE),
+    read(VERIFY_FILE)
+  ])
+  const stateExists = await fs.access(path.join(dir, STATE_FILE)).then(
+    () => true,
+    () => false
+  )
+  const requiredPresence: ReadonlyArray<readonly [string, boolean]> = [
+    [SKILL_FILE, skillMd !== undefined],
+    [RULES_FILE, rulesMd !== undefined],
+    [SCOPE_FILE, scopeJson !== undefined],
+    [STATE_FILE, stateExists],
+    [VERIFY_FILE, verifySh !== undefined]
+  ]
+  for (const [file, present] of requiredPresence) {
+    if (!present) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'file-missing',
+        message: `${file} is missing or unreadable`,
+        file
+      })
+    }
+  }
+  const handoffsIsDir = await fs.stat(path.join(dir, HANDOFFS_DIR)).then(
+    (s) => s.isDirectory(),
+    () => false
+  )
+  if (!handoffsIsDir) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'file-missing',
+      message: `${HANDOFFS_DIR}/ directory is missing`,
+      file: `${HANDOFFS_DIR}/`
+    })
+  }
+
+  // verify.sh mode drift: created 0o555, never agent-writable. Drift is a
+  // tamper signal but not a boundary (contracts §5) — warning.
+  if (verifySh !== undefined) {
+    try {
+      const mode = (await fs.stat(path.join(dir, VERIFY_FILE))).mode & 0o777
+      if (mode !== 0o555) {
+        diagnostics.push({
+          severity: 'warning',
+          code: 'verify-mode',
+          message: `verify.sh mode drifted to 0o${mode.toString(8)} (created 0o555)`,
+          file: VERIFY_FILE
+        })
+      }
+    } catch {
+      // Raced deletion between read and stat: the presence lint above (or
+      // the next list) owns it.
+    }
+  }
+
+  // Compose the shared content lints — never reimplemented here.
+  diagnostics.push(...lintHarness({ slug, skillMd, rulesMd, scopeJson, verifySh }))
+
+  let frontmatter: HarnessFrontmatter | null = null
+  if (skillMd !== undefined) {
+    const parsed = parseHarnessFrontmatter(skillMd)
+    if (parsed.ok) frontmatter = parsed.value
+  }
+  return { diagnostics, frontmatter }
+}
+
+function symlinkAncestryDiagnostic(message: string): Diagnostic {
+  return { severity: 'error', code: 'symlink-ancestry', message, file: '.' }
 }

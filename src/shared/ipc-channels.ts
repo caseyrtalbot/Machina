@@ -391,6 +391,15 @@ export interface IpcChannels {
     request: { threadId: string }
     response: { sessionId: string; live: boolean } | null
   }
+
+  // --- Harness linter (workstation contracts §5/§6, step 7, v1.2.4) ---
+  // On-demand re-lint of one harness; root resolved main-side, no workspace
+  // ⇒ [] (same read-op semantics as harness:list, whose summaries carry the
+  // identical diagnostics).
+  'harness:lint': {
+    request: { slug: string }
+    response: import('./harness-lint').Diagnostic[]
+  }
 }
 
 export type AgentNativeApprovalPreview =

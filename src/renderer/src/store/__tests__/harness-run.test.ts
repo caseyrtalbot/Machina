@@ -17,7 +17,8 @@ const summary: HarnessSummary = {
   slug: 'test-fixer',
   name: 'test-fixer',
   description: 'Runs the test suite, fixes the first failure, stops.',
-  adapter: 'claude'
+  adapter: 'claude',
+  diagnostics: []
 }
 
 /** Whatever main composed is what gets sent — the renderer never rebuilds it. */
@@ -117,6 +118,25 @@ describe('runHarness', () => {
   it('creates no thread when no workspace is open', async () => {
     useThreadStore.setState({ vaultPath: null })
     await run()
+    expect(createThread).not.toHaveBeenCalled()
+    expect(harnessRun).not.toHaveBeenCalled()
+  })
+
+  it('refuses a summary carrying error-severity lint diagnostics (step-7 guard)', async () => {
+    await run({
+      ...summary,
+      diagnostics: [
+        { severity: 'error', code: 'scope-protected-globs', message: 'm', file: 'scope.json' }
+      ]
+    })
+    expect(createThread).not.toHaveBeenCalled()
+    expect(harnessRun).not.toHaveBeenCalled()
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify.mock.calls[0][0]).toContain('run disabled')
+  })
+
+  it('refuses a summary with no readable adapter (frontmatter-invalid harness)', async () => {
+    await run({ ...summary, adapter: null })
     expect(createThread).not.toHaveBeenCalled()
     expect(harnessRun).not.toHaveBeenCalled()
   })

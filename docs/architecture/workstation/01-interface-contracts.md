@@ -538,6 +538,45 @@ agents subtree as the future path. `scope.json` is advisory in Phase 1: nothing 
 write path enforces globs — the watcher's auto-reject and the queue are the only teeth,
 and UI copy must not imply more.
 
+### Harness linter (Phase 2 step 7, v1.2.4)
+
+Everything create-time validation cannot see is the linter's job: scope.json is never
+re-validated after create (a hand-edit can strip `HARNESS_PROTECTED_GLOBS` undetected),
+verify.sh mode/presence drift is unchecked, and malformed harnesses used to vanish from
+the palette silently.
+
+```ts
+type DiagnosticSeverity = 'error' | 'warning'
+interface Diagnostic {
+  severity: DiagnosticSeverity
+  code: string    // e.g. 'scope-protected-globs', 'symlink-ancestry', 'file-missing'
+  message: string
+  file: string    // harness-dir-relative; '.' = the directory itself
+}
+lintHarness(input: HarnessLintInput): Diagnostic[]   // src/shared/harness-lint.ts — PURE
+lintHarnessOnDisk(root, slug): Promise<Diagnostic[]> // harness-service.ts — fs lints ∘ lintHarness
+```
+
+`Diagnostic` is deliberately minimal — four fields, TWO severities. Severity-taxonomy
+creep is the named linter failure mode; widening this shape requires a contracts
+amendment. **Composition rule:** the pure CONTENT lints live in `harness-lint.ts`
+(renderer-importable — step 8's wizard previews diagnostics on a would-be harness):
+scope superset re-validation (REUSES `validateHarnessScope`, never reimplemented),
+rules.md `- [severity] text` tag format, `<dir>` placeholder leakage into a
+materialized scope, frontmatter name↔directory-slug mismatch, frontmatter
+parse-failure reasons, verify.sh shebang. The FILESYSTEM lints live main-side in
+`harness-service.ts`: presence of the five files + `handoffs/`, verify.sh 0o555 mode
+drift, and the symlink-in-ancestry realpath-equality check (the agents dir or slug dir
+not canonicalizing to its literal path ⇒ error diagnostic) — **this discharges v1.1.5
+residual #2**. Main COMPOSES shared + fs lints and never reimplements a shared check.
+
+`harness:list` summaries carry `diagnostics` (and `adapter: HarnessAdapter | null` —
+null when the frontmatter is unreadable), so malformed harnesses surface with their
+skip reason instead of silently vanishing; only non-addressable entries (invalid-slug
+names, stray files) stay skipped. Error severity disables run everywhere — the palette
+renders broken harnesses greyed with the reason (never vanished), and `runHarness`
+re-checks defensively. Warnings inform but never disable.
+
 ## 6. IPC channels (names reserved; registration follows the 4-step pattern)
 
 New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcEvents`:
@@ -560,6 +599,7 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'approvals:resolve':     { request: { id: string; approve: boolean; message?: string }; response: GitOpResult }
 'approvals:watcher-status': { request: void; response: WatcherHealth } // v1.2.1 — pull mirror for late subscribers
 'approvals:watcher-retry':  { request: void; response: GitOpResult }  // v1.2.1 — manual restart; resets the backoff cap
+'harness:lint':          { request: { slug: string }; response: Diagnostic[] } // v1.2.4 — on-demand re-lint; no workspace ⇒ [] (list semantics). harness:list summaries carry the same diagnostics (+ adapter widened to HarnessAdapter | null)
 // IpcEvents
 'approvals:changed':     { pending: number }
 'approvals:watcher-health': WatcherHealth // v1.2.1 — health transitions (tray badge/banner, thread chip)
@@ -595,6 +635,69 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.2.4 (2026-07-07, Phase 2 step 7 landing)** — §5 gains
+  the harness-linter subsection: `Diagnostic { severity: 'error' | 'warning', code,
+  message, file }` (deliberately minimal — severity-taxonomy creep is the named linter
+  failure mode), pure content lints in `src/shared/harness-lint.ts`
+  (`lintHarness(files) → Diagnostic[]`, renderer-importable: scope superset
+  re-validation reusing `validateHarnessScope`, rules.md severity-tag format, `<dir>`
+  placeholder leakage, frontmatter name↔slug mismatch, frontmatter parse-failure
+  reasons, verify.sh shebang) COMPOSED with main-side fs lints in `harness-service.ts`
+  (file presence, verify.sh 0o555 mode drift, handoffs/ presence, symlink-in-ancestry
+  realpath equality — **discharges v1.1.5 residual #2**, dated status line added
+  there); main never reimplements a shared check. §6 gains `harness:lint` (root
+  main-side; no workspace ⇒ `[]`, list semantics) and `harness:list` is widened:
+  `HarnessSummary` carries `diagnostics` plus `adapter: HarnessAdapter | null` (null =
+  unreadable frontmatter, always accompanied by an error diagnostic) — malformed
+  harnesses stop silently vanishing; a symlinked agents dir now LISTS its entries with
+  `symlink-ancestry` errors (supersedes v1.1.5's silent `[]` skip — the lint surfaces
+  what the skip hid; createHarness's refusal behavior is unchanged). Error severity
+  disables run: the palette renders broken harnesses greyed with the first error's
+  reason (`PaletteItem.disabledReason`, `aria-disabled`), and `runHarness` re-checks
+  defensively before creating a thread. Recorded deviations: (1) `harness-store.ts`
+  needed no textual change — diagnostics ride the widened `HarnessSummary` type; (2)
+  presence lints use ONE code `file-missing` with the `file` field disambiguating
+  (severity: error for SKILL.md/rules.md/scope.json/state.md/verify.sh — all five are
+  read by run or are the gate — warning for `handoffs/`), and missing
+  rules.md/scope.json/state.md are flagged beyond the spec's enumerated fs lints
+  because `harness:run` reads all four files; (3) invalid-slug directories and stray
+  files remain skipped (not addressable as harnesses — "malformed harness" means a
+  valid-slug directory); (4) `<dir>` placeholder leakage is WARNING severity —
+  containment is unaffected (the watcher auto-reject matches the
+  `HARNESS_PROTECTED_GLOBS` literals, not scope.json), and the superset check
+  independently errors if the protected literals themselves are gone; verify.sh mode
+  drift is likewise a warning (defense-in-depth, not a boundary — §5).
+- **v1.2.3 (2026-07-07, Phase 2 step 4 landing)** — two-projection agent
+  view: §3 SessionProjection/WorkstationSession CONSUMED (dated status line added
+  there) — the thread surface and the raw PTY are two projections of one
+  WorkstationSession, flipped from the ThreadPanel header. New renderer
+  `cli-session-store` is the SINGLE sessionId authority (seeded from the
+  `cli-thread:spawn` response — `agent-transport.start` now keeps the sessionId it
+  used to drop; updated by the new `cli-thread:session-changed` event, fired on the
+  spawner's spawn-on-demand respawn path; pull-hydrated by the new
+  `cli-thread:get-session` invoke). The bridge's `metadata.sessionId` path is
+  untouched and must not feed the store. §4 gains the two-projection subsection: the
+  **dead-PTY no-respawn rule** as a contract point (agent projections are
+  reattach-only at BOTH layers — adapter `projection="agent"` renders a read-only
+  dead state and mounts no webview without a session + omits cwd/vaultPath from the
+  URL; the guest's `terminal:create` fallback is disabled by the `reattachOnly` URL
+  param and reports `session-dead` to the host; the stale-session respawn stays
+  correct for plain terminals) and the honest §4 copy that raw-view input is
+  attributed to the thread's turn windows (interactive-input residual). §6 gains
+  `cli-thread:get-session` + the `cli-thread:session-changed` event (appended at the
+  list end per the same rule). Recorded deviations from the step-4 spec: (1) the
+  guest-side connect decision was EXTRACTED to
+  `src/renderer/terminal-webview/connect-session.ts` (pure, api-injected) rather than
+  edited inline in `TerminalApp.tsx` connectSession — the spec's load-bearing
+  "no terminal:create at the webview layer" assertion is only behaviorally pinnable
+  against a pure function (TerminalApp itself is not unit-mountable; its existing
+  source-string tests were updated to pin the delegation); (2) the adapter dead state
+  is also shown when a live raw view's PTY exits (`session-exited` in projection
+  mode) — a strict reading only required stale-at-mount, but a PTY dying under the
+  view is the same dead session; (3) `cli-thread:get-session` returns
+  `{ sessionId, live } | null` (liveness from the spawner's existing
+  `hasLiveSession` probe) rather than a bare sessionId — the store needs liveness to
+  render the dead state without a second channel.
 - **v1.2.2 (2026-07-06, Phase 2 step 3 landing)** — §4 gains the attribution-authority
   subsection: `HarnessRunRegistry` (write-once threadId→slug, persisted keyed workspace
   root + threadId under userData `harness-bindings.json`; acknowledged residual: a
@@ -728,6 +831,10 @@ Implementation detail per step: `02-phase-1-specs.md`.
   `harnessDirExists` applies the same check; nothing execs verify.sh yet, so
   the read-time check covers the whole current surface. Residual #2 (linter
   flags symlinks in the agents ancestry) remains for step 7.
+  **Status 2026-07-07 (Phase 2 step 7, v1.2.4):** residual #2 is DISCHARGED —
+  the main-side fs lints flag a non-canonicalizing agents/slug ancestry as an
+  error diagnostic (`symlink-ancestry`), so a symlinked harness now surfaces
+  greyed-with-reason with run disabled instead of the silent `[]` skip.
 
 - **v1.1.4 (2026-07-06, step 5 landing)** — the §2/§4 never-regress rule is discharged:
   `commitPreAgentSnapshot` retired (spawn-site + per-turn call sites removed from
@@ -794,36 +901,3 @@ Implementation detail per step: `02-phase-1-specs.md`.
   -boundary statement, flags/TOCTOU; §5 state.md indexing corrected to prompt-composition
   only, dual-TE_DIR protected globs; §6 response shapes + moot sequencing; §7 reordered.
 - **v1.0 (2026-07-05)** — initial Phase 0 contracts (`ec6fa6d`).
-
-- **v1.2.3 (2026-07-07, Phase 2 step 4 landing; appended at end per the
-  parallel-session rule — chronologically it follows v1.2.2)** — two-projection agent
-  view: §3 SessionProjection/WorkstationSession CONSUMED (dated status line added
-  there) — the thread surface and the raw PTY are two projections of one
-  WorkstationSession, flipped from the ThreadPanel header. New renderer
-  `cli-session-store` is the SINGLE sessionId authority (seeded from the
-  `cli-thread:spawn` response — `agent-transport.start` now keeps the sessionId it
-  used to drop; updated by the new `cli-thread:session-changed` event, fired on the
-  spawner's spawn-on-demand respawn path; pull-hydrated by the new
-  `cli-thread:get-session` invoke). The bridge's `metadata.sessionId` path is
-  untouched and must not feed the store. §4 gains the two-projection subsection: the
-  **dead-PTY no-respawn rule** as a contract point (agent projections are
-  reattach-only at BOTH layers — adapter `projection="agent"` renders a read-only
-  dead state and mounts no webview without a session + omits cwd/vaultPath from the
-  URL; the guest's `terminal:create` fallback is disabled by the `reattachOnly` URL
-  param and reports `session-dead` to the host; the stale-session respawn stays
-  correct for plain terminals) and the honest §4 copy that raw-view input is
-  attributed to the thread's turn windows (interactive-input residual). §6 gains
-  `cli-thread:get-session` + the `cli-thread:session-changed` event (appended at the
-  list end per the same rule). Recorded deviations from the step-4 spec: (1) the
-  guest-side connect decision was EXTRACTED to
-  `src/renderer/terminal-webview/connect-session.ts` (pure, api-injected) rather than
-  edited inline in `TerminalApp.tsx` connectSession — the spec's load-bearing
-  "no terminal:create at the webview layer" assertion is only behaviorally pinnable
-  against a pure function (TerminalApp itself is not unit-mountable; its existing
-  source-string tests were updated to pin the delegation); (2) the adapter dead state
-  is also shown when a live raw view's PTY exits (`session-exited` in projection
-  mode) — a strict reading only required stale-at-mount, but a PTY dying under the
-  view is the same dead session; (3) `cli-thread:get-session` returns
-  `{ sessionId, live } | null` (liveness from the spawner's existing
-  `hasLiveSession` probe) rather than a bare sessionId — the store needs liveness to
-  render the dead state without a second channel.

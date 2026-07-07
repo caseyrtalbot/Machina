@@ -94,12 +94,20 @@ export interface HarnessFrontmatter {
   readonly budgets: { readonly maxTurns: number; readonly maxWritesPerMinute: number }
 }
 
-/** Palette-facing summary of one on-disk harness. */
+/**
+ * Palette-facing summary of one on-disk harness. Widened by the step-7
+ * linter (contracts v1.2.4): every summary carries its lint diagnostics —
+ * malformed harnesses surface greyed-with-reason instead of silently
+ * vanishing from `harness:list`. `adapter` is null when the frontmatter is
+ * unreadable (no honest adapter exists; such entries always carry an error
+ * diagnostic, which disables run).
+ */
 export interface HarnessSummary {
   readonly slug: string
   readonly name: string
   readonly description: string
-  readonly adapter: HarnessAdapter
+  readonly adapter: HarnessAdapter | null
+  readonly diagnostics: readonly import('./harness-lint').Diagnostic[]
 }
 
 /** harness:create response (contracts §6). `root` = the created harness dir. */

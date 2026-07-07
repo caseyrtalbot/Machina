@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   current: vi.fn<() => { root: string } | null>(() => null),
   createHarness: vi.fn(),
   listHarnesses: vi.fn(),
+  lintHarnessOnDisk: vi.fn(),
   composeHarnessRun: vi.fn(),
   ensureRootReady: vi.fn(),
   registryGet: vi.fn()
@@ -28,7 +29,8 @@ vi.mock('../../services/workspace-service', () => ({
 
 vi.mock('../../services/harness-service', () => ({
   createHarness: state.createHarness,
-  listHarnesses: state.listHarnesses
+  listHarnesses: state.listHarnesses,
+  lintHarnessOnDisk: state.lintHarnessOnDisk
 }))
 
 vi.mock('../../services/harness-run', () => ({
@@ -103,6 +105,22 @@ describe('harness IPC handlers', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toContain('scan exploded')
     expect(state.composeHarnessRun).not.toHaveBeenCalled()
+  })
+
+  it('harness:lint returns [] when no workspace is open (same read-op semantics as list)', async () => {
+    expect(await invoke('harness:lint', { slug: 'test-fixer' })).toEqual([])
+    expect(state.lintHarnessOnDisk).not.toHaveBeenCalled()
+  })
+
+  it('harness:lint resolves the root main-side and forwards slug + root to the service', async () => {
+    state.current.mockReturnValue({ root: '/ws' })
+    const diags = [
+      { severity: 'error', code: 'scope-protected-globs', message: 'm', file: 'scope.json' }
+    ]
+    state.lintHarnessOnDisk.mockResolvedValue(diags)
+
+    expect(await invoke('harness:lint', { slug: 'test-fixer' })).toEqual(diags)
+    expect(state.lintHarnessOnDisk).toHaveBeenCalledWith('/ws', 'test-fixer')
   })
 
   it('harness:binding returns the binding slug, and null when the registry throws', async () => {

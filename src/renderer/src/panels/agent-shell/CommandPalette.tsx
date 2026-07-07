@@ -242,17 +242,21 @@ export function CommandPalette({
           )}
           {results.map((it, i) => {
             const isActive = i === active
+            // Disabled items (step-7 linter: broken harnesses) render greyed
+            // with their reason; run() is a no-op so click/Enter do nothing.
+            const isDisabled = it.disabledReason !== undefined
             return (
               <li
                 key={it.id}
                 role="option"
                 aria-selected={isActive}
+                aria-disabled={isDisabled || undefined}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => void it.run()}
                 style={{
                   padding: '8px 18px',
                   background: isActive ? 'var(--bg-tint-accent)' : 'transparent',
-                  cursor: 'pointer',
+                  cursor: isDisabled ? 'default' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
@@ -286,7 +290,7 @@ export function CommandPalette({
                 >
                   <span
                     style={{
-                      color: colors.text.primary,
+                      color: isDisabled ? colors.text.disabled : colors.text.primary,
                       fontSize: 12,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',

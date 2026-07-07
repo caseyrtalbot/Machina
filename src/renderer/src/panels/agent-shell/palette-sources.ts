@@ -22,6 +22,11 @@ export interface PaletteItem {
   readonly title: string
   readonly subtitle?: string
   readonly run: () => void | Promise<void>
+  /**
+   * Present = the item is rendered greyed with this reason and its `run` is
+   * a no-op (step-7 linter: broken harnesses are flagged, never vanished).
+   */
+  readonly disabledReason?: string
 }
 
 interface IndexDoc {
@@ -234,7 +239,21 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
 
   // One run item per on-disk harness (step 6): reads the harness files,
   // composes the prompt, and starts a CLI thread attributed to the slug.
+  // Broken harnesses (step 7 linter, error-severity diagnostics) stay
+  // visible — greyed with the reason, run disabled, never vanished.
   for (const h of opts.harnesses ?? []) {
+    const firstError = h.diagnostics.find((d) => d.severity === 'error')
+    if (firstError !== undefined) {
+      items.push({
+        id: `action:harness-run:${h.slug}`,
+        kind: 'action',
+        title: `Run harness: ${h.name}`,
+        subtitle: `broken harness · ${firstError.message}`,
+        disabledReason: firstError.message,
+        run: () => {}
+      })
+      continue
+    }
     items.push({
       id: `action:harness-run:${h.slug}`,
       kind: 'action',

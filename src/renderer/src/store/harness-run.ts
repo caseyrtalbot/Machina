@@ -44,6 +44,16 @@ export async function runHarness(
   summary: HarnessSummary,
   opts?: { readonly shellReadyTimeoutMs?: number }
 ): Promise<void> {
+  // Defensive twin of the palette's disable (step-7 linter): a harness with
+  // error-severity diagnostics — or no readable adapter — never starts a
+  // thread, whatever surface called this.
+  if (summary.adapter === null || summary.diagnostics.some((d) => d.severity === 'error')) {
+    notifyError(
+      'harness-run',
+      new Error(`harness "${summary.slug}" has lint errors — run disabled`)
+    )
+    return
+  }
   const store = useThreadStore.getState()
   if (!store.vaultPath) {
     notifyError('harness-run', new Error('no workspace open'))
