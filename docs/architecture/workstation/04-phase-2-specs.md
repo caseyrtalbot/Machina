@@ -83,6 +83,13 @@ graph TD
 
 ## Step 1 — Adapter registry + session-types + model aliasing (+ raw fallback)
 
+> **DONE** (`18cc29d`, 2026-07-06, contracts v1.2). Spike-verified flags: `claude
+> --model` / `codex -m` (exec + exec resume) / `gemini -m`; gemini ships `models: []`
+> (no auth on the dev machine to verify ids — widen the roster only with a real spike).
+> Golden byte-exact invocation tables + built-app probe (real `--model` acceptance,
+> gemini reply-mirroring guard) are the regression harness. `cli-raw` thread input is
+> disabled until step 8's templates (OQ3).
+
 Land contracts §3 as code: `AdapterId`/`AgentAdapter`/`WorkstationSession`/
 `SessionProjection` in a new `session-types.ts`, with an adapter registry that absorbs
 the `formatCliInvocation` switch (`cli-thread-spawner.ts:63-96`), the bridge's
@@ -170,6 +177,14 @@ adapter; `cli-thread-spawner.ts` is also step 3's surface — steps 1 and 3 are 
 sequential.
 
 ## Step 2 — Agent-write-watcher health model
+
+> **DONE** (`be07439`, 2026-07-06, contracts v1.2.1). Recorded deviations (§8): turn
+> tagging via a late-bound `setGateHealthProbe` on CliTurnRegistry instead of widening
+> `TurnStartedOpts` (keeps the step-3-owned spawner untouched); the one-time thread
+> notice latches on inFlight∧unhealthy (a deliberate superset of turn-start-unhealthy);
+> `restartWatcher` carries a generation-counter guard against restart×workspace-switch
+> races. Built-app probe `e2e/watcher-health.spec.ts` executed green. Casey-observed
+> dev-app degraded-banner check still pending.
 
 Give the containment watcher the health surface the item-4 dossier specs: a state
 machine (`starting/watching/degraded/down/stopped`) exposed over IPC, honest degraded UI

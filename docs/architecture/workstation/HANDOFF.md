@@ -4,7 +4,7 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the three docs it points at, and you can start building without
 asking questions.
 
-## Where things stand (2026-07-05, post step 2)
+## Where things stand (2026-07-06, Phase 2 steps 1–2 shipped)
 
 The vision is locked and the design is verified. Phase 0 (seam audit + interface
 contracts) shipped to main. The Phase 0 docs were then adversarially re-verified by an
@@ -34,6 +34,29 @@ rollback now; the gate checklist, parity ledger, and full P1/P2 transcripts live
 confirming on the running app (2026-07-06)** — see "Definition of done" below;
 `HANDOFF-PARALLEL-STEPS-5-6.md` deleted per its own instructions. Phase 1 is COMPLETE.
 
+**Phase 2 is underway. Steps 1 and 2 are SHIPPED and pushed** — step 1 (adapter
+registry + model aliasing + raw fallback) at `18cc29d` (contracts v1.2), step 2
+(watcher health model) at `be07439` (contracts v1.2.1), plus a chat-output quality
+pass at `fb7e17c` (thinking indicator, secret masking in thread output, honest tool
+status). Both landed with the full gate (3290 tests, build, full e2e including the
+new watcher-health probe, executed).
+
+**Next work order for the incoming team(s):**
+
+- **Step 3 (main-side harness↔thread binding) is next and strictly sequential** — it
+  edits `cli-thread-spawner.ts` + `ipc/cli-thread.ts` (step-1 surface) and
+  `ApprovalsTray.tsx` (step-2 surface), and it hard-gates step 5. One session only.
+- After step 3 lands: **steps 4 and 7 are the sanctioned parallel pair** (disjoint
+  files). Step 5 follows 3; step 6 follows 2+3; step 8 follows 7 (and consumes 1).
+- **Blocked on Casey, do not land without the call**: OQ8 (workspace-switch PTY
+  visibility graft — severable from step 6; step 6 lands green without it), OQ7
+  (gallery roster — before step 8). Also pending Casey: the step-2 exit-bar dev-app
+  observation (degraded banner + Retry while a simulated failure is driven), the
+  step-4 tick-counter acceptance, and dependabot triage (`npm audit --omit=dev`
+  reports 1 moderate production vuln as of 2026-07-06).
+- Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
+  leave it alone, do not commit or delete it.
+
 ## The doc map (all in this folder — trust these over memory or older drafts)
 
 1. **PLAN.md** — the vision: 13 locked decisions, five primitives, four phases,
@@ -51,7 +74,9 @@ confirming on the running app (2026-07-06)** — see "Definition of done" below;
    pass 2026-07-06 from a 4-designer + 2-judge workflow over four disk-verified
    investigation dossiers). Phase 1 is COMPLETE — new sessions start here. Pre-Phase-2
    hardening already landed: AGENTS.md regen unparked (`c7d463f`), symlinked-parent
-   harness refusal + contracts v1.1.5 (`660dc56`).
+   harness refusal + contracts v1.1.5 (`660dc56`). **Steps 1 (`18cc29d`) and 2
+   (`be07439`) are DONE — each step header carries a dated DONE block with its
+   recorded deviations. Next = step 3; steps 4∥7 open up after it.**
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -293,6 +318,75 @@ confirming on the running app (2026-07-06)** — see "Definition of done" below;
    `agentId` (stored per thread, defaults to identity) — the harness slug
    flows into turn attribution and commit trailers with no further plumbing.
 
+## What Phase 2 step 1 changed under you (`18cc29d`)
+
+1. **The adapter registry is the single invocation authority.**
+   `src/shared/agent-adapters.ts` (pure, renderer-importable): per-adapter
+   `formatInvocation` absorbed the spawner's `formatCliInvocation` switch, optional
+   `parseEvent` absorbed the bridge's claude/codex extractors
+   (`supportsStructuredOutput` is now `!!adapter.parseEvent`), and `models` rosters are
+   spike-verified. Session shapes live in `src/shared/session-types.ts` (contracts §3
+   landed) — do NOT confuse with `cli-agent-session-types.ts`, which is CLI-agent
+   *presence* types (the seam-map trap the spec warns about).
+2. **The model-flag trust rule lives at the IPC boundary** (`resolveModelPick`,
+   `src/main/ipc/cli-thread.ts`): a flag is emitted ONLY for an explicit user pick that
+   passes membership in `adapter.models` plus a charset regex. Absent, unknown, or the
+   persisted `DEFAULT_NATIVE_MODEL` filler ⇒ adapter default with no flag; rejected
+   explicit picks are audited. The **golden byte-exact invocation tables** in the
+   spawner tests are the regression harness — extend them when you touch invocation
+   construction; never bypass them.
+3. **`cli-raw` exists but is input-disabled** until step 8 lands harness-supplied
+   invocation templates (OQ3): plain PTY, no parser, no resume, no models.
+4. **`Thread.model` is real for CLI threads now** — `setThreadModel` is un-no-op'd and
+   the model round-trips through thread-md encode/decode. Gemini's roster ships EMPTY
+   (`models: []` — no auth on the dev machine to verify ids); widen it only with a
+   real CLI spike, not from training data.
+
+## What Phase 2 step 2 changed under you (`be07439`, contracts v1.2.1)
+
+1. **The watcher has a five-state health machine** (starting/watching/degraded/down/
+   stopped; `WatcherState`/`WatcherHealth` in `git-types.ts`) emitted via an optional
+   `onHealthChange` dep and broadcast as `approvals:watcher-health`, with
+   `approvals:watcher-status` (pull) and `approvals:watcher-retry` (manual restart,
+   resets the backoff cap). All three silent death paths are hardened; `start()` races
+   ready vs error vs a 30s timeout (injectable for tests) and THROWS on failure —
+   vault init can no longer hang on a dead watcher.
+2. **`restartWatcher` in `ipc/git.ts` is generation-guarded.** A module-level
+   `watcherGeneration` counter bumps at `stopApprovals` / `initApprovalsForRoot` /
+   `restartWatcher` entry; an in-flight restart that discovers the generation moved
+   aborts with `watcher-restart-superseded` and retires its own just-built watcher.
+   **Step 3 edits this file — respect the guard**: any new await-bearing path that
+   rebuilds or rebinds the watcher must revalidate generation + root after each await,
+   and stale watcher instances must not emit health. Same-root restarts NEVER call
+   `getApprovalQueue().clear()` (mutation-tested); the clear stays in
+   `initApprovalsForRoot` and is load-bearing for workspace switches.
+3. **Turn tagging did NOT widen `TurnStartedOpts`** (recorded deviation): the registry
+   takes a late-bound `setGateHealthProbe` (same pattern as `setPtyAliveProbe`), and
+   `CliTurn.gateDegradedAtStart` flows into `PendingChangeFlags.gateDegraded` → queue
+   merge → tray chip. The spawner was deliberately left untouched for step 3.
+4. **Degraded UX**: tray warning dot (shows even at zero pending) + banner with the
+   contract's honest copy + Retry; `WatcherHealthChip.tsx` holds the thread-header chip
+   and the one-time inline notice (latch = inFlight∧unhealthy, a recorded superset of
+   turn-start-unhealthy). ThreadPanel integration is three lines. Policy is OQ6:
+   visibly degrade, NEVER block turns.
+5. **`e2e/watcher-health.spec.ts` is the built-app probe and it has been executed
+   green** (healthy boot → `watching`; chmod-000 subdir fixture → workspace live,
+   state `down`). It encodes an e2e lesson — see the new repo gotcha below.
+
+## Chat-output quality pass (`fb7e17c`) — same landing window
+
+Not a workstation step; touched only the thread/message rendering surface.
+`ThinkingIndicator.tsx` (mounts via `InflightAssistant`'s `inFlight` prop),
+`scanSecrets` masking over CLI output/tool pills/error cards via
+`tool-renderers/mask-secrets.ts` (copy follows display; per-card reveal), honest tool
+status (ok / failed / observed / pending / not run), `closeSession` synthesizes a
+final message on PTY death (stale inFlight cleared), degraded-parse gate stops
+truncated JSONL fabricating tool pills, non-AUTH native errors are system messages
+now, and ThreadMessage keys are thread-scoped. **Known residuals for a later pass**
+(recorded, not blocking): the interim-stream → final-markdown reflow "pop" in
+`InflightAssistant`, and streamed-CLI finals dropping bridge metadata
+(`use-thread-streaming.ts` finalize path rebuilds the message).
+
 Repo gotchas the step-1 team hit (they will bite you too):
 
 - **CLAUDE.md is gitignored in this repo.** `AGENTS.md` is the tracked copy: a
@@ -309,6 +403,12 @@ Repo gotchas the step-1 team hit (they will bite you too):
   titlebar drag-region product issue — un-fixme it only when that is fixed.
 - **e2e runs dirty `e2e/fixtures/test-vault/.machina/state.json`** (the app persists
   state into the fixture). `git restore` it before committing.
+- **`page.evaluate` dies across the boot-time `location.reload()`** in e2e probes
+  ("Execution context was destroyed"). Locator waits span navigations; evaluate does
+  not. Pattern: after seeding the workspace and reloading, wait on an app-mounted
+  locator (e.g. the approvals tray button) BEFORE any evaluate-based polling, and wrap
+  polled evaluates in try/catch returning a retry sentinel. `watcher-health.spec.ts`
+  is the working template — the step-2 gate hit this live.
 - **Non-packaged runs (e2e, dev, Playwright probes) share
   `~/Library/Application Support/Electron/`** for electron-store + localStorage. Test
   pollution persists across runs; move the dir aside if you need a clean boot.
@@ -322,7 +422,9 @@ Repo gotchas the step-1 team hit (they will bite you too):
    live on disk before anyone reviews them. Approve blesses into history; Reject reverts
    via git. UI copy and your own mental model must never claim writes are blocked. The
    agent is a full shell — it can run git itself; we detect (headMoved tripwire), we do
-   not prevent. Real enforcement is Phase 2 (adapter-native permission hooks).
+   not prevent. Adapter-native permission hooks were DEFERRED out of Phase 2 (OQ1,
+   recorded in 04-phase-2-specs.md) — containment stays post-persistence all phase; a
+   reserved `AgentAdapter` capability field keeps the future seam cheap.
 2. **Never let rollback coverage gap.** DISCHARGED 2026-07-06: step 5's G1–G8 evidence
    gate passed on fresh runs (G6 included) and the snapshot was retired in the same
    step — coverage never gapped. The rule's spirit survives: rollback is now the
@@ -395,8 +497,10 @@ with import-graph evidence is in 00-seam-audit.md §1.
 
 ## Open items deliberately left for later phases
 
-Adapter registry + session-types (Phase 2), loop scheduler (Phase 3), LSP + git map
-(Phase 4), worktree isolation (only if parallel usage demands), renderer "workspace"
-filter-naming cleanup, state.md knowledge-indexing, DocumentManager coordination for git
-discard, MCP gate convergence onto QueueHitlGate. The full residual list with rationale
-is at the end of 02-phase-1-specs.md.
+Loop scheduler + per-slug budget aggregation + max-$ budget (Phase 3), LSP + git map
+(Phase 4), adapter-native permission hooks (OQ1 deferral, reserved seam), worktree
+isolation (only if parallel usage demands), renderer "workspace" filter-naming cleanup,
+state.md knowledge-indexing, DocumentManager coordination for git discard, MCP gate
+convergence onto QueueHitlGate. (Adapter registry + session-types landed as Phase 2
+step 1.) The full residual lists with rationale: end of 02-phase-1-specs.md (Phase 1)
+and "Deferred / accepted residuals" in 04-phase-2-specs.md (Phase 2).
