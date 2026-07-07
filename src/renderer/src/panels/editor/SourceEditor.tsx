@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { machinaCodeTheme } from '../canvas/shared/code-theme'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
@@ -89,7 +89,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
         highlightSelectionMatches(),
         history(),
         markdown(),
-        oneDark,
+        machinaCodeTheme,
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {

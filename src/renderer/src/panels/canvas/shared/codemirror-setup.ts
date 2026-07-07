@@ -1,6 +1,6 @@
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { machinaCodeTheme } from './code-theme'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { loadLanguageExtension, type SupportedLanguage } from './codemirror-languages'
@@ -43,7 +43,7 @@ export async function createEditorExtensions(
   const extensions: Extension[] = [
     lineNumbers(),
     EditorView.lineWrapping,
-    oneDark,
+    machinaCodeTheme,
     EditorView.theme({
       '&': { height: '100%', fontSize },
       '.cm-scroller': {

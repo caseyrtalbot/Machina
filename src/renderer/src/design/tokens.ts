@@ -90,6 +90,25 @@ export const colors = {
       bg: 'color-mix(in srgb, #94a3b8 8%, transparent)',
       border: '#94a3b8'
     }
+  },
+  // Syntax highlighting palette for the code surface (CodeFileEditor and the
+  // canvas CodeCard). Hues are drawn from the OKLCH L=0.75/C=0.15 family below
+  // so every token carries equal visual weight — a calm, uniform highlight that
+  // sits on the app's near-black void instead of an imported theme's washed
+  // background. Operators/comments/meta use theme CSS vars so they track accent.
+  syntax: {
+    keyword: '#93a4ff', // indigo — control flow, declarations, import/export
+    string: '#4ec983', // emerald — strings, template literals
+    number: '#dfa11a', // amber — numeric literals
+    constant: '#fa8c58', // orange — booleans, null, constants (ties to ember)
+    function: '#5cb3ff', // blue — function and method names
+    type: '#00cacb', // cyan — types, classes, namespaces
+    property: '#a3afc1', // slate — object properties, attributes
+    regexp: '#fe838f', // rose — regular expressions
+    tag: '#fa8c58', // orange — html/jsx tags
+    operator: 'var(--color-text-secondary)', // operators/punctuation recede
+    comment: 'var(--color-text-muted)', // comments recede
+    meta: 'var(--color-accent-default)' // decorators/annotations — brand accent
   }
 } as const
 

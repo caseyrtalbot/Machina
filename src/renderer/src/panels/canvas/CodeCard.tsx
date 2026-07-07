@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { machinaCodeTheme } from './shared/code-theme'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { useCanvasStore } from '../../store/canvas-store'
@@ -61,7 +61,7 @@ export function CodeCard({ node }: CodeCardProps) {
         highlightActiveLine(),
         highlightSelectionMatches(),
         history(),
-        oneDark,
+        machinaCodeTheme,
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         EditorView.theme({
           '&': { height: '100%', fontSize: '13px' },

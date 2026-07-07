@@ -18,7 +18,7 @@ vi.mock('@codemirror/view', () => ({
   lineNumbers: vi.fn(),
   highlightActiveLine: vi.fn()
 }))
-vi.mock('@codemirror/theme-one-dark', () => ({ oneDark: [] }))
+vi.mock('@renderer/panels/canvas/shared/code-theme', () => ({ machinaCodeTheme: [] }))
 vi.mock('@codemirror/commands', () => ({
   defaultKeymap: [],
   history: vi.fn(),
