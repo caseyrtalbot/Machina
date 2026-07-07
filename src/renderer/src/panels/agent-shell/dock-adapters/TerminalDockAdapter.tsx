@@ -17,19 +17,32 @@ interface TerminalDockAdapterProps {
   readonly onSessionCreated?: (sessionId: string) => void
   /** Fires when the PTY exits (user typed `exit`, process ended). */
   readonly onSessionExited?: () => void
+  /**
+   * Agent-projection mode (workstation Phase 2 step 4, contracts §4):
+   * reattach-only. A stale/dead/absent session renders a read-only dead
+   * state — the adapter never mounts a webview that could terminal:create,
+   * and the mounted webview URL carries `reattachOnly` so the guest's own
+   * create fallback is disabled too (both layers enforce the no-respawn
+   * rule). The stale-session respawn stays correct for plain terminals.
+   */
+  readonly projection?: 'agent'
 }
 
 export function TerminalDockAdapter({
   sessionId,
   cwd,
   onSessionCreated,
-  onSessionExited
+  onSessionExited,
+  projection
 }: TerminalDockAdapterProps) {
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const preloadPath = useMemo(() => 'file://' + window.api.getTerminalPreloadPath(), [])
+  const reattachOnly = projection === 'agent'
   // When sessionId is empty the webview's TerminalApp spawns a fresh PTY at
   // cwd; passing a sessionId reattaches to a survivor, and cwd doubles as the
-  // respawn target when that sessionId turns out to be stale.
+  // respawn target when that sessionId turns out to be stale. Agent
+  // projections instead set reattachOnly and omit cwd entirely: nothing in
+  // the guest may create, and nothing in the URL says where to.
   const webviewSrc = useMemo(() => {
     const base = resolveTerminalWebviewBase(
       import.meta.env.DEV,
@@ -38,10 +51,11 @@ export function TerminalDockAdapter({
     )
     return buildTerminalWebviewSrc(base, {
       sessionId: sessionId || undefined,
-      cwd: cwd ?? vaultPath ?? undefined,
-      vaultPath: vaultPath ?? undefined
+      cwd: reattachOnly ? undefined : (cwd ?? vaultPath ?? undefined),
+      vaultPath: reattachOnly ? undefined : (vaultPath ?? undefined),
+      reattachOnly: reattachOnly || undefined
     })
-  }, [sessionId, cwd, vaultPath])
+  }, [sessionId, cwd, vaultPath, reattachOnly])
 
   // Session lifecycle callbacks live in refs so a new callback identity does
   // not tear down and re-register the webview listeners mid-session.
@@ -54,14 +68,17 @@ export function TerminalDockAdapter({
 
   const webviewRef = useRef<Electron.WebviewTag | null>(null)
   const [failure, setFailure] = useState<LoadFailure | null>(null)
+  const [dead, setDead] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  // Reset stale failure during render when the webview navigates to a fresh
-  // URL or the user clicks reload. React's recommended pattern for prop-derived
-  // resets, avoiding the cascading-render warning of setState-in-effect.
+  // Reset stale failure/dead state during render when the webview navigates
+  // to a fresh URL or the user clicks reload. React's recommended pattern for
+  // prop-derived resets, avoiding the cascading-render warning of
+  // setState-in-effect.
   const [resetKey, setResetKey] = useState({ src: webviewSrc, reloadKey })
   if (resetKey.src !== webviewSrc || resetKey.reloadKey !== reloadKey) {
     setResetKey({ src: webviewSrc, reloadKey })
     setFailure(null)
+    setDead(false)
   }
 
   useEffect(() => {
@@ -91,7 +108,14 @@ export function TerminalDockAdapter({
       if (ipcEvent.channel === 'session-created') {
         onSessionCreatedRef.current?.(String(ipcEvent.args[0]))
       } else if (ipcEvent.channel === 'session-exited') {
+        // Agent projection: a PTY that exits under the raw view flips to the
+        // read-only dead state (scrollback stays visible; nothing respawns).
+        if (reattachOnly) setDead(true)
         onSessionExitedRef.current?.()
+      } else if (ipcEvent.channel === 'session-dead') {
+        // Reattach-only guest found no surviving PTY and (by contract) did
+        // not create one — render the dead state.
+        setDead(true)
       }
     }
     el.addEventListener('did-fail-load', onFail as EventListener)
@@ -102,7 +126,14 @@ export function TerminalDockAdapter({
       el.removeEventListener('did-finish-load', onLoad)
       el.removeEventListener('ipc-message', onIpcMessage)
     }
-  }, [webviewSrc, reloadKey])
+  }, [webviewSrc, reloadKey, reattachOnly])
+
+  // Adapter-layer no-respawn enforcement (contracts §4): with no session to
+  // reattach to, an agent projection never mounts a webview at all — a
+  // mounted guest with an empty sessionId would terminal:create.
+  if (reattachOnly && !sessionId) {
+    return <DeadSessionState />
+  }
 
   /* eslint-disable react/no-unknown-property */
   return (
@@ -119,6 +150,7 @@ export function TerminalDockAdapter({
         }}
         webpreferences="contextIsolation=yes, sandbox=yes"
       />
+      {dead && <DeadSessionState overlay />}
       {failure && (
         <div
           role="alert"
@@ -176,4 +208,52 @@ export function TerminalDockAdapter({
     </div>
   )
   /* eslint-enable react/no-unknown-property */
+}
+
+/**
+ * Read-only dead state for agent projections (workstation Phase 2 step 4).
+ * Honest copy per contracts §4: the session ended and Machina deliberately
+ * does NOT respawn a shell for an agent thread (it would be unattributed).
+ * As `overlay` it banners over the webview so the final scrollback stays
+ * visible; standalone it replaces the webview entirely.
+ */
+function DeadSessionState({ overlay }: { readonly overlay?: boolean }) {
+  return (
+    <div
+      role="status"
+      data-testid="terminal-dead-state"
+      style={{
+        ...(overlay
+          ? { position: 'absolute' as const, top: 0, left: 0, right: 0 }
+          : { width: '100%', height: '100%', boxSizing: 'border-box' as const }),
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        justifyContent: overlay ? 'flex-start' : 'center',
+        padding: overlay ? '10px 16px' : 24,
+        gap: 6,
+        background: colors.bg.surface,
+        borderBottom: overlay ? `1px solid ${colors.border.subtle}` : undefined,
+        color: colors.text.primary,
+        fontFamily: typography.fontFamily.mono,
+        fontSize: 12,
+        lineHeight: 1.6
+      }}
+    >
+      <div
+        style={{
+          color: colors.text.muted,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform
+        }}
+      >
+        agent session ended
+      </div>
+      <div style={{ color: colors.text.secondary }}>
+        This PTY is gone. Machina does not restart shells for agent threads — send a message to
+        start the next turn in a fresh, attributed session.
+      </div>
+    </div>
+  )
 }

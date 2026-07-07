@@ -384,6 +384,30 @@ with step 2 — sequential.
 
 ## Step 4 — Two-projection agent view (structured thread ⇄ raw PTY)
 
+> **DONE** (2026-07-07, contracts v1.2.3, landed on `wip/p2-step4` for the
+> orchestrator's post-merge reconciliation). Recorded deviations (§8): (1) the
+> webview-guest connect decision (reconnect → reattachOnly dead-stop → create) was
+> EXTRACTED to `src/renderer/terminal-webview/connect-session.ts` instead of edited
+> inline in `TerminalApp.tsx` — the load-bearing "no terminal:create at the webview
+> layer" test is only behaviorally pinnable against a pure api-injected function;
+> TerminalApp's source-string tests were updated to pin the delegation (and that
+> `window.terminalApi.create` no longer appears in TerminalApp at all); (2) the
+> adapter's read-only dead state also covers a PTY that exits UNDER a live raw view
+> (`session-exited` in projection mode), not just stale-at-mount; (3)
+> `cli-thread:get-session` responds `{ sessionId, live } | null` (liveness from the
+> existing `hasLiveSession` probe) so the dead state needs no second channel; (4) in
+> projection mode the adapter also OMITS `cwd`/`vaultPath` from the webview URL
+> (belt-and-suspenders beyond the spec's reattachOnly param: nothing in the URL may
+> create, and nothing says where). All specced tests landed, including the
+> block-protocol integrity pair (echoed keystrokes interleaved into the running agent
+> block + a user-run non-agent command block mid-turn: turn completes once, reply
+> mirrors, no early close). The built-app Playwright probe
+> (`e2e/agent-projection.spec.ts`) is WRITTEN but NOT executed in this session
+> (parallel-session e2e collision rule) — the orchestrator runs it post-merge; it
+> uses a direct `cli-thread:input` echo turn rather than a harness turn so it does
+> not depend on an installed/authed CLI. Casey-observed one-click flip on a live
+> harness run still pending.
+
 One click between the structured thread and the live raw PTY (PLAN Q8). The plumbing gap is
 precise (seam map §3): `cli-thread:spawn` RETURNS `sessionId` (`ipc-channels.ts:277`)
 but `cliTransport.start` drops it (`agent-transport.ts:96-104`);

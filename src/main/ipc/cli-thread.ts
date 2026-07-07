@@ -4,7 +4,8 @@ import type { AgentIdentity } from '@shared/agent-identity'
 import type { AdapterId } from '@shared/session-types'
 import { ADAPTERS, resolveModelPick } from '@shared/agent-adapters'
 import { SAFE_ID_RE } from '@shared/git-types'
-import { typedHandle } from '../typed-ipc'
+import { typedHandle, typedSend } from '../typed-ipc'
+import { getMainWindow } from '../window-registry'
 import {
   CliThreadSpawner,
   isCliAgentIdentity,
@@ -24,7 +25,14 @@ function getSpawner(): CliThreadSpawner {
       bridge: getCliAgentThreadBridge(),
       // Gate-parity attribution (step 3): turn windows open on send, close on
       // block completion (wired in ipc/shell.ts), drop on thread close.
-      registry: getCliTurnRegistry()
+      registry: getCliTurnRegistry(),
+      // Two-projection view (step 4): a spawn-on-demand respawn rebinds the
+      // thread to a fresh PTY the renderer never saw a spawn response for —
+      // broadcast it so the cli-session-store stays the single authority.
+      onSessionChanged: (threadId, sessionId) => {
+        const window = getMainWindow()
+        if (window) typedSend(window, 'cli-thread:session-changed', { threadId, sessionId })
+      }
     })
     // Late-bound to break the shell.ts ↔ cli-thread.ts cycle: the registry's
     // degraded-mode window is "this thread's PTY is still alive".
@@ -190,5 +198,15 @@ export function registerCliThreadIpc(): void {
   typedHandle('cli-thread:cancel', async ({ threadId }) => {
     const ok = getSpawner().cancel(threadId)
     return { ok }
+  })
+
+  // Two-projection view (step 4): pull mirror of the spawner's binding for
+  // late subscribers. The spawner map is the main-side authority; `live` is
+  // the same PTY-alive probe the turn registry uses.
+  typedHandle('cli-thread:get-session', async ({ threadId }) => {
+    const spawner = getSpawner()
+    const sessionId = spawner.getSessionId(threadId)
+    if (sessionId === undefined) return null
+    return { sessionId, live: spawner.hasLiveSession(threadId) }
   })
 }

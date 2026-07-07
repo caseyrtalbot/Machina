@@ -160,7 +160,8 @@ const api = {
       model?: string
     }) => typedInvoke('cli-thread:input', req),
     close: (threadId: string) => typedInvoke('cli-thread:close', { threadId }),
-    cancel: (threadId: string) => typedInvoke('cli-thread:cancel', { threadId })
+    cancel: (threadId: string) => typedInvoke('cli-thread:cancel', { threadId }),
+    getSession: (threadId: string) => typedInvoke('cli-thread:get-session', { threadId })
   },
   embeddings: {
     setEnabled: (enabled: boolean) => typedInvoke('embeddings:set-enabled', { enabled }),
@@ -210,7 +211,10 @@ const api = {
     approvalsChanged: (callback: (data: { pending: number }) => void) =>
       typedOn('approvals:changed', callback),
     watcherHealth: (callback: (data: IpcEventData<'approvals:watcher-health'>) => void) =>
-      typedOn('approvals:watcher-health', callback)
+      typedOn('approvals:watcher-health', callback),
+    cliThreadSessionChanged: (
+      callback: (data: IpcEventData<'cli-thread:session-changed'>) => void
+    ) => typedOn('cli-thread:session-changed', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path }),

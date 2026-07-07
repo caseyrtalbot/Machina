@@ -686,3 +686,85 @@ describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
     expect(log.filter((e) => e.kind === 'turn-complete')).toHaveLength(2)
   })
 })
+
+describe('block-protocol integrity with interleaved human input (workstation Phase 2 step 4)', () => {
+  // The raw projection is the user's PTY: keystrokes typed mid-turn echo into
+  // the agent block's output, and commands the user runs land as separate
+  // blocks on the same session. Neither may corrupt block detection, close
+  // the turn window early, or stop the reply from mirroring.
+  function recordingBridge(): {
+    bridge: CliAgentThreadBridge
+    messages: CliAgentThreadMessageEvent[]
+    turnCompletes: string[]
+  } {
+    const messages: CliAgentThreadMessageEvent[] = []
+    const turnCompletes: string[] = []
+    const bridge = new CliAgentThreadBridge({
+      onMessage: (e) => messages.push(e),
+      onTurnComplete: (threadId) => turnCompletes.push(threadId)
+    })
+    return { bridge, messages, turnCompletes }
+  }
+
+  it('echoed keystrokes interleaved into the running agent block do not corrupt extraction; the turn still completes and the reply mirrors', () => {
+    const { bridge, messages, turnCompletes } = recordingBridge()
+    bridge.bind('s1', 'thread-A')
+
+    let block = startedBlock('s1', 'claude --print --verbose --output-format stream-json "fix"')
+    // First structured lines arrive.
+    block = appendOutput(block, claudeInit + '\n' + claudeText('working on it') + '\n')
+    bridge.observe('s1', block)
+    // Human types into the raw view mid-turn: raw bytes echo between JSONL
+    // lines (not valid JSON — parseEvent must skip them, not derail).
+    block = appendOutput(block, 'ls -la\r\nwhoami\r\n')
+    bridge.observe('s1', block)
+    expect(turnCompletes).toEqual([])
+    // The agent finishes normally after the interleaved noise.
+    block = appendOutput(
+      block,
+      claudeText('done: tests pass') + '\n' + claudeResult('done: tests pass') + '\n'
+    )
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+
+    // The turn completed exactly once and the reply mirrored with the
+    // structured text intact (echoed keystrokes are not assistant text).
+    expect(turnCompletes).toEqual(['thread-A'])
+    const final = messages[messages.length - 1].message
+    expect(final.metadata?.endedAt).toBeDefined()
+    expect(final.body).toBe('working on it\n\ndone: tests pass')
+    expect(final.body).not.toContain('ls -la')
+    expect(final.metadata?.sessionId).toBe('s1')
+  })
+
+  it('a user-run non-agent command block mid-turn neither mirrors nor closes the turn window', () => {
+    const { bridge, messages, turnCompletes } = recordingBridge()
+    bridge.bind('s1', 'thread-A')
+
+    // Agent turn opens and is still running.
+    const agentStart = startedBlock(
+      's1',
+      'claude --print --verbose --output-format stream-json "fix"'
+    )
+    bridge.observe('s1', appendOutput(agentStart, claudeInit + '\n'))
+
+    // Human runs `npm test` in the raw view: a SEPARATE completed block on
+    // the same session. detectAgentFromCommand must reject it — no mirrored
+    // message, no early turn-complete.
+    const humanPending = pendingBlock('b-s1-human', meta('s1'))
+    const humanStart = startBlock(humanPending, 'npm test', 2000)
+    if (!humanStart.ok) throw new Error(humanStart.error)
+    bridge.observe('s1', completed(appendOutput(humanStart.value, '4 passed\n'), 0))
+    expect(turnCompletes).toEqual([])
+    expect(messages.filter((m) => m.message.metadata?.endedAt !== undefined)).toHaveLength(0)
+
+    // The agent block then completes: exactly one turn-complete, one final.
+    let agentBlock = appendOutput(agentStart, claudeInit + '\n' + claudeText('fixed') + '\n')
+    agentBlock = completed(agentBlock, 0)
+    bridge.observe('s1', agentBlock)
+    expect(turnCompletes).toEqual(['thread-A'])
+    const finals = messages.filter((m) => m.message.metadata?.endedAt !== undefined)
+    expect(finals).toHaveLength(1)
+    expect(finals[0].message.body).toBe('fixed')
+  })
+})

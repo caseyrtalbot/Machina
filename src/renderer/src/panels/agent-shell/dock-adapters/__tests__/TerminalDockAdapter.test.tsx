@@ -192,4 +192,98 @@ describe('TerminalDockAdapter (webview host)', () => {
       )
     })
   })
+
+  // Agent projection (workstation Phase 2 step 4, contracts §4): the adapter
+  // is the FIRST no-respawn layer — with no session to reattach to it never
+  // mounts a webview (a mounted guest with no sessionId would
+  // terminal:create), and a mounted guest gets reattachOnly so its own create
+  // fallback is disabled (the second layer, pinned in connect-session.test.ts).
+  describe('projection="agent" (reattach-only, no-respawn)', () => {
+    it('renders the dead state with NO webview when there is no session at all', async () => {
+      const { TerminalDockAdapter } = await import('../TerminalDockAdapter')
+      const { container } = render(<TerminalDockAdapter sessionId="" projection="agent" />)
+
+      expect(container.querySelector('webview')).toBeNull()
+      expect(container.querySelector('[data-testid="terminal-dead-state"]')).toBeTruthy()
+    })
+
+    it('mounts the webview with reattachOnly=1 and WITHOUT cwd/vaultPath', async () => {
+      const { TerminalDockAdapter } = await import('../TerminalDockAdapter')
+      const { container } = render(
+        <TerminalDockAdapter sessionId="sess-agent" cwd="/repo" projection="agent" />
+      )
+
+      const src = getWebview(container).getAttribute('src') ?? ''
+      const qs = new URL(src).searchParams
+      expect(qs.get('sessionId')).toBe('sess-agent')
+      expect(qs.get('reattachOnly')).toBe('1')
+      // Nothing in the URL may create, and nothing says where to.
+      expect(qs.has('cwd')).toBe(false)
+      expect(qs.has('vaultPath')).toBe(false)
+    })
+
+    it('plain mode (no projection) never sets reattachOnly', async () => {
+      const { TerminalDockAdapter } = await import('../TerminalDockAdapter')
+      const { container } = render(<TerminalDockAdapter sessionId="sess-plain" cwd="/repo" />)
+
+      const qs = new URL(getWebview(container).getAttribute('src') ?? '').searchParams
+      expect(qs.has('reattachOnly')).toBe(false)
+      expect(qs.get('cwd')).toBe('/repo')
+    })
+
+    it('flips to the dead state when the guest reports session-dead', async () => {
+      const { TerminalDockAdapter } = await import('../TerminalDockAdapter')
+      const { container } = render(
+        <TerminalDockAdapter sessionId="sess-stale" projection="agent" />
+      )
+      const webview = getWebview(container)
+
+      await act(async () => {
+        dispatchWebviewEvent(webview, 'ipc-message', {
+          channel: 'session-dead',
+          args: ['sess-stale']
+        })
+      })
+
+      expect(container.querySelector('[data-testid="terminal-dead-state"]')).toBeTruthy()
+    })
+
+    it('flips to the dead state when the PTY exits under the raw view (no respawn)', async () => {
+      const { TerminalDockAdapter } = await import('../TerminalDockAdapter')
+      const onSessionExited = vi.fn()
+      const { container } = render(
+        <TerminalDockAdapter
+          sessionId="sess-agent"
+          projection="agent"
+          onSessionExited={onSessionExited}
+        />
+      )
+      const webview = getWebview(container)
+
+      await act(async () => {
+        dispatchWebviewEvent(webview, 'ipc-message', {
+          channel: 'session-exited',
+          args: ['sess-agent', 0]
+        })
+      })
+
+      expect(onSessionExited).toHaveBeenCalledTimes(1)
+      expect(container.querySelector('[data-testid="terminal-dead-state"]')).toBeTruthy()
+    })
+
+    it('plain mode does NOT show the dead state on session-exited (respawn surface)', async () => {
+      const { TerminalDockAdapter } = await import('../TerminalDockAdapter')
+      const { container } = render(<TerminalDockAdapter sessionId="sess-plain" />)
+      const webview = getWebview(container)
+
+      await act(async () => {
+        dispatchWebviewEvent(webview, 'ipc-message', {
+          channel: 'session-exited',
+          args: ['sess-plain', 0]
+        })
+      })
+
+      expect(container.querySelector('[data-testid="terminal-dead-state"]')).toBeNull()
+    })
+  })
 })

@@ -7,10 +7,13 @@ import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
+import { connectToSession } from './connect-session'
 
 /**
  * Read launch parameters from the webview URL query string.
- * The host (TerminalCard) sets these when constructing the <webview> src.
+ * The host (TerminalCard / dock adapters) sets these when constructing the
+ * <webview> src — param names must stay in sync with the pure builders in
+ * terminal-webview-src.ts.
  */
 function readUrlParams(): {
   sessionId: string | null
@@ -19,6 +22,7 @@ function readUrlParams(): {
   systemPrompt: string | null
   label: string | null
   vaultPath: string | null
+  reattachOnly: boolean
 } {
   const params = new URLSearchParams(window.location.search)
   return {
@@ -27,7 +31,10 @@ function readUrlParams(): {
     initialCommand: params.get('initialCommand'),
     systemPrompt: params.get('systemPrompt'),
     label: params.get('label'),
-    vaultPath: params.get('vaultPath')
+    vaultPath: params.get('vaultPath'),
+    // Agent projection (workstation Phase 2 step 4): a failed reconnect must
+    // report a dead session, never fall through to terminal:create.
+    reattachOnly: params.get('reattachOnly') === '1'
   }
 }
 
@@ -147,7 +154,8 @@ export function TerminalApp() {
       initialCommand,
       systemPrompt,
       label,
-      vaultPath
+      vaultPath,
+      reattachOnly
     } = readUrlParams()
     let cancelled = false
     firstDataRef.current = true
@@ -367,38 +375,36 @@ export function TerminalApp() {
       const cols = termRef.current?.cols || fallbackSize.cols
       const rows = termRef.current?.rows || fallbackSize.rows
 
-      // Reconnect path: try to reattach to a surviving session
-      if (urlSessionId) {
-        const result = await window.terminalApi.reconnect({
-          sessionId: urlSessionId,
-          cols,
-          rows
-        })
-        if (cancelled) return
-
-        if (result) {
-          sessionIdRef.current = urlSessionId
-          // Ring buffer provides clean scrollback without alternate-screen
-          // artifacts (unlike tmux capture-pane which flattens alt-screen context).
-          if (result.scrollback) {
-            term.write(result.scrollback)
-          }
-          return
-        }
-      }
-
-      // Create path: spawn a new session at the actual terminal dimensions
-      const newSessionId = await window.terminalApi.create({
-        cwd: cwd || '/',
-        cols,
-        rows,
-        label: label ?? undefined,
-        vaultPath: vaultPath ?? undefined
-      })
+      // Decision extracted to connect-session.ts (reconnect → reattachOnly
+      // dead-stop → create) so the agent-projection no-respawn rule is
+      // behaviorally test-pinned.
+      const outcome = await connectToSession(
+        { sessionId: urlSessionId, reattachOnly, cwd, label, vaultPath, cols, rows },
+        window.terminalApi
+      )
       if (cancelled) return
 
-      sessionIdRef.current = newSessionId
-      window.terminalApi.sendToHost('session-created', newSessionId)
+      if (outcome.kind === 'reconnected') {
+        sessionIdRef.current = outcome.sessionId
+        // Ring buffer provides clean scrollback without alternate-screen
+        // artifacts (unlike tmux capture-pane which flattens alt-screen context).
+        if (outcome.scrollback) {
+          term.write(outcome.scrollback)
+        }
+        return
+      }
+
+      if (outcome.kind === 'dead') {
+        // Reattach-only session is gone: report the dead state to the host
+        // (which renders the read-only dead surface) and stop — never spawn
+        // a replacement shell for an agent projection (contracts §4).
+        sessionIdRef.current = null
+        window.terminalApi.sendToHost('session-dead', outcome.sessionId ?? '')
+        return
+      }
+
+      sessionIdRef.current = outcome.sessionId
+      window.terminalApi.sendToHost('session-created', outcome.sessionId)
 
       // Send initial command after a brief delay to let the shell initialize
       if (initialCommand) {

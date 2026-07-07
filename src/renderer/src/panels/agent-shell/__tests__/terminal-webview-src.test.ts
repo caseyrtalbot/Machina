@@ -67,6 +67,21 @@ describe('buildTerminalWebviewSrc', () => {
     const partial = buildTerminalWebviewSrc(BASE, { sessionId: 's' })
     expect([...new URL(partial).searchParams.keys()]).toEqual(['sessionId'])
   })
+
+  // Agent projection (workstation Phase 2 step 4): the reattachOnly param is
+  // what disables the guest's terminal:create fallback — its name must stay
+  // in sync with TerminalApp.readUrlParams.
+  it('sets reattachOnly=1 when the flag is true', () => {
+    const src = buildTerminalWebviewSrc(BASE, { sessionId: 's', reattachOnly: true })
+    expect(new URL(src).searchParams.get('reattachOnly')).toBe('1')
+  })
+
+  it('omits reattachOnly when false or unset (plain terminals keep the respawn)', () => {
+    const unset = buildTerminalWebviewSrc(BASE, { sessionId: 's' })
+    expect(new URL(unset).searchParams.has('reattachOnly')).toBe(false)
+    const explicit = buildTerminalWebviewSrc(BASE, { sessionId: 's', reattachOnly: false })
+    expect(new URL(explicit).searchParams.has('reattachOnly')).toBe(false)
+  })
 })
 
 describe('resolveTerminalWebviewBase', () => {

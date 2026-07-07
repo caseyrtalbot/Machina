@@ -62,6 +62,13 @@ interface CliThreadSpawnerOptions {
   readonly detect?: () => Promise<readonly CLIAgentInstallation[]>
   /** Optional so existing tests and callers stay valid; wired in ipc/cli-thread.ts. */
   readonly registry?: SpawnerTurnRegistry
+  /**
+   * Fired when a thread's turn lands in a FRESH PTY on the spawn-on-demand
+   * respawn path inside `input()` (workstation Phase 2 step 4). The explicit
+   * `spawn()` call already returns its sessionId in the IPC response, so the
+   * event covers only the rebinding the renderer would otherwise never see.
+   */
+  readonly onSessionChanged?: (threadId: string, sessionId: string) => void
 }
 
 export class CliThreadSpawner {
@@ -180,6 +187,7 @@ export class CliThreadSpawner {
     if (!this.hasLiveSession(threadId)) {
       const spawned = await this.spawn(threadId, identity, cwd, agentId, model, attributionSuspect)
       if (!spawned.ok) return { ok: false }
+      this.opts.onSessionChanged?.(threadId, spawned.sessionId)
     }
     return { ok: this.sendUserMessage(threadId, identity, text) }
   }

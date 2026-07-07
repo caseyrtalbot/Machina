@@ -620,3 +620,83 @@ describe('isCliAgentIdentity', () => {
     expect(isCliAgentIdentity('')).toBe(false)
   })
 })
+
+describe('CliThreadSpawner onSessionChanged (workstation Phase 2 step 4)', () => {
+  function sessionBridge(): CliAgentThreadBridge {
+    return {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+  }
+
+  it('fires on the spawn-on-demand path (post-relaunch dead thread)', async () => {
+    const { shell } = fakeServices()
+    const onSessionChanged = vi.fn()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: sessionBridge(),
+      detect: async () => [installed('claude')],
+      onSessionChanged
+    })
+    // No prior spawn: input respawns and must announce the fresh binding.
+    const res = await spawner.input('thread-A', 'cli-claude', 'go', '/v')
+    expect(res.ok).toBe(true)
+    expect(onSessionChanged).toHaveBeenCalledTimes(1)
+    expect(onSessionChanged).toHaveBeenCalledWith('thread-A', 'sess-xyz')
+  })
+
+  it('fires when a stale (exited) PTY forces a respawn, with the NEW sessionId', async () => {
+    const { shell, pty } = fakeServices()
+    const onSessionChanged = vi.fn()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: sessionBridge(),
+      detect: async () => [installed('claude')],
+      onSessionChanged
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    pty.getActiveSessions.mockReturnValue([])
+    shell.create.mockReturnValue('sess-new')
+    await spawner.input('thread-A', 'cli-claude', 'retry', '/v')
+    expect(onSessionChanged).toHaveBeenCalledTimes(1)
+    expect(onSessionChanged).toHaveBeenCalledWith('thread-A', 'sess-new')
+  })
+
+  it('does NOT fire on a direct spawn (the IPC response already carries the id)', async () => {
+    const { shell } = fakeServices()
+    const onSessionChanged = vi.fn()
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: sessionBridge(),
+      detect: async () => [installed('claude')],
+      onSessionChanged
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    expect(onSessionChanged).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire when input reuses the live session or when the respawn fails', async () => {
+    const { shell } = fakeServices()
+    const onSessionChanged = vi.fn()
+    const live = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: sessionBridge(),
+      detect: async () => [installed('claude')],
+      onSessionChanged
+    })
+    await live.spawn('thread-A', 'cli-claude', '/v')
+    await live.input('thread-A', 'cli-claude', 'hi', '/v')
+    expect(onSessionChanged).not.toHaveBeenCalled()
+
+    const { shell: shell2 } = fakeServices()
+    const failing = new CliThreadSpawner({
+      shellService: shell2 as never,
+      bridge: sessionBridge(),
+      detect: async () => [installed('claude', false)],
+      onSessionChanged
+    })
+    const res = await failing.input('thread-B', 'cli-claude', 'go', '/v')
+    expect(res.ok).toBe(false)
+    expect(onSessionChanged).not.toHaveBeenCalled()
+  })
+})

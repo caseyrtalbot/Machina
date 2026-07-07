@@ -381,6 +381,16 @@ export interface IpcChannels {
     request: { threadId: string }
     response: { slug: string } | null
   }
+
+  // --- Two-projection agent view (workstation contracts §3/§6, Phase 2 step 4) ---
+  // Pull mirror of the spawner's threadId → sessionId binding for late
+  // subscribers (the renderer cli-session-store is the single sessionId
+  // authority; the bridge's metadata.sessionId path must never feed it).
+  // Null when no PTY was ever bound for the thread in this app run.
+  'cli-thread:get-session': {
+    request: { threadId: string }
+    response: { sessionId: string; live: boolean } | null
+  }
 }
 
 export type AgentNativeApprovalPreview =
@@ -473,6 +483,12 @@ export interface IpcEvents {
   // tray warning badge/banner and thread-surface degraded chip (contracts
   // §4/§6, step 2).
   'approvals:watcher-health': import('./git-types').WatcherHealth
+
+  // CLI-thread PTY rebinding (main -> renderer, workstation Phase 2 step 4):
+  // fired on the spawn-on-demand respawn path when a thread's turn lands in a
+  // FRESH PTY (the spawn response only covers the explicit cli-thread:spawn
+  // call). The renderer cli-session-store applies it as the single authority.
+  'cli-thread:session-changed': { threadId: string; sessionId: string }
 }
 
 export type IpcChannel = keyof IpcChannels

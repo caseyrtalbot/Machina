@@ -2,6 +2,7 @@ import type { Thread } from '@shared/thread-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 import type { DockTab } from '@shared/dock-types'
 import { withTimeout } from '../utils/ipc-timeout'
+import { useCliSessionStore } from './cli-session-store'
 
 /**
  * AgentTransport (2.2): one command-side interface over the two agent
@@ -106,6 +107,11 @@ const cliTransport: AgentTransport = {
       // turn windows and commit trailers carry it. Absent → identity.
       ...(thread.agentId !== undefined ? { agentId: thread.agentId } : {})
     })
+    // Keep the sessionId the spawn response returns (workstation Phase 2
+    // step 4): it seeds the cli-session-store, the single renderer authority
+    // the raw projection attaches to. Before this, start() dropped it and the
+    // only renderer copy was the bridge's stale metadata.sessionId leak.
+    if (result.ok) useCliSessionStore.getState().seed(thread.id, result.sessionId)
     return result.ok ? { ok: true } : { ok: false, error: result.error }
   },
 
@@ -145,6 +151,8 @@ const cliTransport: AgentTransport = {
 
   close: async (threadId) => {
     await window.api.cliThread.close(threadId)
+    // Thread deleted: forget the projection binding (the PTY was killed).
+    useCliSessionStore.getState().drop(threadId)
   }
 }
 

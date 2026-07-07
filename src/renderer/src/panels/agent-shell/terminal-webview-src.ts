@@ -6,6 +6,12 @@
  * Always pass `cwd` alongside `sessionId`: reconnect ignores it, but when the
  * persisted sessionId is stale the guest falls through to terminal:create and
  * cwd is what makes the respawn land in the right directory.
+ *
+ * EXCEPT for agent projections (workstation Phase 2 step 4): `reattachOnly`
+ * disables the guest's terminal:create fallback entirely — a stale/dead agent
+ * sessionId must render a dead state, never respawn an unattributed shell in
+ * the thread's cwd (contracts §4). The stale-session respawn stays correct
+ * for plain terminals; it is forbidden for agent projections.
  */
 export interface TerminalWebviewParams {
   readonly sessionId?: string
@@ -16,6 +22,7 @@ export interface TerminalWebviewParams {
   readonly accent?: string
   readonly bg?: string
   readonly systemPrompt?: string
+  readonly reattachOnly?: boolean
 }
 
 export function buildTerminalWebviewSrc(base: string, params: TerminalWebviewParams): string {
@@ -28,6 +35,7 @@ export function buildTerminalWebviewSrc(base: string, params: TerminalWebviewPar
   if (params.accent) qs.set('accent', params.accent)
   if (params.bg) qs.set('bg', params.bg)
   if (params.systemPrompt) qs.set('systemPrompt', params.systemPrompt)
+  if (params.reattachOnly) qs.set('reattachOnly', '1')
   const q = qs.toString()
   return q ? `${base}?${q}` : base
 }

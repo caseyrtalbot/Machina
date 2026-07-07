@@ -38,6 +38,10 @@ describe('TerminalApp component', () => {
     it('reads vaultPath from URL search params', () => {
       expect(src).toContain("'vaultPath'")
     })
+
+    it('reads reattachOnly from URL search params (agent projection, step 4)', () => {
+      expect(src).toContain("params.get('reattachOnly') === '1'")
+    })
   })
 
   describe('xterm setup', () => {
@@ -157,25 +161,29 @@ describe('TerminalApp component', () => {
   })
 
   describe('session lifecycle', () => {
-    it('calls terminalApi.reconnect when sessionId is present', () => {
-      expect(src).toContain('window.terminalApi.reconnect')
-    })
-
-    it('calls terminalApi.create for new sessions', () => {
-      expect(src).toContain('window.terminalApi.create')
-    })
-
-    it('passes action metadata into terminal creation', () => {
-      expect(src).toContain('label: label ?? undefined')
-      expect(src).toContain('vaultPath: vaultPath ?? undefined')
+    // The reconnect → reattachOnly dead-stop → create decision moved to
+    // connect-session.ts (step 4) where it is behaviorally test-pinned
+    // (connect-session.test.ts); TerminalApp delegates to it.
+    it('delegates the connect decision to connect-session', () => {
+      expect(src).toContain("from './connect-session'")
+      expect(src).toContain('await connectToSession(')
+      expect(src).toContain('window.terminalApi')
+      expect(src).toContain('reattachOnly')
     })
 
     it('sends session-created to host after creation', () => {
       expect(src).toContain("sendToHost('session-created'")
     })
 
+    it('reports a dead reattach-only session to the host without creating', () => {
+      expect(src).toContain("sendToHost('session-dead'")
+      // The create fallback lives only behind connect-session's reattachOnly
+      // gate — TerminalApp itself never calls terminal:create directly.
+      expect(src).not.toContain('window.terminalApi.create')
+    })
+
     it('replays ring buffer scrollback on reconnect', () => {
-      expect(src).toContain('term.write(result.scrollback)')
+      expect(src).toContain('term.write(outcome.scrollback)')
       expect(src).toContain('Ring buffer provides clean scrollback')
     })
 

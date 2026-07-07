@@ -17,7 +17,9 @@ const state = vi.hoisted(() => ({
     spawn: vi.fn().mockResolvedValue({ ok: true, sessionId: 's1' }),
     input: vi.fn().mockResolvedValue({ ok: true }),
     close: vi.fn(),
-    cancel: vi.fn().mockReturnValue(true)
+    cancel: vi.fn().mockReturnValue(true),
+    getSessionId: vi.fn().mockReturnValue(undefined),
+    hasLiveSession: vi.fn().mockReturnValue(false)
   },
   readAppConfigValue: vi.fn(),
   auditEntries: [] as unknown[]
@@ -38,6 +40,8 @@ vi.mock('../../services/cli-thread-spawner', async (importOriginal) => {
       input = state.spawner.input
       close = state.spawner.close
       cancel = state.spawner.cancel
+      getSessionId = state.spawner.getSessionId
+      hasLiveSession = state.spawner.hasLiveSession
     }
   }
 })
@@ -252,5 +256,35 @@ describe('cli-thread model trust rule (workstation Phase 2 step 1)', () => {
       false
     )
     expect(state.auditEntries).toHaveLength(1)
+  })
+})
+
+describe('cli-thread:get-session (workstation Phase 2 step 4)', () => {
+  beforeEach(() => {
+    state.handlers.clear()
+    vi.clearAllMocks()
+    registerCliThreadIpc()
+  })
+
+  it('round-trips the spawner binding with PTY liveness', async () => {
+    state.spawner.getSessionId.mockReturnValue('sess-live')
+    state.spawner.hasLiveSession.mockReturnValue(true)
+    const result = await invoke('cli-thread:get-session', { threadId: 'th_1' })
+    expect(result).toEqual({ sessionId: 'sess-live', live: true })
+    expect(state.spawner.getSessionId).toHaveBeenCalledWith('th_1')
+    expect(state.spawner.hasLiveSession).toHaveBeenCalledWith('th_1')
+  })
+
+  it('reports a bound-but-dead PTY as live: false (dead state, never a respawn)', async () => {
+    state.spawner.getSessionId.mockReturnValue('sess-stale')
+    state.spawner.hasLiveSession.mockReturnValue(false)
+    const result = await invoke('cli-thread:get-session', { threadId: 'th_1' })
+    expect(result).toEqual({ sessionId: 'sess-stale', live: false })
+  })
+
+  it('returns null when the thread never had a PTY in this app run', async () => {
+    state.spawner.getSessionId.mockReturnValue(undefined)
+    const result = await invoke('cli-thread:get-session', { threadId: 'th_none' })
+    expect(result).toBeNull()
   })
 })

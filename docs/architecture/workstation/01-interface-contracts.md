@@ -241,6 +241,18 @@ Migration = `session-router.unregister` → new surface mounts → `terminal:rec
 webContentsId. All three pieces exist (audit §4); Phase 1 only adds the renderer
 affordance.
 
+**Status 2026-07-07 (Phase 2 step 4, v1.2.3):** CONSUMED — the structured thread and
+the raw PTY are two projections of ONE WorkstationSession (PLAN Q8), flipped by the
+ThreadPanel header toggle. The renderer's single sessionId authority is
+`src/renderer/src/store/cli-session-store.ts` (threadId → sessionId + liveness):
+seeded from the `cli-thread:spawn` response (agent-transport now KEEPS it), updated by
+the `cli-thread:session-changed` event (fired on the spawner's spawn-on-demand respawn
+path), pull-hydrated via `cli-thread:get-session` (§6). The bridge's
+`metadata.sessionId` path stays untouched and must NOT feed the store — it arrives
+only after the first block and goes stale on respawn (the two-sources bug the store
+closes). The raw projection reattaches via the existing `terminal:reconnect` seam,
+reattach-ONLY: see the §4 dead-PTY no-respawn contract point.
+
 ## 4. Gate parity for CLI agents (the load-bearing contract) — v1.1, post adversarial pass
 
 CLI children write to disk directly (audit §3); in-process interception is impossible.
@@ -461,7 +473,33 @@ binding authority:
   it. Post-binding, forged slugs can no longer *enter* trailers via Machina's own path;
   forged-by-shell trailers remain the accepted §4 forgery residual.
 
-## 5. Agent harness folder (on-disk schema)
+### Two-projection agent view (Phase 2 step 4, v1.2.3)
+
+- **Dead-PTY no-respawn rule (contract point):** an agent thread's raw projection is
+  reattach-ONLY. A stale, dead, or absent PTY renders a read-only dead state and NEVER
+  respawns a fresh shell in the thread's cwd — an unattributed shell there would be a
+  containment hole (no turn window would ever cover its writes). Enforced at BOTH
+  layers, each test-pinned in the Phase-1-step-4 no-kill-on-detach style: the host
+  adapter (`TerminalDockAdapter` `projection="agent"` mounts no webview at all without
+  a session, and omits `cwd`/`vaultPath` from the webview URL) and the webview guest
+  itself (`reattachOnly` URL param, built by the pure builders in
+  `terminal-webview-src.ts` in name-sync with `TerminalApp.readUrlParams`, read by the
+  extracted `connect-session.ts` decision to skip the `terminal:create` fallback and
+  report `session-dead` to the host). The webview's stale-session respawn stays
+  CORRECT for plain terminals; it is forbidden only for agent projections. The next
+  turn — an explicit user send — is the only thing that spawns a fresh, attributed
+  PTY (the spawner's existing spawn-on-demand path).
+- **Raw-view input is attributed to the thread's turn windows**
+  (interactive-input residual, named honestly): the raw view is the user's PTY —
+  keystrokes flow through the same shell-hook block → bridge path as agent output,
+  at the same trust level as today's dock terminal. Echoed keystrokes inside a
+  running agent block and user-run non-agent commands mid-turn are test-pinned
+  harmless (the turn still completes once, the reply still mirrors); but a user-typed
+  command whose first token matches a CLI agent binary can be mirrored as an agent
+  reply (`detectAgentFromCommand`) and interacts with turn-window open/close counting.
+  Accepted for Phase 2 and documented here; §4's scope-limit honesty applies — writes
+  made by the user through the raw view during an open turn land in that turn's
+  queue item.
 
 ```
 <workspace>/.machina/agents/<slug>/
@@ -525,6 +563,9 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 // IpcEvents
 'approvals:changed':     { pending: number }
 'approvals:watcher-health': WatcherHealth // v1.2.1 — health transitions (tray badge/banner, thread chip)
+'cli-thread:get-session': { request: { threadId: string }; response: { sessionId: string; live: boolean } | null } // v1.2.3 — pull mirror of the spawner binding (invoke, not an event; appended per the parallel-session rule)
+// IpcEvents (v1.2.3)
+'cli-thread:session-changed': { threadId: string; sessionId: string } // v1.2.3 — spawn-on-demand respawn rebinding; feeds cli-session-store
 ```
 
 Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
@@ -753,3 +794,36 @@ Implementation detail per step: `02-phase-1-specs.md`.
   -boundary statement, flags/TOCTOU; §5 state.md indexing corrected to prompt-composition
   only, dual-TE_DIR protected globs; §6 response shapes + moot sequencing; §7 reordered.
 - **v1.0 (2026-07-05)** — initial Phase 0 contracts (`ec6fa6d`).
+
+- **v1.2.3 (2026-07-07, Phase 2 step 4 landing; appended at end per the
+  parallel-session rule — chronologically it follows v1.2.2)** — two-projection agent
+  view: §3 SessionProjection/WorkstationSession CONSUMED (dated status line added
+  there) — the thread surface and the raw PTY are two projections of one
+  WorkstationSession, flipped from the ThreadPanel header. New renderer
+  `cli-session-store` is the SINGLE sessionId authority (seeded from the
+  `cli-thread:spawn` response — `agent-transport.start` now keeps the sessionId it
+  used to drop; updated by the new `cli-thread:session-changed` event, fired on the
+  spawner's spawn-on-demand respawn path; pull-hydrated by the new
+  `cli-thread:get-session` invoke). The bridge's `metadata.sessionId` path is
+  untouched and must not feed the store. §4 gains the two-projection subsection: the
+  **dead-PTY no-respawn rule** as a contract point (agent projections are
+  reattach-only at BOTH layers — adapter `projection="agent"` renders a read-only
+  dead state and mounts no webview without a session + omits cwd/vaultPath from the
+  URL; the guest's `terminal:create` fallback is disabled by the `reattachOnly` URL
+  param and reports `session-dead` to the host; the stale-session respawn stays
+  correct for plain terminals) and the honest §4 copy that raw-view input is
+  attributed to the thread's turn windows (interactive-input residual). §6 gains
+  `cli-thread:get-session` + the `cli-thread:session-changed` event (appended at the
+  list end per the same rule). Recorded deviations from the step-4 spec: (1) the
+  guest-side connect decision was EXTRACTED to
+  `src/renderer/terminal-webview/connect-session.ts` (pure, api-injected) rather than
+  edited inline in `TerminalApp.tsx` connectSession — the spec's load-bearing
+  "no terminal:create at the webview layer" assertion is only behaviorally pinnable
+  against a pure function (TerminalApp itself is not unit-mountable; its existing
+  source-string tests were updated to pin the delegation); (2) the adapter dead state
+  is also shown when a live raw view's PTY exits (`session-exited` in projection
+  mode) — a strict reading only required stale-at-mount, but a PTY dying under the
+  view is the same dead session; (3) `cli-thread:get-session` returns
+  `{ sessionId, live } | null` (liveness from the spawner's existing
+  `hasLiveSession` probe) rather than a bare sessionId — the store needs liveness to
+  render the dead state without a second channel.

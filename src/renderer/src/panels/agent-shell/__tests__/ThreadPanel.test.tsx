@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
 import { useApprovalsStore } from '../../../store/approvals-store'
+import { useCliSessionStore } from '../../../store/cli-session-store'
 import { ThreadPanel } from '../ThreadPanel'
 import type { Thread, ToolCall } from '@shared/thread-types'
 
@@ -96,5 +97,72 @@ describe('ThreadPanel watcher-health chip (contracts §4 v1.2.1)', () => {
     useApprovalsStore.setState({ watcherHealth: unhealthy })
     render(<ThreadPanel />)
     expect(screen.queryByTestId('thread-watcher-chip')).toBeNull()
+  })
+})
+
+describe('ThreadPanel projection toggle (workstation Phase 2 step 4)', () => {
+  beforeEach(() => {
+    // The raw view mounts RawProjectionView (hydrate pull) and, when live,
+    // TerminalDockAdapter (webview host).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).api
+    api.cliThread = { getSession: vi.fn().mockResolvedValue(null) }
+    api.getTerminalPreloadPath = vi.fn(() => '/path/to/preload/terminal-webview.js')
+    useCliSessionStore.setState({ byThread: {} })
+  })
+
+  function setCliThread(): void {
+    useThreadStore.setState({
+      threadsById: { t1: { ...baseThread, agent: 'cli-claude' } }
+    })
+  }
+
+  it('shows the thread/raw toggle on CLI threads only', () => {
+    setCliThread()
+    render(<ThreadPanel />)
+    expect(screen.getByTestId('projection-toggle')).toBeTruthy()
+  })
+
+  it('hides the toggle on machina-native threads', () => {
+    render(<ThreadPanel />)
+    expect(screen.queryByTestId('projection-toggle')).toBeNull()
+  })
+
+  it('raw with no session shows the dead state and NEVER mounts a webview', async () => {
+    setCliThread()
+    render(<ThreadPanel />)
+    fireEvent.click(screen.getByTestId('projection-raw'))
+    expect(await screen.findByTestId('raw-projection-dead')).toBeTruthy()
+    expect(document.querySelector('webview')).toBeNull()
+  })
+
+  it('raw with a DEAD session shows the dead state, not a fresh terminal', async () => {
+    setCliThread()
+    useCliSessionStore.setState({ byThread: { t1: { sessionId: 'sess-old', live: false } } })
+    render(<ThreadPanel />)
+    fireEvent.click(screen.getByTestId('projection-raw'))
+    expect(await screen.findByTestId('raw-projection-dead')).toBeTruthy()
+    expect(document.querySelector('webview')).toBeNull()
+  })
+
+  it('raw with a live session attaches reattach-only to EXACTLY that sessionId', async () => {
+    setCliThread()
+    useCliSessionStore.setState({ byThread: { t1: { sessionId: 'sess-live', live: true } } })
+    render(<ThreadPanel />)
+    fireEvent.click(screen.getByTestId('projection-raw'))
+    const webview = document.querySelector('webview')
+    expect(webview).toBeTruthy()
+    const qs = new URL(webview?.getAttribute('src') ?? '').searchParams
+    expect(qs.get('sessionId')).toBe('sess-live')
+    expect(qs.get('reattachOnly')).toBe('1')
+  })
+
+  it('toggling back restores the structured thread view intact', () => {
+    setCliThread()
+    render(<ThreadPanel />)
+    fireEvent.click(screen.getByTestId('projection-raw'))
+    fireEvent.click(screen.getByTestId('projection-thread'))
+    expect(screen.getByText('Surprise me.')).toBeTruthy()
+    expect(document.querySelector('webview')).toBeNull()
   })
 })

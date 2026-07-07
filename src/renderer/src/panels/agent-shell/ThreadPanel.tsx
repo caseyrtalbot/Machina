@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
+import { useCliSessionStore } from '../../store/cli-session-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
@@ -8,6 +9,10 @@ import { AgentBadge } from './agent-badge'
 import { WatcherHealthChip, WatcherHealthNotice } from './WatcherHealthChip'
 import { HarnessIdentityChip } from './HarnessIdentityChip'
 import { ThinkingIndicator } from './ThinkingIndicator'
+import { TerminalDockAdapter } from './dock-adapters/TerminalDockAdapter'
+
+/** The two projections of one CLI agent session (contracts §3, Phase 2 step 4). */
+type ProjectionMode = 'thread' | 'raw'
 
 const AT_BOTTOM_THRESHOLD_PX = 40
 
@@ -39,6 +44,15 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  // Projection toggle (Phase 2 step 4): per-thread, reset to the structured
+  // view on thread switch. Render-time prop-derived reset (no effect churn).
+  const [projection, setProjection] = useState<{ id: string | null; mode: ProjectionMode }>({
+    id: activeId,
+    mode: 'thread'
+  })
+  if (projection.id !== activeId) {
+    setProjection({ id: activeId, mode: 'thread' })
+  }
 
   useEffect(() => {
     const el = scrollRef.current
@@ -129,6 +143,12 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {t.agent !== 'machina-native' && (
+            <ProjectionToggle
+              mode={projection.mode}
+              onChange={(mode) => setProjection({ id: activeId, mode })}
+            />
+          )}
+          {t.agent !== 'machina-native' && (
             <HarnessIdentityChip threadId={t.id} agentId={t.agentId} />
           )}
           {t.agent !== 'machina-native' && <WatcherHealthChip />}
@@ -142,36 +162,165 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
         </div>
       </header>
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-        <div ref={scrollRef} onScroll={handleScroll} style={{ height: '100%', overflowY: 'auto' }}>
-          {t.messages.length === 0 && !streaming && !pendingTools?.length && !inFlight ? (
-            <EmptyState />
-          ) : (
-            <>
-              {t.messages.map((m, i) => {
-                const isLastAssistant = i === t.messages.length - 1 && m.role === 'assistant'
-                return (
-                  <ThreadMessage
-                    key={`${t.id}:${i}`}
-                    message={m}
-                    streamingBody={isLastAssistant ? (streaming ?? undefined) : undefined}
+        {projection.mode === 'raw' && t.agent !== 'machina-native' ? (
+          <RawProjectionView threadId={t.id} />
+        ) : (
+          <>
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              style={{ height: '100%', overflowY: 'auto' }}
+            >
+              {t.messages.length === 0 && !streaming && !pendingTools?.length && !inFlight ? (
+                <EmptyState />
+              ) : (
+                <>
+                  {t.messages.map((m, i) => {
+                    const isLastAssistant = i === t.messages.length - 1 && m.role === 'assistant'
+                    return (
+                      <ThreadMessage
+                        key={`${t.id}:${i}`}
+                        message={m}
+                        streamingBody={isLastAssistant ? (streaming ?? undefined) : undefined}
+                      />
+                    )
+                  })}
+                  {t.agent !== 'machina-native' && (
+                    <WatcherHealthNotice key={t.id} threadId={t.id} />
+                  )}
+                  <InflightAssistant
+                    messages={t.messages}
+                    streaming={streaming}
+                    pendingTools={pendingTools}
+                    inFlight={inFlight}
                   />
-                )
-              })}
-              {t.agent !== 'machina-native' && <WatcherHealthNotice key={t.id} threadId={t.id} />}
-              <InflightAssistant
-                messages={t.messages}
-                streaming={streaming}
-                pendingTools={pendingTools}
-                inFlight={inFlight}
-              />
-            </>
-          )}
-        </div>
-        {!isAtBottom && <ScrollToBottomButton onClick={scrollToBottom} />}
+                </>
+              )}
+            </div>
+            {!isAtBottom && <ScrollToBottomButton onClick={scrollToBottom} />}
+          </>
+        )}
       </div>
       <ThreadInputBar />
     </section>
   )
+}
+
+/**
+ * Segmented thread ⇄ raw switch (Phase 2 step 4): one click between the two
+ * projections of the same CLI agent session.
+ */
+function ProjectionToggle({
+  mode,
+  onChange
+}: {
+  readonly mode: ProjectionMode
+  readonly onChange: (mode: ProjectionMode) => void
+}) {
+  const segment = (value: ProjectionMode, label: string) => {
+    const active = mode === value
+    return (
+      <button
+        type="button"
+        data-testid={`projection-${value}`}
+        aria-pressed={active}
+        onClick={() => onChange(value)}
+        title={
+          value === 'raw'
+            ? 'Raw view: the live PTY behind this thread. Keystrokes go to the same shell the agent runs in.'
+            : 'Structured thread view'
+        }
+        style={{
+          fontFamily: typography.fontFamily.mono,
+          fontSize: typography.metadata.size,
+          letterSpacing: typography.metadata.letterSpacing,
+          textTransform: typography.metadata.textTransform,
+          padding: '3px 8px',
+          border: 'none',
+          background: active
+            ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
+            : 'transparent',
+          color: active ? colors.text.primary : colors.text.muted,
+          cursor: 'pointer',
+          transition: `background ${transitions.fast}, color ${transitions.fast}`
+        }}
+      >
+        {label}
+      </button>
+    )
+  }
+  return (
+    <div
+      data-testid="projection-toggle"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'stretch',
+        border: `1px solid ${colors.border.subtle}`,
+        borderRadius: borderRadius.inline,
+        overflow: 'hidden'
+      }}
+    >
+      {segment('thread', 'thread')}
+      {segment('raw', 'raw')}
+    </div>
+  )
+}
+
+/**
+ * Raw projection (Phase 2 step 4): reattach-only view onto the thread's live
+ * PTY, sourced exclusively from the cli-session-store (the single sessionId
+ * authority). No live session ⇒ read-only dead state — an agent thread's PTY
+ * is NEVER respawned from the view layer (contracts §4).
+ */
+function RawProjectionView({ threadId }: { readonly threadId: string }) {
+  const entry = useCliSessionStore((s) => s.byThread[threadId])
+  const hydrate = useCliSessionStore((s) => s.hydrate)
+  // Pull hydration covers late subscribers: a renderer reload empties the
+  // store while the main-side PTY survives; get-session restores the binding.
+  useEffect(() => {
+    void hydrate(threadId)
+  }, [threadId, hydrate])
+
+  if (!entry || !entry.live) {
+    return (
+      <div
+        role="status"
+        data-testid="raw-projection-dead"
+        style={{
+          height: '100%',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          padding: 24,
+          gap: 6,
+          background: colors.bg.surface,
+          fontFamily: typography.fontFamily.mono,
+          fontSize: 12,
+          lineHeight: 1.6
+        }}
+      >
+        <div
+          style={{
+            color: colors.text.muted,
+            fontSize: typography.metadata.size,
+            letterSpacing: typography.metadata.letterSpacing,
+            textTransform: typography.metadata.textTransform
+          }}
+        >
+          {entry ? 'agent session ended' : 'no agent session'}
+        </div>
+        <div style={{ color: colors.text.secondary }}>
+          {entry
+            ? 'This PTY is gone. Machina does not restart shells for agent threads — send a message to start the next turn in a fresh, attributed session.'
+            : 'No PTY is running for this thread yet. Send a message to start one.'}
+        </div>
+      </div>
+    )
+  }
+
+  return <TerminalDockAdapter sessionId={entry.sessionId} projection="agent" />
 }
 
 function EmptyState() {
