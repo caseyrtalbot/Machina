@@ -34,24 +34,27 @@ rollback now; the gate checklist, parity ledger, and full P1/P2 transcripts live
 confirming on the running app (2026-07-06)** — see "Definition of done" below;
 `HANDOFF-PARALLEL-STEPS-5-6.md` deleted per its own instructions. Phase 1 is COMPLETE.
 
-**Phase 2 is underway. Steps 1 and 2 are SHIPPED and pushed** — step 1 (adapter
+**Phase 2 is underway. Steps 1, 2, and 3 are SHIPPED** — step 1 (adapter
 registry + model aliasing + raw fallback) at `18cc29d` (contracts v1.2), step 2
 (watcher health model) at `be07439` (contracts v1.2.1), plus a chat-output quality
 pass at `fb7e17c` (thinking indicator, secret masking in thread output, honest tool
-status). Both landed with the full gate (3290 tests, build, full e2e including the
-new watcher-health probe, executed).
+status), and step 3 (main-side harness↔thread binding + harness:run attribution
+authority) at `4047d35` (contracts v1.2.2). All landed with the full gate (3345
+tests at step 3, build, full e2e executed); step 3 additionally ran the built-app
+tamper probe green (see its DONE block in 04-phase-2-specs.md).
 
 **Next work order for the incoming team(s):**
 
-- **Step 3 (main-side harness↔thread binding) is next and strictly sequential** — it
-  edits `cli-thread-spawner.ts` + `ipc/cli-thread.ts` (step-1 surface) and
-  `ApprovalsTray.tsx` (step-2 surface), and it hard-gates step 5. One session only.
-- After step 3 lands: **steps 4 and 7 are the sanctioned parallel pair** (disjoint
-  files). Step 5 follows 3; step 6 follows 2+3; step 8 follows 7 (and consumes 1).
+- **Steps 4 and 7 are now the sanctioned parallel pair** (disjoint files; only
+  append-only hotspot ends collide). Step 5 (per-agent revert UI) is UNBLOCKED —
+  its hard gate was step 3's binding. Step 6 follows 2+3 (both landed) but collides
+  with 7 on `harness-service.ts` listHarnesses — sequential vs 7. Step 8 follows 7
+  (and consumes 1).
 - **Blocked on Casey, do not land without the call**: OQ8 (workspace-switch PTY
   visibility graft — severable from step 6; step 6 lands green without it), OQ7
   (gallery roster — before step 8). Also pending Casey: the step-2 exit-bar dev-app
   observation (degraded banner + Retry while a simulated failure is driven), the
+  step-3 harness-identity chip observation on a bound thread in the running app, the
   step-4 tick-counter acceptance, and dependabot triage (`npm audit --omit=dev`
   reports 1 moderate production vuln as of 2026-07-06).
 - Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
@@ -74,9 +77,10 @@ new watcher-health probe, executed).
    pass 2026-07-06 from a 4-designer + 2-judge workflow over four disk-verified
    investigation dossiers). Phase 1 is COMPLETE — new sessions start here. Pre-Phase-2
    hardening already landed: AGENTS.md regen unparked (`c7d463f`), symlinked-parent
-   harness refusal + contracts v1.1.5 (`660dc56`). **Steps 1 (`18cc29d`) and 2
-   (`be07439`) are DONE — each step header carries a dated DONE block with its
-   recorded deviations. Next = step 3; steps 4∥7 open up after it.**
+   harness refusal + contracts v1.1.5 (`660dc56`). **Steps 1 (`18cc29d`), 2
+   (`be07439`), and 3 (`4047d35`) are DONE — each step header carries a dated DONE
+   block with its recorded deviations. Next = 4∥7 (parallel-safe pair); 5 and 6 are
+   unblocked but sequential (6 collides with 7 on harness-service.ts).**
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -372,6 +376,52 @@ new watcher-health probe, executed).
 5. **`e2e/watcher-health.spec.ts` is the built-app probe and it has been executed
    green** (healthy boot → `watching`; chmod-000 subdir fixture → workspace live,
    state `down`). It encodes an e2e lesson — see the new repo gotcha below.
+
+## What Phase 2 step 3 changed under you (`4047d35`, contracts v1.2.2)
+
+1. **The attribution authority is `HarnessRunRegistry`**
+   (`src/main/services/harness-run-registry.ts`, singleton via
+   `getHarnessRunRegistry()`): write-once threadId→slug bindings persisted at
+   `userData/harness-bindings.json` (key = workspaceRoot + NUL + threadId; a reserved
+   budgets field is step 6's trust anchor). Bindings are minted ONLY inside
+   `harness:run` (`harness-run.ts:composeHarnessRun`) after main's own validation:
+   slug format + reserved-slug refusal (adapter identities like `cli-claude` can
+   never be harness slugs — create/run/backfill all refuse), the v1.1.5
+   realpath-equality re-check (residual #1 discharged), all four harness files
+   readable, SAFE_ID threadId. Frontmatter `agent_id` is DISPLAY-ONLY now
+   (thread-md.ts comments updated) — do not reintroduce it as an attribution source.
+2. **Every forwarded agentId is validated at the IPC boundary**
+   (`resolveRequestedAgentId` in `ipc/cli-thread.ts`, both spawn and input) with
+   degrade-not-fail semantics: malformed / unbound-thread / binding-mismatch /
+   registry-error ⇒ adapter identity + `cli-agent:attribution-mismatch` audit
+   (decision `denied`, mismatches carry `boundSlug`) + `attributionSuspect`, flowing
+   turnStarted → ActiveTurnMatch → PendingChangeFlags → tray chip. A degraded
+   resolution also CLEARS any stale in-session slug in the spawner. The turn always
+   proceeds — a throwing registry (e.g. one malformed file in the watcher-ignored
+   threads dir; that DoS was a caught review blocker) degrades instead of rejecting,
+   via the tolerant per-file thread scan (`listThreadAgentIdsTolerant`).
+3. **Legacy threads got a one-time trust-on-upgrade backfill** per workspace root
+   (persistent `backfilledRoots` marker; each minted binding audited
+   `cli-agent:binding-backfill`). One-time is load-bearing: re-running per open
+   would re-trust tampered frontmatter after every relaunch. After the epoch, ANY
+   forwarded agentId on an unbound thread flags.
+4. **The renderer run sequence changed** (`store/harness-run.ts`): createThread
+   WITHOUT agentId → `harness:run { slug, threadId }` → on ok
+   `setThreadAgentId(id, slug)` (the one sanctioned thread-store addition) → the
+   unchanged shell-prompt wait → send main's prompt. Refusals AND thrown rejections
+   delete the just-created thread (net "no thread created"). The send stays
+   renderer-side — moving it into main re-opens the Phase-1 step-6 lost-reply
+   failure.
+5. **`HarnessIdentityChip`** on CLI thread headers shows the MAIN-sourced binding via
+   the new `harness:binding` read channel; the thread's `agentId` prop is only the
+   null→bound re-fetch trigger (the displayed value never comes from frontmatter).
+6. **Known accepted residuals**: orphan bindings for deleted threads (revert
+   validation is trailer-based, so harmless); a user-level agent can reach userData
+   (same class as trailer forgery — accident containment, not a boundary); the
+   selection-time PTY spawn does not forward agentId (input does, and input is where
+   turns open — observed in the probe, attribution unaffected).
+7. **Step 5 is unblocked**: `git:revert-agent` validation is trailer enumeration
+   (unknown ⇒ `no-commits-for-agent`, test-pinned) — safe under a one-click UI.
 
 ## Chat-output quality pass (`fb7e17c`) — same landing window
 

@@ -262,6 +262,28 @@ rearms against a dead root). Parallel-safe with step 1 except append-only hotspo
 
 ## Step 3 — Main-side harness↔thread binding + harness:run (attribution authority)
 
+> **DONE** (`4047d35`, 2026-07-06, contracts v1.2.2). Recorded deviations (§8): the
+> renderer creates the thread WITHOUT agentId and persists the slug only after main
+> records the binding (refusal — including a thrown, non-structured rejection — deletes
+> the just-created thread: net "no thread created"); a `harness:binding` read channel
+> was added (the main-binding-sourced identity chip needs a read path); the backfill is
+> one-time PER ROOT with a persistent `backfilledRoots` marker (re-running would
+> re-trust tampered frontmatter every relaunch); `git:revert-agent` needed NO code
+> change (the existing trailer walk already is the enumeration authority — a test pins
+> `no-commits-for-agent`); orphan bindings for deleted threads accepted. Adversarial
+> review hardening folded in pre-landing: registry failures degrade-not-fail
+> (`registry-error` reason; a tolerant per-file thread scan so one malformed file in
+> the watcher-ignored threads dir cannot DoS every harness turn), serialized mirror
+> persists, NUL-delimited binding key + SAFE_ID threadId validated at the mint
+> boundary, reserved (adapter-identity) slugs refused at create/run/backfill. Built-app
+> probe executed green (real `claude` turns, throwaway repo): happy path ⇒
+> `Machina-Agent: probe-fixer` trailer; frontmatter tamper ⇒ adapter-identity trailer,
+> `cli-agent:attribution-mismatch` audit line (`reason: binding-mismatch`,
+> `boundSlug: probe-fixer`), Attribution-suspect tray chip,
+> `revertAgent('evil-agent')` ⇒ `no-commits-for-agent` while the true slug reverted
+> cleanly with `Machina-Reverts`. Casey-observed harness-identity chip check still
+> pending.
+
 Close the item-3 dossier: `agentId` is renderer/disk-supplied end-to-end
 (`thread-md.ts:63,105` persists/reloads frontmatter `agent_id`;
 `agent-transport.ts:102,115` re-sends it every spawn/input;
