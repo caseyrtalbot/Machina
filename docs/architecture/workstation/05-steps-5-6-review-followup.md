@@ -1,22 +1,32 @@
-# Phase 2 steps 5+6 — post-merge review follow-up (OPEN)
+# Phase 2 steps 5+6 — post-merge review follow-up (RESOLVED)
+
+**RESOLVED 2026-07-07: every confirmed finding below is fixed in `c1b21c8`
+(contracts v1.2.7).** Gate evidence on the final tree: `npm run check` green
+(3505 tests), `npm run build` green, full sequential e2e 24 passed / 1 known
+fixme-skip — including both `e2e/agent-breaker.spec.ts` tests that were red at
+review time. The e2e root cause: turn attribution compared paths as strings, so
+a symlink-aliased workspace root disengaged the whole containment gate — turn
+attribution is PATH identity now (realpath-canonicalized both sides). The
+durable statements of the fixes live in the §8 v1.2.7 changelog entry in
+`01-interface-contracts.md` and the step 5/6 DONE blocks (+ v1.2.7 amendment)
+in `04-phase-2-specs.md`; the HANDOFF.md "What Phase 2 step 5/6 changed under
+you" sections carry the cross-session facts. Everything below is kept as the
+historical record of what the review caught.
 
 Steps 5 (`5b1589d`, per-agent revert UI, contracts v1.2.5) and 6 (`24d53e1`, budget
-stack + circuit breakers + kill switch, contracts v1.2.6) are LANDED on main and each
+stack + circuit breakers + kill switch, contracts v1.2.6) LANDED on main and each
 passed its own `npm run check` + `npm run build` gate. They were then run through the
 full sequential post-merge e2e suite and a 7-lens adversarial review (step-5/step-6 spec
 compliance, adversarial git plumbing, adversarial breaker/kill semantics, test quality,
 merge spotcheck, Codex cold read; every blocker/major attacked by two independent
-refuters before confirmation). **The review and e2e turned up real defects that are NOT
-yet fixed** — this doc is the durable cold-start for that fix commit. The session that
-started the fixes ran out of budget before landing anything; the working tree was clean
-when it stopped (no partial edits on disk).
+refuters before confirmation).
 
 The confirmed-findings JSON produced by the review is the fuller record but lived only in
 an ephemeral scratchpad; the load-bearing content is transcribed below.
 
-## Current main is e2e-RED — fix before declaring the pair done
+## The two e2e failures at review time (both green after `c1b21c8`)
 
-`e2e/agent-breaker.spec.ts` has two failing tests on the built app (the rest of the suite,
+`e2e/agent-breaker.spec.ts` had two failing tests on the built app (the rest of the suite,
 22 tests incl. `e2e/revert-agent.spec.ts`, passed):
 
 - `:179 › a scripted write loop trips the velocity breaker: PTY dead, UI shows tripped` —
@@ -25,16 +35,15 @@ an ephemeral scratchpad; the load-bearing content is transcribed below.
 - `:249 › manual kill: the header kill switch halts a live turn mid-output` — 15s timeout
   (~line 281, "main-side authority reports dead"); `hasLiveSession` stayed true.
 
-Same signature both times: **the trip/kill fires but the PTY never actually dies.**
-Root-cause the kill wiring first (is `setBreakerKillCallback` bound to something that
-truly terminates the PTY session — `spawner.close` vs whatever actually kills the pty in
-shell-service/pty-service — and does the kill-switch IPC handler reach it?). Note the
-review independently found the kill wiring is untested behaviorally (see finding [6]).
-It could also be a probe defect — these two specs were WRITTEN but never executed before
-merge (the 4∥7 landing shipped plausible-but-unrunnable probes once). Write the failing
-behavioral repro (real listener path, fake PTY that records kill) before touching code.
+Same signature both times: the trip/kill fired but the PTY was never observed dying.
+As-diagnosed resolution (recorded in §8 v1.2.7): the velocity failure was PRODUCT —
+string-identity turn attribution under the probe's symlink-aliased tmpdir root detached
+every turn window from the watcher root, so no signals ever reached the breaker; the
+manual-kill failure was PROBE — the dead-PTY polls coerced the post-kill null session to
+"alive" (`?.live ?? true`) and could never observe a kill. The probe deliberately keeps
+its un-realpathed tmpdir root as the standing regression check.
 
-## Confirmed majors (fix, test-first, one follow-up commit, contracts v1.2.7)
+## Confirmed majors (all fixed in `c1b21c8`, contracts v1.2.7)
 
 **Git surface (step 5):**
 
@@ -82,8 +91,8 @@ behavioral repro (real listener path, fake PTY that records kill) before touchin
    with stripped frontmatter, budgets don't enforce on the first send. Guarantee the mirror
    is loaded before budget reads on every turn path, degrade-not-fail preserved.
 
-6. **`headMoved` wrongful-kill channel — ORCHESTRATOR DECISION recorded here, not yet
-   applied** (`agent-circuit-breaker.ts:141`). `noteHeadMoved` kills on the FIRST signal
+6. **`headMoved` wrongful-kill channel — ORCHESTRATOR DECISION recorded here, applied
+   in `c1b21c8`** (`agent-circuit-breaker.ts:141`). `noteHeadMoved` kills on the FIRST signal
    with no threshold; `isAgentHeadMove` excuses only queue-made approval commits, so the
    user's own `git commit`/`pull`/`checkout` during a live turn is indistinguishable from
    agent git activity and kills the healthy agent (both refuters traced it end-to-end;
@@ -123,10 +132,11 @@ behavioral repro (real listener path, fake PTY that records kill) before touchin
 - Several unpinned test behaviors (recordWrites-before-noteVelocity ordering; renderer breaker
   push path uncovered; trip thresholds parametrized so a drift to 1 passes vacuously).
 
-## Still open, not part of this fix commit
+## Disposition
 
-The docs-reconciliation commit (HANDOFF.md "Next work order" update, delete
-`HANDOFF-PHASE2-STEPS-5-6.md` per its own instruction) should land WITH or AFTER the fix
-commit, once the pair is genuinely green. Steps 5+6 are unpushed (`main` is ahead 2) and
-should stay local until the e2e suite is green and the confirmed majors are fixed. OQ7
-(before step 8) and OQ8 (the severable step-6 workspace-switch graft) remain pending Casey.
+The fix commit landed as `c1b21c8` (contracts v1.2.7); the docs-reconciliation commit
+that carries this RESOLVED flip stamps steps 5+6 DONE (HANDOFF.md sections updated,
+`HANDOFF-PHASE2-STEPS-5-6.md` deleted per its own instruction). The "Notable minors"
+above were record-only findings — treat each as unresolved unless a fix is verified on
+disk. OQ7 (before step 8) and OQ8 (the severable step-6 workspace-switch graft) remain
+pending Casey.

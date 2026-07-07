@@ -4,7 +4,7 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the three docs it points at, and you can start building without
 asking questions.
 
-## Where things stand (2026-07-07, Phase 2 steps 1–4 + 7 shipped)
+## Where things stand (2026-07-07, Phase 2 steps 1–7 shipped)
 
 The vision is locked and the design is verified. Phase 0 (seam audit + interface
 contracts) shipped to main. The Phase 0 docs were then adversarially re-verified by an
@@ -53,23 +53,42 @@ under you" below. Full gate on the final tree: `npm run check` 3421 tests green,
 build green, full e2e 21 passed / 1 known fixme-skip INCLUDING both new built-app
 probes executed green (`e2e/agent-projection.spec.ts`, `e2e/harness-lint.spec.ts`).
 
+**Steps 5 (per-agent revert UI) and 6 (budget stack + circuit breakers + kill
+switch) SHIPPED 2026-07-07** as the second sanctioned parallel pair: two isolated
+worktree sessions per the 5∥6 work order (step 5 landed FIRST at `5b1589d`,
+contracts v1.2.5; step 6 rebased onto it and landed at `24d53e1`, v1.2.6), then a
+post-merge 7-lens adversarial review (step-5/step-6 spec compliance, adversarial
+git plumbing, adversarial breaker/kill semantics, test quality, merge spotcheck,
+Codex cold read) plus the full sequential e2e run surfaced 9 confirmed majors —
+ALL fixed in the same-day hardening commit `c1b21c8` (contracts v1.2.7). Full
+gate on the final tree: `npm run check` 3505 tests green, build green, e2e 24
+passed / 1 known fixme-skip, including both new built-app probes executed green
+(`e2e/revert-agent.spec.ts`, `e2e/agent-breaker.spec.ts`). The review record is
+`05-steps-5-6-review-followup.md` (RESOLVED); the 5∥6 work-order file
+(`HANDOFF-PHASE2-STEPS-5-6.md`) was deleted per its own instruction — see "What
+Phase 2 step 5/6 changed under you" below.
+
 **Next work order for the incoming team(s):**
 
-- **Next = steps 5 and 6** (both unblocked: 5's hard gate was step 3's binding; 6
-  follows 2+3 and its designed collision with 7 is now resolved by 7 having landed
-  first — step 6 MUST restructure `listHarnesses` around step 7's `inspectHarness`
-  composition, not the pre-step-7 shape). Step 8 follows 7 (landed) and consumes 1,
-  but needs the OQ7 call first.
+- **Next = step 8** (follows 7 and consumes 1, both landed) — **but it needs the
+  OQ7 call first**; do not start it without the roster decision. Steps 5 and 6
+  are DONE; the only other Phase-2 build item is the severable OQ8 graft below.
 - **Blocked on Casey, do not land without the call**: OQ8 (workspace-switch PTY
-  visibility graft — severable from step 6; step 6 lands green without it), OQ7
+  visibility graft — severable; step 6 landed green without it, and after
+  ratification the graft becomes its own small follow-up commit), OQ7
   (gallery roster — before step 8). Also pending Casey: the step-2 exit-bar dev-app
   observation (degraded banner + Retry while a simulated failure is driven), the
   step-3 harness-identity chip observation on a bound thread in the running app, the
   Phase-1 step-4 tick-counter acceptance, the Phase-2 step-4 one-click thread↔raw
   flip on a live harness run (scrollback both ways), the Phase-2 step-7
   hand-broken-harness observation (greyed with reason, run disabled, in the running
-  app), and dependabot triage (`npm audit --omit=dev` reports 1 moderate production
-  vuln — js-yaml via gray-matter — re-confirmed 2026-07-07).
+  app), the Phase-2 step-5 tray-revert observation (reverting an agent's commits
+  from the tray without touching the DevTools console), the Phase-2 step-6
+  kill-switch observation (pressing Kill on a running agent visibly stops output
+  in the running app), the OPTIONAL step-6 breaker-notice-row observation (a tray
+  notice row on a driven ambiguous-signal trip — the e2e probe covers it; observe
+  if convenient), and dependabot triage (`npm audit --omit=dev` reports 1 moderate
+  production vuln — js-yaml via gray-matter — re-confirmed 2026-07-07).
 - Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
   leave it alone, do not commit or delete it.
 
@@ -94,8 +113,9 @@ probes executed green (`e2e/agent-projection.spec.ts`, `e2e/harness-lint.spec.ts
    (`be07439`), and 3 (`4047d35`) are DONE — each step header carries a dated DONE
    block with its recorded deviations. Steps 4 (`61f8ce3`) and 7 (`065d312`) are
    DONE (2026-07-07, parallel worktree sessions + post-merge review fix commit).
-   Next = 5 and 6 (6 restructures listHarnesses around 7's inspectHarness), then 8
-   after the OQ7 call.**
+   Steps 5 (`5b1589d`) and 6 (`24d53e1`) are DONE (2026-07-07, the second parallel
+   pair, hardened post-merge at `c1b21c8`, contracts v1.2.7). Next = step 8 after
+   the OQ7 call.**
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -511,6 +531,126 @@ probes executed green (`e2e/agent-projection.spec.ts`, `e2e/harness-lint.spec.ts
    that are NOT covered: file-level symlinks inside a harness dir (hand-created;
    in-app creation is watcher-auto-rejected), dangling agents-dir symlink ⇒ silent
    `[]`, and the run-time lint reading real fs even when `deps.fs` is injected.
+
+## What Phase 2 step 5 changed under you (`5b1589d`, contracts v1.2.5)
+
+Includes the v1.2.7 hardening (`c1b21c8`) facts that belong to this surface.
+
+1. **`listAgentCommits` is the read-only twin of `revertAgent`** — the trailer
+   log-walk was factored into ONE shared reader (`readTrailerLog` in
+   `git-service.ts`), so enumeration and revert see identical commits and
+   identical `Machina-Reverts` exclusions. Ids are trailer-enumerated, never
+   registry-checked: commits from a since-deleted harness (or an
+   adapter-identity fallback) stay listed and revertable. v1.2.7: a failed
+   git-log walk returns null and `git:list-agent-commits` answers
+   `{ ok:false, reason:'git-failed' }` — the "never a false empty" rule covers
+   git failures too; `RevertAgentSection` renders an honest error state, never
+   "no unreverted agent commits" on a failed walk.
+2. **`readTrailerLog` is injection-proof by field validation** (v1.2.7):
+   exclusion-set tokens must be full 40-hex shas (`FULL_SHA_RE`), listed agent
+   ids must pass `SAFE_ID_RE`, and the Machina-Reverts field precedes the agent
+   field so a `\x1f` smuggled into a forged trailer value can only push content
+   AWAY from the exclusion set. Pre-fix, a forged trailer could permanently
+   immunize attacker-chosen shas against listing AND revert.
+3. **`revertAgent` pathspec-limits its final commit** to the reverted paths
+   (v1.2.7, the `commitApproved` discipline): independently user-staged
+   bystander files stay staged and untouched — a bare commit after
+   `git revert --no-commit` swept them in. `--allow-empty --only` keeps the
+   net-zero and zero-paths marker-commit cases without sweeping the index.
+4. **A tray revert during a live turn is gate machinery, not agent activity**
+   (v1.2.7): `revertAgent` gained `onWillRevert(paths)` — fired with the union
+   of to-be-touched paths BEFORE any tree change — and the `git:revert-agent`
+   handler uses it to suppress the watcher's echo of the revert's own writes
+   and to excuse the revert commit sha on every open turn window
+   (`CliTurnRegistry.noteGateCommitForRoot`). Pre-fix, a revert during a
+   writing turn tripped headMoved against the healthy agent and queued a bogus
+   pending item.
+5. **The UI keeps one confirm surface**: `RevertAgentSection` in the
+   ApprovalsTray popover (collapsed by default, enumerates only when opened,
+   per-agent rows with count + last subject/date, inline arm→confirm — not a
+   modal — with the §4 containment copy: revert CREATES new commits, deletes no
+   history, is not protection). Palette "Revert harness: <slug>" entries are
+   gated on a non-empty commit list and never one-click revert: they dispatch
+   the `te:revert-agent` CustomEvent and the tray opens with the confirm armed;
+   `CommandPalette.tsx` fetches the snapshot on palette open (recorded
+   deviation — the open-refresh pattern).
+6. **Convention change that sticks for parallel landings**: §8 changelog
+   entries now go at the TOP (reverse-chronological) — the 4∥7 append-at-end
+   rule caused avoidable churn; keep top-inserting.
+
+## What Phase 2 step 6 changed under you (`24d53e1`, contracts v1.2.6)
+
+Includes the v1.2.7 hardening (`c1b21c8`) facts that belong to this surface.
+
+1. **Budgets are real now.** `maxWritesPerMinute` is the per-THREAD limiter
+   threshold sourced from the budgets snapshot taken at bind time
+   (`HarnessBinding.budgets` — the step-3 reserved field — persisted in the
+   userData mirror; write-once covers the snapshot, so post-bind SKILL.md edits
+   affect the NEXT run only; SKILL.md frontmatter is the named tamper channel,
+   widening `HARNESS_PROTECTED_GLOBS` to cover it was rejected). `maxTurns` =
+   CLI invocations per thread counted at `CliTurnRegistry.turnStarted` (OQ2),
+   in-memory per app run and surviving `threadClosed` so a kill never refills
+   the budget. Backfilled legacy bindings carry NO budgets — default threshold,
+   no maxTurns enforcement.
+2. **The bindings mirror is guaranteed loaded on every turn open** (v1.2.7):
+   the turn-start listener awaits `HarnessRunRegistry.ensureRootReady(cwd)`
+   before the budget lookup (still deferred past the in-flight send; registry
+   errors degrade to unbound — never a blocked turn), and
+   `initApprovalsForRoot` loads the mirror before the watcher starts so the
+   synchronous `getWriteBudget` reads are covered. Pre-fix, budgets silently
+   disengaged on the no-agentId-forwarded path after relaunch.
+3. **`AgentCircuitBreaker`** (`agent-circuit-breaker.ts`, types in the new
+   `agent-breaker-types.ts`) escalates advisory signals to EXACTLY ONE hard
+   kill per episode (late-bound `spawner.close` callback, per-thread latch,
+   reset on the thread's next turn) + audit + the `agent:breaker-tripped`
+   event. Kill-class signals: velocity (3 CONSECUTIVE limiter-exceeded batches,
+   never one), 3 forbidden autoRejects per turn, maxTurns breach. Negative
+   rules are contract points: never trip on watcher-degraded state alone
+   (health feeds only `signalsDegraded` honesty — and the v1.2.7 companion
+   positive pins that threshold signals under an UNHEALTHY gate still trip),
+   and never auto-kill on `concurrentTurns`-flagged signals (tray notice
+   instead).
+4. **Bare headMoved is notice-latch, NOT kill** (v1.2.7 — ORCHESTRATOR
+   DECISION, recorded as such and cheaply reversible): the user's own
+   `git commit`/`pull`/`checkout` during a writing turn is indistinguishable
+   from agent git activity, so a first headMoved produces notice + audit + tray
+   row; the episode escalates to its single kill only on a later unambiguous
+   kill-class signal. The step-3 audit/flag path is unchanged; named negative
+   test: single window, unexcused HEAD move, NO kill. If a later owner wants
+   headMoved to kill again, that is a one-line revert plus a corroboration
+   rule.
+5. **Turn attribution is PATH identity, not string identity** (v1.2.7 — the
+   biggest find of the landing; root cause of the velocity-breaker e2e
+   failure): `CliTurnRegistry.isInside` realpath-canonicalizes BOTH sides
+   (memoized) before comparing. The watcher roots at the canonical workspace
+   path (WorkspaceService realpaths: `/var/...` → `/private/var/...` on macOS)
+   but the per-turn cwd arrives from the caller verbatim — a symlink-aliased
+   workspace root used to silently detach every turn window from the watcher
+   root, routing ALL agent writes to "outside any turn window": no queue
+   capture, no velocity/forbidden signals, no breaker coverage — the whole
+   containment gate disengaged without a trace outside the audit log. The same
+   rule applies to `noteGateCommitForRoot`, so revert-sha excusal reaches
+   alias-cwd windows. `e2e/agent-breaker.spec.ts` deliberately keeps an
+   un-realpathed tmpdir root as the standing regression probe — do not "fix"
+   it. (Its dead-PTY predicate was also repaired: `spawner.close` unbinds the
+   session, so a null get-session IS the dead state; the old `?.live ?? true`
+   coercion could never observe a kill.)
+6. **The kill switch lives in the ThreadPanel header** (recorded deviation —
+   the spec offered ThreadInputBar or header; Stop/interrupt and Kill/hard-stop
+   stay visually distinct and ThreadInputBar is untouched), surfacing the
+   existing hard-kill path (`agent-breaker-kill-switch.tsx` →
+   `cli-thread:close`). The tray gains mount-only breaker notice rows
+   (`agent-breaker-notice.tsx`). The maxTurns kill wiring is pinned
+   BEHAVIORALLY through the real `registerCliThreadIpc` registration path
+   against a real persisted mirror (mutation-verified, v1.2.7) — the mock-only
+   pin was a review finding.
+7. **Post-kill flush-window writes become audited-unattributed** (writes
+   flushing within the ~300ms awaitWriteFinish window after `spawner.close`;
+   the zero-linger `threadClosed` trade) — documented and tested, not silent.
+8. **The OQ8 workspace-switch visibility graft is EXCLUDED by design** — not
+   ratified by Casey as of 2026-07-07; the spec marks it severable, step 6
+   landed green without it, and the graft becomes its own small follow-up
+   commit after the call.
 
 ## Chat-output quality pass (`fb7e17c`) — same landing window
 
