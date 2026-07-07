@@ -104,3 +104,22 @@ export interface WatcherHealth {
   /** Human-readable cause for degraded/down transitions. */
   readonly reason?: string
 }
+
+/**
+ * One agent's unreverted attributed commits (contracts §2 `listAgentCommits`,
+ * v1.2.5). Ids are trailer-sourced — harness slugs, adapter identities, and
+ * slugs from since-deleted harnesses all appear. `shas` are newest first;
+ * `lastSubject`/`lastDate` come from the newest commit.
+ */
+export interface AgentCommits {
+  readonly agentId: string
+  readonly shas: readonly string[]
+  readonly lastSubject: string
+  /** ISO 8601 author date of the newest commit. */
+  readonly lastDate: string
+}
+
+/** Response for git:list-agent-commits (structured, never throws). */
+export type AgentCommitsResult =
+  | { readonly ok: true; readonly agents: readonly AgentCommits[] }
+  | { readonly ok: false; readonly reason: string }

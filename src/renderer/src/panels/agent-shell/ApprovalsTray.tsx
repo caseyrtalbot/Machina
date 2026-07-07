@@ -11,6 +11,7 @@ import { Inbox } from 'lucide-react'
 import type { PendingChange } from '@shared/git-types'
 import { isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
 import { flagChips } from './approval-flags'
+import { REVERT_AGENT_EVENT, RevertAgentSection } from './RevertAgentSection'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 
 const PATHS_SHOWN_MAX = 6
@@ -31,6 +32,8 @@ export function ApprovalsTray() {
 
   const [open, setOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
+  // Palette-routed revert request (step 5): arms RevertAgentSection's confirm.
+  const [revertRequest, setRevertRequest] = useState<string | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const unhealthy = isWatcherUnhealthy(watcherHealth)
 
@@ -52,6 +55,25 @@ export function ApprovalsTray() {
     window.addEventListener('pointerdown', onPointerDown)
     return () => window.removeEventListener('pointerdown', onPointerDown)
   }, [open, refresh])
+
+  // Palette "Revert harness: <slug>" entries route here (step 5): the tray is
+  // the one confirm surface for git-consequences actions (OQ5) — the palette
+  // never reverts directly.
+  useEffect(() => {
+    const onRevertRequest = (e: Event) => {
+      const agentId = (e as CustomEvent<string>).detail
+      if (typeof agentId !== 'string' || agentId.length === 0) return
+      setRevertRequest(agentId)
+      setOpen(true)
+    }
+    window.addEventListener(REVERT_AGENT_EVENT, onRevertRequest)
+    return () => window.removeEventListener(REVERT_AGENT_EVENT, onRevertRequest)
+  }, [])
+
+  // A stale request must not re-arm the confirm on the next manual open —
+  // cleared render-side when the popover closes (CommandPalette's prevOpen
+  // pattern; a setState-in-effect here is a cascading-render lint error).
+  if (!open && revertRequest !== null) setRevertRequest(null)
 
   const toggle = useCallback(() => {
     setOpen((v) => !v)
@@ -260,6 +282,8 @@ export function ApprovalsTray() {
               ))
             )}
           </div>
+
+          <RevertAgentSection requestedAgentId={revertRequest} />
 
           <div
             style={{

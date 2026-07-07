@@ -229,7 +229,8 @@ const api = {
     status: () => typedInvoke('git:status'),
     diff: (paths?: string[]) => typedInvoke('git:diff', { paths }),
     commitApproved: (opts: CommitApprovedOpts) => typedInvoke('git:commit-approved', opts),
-    revertAgent: (agentId: string) => typedInvoke('git:revert-agent', { agentId })
+    revertAgent: (agentId: string) => typedInvoke('git:revert-agent', { agentId }),
+    listAgentCommits: () => typedInvoke('git:list-agent-commits')
   },
   approvals: {
     list: () => typedInvoke('approvals:list'),

@@ -10,6 +10,7 @@ import {
   TRAILER_SESSION
 } from '@shared/git-types'
 import type {
+  AgentCommits,
   CommitApprovedOpts,
   GitFileState,
   GitOpResult,
@@ -369,6 +370,93 @@ export function commitApproved(root: string, opts: CommitApprovedOpts): GitOpRes
   return sha !== null ? { ok: true, sha } : { ok: true }
 }
 
+interface TrailerLogRecord {
+  readonly sha: string
+  /** ISO 8601 author date. */
+  readonly date: string
+  readonly subject: string
+  /** Machina-Agent trailer values (one per trailer line). */
+  readonly agentIds: readonly string[]
+}
+
+interface TrailerLog {
+  /** Every commit, newest first (git log order). */
+  readonly records: readonly TrailerLogRecord[]
+  /** Shas named in any Machina-Reverts trailer — excluded from later reverts. */
+  readonly reverted: ReadonlySet<string>
+}
+
+/**
+ * The one bounded git-log trailer walk (contracts §2, v1.2.5): shared by
+ * revertAgent and listAgentCommits so both enumerate agent commits — and the
+ * Machina-Reverts exclusions — identically. `%s` is the LAST field so a
+ * subject containing the field separator re-joins intact. Null on failure.
+ */
+function readTrailerLog(root: string): TrailerLog | null {
+  const log = runGit(root, [
+    'log',
+    '-z',
+    `--format=%H%x1f%aI%x1f%(trailers:key=${TRAILER_AGENT},valueonly)%x1f%(trailers:key=${TRAILER_REVERTS},valueonly)%x1f%s`
+  ])
+  if (!log.ok) return null
+
+  const records: TrailerLogRecord[] = []
+  const reverted = new Set<string>()
+  for (const record of log.stdout.split('\0')) {
+    const fields = record.split('\x1f')
+    const [sha, date, agentField, revertsField] = fields
+    if (sha === undefined || sha.length === 0 || agentField === undefined) continue
+    records.push({
+      sha,
+      date: date ?? '',
+      subject: fields.slice(4).join('\x1f'),
+      agentIds: agentField.split('\n').filter((v) => v.length > 0)
+    })
+    for (const value of (revertsField ?? '').split(/\s+/)) {
+      if (value.length > 0) reverted.add(value)
+    }
+  }
+  return { records, reverted }
+}
+
+/**
+ * Read-only twin of revertAgent's enumeration (contracts §2, v1.2.5): every
+ * unreverted agent-attributed commit grouped by exact Machina-Agent trailer
+ * value. Ids are trailer-sourced, so commits from a since-deleted harness
+ * (or an adapter identity) stay listed and revertable. Shas newest first
+ * within each group; group order follows each agent's newest commit.
+ * Non-repo and git failure → [] (list semantics, matching status()).
+ */
+export function listAgentCommits(root: string): readonly AgentCommits[] {
+  if (!isGitRepo(root)) return []
+  const log = readTrailerLog(root)
+  if (log === null) return []
+
+  const groups = new Map<string, { shas: string[]; lastSubject: string; lastDate: string }>()
+  for (const record of log.records) {
+    if (log.reverted.has(record.sha)) continue
+    // De-duped: a commit carrying the same trailer twice adds its sha once.
+    for (const agentId of new Set(record.agentIds)) {
+      const group = groups.get(agentId)
+      if (group === undefined) {
+        groups.set(agentId, {
+          shas: [record.sha],
+          lastSubject: record.subject,
+          lastDate: record.date
+        })
+      } else {
+        group.shas.push(record.sha)
+      }
+    }
+  }
+  return [...groups.entries()].map(([agentId, group]) => ({
+    agentId,
+    shas: group.shas,
+    lastSubject: group.lastSubject,
+    lastDate: group.lastDate
+  }))
+}
+
 /**
  * Revert every commit attributed to `agentId` (exact trailer value match, in
  * JS — no --grep injection/prefix collisions), newest first, as ONE revert
@@ -381,25 +469,12 @@ export function revertAgent(root: string, agentId: string): GitOpResult {
   if (!isGitRepo(root)) return { ok: false, reason: 'not-a-git-repo' }
   if (!SAFE_ID_RE.test(agentId)) return { ok: false, reason: 'invalid-agent-id' }
 
-  const log = runGit(root, [
-    'log',
-    '-z',
-    `--format=%H%x1f%(trailers:key=${TRAILER_AGENT},valueonly)%x1f%(trailers:key=${TRAILER_REVERTS},valueonly)`
-  ])
-  if (!log.ok) return { ok: false, reason: 'git-failed' }
+  const log = readTrailerLog(root)
+  if (log === null) return { ok: false, reason: 'git-failed' }
 
-  const candidates: string[] = []
-  const alreadyReverted = new Set<string>()
-  for (const record of log.stdout.split('\0')) {
-    const [sha, agentField, revertsField] = record.split('\x1f')
-    if (sha === undefined || agentField === undefined) continue
-    const agentValues = agentField.split('\n').filter((v) => v.length > 0)
-    if (agentValues.some((v) => v === agentId)) candidates.push(sha)
-    for (const value of (revertsField ?? '').split(/\s+/)) {
-      if (value.length > 0) alreadyReverted.add(value)
-    }
-  }
-  const shas = candidates.filter((sha) => !alreadyReverted.has(sha))
+  const shas = log.records
+    .filter((r) => r.agentIds.some((v) => v === agentId) && !log.reverted.has(r.sha))
+    .map((r) => r.sha)
   if (shas.length === 0) return { ok: false, reason: 'no-commits-for-agent' }
 
   // git log order is newest-first; one sequencer run so --abort restores everything.

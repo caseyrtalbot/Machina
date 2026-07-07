@@ -8,6 +8,7 @@ import { runHarness } from '../../../store/harness-run'
 import type { Thread } from '@shared/thread-types'
 import type { HarnessSummary } from '@shared/harness-types'
 import type { SearchHit } from '@shared/engine/search-engine'
+import type { AgentCommits } from '@shared/git-types'
 
 vi.mock('../terminal-migration', () => ({
   openStripTerminal: vi.fn(),
@@ -320,5 +321,56 @@ describe('palette-sources — step 7 harness lint diagnostics', () => {
     expect(item!.disabledReason).toBeUndefined()
     await item!.run()
     expect(runHarness).toHaveBeenCalledWith(warned)
+  })
+})
+
+describe('palette-sources — step 5 per-agent revert entries (contracts v1.2.5)', () => {
+  const commits: AgentCommits[] = [
+    {
+      agentId: 'test-fixer',
+      shas: ['aaa1', 'aaa2'],
+      lastSubject: 'fix: retry loop',
+      lastDate: '2026-07-07T10:00:00.000Z'
+    },
+    { agentId: 'spent-agent', shas: [], lastSubject: '', lastDate: '' }
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('emits entries only for agents with revertable commits', () => {
+    const items = buildPaletteItems({ closePalette: () => {}, agentCommits: commits })
+    const entry = items.find((i) => i.id === 'action:revert-agent:test-fixer')
+    expect(entry).toBeDefined()
+    expect(entry!.title).toBe('Revert harness: test-fixer')
+    expect(entry!.subtitle).toContain('2 commits')
+    expect(entry!.subtitle).toContain('confirm in approvals tray')
+    // Zero unreverted commits ⇒ no entry.
+    expect(items.find((i) => i.id === 'action:revert-agent:spent-agent')).toBeUndefined()
+  })
+
+  it('emits no revert entries when the snapshot is absent (tests, note-hit mapping)', () => {
+    const items = buildPaletteItems({ closePalette: () => {} })
+    expect(items.some((i) => i.id.startsWith('action:revert-agent:'))).toBe(false)
+  })
+
+  it('running an entry closes the palette and routes to the tray confirm — never reverts directly', () => {
+    const close = vi.fn()
+    const dispatched: Event[] = []
+    const spy = vi.spyOn(window, 'dispatchEvent').mockImplementation((e) => {
+      dispatched.push(e)
+      return true
+    })
+    try {
+      const items = buildPaletteItems({ closePalette: close, agentCommits: commits })
+      items.find((i) => i.id === 'action:revert-agent:test-fixer')!.run()
+      expect(close).toHaveBeenCalled()
+      const event = dispatched.find((e) => e.type === 'te:revert-agent')
+      expect(event).toBeDefined()
+      expect((event as CustomEvent<string>).detail).toBe('test-fixer')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

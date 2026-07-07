@@ -20,6 +20,7 @@ import {
   diff,
   commitApproved,
   revertAgent,
+  listAgentCommits,
   discard
 } from '../../src/main/services/git-service'
 
@@ -565,6 +566,74 @@ describe('git-service', () => {
       expect(readFileSync(join(vaultRoot, 'doc.md'), 'utf-8')).toBe('original content\n')
       expect(existsSync(join(vaultRoot, 'new.txt'))).toBe(false)
       expect(git(vaultRoot, 'status', '--porcelain')).toBe('')
+    })
+  })
+
+  describe('listAgentCommits (workstation step 5, contracts §2 v1.2.5)', () => {
+    it('groups commits per agent, shas newest first, with last subject and date', () => {
+      initGitRepo(vaultRoot)
+      const shaA1 = agentCommit(vaultRoot, 'alpha', 'a1.txt', 'alpha one')
+      const shaB1 = agentCommit(vaultRoot, 'beta', 'b1.txt', 'beta one')
+      const shaA2 = agentCommit(vaultRoot, 'alpha', 'a2.txt', 'alpha two')
+
+      const groups = listAgentCommits(vaultRoot)
+      // Group order follows each agent's newest commit (alpha committed last).
+      expect(groups.map((g) => g.agentId)).toEqual(['alpha', 'beta'])
+
+      const alpha = groups.find((g) => g.agentId === 'alpha')!
+      expect(alpha.shas).toEqual([shaA2, shaA1])
+      expect(alpha.lastSubject).toBe('agent writes a2.txt')
+      expect(Number.isNaN(Date.parse(alpha.lastDate))).toBe(false)
+
+      const beta = groups.find((g) => g.agentId === 'beta')!
+      expect(beta.shas).toEqual([shaB1])
+      expect(beta.lastSubject).toBe('agent writes b1.txt')
+    })
+
+    it('excludes shas named in a Machina-Reverts trailer and never lists the revert commit', () => {
+      initGitRepo(vaultRoot)
+      agentCommit(vaultRoot, 'alpha', 'a1.txt', 'alpha one')
+      const shaB = agentCommit(vaultRoot, 'beta', 'b1.txt', 'beta one')
+      expect(revertAgent(vaultRoot, 'alpha').ok).toBe(true)
+
+      const groups = listAgentCommits(vaultRoot)
+      expect(groups.map((g) => g.agentId)).toEqual(['beta'])
+      expect(groups[0].shas).toEqual([shaB])
+    })
+
+    it('matches ids exactly — fixer and fixer-2 are separate groups', () => {
+      initGitRepo(vaultRoot)
+      const shaFixer = agentCommit(vaultRoot, 'fixer', 'f1.txt', 'by fixer')
+      const shaFixer2 = agentCommit(vaultRoot, 'fixer-2', 'f2.txt', 'by fixer-2')
+
+      const groups = listAgentCommits(vaultRoot)
+      expect(groups.find((g) => g.agentId === 'fixer')?.shas).toEqual([shaFixer])
+      expect(groups.find((g) => g.agentId === 'fixer-2')?.shas).toEqual([shaFixer2])
+    })
+
+    it('lists ids that are not registry-known — a deleted harness stays revertable', () => {
+      // Trailer enumeration is the only source (judge graft, step-5 spec): no
+      // registry lookup exists on this path, so a slug whose harness dir was
+      // deleted keeps its group AND revertAgent accepts the same id.
+      initGitRepo(vaultRoot)
+      const sha = agentCommit(vaultRoot, 'deleted-harness', 'd.txt', 'orphan commit')
+
+      const groups = listAgentCommits(vaultRoot)
+      expect(groups).toHaveLength(1)
+      expect(groups[0].agentId).toBe('deleted-harness')
+      expect(groups[0].shas).toEqual([sha])
+      expect(revertAgent(vaultRoot, 'deleted-harness').ok).toBe(true)
+      expect(listAgentCommits(vaultRoot)).toEqual([])
+    })
+
+    it('ignores commits without Machina-Agent trailers', () => {
+      initGitRepo(vaultRoot)
+      userCommit(vaultRoot, 'u.txt', 'user\n', 'plain user commit')
+      expect(listAgentCommits(vaultRoot)).toEqual([])
+    })
+
+    it('returns [] for a non-repo (list semantics)', () => {
+      expect(listAgentCommits(vaultRoot)).toEqual([])
     })
   })
 

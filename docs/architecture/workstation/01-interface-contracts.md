@@ -82,6 +82,22 @@ export interface GitStatusEntry { readonly path: string; readonly state: GitFile
 /** isRepo lets the renderer surface "non-repo = no rollback protection" honestly. */
 export interface GitStatusResult { readonly isRepo: boolean; readonly entries: readonly GitStatusEntry[] }
 
+/**
+ * v1.2.5 — one agent's unreverted attributed commits (listAgentCommits). Ids are
+ * trailer-sourced: harness slugs, adapter identities, and slugs from since-deleted
+ * harnesses all appear. shas newest first; lastSubject/lastDate from the newest commit.
+ */
+export interface AgentCommits {
+  readonly agentId: string
+  readonly shas: readonly string[]
+  readonly lastSubject: string
+  readonly lastDate: string // ISO 8601 author date
+}
+/** v1.2.5 — response for git:list-agent-commits (structured, never throws). */
+export type AgentCommitsResult =
+  | { readonly ok: true; readonly agents: readonly AgentCommits[] }
+  | { readonly ok: false; readonly reason: string }
+
 // src/main/services/git-service.ts (vault-git.ts grown via git mv, history preserved)
 export interface GitService {
   isRepo(root: string): boolean
@@ -104,6 +120,14 @@ export interface GitService {
    * The agentId stays readable in the revert commit subject.
    */
   revertAgent(root: string, agentId: string): GitOpResult
+  /**
+   * v1.2.5 — read-only twin of revertAgent's enumeration (the SAME single git-log
+   * trailer walk, factored into a shared reader): every unreverted agent-attributed
+   * commit grouped by exact Machina-Agent trailer value; shas named in any
+   * Machina-Reverts trailer are excluded, so the list refreshes past a revert.
+   * Non-repo and git failure → [] (list semantics, matching status()).
+   */
+  listAgentCommits(root: string): readonly AgentCommits[]
   /**
    * Reject flow. Tracked → `git restore --source=HEAD`; untracked → the INJECTED
    * removeFile callback (v1.1.1: required third parameter; the IPC layer binds
@@ -606,6 +630,7 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'cli-thread:get-session': { request: { threadId: string }; response: { sessionId: string; live: boolean } | null } // v1.2.3 — pull mirror of the spawner binding (invoke, not an event; appended per the parallel-session rule)
 // IpcEvents (v1.2.3)
 'cli-thread:session-changed': { threadId: string; sessionId: string } // v1.2.3 — spawn-on-demand respawn rebinding; feeds cli-session-store
+'git:list-agent-commits': { request: void; response: AgentCommitsResult } // v1.2.5 — read path for the revert UI; null root ⇒ { ok:false, reason:'no-workspace' }, non-repo ⇒ 'not-a-git-repo' (the tray renders the honest "nothing to revert from" state, never a false empty)
 ```
 
 Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
@@ -635,6 +660,32 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.2.5 (2026-07-07, Phase 2 step 5 landing)** — per-agent revert UI +
+  list-agent-commits. §2 GitService gains `listAgentCommits(root)` — the single
+  git-log trailer walk was factored out of `revertAgent` into a shared reader so
+  both enumerate commits (and Machina-Reverts exclusions) identically; groups are
+  per exact Machina-Agent value, shas newest first, with the newest commit's
+  subject/author-date; non-repo and git failure → [] (list semantics). git-types
+  gains `AgentCommits` / `AgentCommitsResult`. §6 gains `git:list-agent-commits`
+  (root main-side; null root ⇒ `{ ok:false, reason:'no-workspace' }`, non-repo ⇒
+  `'not-a-git-repo'` so the tray renders the honest "nothing to revert from"
+  state). Renderer: `RevertAgentSection` mounts in the ApprovalsTray popover
+  (OQ5's git-consequences surface), collapsed by default and enumerating only
+  when opened; revert sits behind an inline arm→confirm whose copy follows the §4
+  containment framing (revert CREATES new commits, deletes no history, and is not
+  protection — later agent writes are not blocked). Palette "Revert harness:
+  <slug>" entries are gated on a non-empty unreverted-commit list and route
+  through the `te:revert-agent` CustomEvent into the tray confirm — the palette
+  never one-click reverts. Ids are trailer-enumerated, never registry-checked, so
+  commits from a since-deleted harness (or an adapter-identity fallback) stay
+  listed and revertable (the step-5 judge graft). Recorded deviations: (1)
+  `CommandPalette.tsx` (not in the spec's edit list) fetches the snapshot on
+  palette open — same open-refresh pattern as harness summaries; (2) the confirm
+  is an inline two-step arm/confirm in the tray section, not a modal dialog (no
+  modal-confirm component exists in the app; same discipline as CanvasToolbar's
+  destructive clear); (3) `revertAgent`'s failure copy distinguishes
+  `revert-conflict` ("nothing was changed — resolve in git directly") from other
+  structured reasons.
 - **v1.2.4 (2026-07-07, Phase 2 step 7 landing)** — §5 gains
   the harness-linter subsection: `Diagnostic { severity: 'error' | 'warning', code,
   message, file }` (deliberately minimal — severity-taxonomy creep is the named linter

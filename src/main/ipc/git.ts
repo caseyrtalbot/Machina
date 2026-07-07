@@ -27,6 +27,7 @@ import {
   headSha,
   ignoredUntracked,
   isGitRepo,
+  listAgentCommits,
   revertAgent,
   status
 } from '../services/git-service'
@@ -364,6 +365,16 @@ export function registerGitIpc(): void {
     const root = currentRoot()
     if (root === null) return NO_WORKSPACE
     return revertAgent(root, args.agentId)
+  })
+
+  // Read path for the per-agent revert UI (step 5, contracts §2/§6 v1.2.5).
+  // Non-repo is a structured reason (not an empty list) so the tray renders
+  // the honest "nothing to revert from" state instead of a false empty.
+  typedHandle('git:list-agent-commits', async () => {
+    const root = currentRoot()
+    if (root === null) return { ok: false as const, reason: 'no-workspace' }
+    if (!isGitRepo(root)) return { ok: false as const, reason: 'not-a-git-repo' }
+    return { ok: true as const, agents: listAgentCommits(root) }
   })
 
   typedHandle('approvals:list', async () => {

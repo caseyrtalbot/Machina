@@ -12,6 +12,7 @@ import { useHarnessStore } from '../../store/harness-store'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { searchVault } from '../../engine/vault-search'
 import type { SearchHit } from '@shared/engine/search-engine'
+import type { AgentCommits } from '@shared/git-types'
 import {
   buildIndex,
   buildPaletteItems,
@@ -68,6 +69,26 @@ export function CommandPalette({
     if (open) void useHarnessStore.getState().refresh()
   }, [open])
 
+  // Per-agent revert snapshot, refreshed on palette open (workstation step 5):
+  // revert entries are gated on a non-empty unreverted-commit list. Errors
+  // (no workspace, non-repo, no bridge in tests) just mean no entries.
+  const [agentCommits, setAgentCommits] = useState<readonly AgentCommits[]>([])
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await window.api.git.listAgentCommits()
+        if (!cancelled) setAgentCommits(res.ok ? res.agents : [])
+      } catch {
+        if (!cancelled) setAgentCommits([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (!open) {
@@ -81,8 +102,11 @@ export function CommandPalette({
   }
 
   const items = useMemo(
-    () => (open ? buildPaletteItems({ closePalette: onClose, harnesses: harnessSummaries }) : []),
-    [open, onClose, harnessSummaries]
+    () =>
+      open
+        ? buildPaletteItems({ closePalette: onClose, harnesses: harnessSummaries, agentCommits })
+        : [],
+    [open, onClose, harnessSummaries, agentCommits]
   )
   const index = useMemo(() => (open ? buildIndex(items) : null), [open, items])
 

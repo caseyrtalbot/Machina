@@ -6,7 +6,7 @@
  * with stubs so the component's mount/open refresh effects are inert.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import type { PendingChange, PendingChangeFlags, WatcherHealth } from '@shared/git-types'
 import { useApprovalsStore } from '../../../store/approvals-store'
 import { ApprovalsTray } from '../ApprovalsTray'
@@ -198,6 +198,43 @@ describe('ApprovalsTray watcher health (contracts §4 v1.2.1)', () => {
     openTray()
 
     expect(screen.getByTestId<HTMLButtonElement>('approvals-watcher-retry').disabled).toBe(true)
+  })
+})
+
+describe('ApprovalsTray revert section (workstation step 5, contracts v1.2.5)', () => {
+  it('mounts RevertAgentSection collapsed in the popover — no enumeration on open', () => {
+    // window.api is deliberately NOT stubbed: a collapsed section must not
+    // touch the git bridge at all.
+    render(<ApprovalsTray />)
+    openTray()
+    const toggle = screen.getByTestId('revert-agent-toggle')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('te:revert-agent (palette route) opens the popover with the confirm armed', async () => {
+    const listAgentCommits = vi.fn().mockResolvedValue({
+      ok: true,
+      agents: [
+        {
+          agentId: 'test-fixer',
+          shas: ['aaa1'],
+          lastSubject: 'fix: retry loop',
+          lastDate: '2026-07-07T10:00:00.000Z'
+        }
+      ]
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api = { git: { listAgentCommits, revertAgent: vi.fn() } }
+
+    render(<ApprovalsTray />)
+    act(() => {
+      window.dispatchEvent(new CustomEvent('te:revert-agent', { detail: 'test-fixer' }))
+    })
+
+    expect(screen.getByTestId('approvals-popover')).toBeTruthy()
+    const confirm = await screen.findByTestId('revert-agent-confirm')
+    expect(confirm.textContent).toContain('test-fixer')
+    expect(confirm.textContent).toContain('creates new commits')
   })
 })
 

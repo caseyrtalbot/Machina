@@ -483,6 +483,34 @@ Parallel-safe with step 7.
 
 ## Step 5 — Per-agent revert UI + list-agent-commits
 
+> **DONE** (2026-07-07, contracts v1.2.5; built in the sanctioned step-5 parallel
+> worktree session on branch `ws-p2-step5` off `8d5dd67`, landing FIRST per the
+> 5∥6 work order — the merge sha is the orchestrator's to record). Shipped: §2
+> `listAgentCommits` (the revertAgent trailer walk factored into one shared
+> reader — both enumerate commits and Machina-Reverts exclusions identically),
+> `git:list-agent-commits` (null root ⇒ `no-workspace`, non-repo ⇒
+> `not-a-git-repo` structured reasons), `RevertAgentSection` in the ApprovalsTray
+> popover (collapsed by default, per-agent rows with count + last subject/date,
+> inline arm→confirm with the §4 containment copy: creates new commits, deletes
+> no history, not protection), palette "Revert harness: <slug>" entries gated on
+> a non-empty commit list. All specced tests landed (grouping + Machina-Reverts
+> exclusion + exact-match ids + deleted-harness id revertable + handler
+> null-root/non-repo structured errors + component confirm flow + non-repo
+> disabled state + palette gating). Recorded deviations (§8 v1.2.5): (1) palette
+> entries do NOT revert directly — they dispatch the `te:revert-agent`
+> CustomEvent and the tray opens with the confirm armed (one confirm surface,
+> OQ5; a palette-native dialog would duplicate it); this required a small
+> `CommandPalette.tsx` touch (fetch the snapshot on palette open, the harness
+> open-refresh pattern) beyond the spec's edit list; (2) the confirm is an
+> inline two-step arm/confirm, not a modal (no modal-confirm component exists in
+> the app). Gate: fresh `npm run check` (3444 tests) + `npm run build` green in
+> the worktree. Per the 5∥6 discipline no e2e ran here — the built-app probe
+> `e2e/revert-agent.spec.ts` (two agents grouped → UI revert of A → B intact →
+> list refreshed past the reverted shas, with the TE_DIR-scaffold porcelain
+> exception) is WRITTEN for the orchestrator's sequential post-merge run.
+> Casey-observed acceptance still open: reverting an agent's commits from the
+> tray without touching the DevTools console.
+
 Retire the last Phase-1 residual: `revertAgent` is backend-complete (channel
 `ipc-channels.ts:322-325`, handler `ipc/git.ts:190-194`, preload `index.ts:220`) with
 ZERO renderer callers and no enumeration IPC — the exact gap named in HANDOFF's

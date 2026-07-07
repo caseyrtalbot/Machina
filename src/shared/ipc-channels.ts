@@ -400,6 +400,15 @@ export interface IpcChannels {
     request: { slug: string }
     response: import('./harness-lint').Diagnostic[]
   }
+
+  // --- Per-agent revert UI (workstation contracts §2/§6, step 5, v1.2.5) ---
+  // Read-only trailer enumeration behind RevertAgentSection + the palette
+  // revert entries. Root resolved main-side; no workspace / non-repo come
+  // back as structured reasons, never throws.
+  'git:list-agent-commits': {
+    request: void
+    response: import('./git-types').AgentCommitsResult
+  }
 }
 
 export type AgentNativeApprovalPreview =

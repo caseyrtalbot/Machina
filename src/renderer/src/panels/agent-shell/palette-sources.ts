@@ -3,6 +3,7 @@ import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 import type { SearchHit } from '@shared/engine/search-engine'
 import type { HarnessSummary } from '@shared/harness-types'
+import type { AgentCommits } from '@shared/git-types'
 import { TE_DIR } from '@shared/constants'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -13,6 +14,7 @@ import { notifyError } from '../../utils/error-logger'
 import { showToast } from '../../components/Toast'
 import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
 import { openStripTerminal, openStripTerminalInFolder } from './terminal-migration'
+import { REVERT_AGENT_EVENT } from './RevertAgentSection'
 
 export type PaletteItemKind = 'thread' | 'file' | 'surface' | 'action' | 'note'
 
@@ -45,6 +47,12 @@ interface PaletteSourcesOptions {
    * lands; absent (tests, note-hit mapping) means no run items.
    */
   readonly harnesses?: readonly HarnessSummary[]
+  /**
+   * Per-agent unreverted-commit snapshot (workstation step 5). The palette
+   * fetches it on open; absent (tests, note-hit mapping) means no revert
+   * entries.
+   */
+  readonly agentCommits?: readonly AgentCommits[]
 }
 
 export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
@@ -262,6 +270,23 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       run: async () => {
         opts.closePalette()
         await runHarness(h)
+      }
+    })
+  }
+
+  // Per-agent revert entries (step 5): gated on a non-empty unreverted-commit
+  // list. run() routes to the ApprovalsTray confirm surface (OQ5) via the
+  // te:revert-agent event — the palette never one-click reverts.
+  for (const a of opts.agentCommits ?? []) {
+    if (a.shas.length === 0) continue
+    items.push({
+      id: `action:revert-agent:${a.agentId}`,
+      kind: 'action',
+      title: `Revert harness: ${a.agentId}`,
+      subtitle: `${a.shas.length} ${a.shas.length === 1 ? 'commit' : 'commits'} · confirm in approvals tray`,
+      run: () => {
+        opts.closePalette()
+        window.dispatchEvent(new CustomEvent(REVERT_AGENT_EVENT, { detail: a.agentId }))
       }
     })
   }
