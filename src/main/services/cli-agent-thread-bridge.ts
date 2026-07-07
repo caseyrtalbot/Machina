@@ -95,6 +95,9 @@ interface BindingState {
   readonly emittedBlockIds: Set<string>
   /** Per-block incremental parse state for interim streaming. */
   readonly streamStates: Map<string, StreamState>
+  /** Last observed still-running agent block, if any. Used by closeSession to
+   *  settle a mid-flight turn when the PTY dies before the block completes. */
+  runningBlock: Block | null
 }
 
 export class CliAgentThreadBridge {
@@ -111,7 +114,8 @@ export class CliAgentThreadBridge {
     this.bindings.set(sessionId, {
       threadId,
       emittedBlockIds: new Set(),
-      streamStates: new Map()
+      streamStates: new Map(),
+      runningBlock: null
     })
   }
 
@@ -141,6 +145,7 @@ export class CliAgentThreadBridge {
     }
 
     if (!finished) {
+      binding.runningBlock = block
       // Interim streaming: emit only the newly extracted text. The final
       // message repeats the full body, so the renderer reconciles by suffix.
       if (delta.length > 0) {
@@ -154,6 +159,9 @@ export class CliAgentThreadBridge {
 
     binding.emittedBlockIds.add(blockId)
     binding.streamStates.delete(blockId)
+    if (binding.runningBlock !== null && (binding.runningBlock.id as string) === blockId) {
+      binding.runningBlock = null
+    }
     const message = buildFinalMessage(block, agent, state)
     this.opts.onMessage({ threadId: binding.threadId, message })
     // After the final message: the write-linger window opens from the block's
@@ -162,9 +170,35 @@ export class CliAgentThreadBridge {
   }
 
   closeSession(sessionId: string): void {
+    const binding = this.bindings.get(sessionId)
+    // A block still mid-flight when the PTY dies would otherwise never get a
+    // final message — the renderer's in-flight flag (and the CliTurnRegistry
+    // turn window) would stay open forever. Settle it with a synthetic
+    // terminated final built from whatever output the block accumulated.
+    if (binding) this.settleRunningBlock(binding)
     // Drop the binding but keep agentSessionIdByThread: continuity must
     // survive PTY death (the spawner respawns and resumes by session id).
     this.bindings.delete(sessionId)
+  }
+
+  private settleRunningBlock(binding: BindingState): void {
+    const block = binding.runningBlock
+    if (block === null) return
+    const blockId = block.id as string
+    if (binding.emittedBlockIds.has(blockId)) return
+    const agent = detectAgentFromCommand(block.command)
+    if (agent === null) return
+    const state = binding.streamStates.get(blockId) ?? newStreamState()
+    const parseEvent = adapterForAgent(agent.id)?.parseEvent
+    // Final drain: pick up any trailing complete lines the interim passes
+    // left behind (the trailing line is only consumed on a final pass).
+    if (parseEvent) drainStructuredOutput(state, block, parseEvent, true)
+    binding.emittedBlockIds.add(blockId)
+    this.opts.onMessage({
+      threadId: binding.threadId,
+      message: buildFinalMessage(block, agent, state)
+    })
+    this.opts.onTurnComplete?.(binding.threadId)
   }
 }
 
@@ -271,11 +305,15 @@ function buildFinalMessage(
   const cliCall: ToolCall = { id: callId, kind: 'cli_command', args: { command, cwd } }
   const cliResult = buildCliResult(block, callId, cleaned)
 
-  const inlineCalls = state.sawStructured
-    ? state.tools
-    : agent.toolCallParser
-      ? agent.toolCallParser(cleaned)
-      : []
+  // `degraded` without `sawStructured` means truncation/rewrite hit before a
+  // single JSON line parsed — the output is (likely) raw JSONL, and feeding
+  // it to the plain-text marker parser would fabricate bogus tool pills.
+  const inlineCalls =
+    state.sawStructured || state.degraded
+      ? state.tools
+      : agent.toolCallParser
+        ? agent.toolCallParser(cleaned)
+        : []
   const inlineEntries = inlineCalls.map((parsed, idx) =>
     inlineToolCallEntry(parsed, agent.id, sessionId, block.id, idx)
   )
@@ -308,13 +346,25 @@ function buildCliResult(block: Block, callId: string, output: string): ToolResul
       }
     }
   }
-  // cancelled
+  if (block.state.kind === 'cancelled') {
+    return {
+      id: callId,
+      ok: false,
+      error: {
+        code: 'IO_FATAL',
+        message: 'cancelled (exit -1)',
+        hint: tail(output, HINT_MAX)
+      }
+    }
+  }
+  // Still running/pending: only reachable via closeSession's synthetic final
+  // when the PTY died mid-turn.
   return {
     id: callId,
     ok: false,
     error: {
       code: 'IO_FATAL',
-      message: 'cancelled (exit -1)',
+      message: 'session terminated',
       hint: tail(output, HINT_MAX)
     }
   }
@@ -326,16 +376,35 @@ function inlineToolCallEntry(
   sessionId: string,
   blockId: string,
   idx: number
-): { call: ToolCall; result?: ToolResult } {
+): { call: ToolCall; result: ToolResult } {
   const toolKey = normalizeToolName(parsed.name)
   const id = `cli_${sessionId}_${blockId}_${idx}_${toolKey}`
   const kind = `cli_${agentId}_${toolKey}` as `cli_${string}_${string}`
   const call: ToolCall = { id, kind, args: { preview: parsed.inputPreview } }
-  return { call }
+  if (toolKey === 'error') {
+    return {
+      call,
+      result: {
+        id,
+        ok: false,
+        error: {
+          code: 'IO_FATAL',
+          message: `${agentDisplayName(agentId)} reported error`,
+          hint: parsed.inputPreview
+        }
+      }
+    }
+  }
+  return { call, result: { id, ok: true, output: { preview: parsed.inputPreview } } }
 }
 
 function normalizeToolName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+}
+
+function agentDisplayName(agentId: string): string {
+  const spec = getAgentSpec(agentId)
+  return spec?.displayName.replace(/\s+CLI$/, '') ?? agentId
 }
 
 function tail(s: string, n: number): string {

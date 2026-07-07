@@ -99,6 +99,11 @@ export function ThreadMessage({ message, streamingBody }: Props) {
     message.role === 'user' ? 'User' : message.role === 'assistant' ? 'Machina' : 'System'
   const body =
     message.role === 'assistant' && streamingBody ? message.body + streamingBody : message.body
+  // Plain-text CLI agents (and degraded structured runs) produce finals with
+  // an empty body — suppress the empty prose block instead of rendering a
+  // heading over nothing, and say where the reply went when tool cards exist.
+  const hasBody = body.trim().length > 0
+  const toolOnly = message.role === 'assistant' && !hasBody && (message.toolCalls?.length ?? 0) > 0
 
   return (
     <article
@@ -120,18 +125,31 @@ export function ThreadMessage({ message, streamingBody }: Props) {
       >
         {heading}
       </div>
-      <div className="thread-prose">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkWikilinks]}
-          rehypePlugins={[rehypeEmojiIcons]}
-          components={markdownComponents}
+      {hasBody && (
+        <div className="thread-prose">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkWikilinks]}
+            rehypePlugins={[rehypeEmojiIcons]}
+            components={markdownComponents}
+          >
+            {body}
+          </ReactMarkdown>
+        </div>
+      )}
+      {toolOnly && (
+        <div
+          style={{
+            fontSize: typography.metadata.size,
+            color: colors.text.muted,
+            fontStyle: 'italic'
+          }}
         >
-          {body}
-        </ReactMarkdown>
-      </div>
+          No text reply (see command output)
+        </div>
+      )}
       {message.role === 'assistant' &&
         message.toolCalls?.map((tc, i) => (
-          <ToolCallRenderer key={tc.call.id ?? i} call={tc.call} result={tc.result} />
+          <ToolCallRenderer key={tc.call.id ?? i} call={tc.call} result={tc.result} historical />
         ))}
       {message.role === 'system' && message.body === AUTH_ERROR_BODY && <OpenSettingsAction />}
     </article>

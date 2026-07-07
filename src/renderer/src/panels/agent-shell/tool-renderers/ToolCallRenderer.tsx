@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors, typography } from '../../../design/tokens'
+import { maskSecretsInText } from './mask-secrets'
 import { CliCommandCard } from './CliCommandCard'
 import { EditNoteCard } from './EditNoteCard'
 import { ListVaultCard } from './ListVaultCard'
@@ -13,18 +14,22 @@ import { WriteNoteCard } from './WriteNoteCard'
 
 export function ToolCallRenderer({
   call,
-  result
+  result,
+  historical
 }: {
   readonly call: ToolCall
   readonly result?: ToolResult
+  /** True when rendering a finalized (persisted) message: a result-less call
+   *  can never settle anymore, so unsettled affordances must not render. */
+  readonly historical?: boolean
 }) {
   // write_note / edit_note own their own rejected-state UI (the diff card
   // shows "you rejected this write" instead of a generic error chip).
   if (call.kind === 'write_note') {
-    return <WriteNoteCard call={call} result={result} />
+    return <WriteNoteCard call={call} result={result} historical={historical} />
   }
   if (call.kind === 'edit_note') {
-    return <EditNoteCard call={call} result={result} />
+    return <EditNoteCard call={call} result={result} historical={historical} />
   }
   // cli_command renders its own ok/failed states with an exit-code badge.
   if (call.kind === 'cli_command') {
@@ -44,7 +49,14 @@ export function ToolCallRenderer({
       return <ReadCanvasCard call={call} result={result} />
     case 'pin_to_canvas':
       return <PinToCanvasCard call={call} result={result} />
-    default:
+    default: {
+      const rawPreview = (call.args as Record<string, unknown>).preview
+      // Agent tool input (e.g. a Bash command) can carry secrets — mask like
+      // the cli_command output card does, so the pill can't leak in clear.
+      const preview =
+        typeof rawPreview === 'string' && rawPreview.length > 0
+          ? maskSecretsInText(rawPreview)
+          : null
       return (
         <ToolCardShell variant="pill" inline>
           <span
@@ -53,12 +65,48 @@ export function ToolCallRenderer({
               fontSize: typography.metadata.size,
               letterSpacing: typography.metadata.letterSpacing,
               textTransform: typography.metadata.textTransform,
-              color: colors.text.muted
+              color: colors.text.muted,
+              whiteSpace: 'nowrap'
             }}
           >
-            tool: {call.kind} {result ? 'ok' : 'pending'}
+            tool: {call.kind} {unknownToolStatus(call, result, historical)}
           </span>
+          {preview && (
+            <span
+              style={{
+                fontFamily: typography.fontFamily.mono,
+                fontSize: typography.metadata.size,
+                color: colors.text.secondary,
+                marginLeft: 8,
+                maxWidth: 420,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {preview}
+            </span>
+          )}
         </ToolCardShell>
       )
+    }
   }
+}
+
+/**
+ * Honest settlement status, independent of the failed-result early return
+ * above (which routes ok=false to ToolErrorCard before we get here).
+ */
+function unknownToolStatus(
+  call: ToolCall,
+  result: ToolResult | undefined,
+  historical: boolean | undefined
+): string {
+  if (result) return result.ok ? 'ok' : 'failed'
+  // cli_* trace entries observed from a CLI agent's output never settle —
+  // they are records of something that already happened.
+  if (call.kind.startsWith('cli_')) return 'observed'
+  // In a finalized message a result-less call can never resolve: it was
+  // interrupted before running, not "pending".
+  return historical ? 'not run' : 'pending'
 }

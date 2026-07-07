@@ -42,6 +42,82 @@ describe('ThreadMessage', () => {
     )
     expect(screen.queryByRole('button', { name: /add api key/i })).toBeNull()
   })
+
+  it('replaces an empty assistant body with a muted note when tool cards exist', () => {
+    const { container } = render(
+      <ThreadMessage
+        message={{
+          role: 'assistant',
+          body: '',
+          sentAt: '',
+          toolCalls: [
+            {
+              call: { id: 'c1', kind: 'cli_command', args: { command: 'gemini -p hi', cwd: '/v' } },
+              result: { id: 'c1', ok: true, output: { output: 'raw', exitCode: 0 } }
+            }
+          ]
+        }}
+      />
+    )
+    expect(screen.getByText(/no text reply/i)).toBeTruthy()
+    expect(container.querySelector('.thread-prose')).toBeNull()
+  })
+
+  it('suppresses the empty prose block without the note when there are no tool calls', () => {
+    const { container } = render(
+      <ThreadMessage message={{ role: 'assistant', body: '  ', sentAt: '' }} />
+    )
+    expect(container.querySelector('.thread-prose')).toBeNull()
+    expect(screen.queryByText(/no text reply/i)).toBeNull()
+  })
+
+  it('shows result-less write_note calls in history as "not run" with no approval buttons', () => {
+    render(
+      <ThreadMessage
+        message={{
+          role: 'assistant',
+          body: 'started something',
+          sentAt: '',
+          toolCalls: [
+            {
+              call: {
+                id: 'w1',
+                kind: 'write_note',
+                args: { path: 'a.md', content: 'hello' }
+              }
+            }
+          ]
+        }}
+      />
+    )
+    expect(screen.getByText('not run')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /accept/i })).toBeNull()
+    expect(screen.queryByText('awaiting approval')).toBeNull()
+  })
+
+  it('renders legacy result-less CLI trace entries as observed, not pending', () => {
+    render(
+      <ThreadMessage
+        message={{
+          role: 'assistant',
+          body: '',
+          sentAt: '',
+          toolCalls: [
+            {
+              call: {
+                id: 'cli_s1_b1_0_error',
+                kind: 'cli_codex_error',
+                args: { preview: '{"message":"tool call failed"}' }
+              }
+            }
+          ]
+        }}
+      />
+    )
+
+    expect(screen.getByText(/tool: cli_codex_error observed/i)).toBeTruthy()
+    expect(screen.queryByText(/tool: cli_codex_error pending/i)).toBeNull()
+  })
 })
 
 describe('ThreadMessage — wikilinks', () => {

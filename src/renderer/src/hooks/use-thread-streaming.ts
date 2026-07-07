@@ -66,8 +66,25 @@ export function useThreadStreaming(): void {
             await appendCliMessage(evt.threadId, sysMsg)
           })()
         } else {
-          append(evt.threadId, evt.runId, `\n\n[error: ${evt.code}] ${evt.message}\n`)
-          void finalize(evt.threadId)
+          // Non-auth failures also get a real system message instead of
+          // bracket-garbage text glued into the assistant body.
+          const sysMsg: ThreadMessage = {
+            role: 'system',
+            body: `The agent run failed (${evt.code}): ${evt.message}`,
+            sentAt: new Date().toISOString()
+          }
+          const st = useThreadStore.getState()
+          const hasPartial =
+            (st.streamingByThreadId[evt.threadId] ?? '').length > 0 ||
+            (st.pendingToolCallsByThreadId[evt.threadId] ?? []).length > 0
+          void (async () => {
+            // Materialize any partial turn first so its text isn't dropped;
+            // otherwise just clear the run id (finalize would append an
+            // empty assistant message).
+            if (hasPartial) await finalize(evt.threadId)
+            else setRunId(evt.threadId, null)
+            await appendCliMessage(evt.threadId, sysMsg)
+          })()
         }
       }
     })

@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
+import { scanSecrets } from '@shared/engine/secrets'
+import { segmentOutput, maskSegmentText } from '@shared/engine/block-output-segments'
 import { borderRadius, colors, typography } from '../../../design/tokens'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
 import { ToolCardShell } from './ToolCardShell'
@@ -14,9 +16,19 @@ export function CliCommandCard({
   readonly result?: ToolResult
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [revealed, setRevealed] = useState(false)
   const exitCode = exitCodeFromResult(result)
   const ok = result?.ok === true
-  const output = outputFromResult(result)
+  const rawOutput = outputFromResult(result)
+  // Same render-time masking as the canvas terminal-block card: agent CLI
+  // output (and the error hint, which is a tail of it) can echo secrets.
+  const secrets = useMemo(() => scanSecrets(rawOutput), [rawOutput])
+  const output =
+    revealed || secrets.length === 0
+      ? rawOutput
+      : segmentOutput(rawOutput, secrets)
+          .map((seg) => (seg.secret ? maskSegmentText(seg.text) : seg.text))
+          .join('')
   const { onContextMenu, menu } = useToolCardMenu([
     {
       id: 'copy-command',
@@ -24,6 +36,7 @@ export function CliCommandCard({
       onSelect: () => void copyText(call.args.command)
     },
     {
+      // Copies what is displayed: masked unless the user revealed secrets.
       id: 'copy-output',
       label: 'Copy output',
       disabled: !output,
@@ -71,6 +84,45 @@ export function CliCommandCard({
         </span>
         <ExitBadge ok={ok} code={exitCode} />
       </button>
+      {expanded && secrets.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '4px 12px',
+            borderTop: `1px solid ${colors.border.subtle}`,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: typography.metadata.size,
+            letterSpacing: typography.metadata.letterSpacing,
+            textTransform: typography.metadata.textTransform,
+            color: colors.text.muted
+          }}
+        >
+          <span>
+            {secrets.length} secret{secrets.length === 1 ? '' : 's'}{' '}
+            {revealed ? 'revealed' : 'masked'}
+          </span>
+          <button
+            type="button"
+            data-testid="cli-reveal-secrets"
+            onClick={() => setRevealed((v) => !v)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              color: colors.text.secondary,
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              textTransform: 'inherit'
+            }}
+          >
+            {revealed ? 'hide' : 'reveal'}
+          </button>
+        </div>
+      )}
       {expanded && (
         <pre
           style={{

@@ -10,10 +10,13 @@ const PREVIEW_LIMIT = 40
 
 export function WriteNoteCard({
   call,
-  result
+  result,
+  historical
 }: {
   readonly call: WriteNoteCall
   readonly result?: ToolResult
+  /** Finalized message: a result-less call can never settle — no approval UI. */
+  readonly historical?: boolean
 }) {
   const settled = result !== undefined
   const accepted = settled && result.ok
@@ -54,7 +57,13 @@ export function WriteNoteCard({
   }
 
   const lines = call.args.content.split('\n')
-  const status = !settled ? 'awaiting approval' : accepted ? 'accepted' : 'rejected'
+  const status = !settled
+    ? historical
+      ? 'not run'
+      : 'awaiting approval'
+    : accepted
+      ? 'accepted'
+      : 'rejected'
 
   return (
     <ToolCardShell variant="block" onContextMenu={onContextMenu}>
@@ -109,7 +118,7 @@ export function WriteNoteCard({
           </div>
         )}
       </pre>
-      {!settled && (
+      {!settled && !historical && (
         <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
           <button
             onClick={() => void decide(true)}

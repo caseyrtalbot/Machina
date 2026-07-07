@@ -139,6 +139,20 @@ describe('blockToMessage (pure mapping)', () => {
     }
   })
 
+  it('does not run the legacy tool parser over truncated structured output', () => {
+    // The head of the truncated output keeps the ⏺ marker line; without the
+    // degraded gate the legacy parser would fabricate a cli_claude_read pill
+    // out of output that was actually JSONL/degraded.
+    const out = '⏺ Read(file_path: "/a.ts")\n' + 'y'.repeat(400_000)
+    let block = startedBlock('s-deg', 'claude --print --verbose --output-format stream-json "x"')
+    block = appendOutput(block, out)
+    block = completed(block, 0)
+
+    const msg = blockToMessage(block, claudeSpec)
+
+    expect(msg.toolCalls?.map((tc) => tc.call.kind)).toEqual(['cli_command'])
+  })
+
   it('folds parsed inline tool calls into the message after the cli_command entry', () => {
     const out = '⏺ Read(file_path: "/a.ts")\n⏺ Bash(command: "ls")\n'
     let block = startedBlock('s4', 'claude --print "x"')
@@ -227,6 +241,32 @@ describe('blockToMessage (structured codex --json)', () => {
     expect(msg.toolCalls?.[1].call.args).toMatchObject({
       preview: expect.stringContaining('ls -la')
     })
+    expect(msg.toolCalls?.[1].result?.ok).toBe(true)
+  })
+
+  it('settles codex error items as failed inline results instead of pending calls', () => {
+    const out =
+      [
+        JSON.stringify({ type: 'thread.started', thread_id: CODEX_THREAD }),
+        JSON.stringify({
+          type: 'item.completed',
+          item: { id: 'item_err', type: 'error', message: 'tool call failed' }
+        })
+      ].join('\n') + '\n'
+    let block = startedBlock('s1', `codex exec --json --skip-git-repo-check 'hi'`)
+    block = appendOutput(block, out)
+    block = completed(block, 0)
+
+    const msg = blockToMessage(block, codexSpec)
+    const entry = msg.toolCalls?.[1]
+
+    expect(entry?.call.kind).toBe('cli_codex_error')
+    expect(entry?.result?.ok).toBe(false)
+    if (entry?.result && !entry.result.ok) {
+      expect(entry.result.error.code).toBe('IO_FATAL')
+      expect(entry.result.error.message).toBe('Codex reported error')
+      expect(entry.result.error.hint).toContain('tool call failed')
+    }
   })
 
   it('accepts the item_type field variant', () => {
@@ -484,6 +524,85 @@ describe('CliAgentThreadBridge', () => {
     bridge.observe('s1', a)
     bridge.observe('s2', b)
     expect(emitted.map((e) => e.threadId)).toEqual(['thread-A', 'thread-B'])
+  })
+})
+
+describe('CliAgentThreadBridge closeSession with a mid-flight block (PTY death)', () => {
+  function recordingWithLog(): {
+    bridge: CliAgentThreadBridge
+    messages: CliAgentThreadMessageEvent[]
+    turns: string[]
+  } {
+    const messages: CliAgentThreadMessageEvent[] = []
+    const turns: string[] = []
+    const bridge = new CliAgentThreadBridge({
+      onMessage: (e) => messages.push(e),
+      onTurnComplete: (threadId) => turns.push(threadId)
+    })
+    return { bridge, messages, turns }
+  }
+
+  it('emits a synthetic terminated final so the turn settles', () => {
+    const { bridge, messages, turns } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeText('Partial answer') + '\n')
+    bridge.observe('s1', block)
+    expect(messages).toHaveLength(1) // interim delta
+
+    bridge.closeSession('s1')
+
+    expect(messages).toHaveLength(2)
+    const final = messages[1].message
+    expect(messages[1].threadId).toBe('thread-A')
+    expect(final.body).toBe('Partial answer')
+    expect(final.toolCalls?.[0].call.kind).toBe('cli_command')
+    expect(final.toolCalls?.[0].result?.ok).toBe(false)
+    const result = final.toolCalls?.[0].result
+    if (result && !result.ok) {
+      expect(result.error.message).toBe('session terminated')
+    }
+    expect(final.metadata?.endedAt).toBeDefined()
+    expect(turns).toEqual(['thread-A'])
+  })
+
+  it('drains trailing complete lines the interim passes left behind', () => {
+    const { bridge, messages } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    // No trailing newline: the interim pass leaves the last line unconsumed.
+    block = appendOutput(block, claudeText('Tail text'))
+    bridge.observe('s1', block)
+    expect(messages).toEqual([])
+
+    bridge.closeSession('s1')
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0].message.body).toBe('Tail text')
+  })
+
+  it('emits nothing when the last observed block already completed', () => {
+    const { bridge, messages, turns } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    let block = startedBlock('s1', 'claude --print "x"')
+    bridge.observe('s1', block)
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+    expect(messages).toHaveLength(1)
+    expect(turns).toHaveLength(1)
+
+    bridge.closeSession('s1')
+
+    expect(messages).toHaveLength(1)
+    expect(turns).toHaveLength(1)
+  })
+
+  it('emits nothing when no block was ever observed on the session', () => {
+    const { bridge, messages, turns } = recordingWithLog()
+    bridge.bind('s1', 'thread-A')
+    bridge.closeSession('s1')
+    expect(messages).toEqual([])
+    expect(turns).toEqual([])
   })
 })
 

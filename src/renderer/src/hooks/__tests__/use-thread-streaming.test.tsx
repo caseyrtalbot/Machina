@@ -176,7 +176,7 @@ describe('useThreadStreaming — native agent errors', () => {
     expect(st.runIdByThreadId['a']).toBeUndefined()
   })
 
-  it('keeps the inline [error: CODE] rendering for non-AUTH errors', async () => {
+  it('renders a non-AUTH failure as a system message instead of inline bracket text', async () => {
     useThreadStore.setState({ runIdByThreadId: { a: 'r1' } })
     render(<Harness />)
     await act(async () =>
@@ -191,8 +191,34 @@ describe('useThreadStreaming — native agent errors', () => {
     await waitFor(() => {
       expect(useThreadStore.getState().threadsById['a'].messages).toHaveLength(1)
     })
-    const msg = useThreadStore.getState().threadsById['a'].messages[0]
-    expect(msg.role).toBe('assistant')
-    expect(msg.body).toContain('[error: RATE_LIMIT] slow down')
+    const st = useThreadStore.getState()
+    const msg = st.threadsById['a'].messages[0]
+    expect(msg.role).toBe('system')
+    expect(msg.body).toBe('The agent run failed (RATE_LIMIT): slow down')
+    expect(st.runIdByThreadId['a']).toBeUndefined()
+    expect(st.inFlightByThreadId['a']).toBeUndefined()
+  })
+
+  it('materializes partial streamed text before the non-AUTH system message', async () => {
+    useThreadStore.setState({ runIdByThreadId: { a: 'r1' } })
+    render(<Harness />)
+    act(() => nativeCb!({ kind: 'text', text: 'Partial answer.', threadId: 'a', runId: 'r1' }))
+    await act(async () =>
+      nativeCb!({
+        kind: 'error',
+        code: 'RATE_LIMIT',
+        message: 'slow down',
+        threadId: 'a',
+        runId: 'r1'
+      })
+    )
+    await waitFor(() => {
+      expect(useThreadStore.getState().threadsById['a'].messages).toHaveLength(2)
+    })
+    const msgs = useThreadStore.getState().threadsById['a'].messages
+    expect(msgs[0].role).toBe('assistant')
+    expect(msgs[0].body).toBe('Partial answer.')
+    expect(msgs[1].role).toBe('system')
+    expect(msgs[1].body).toBe('The agent run failed (RATE_LIMIT): slow down')
   })
 })

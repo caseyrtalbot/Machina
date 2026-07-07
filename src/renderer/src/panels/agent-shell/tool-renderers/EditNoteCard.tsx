@@ -10,10 +10,13 @@ const PREVIEW_LIMIT = 40
 
 export function EditNoteCard({
   call,
-  result
+  result,
+  historical
 }: {
   readonly call: EditNoteCall
   readonly result?: ToolResult
+  /** Finalized message: a result-less call can never settle — no approval UI. */
+  readonly historical?: boolean
 }) {
   const settled = result !== undefined
   const accepted = settled && result.ok
@@ -55,7 +58,13 @@ export function EditNoteCard({
 
   const findLines = call.args.find.split('\n')
   const replaceLines = call.args.replace.split('\n')
-  const status = !settled ? 'awaiting approval' : accepted ? 'accepted' : 'rejected'
+  const status = !settled
+    ? historical
+      ? 'not run'
+      : 'awaiting approval'
+    : accepted
+      ? 'accepted'
+      : 'rejected'
 
   return (
     <ToolCardShell variant="block" onContextMenu={onContextMenu}>
@@ -128,7 +137,7 @@ export function EditNoteCard({
           </div>
         )}
       </pre>
-      {!settled && (
+      {!settled && !historical && (
         <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
           <button
             onClick={() => void decide(true)}
