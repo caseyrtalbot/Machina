@@ -6,11 +6,15 @@ describe('DocumentManager.registerExternalWrite', () => {
   const path = '/vault/test.md'
   const initialMtime = '2026-04-01T00:00:00.000Z'
 
-  const createFs = () => ({
-    readFile: vi.fn().mockResolvedValue('# Test'),
-    getFileMtime: vi.fn().mockResolvedValue(initialMtime),
-    writeFile: vi.fn().mockResolvedValue(undefined)
-  })
+  const createFs = () => {
+    const readFile = vi.fn().mockResolvedValue('# Test')
+    return {
+      readFile,
+      readFileBytes: vi.fn(async (p: string) => Buffer.from(await readFile(p))),
+      getFileMtime: vi.fn().mockResolvedValue(initialMtime),
+      writeFile: vi.fn().mockResolvedValue(undefined)
+    }
+  }
 
   let fs: ReturnType<typeof createFs>
   let dm: DocumentManager

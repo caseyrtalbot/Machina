@@ -15,11 +15,17 @@ function flushAsyncWork(): Promise<void> {
 
 const path = '/vault/note.md'
 
-const createFs = () => ({
-  readFile: vi.fn().mockResolvedValue('# Note'),
-  getFileMtime: vi.fn().mockResolvedValue('2026-06-01T00:00:00.000Z'),
-  writeFile: vi.fn().mockResolvedValue(undefined)
-})
+const createFs = () => {
+  const readFile = vi.fn().mockResolvedValue('# Note')
+  return {
+    readFile,
+    // Mirror the real FileService: readFileBytes reads the same file as
+    // readFile, so tests that re-mock readFile flow through open() too.
+    readFileBytes: vi.fn(async (p: string) => Buffer.from(await readFile(p))),
+    getFileMtime: vi.fn().mockResolvedValue('2026-06-01T00:00:00.000Z'),
+    writeFile: vi.fn().mockResolvedValue(undefined)
+  }
+}
 
 beforeEach(() => {
   vi.useFakeTimers()

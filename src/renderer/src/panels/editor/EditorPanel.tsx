@@ -302,12 +302,17 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     frontmatterRawRef.current = parsed.raw
     setFrontmatterData(parsed.data)
 
+    // Loading a file into Tiptap is not a user edit. Tiptap 3 flipped
+    // setContent's `emitUpdate` default to true, so without this flag the load
+    // fires onUpdate → handleUpdate → doc.update, rewriting the file through the
+    // lossy markdown round-trip on open (corrupts code/binary, silently
+    // re-serializes untouched notes). emitUpdate:false makes open a pure load.
     const manager = editor.storage.markdown?.manager
     if (manager) {
       const json = manager.parse(parsed.body)
-      editor.commands.setContent(json)
+      editor.commands.setContent(json, { emitUpdate: false })
     } else {
-      editor.commands.setContent(parsed.body)
+      editor.commands.setContent(parsed.body, { emitUpdate: false })
     }
 
     // Scroll to heading if navigated via [[Note#heading]]
@@ -362,7 +367,11 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
         frontmatterRawRef.current = parsed.raw
         setFrontmatterData(parsed.data)
         if (ed) {
-          ed.commands.setContent(manager ? manager.parse(parsed.body) : parsed.body)
+          // Re-parsing already-saved source text into Tiptap is a display
+          // sync, not a fresh edit — don't emit onUpdate (see load effect).
+          ed.commands.setContent(manager ? manager.parse(parsed.body) : parsed.body, {
+            emitUpdate: false
+          })
         }
         prevLoadedPathRef.current = resolvedPathRef.current
       }

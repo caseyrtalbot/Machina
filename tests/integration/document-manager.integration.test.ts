@@ -12,13 +12,18 @@ type DocEvent = Parameters<DocumentEventCallback>[0]
 
 interface MockFileService extends FileService {
   readFile: Mock<FileService['readFile']>
+  readFileBytes: Mock<FileService['readFileBytes']>
   writeFile: Mock<FileService['writeFile']>
   getFileMtime: Mock<FileService['getFileMtime']>
 }
 
 function createMockFs(): MockFileService {
+  const readFile = vi.fn<FileService['readFile']>().mockResolvedValue('initial content')
   return {
-    readFile: vi.fn<FileService['readFile']>().mockResolvedValue('initial content'),
+    readFile,
+    // Delegates to readFile so open()'s read still registers as a readFile
+    // call — keeps existing call-count/arg assertions valid.
+    readFileBytes: vi.fn(async (path: string) => Buffer.from(await readFile(path))),
     writeFile: vi.fn<FileService['writeFile']>().mockResolvedValue(undefined),
     getFileMtime: vi.fn<FileService['getFileMtime']>().mockResolvedValue('2024-01-01T00:00:00Z')
   } as MockFileService

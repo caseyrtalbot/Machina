@@ -9,11 +9,17 @@ describe('DocumentManager autosave failures', () => {
   const path = '/vault/note.md'
   const initialMtime = '2026-03-30T00:00:00.000Z'
 
-  const createFs = () => ({
-    readFile: vi.fn().mockResolvedValue('# Note'),
-    getFileMtime: vi.fn().mockResolvedValue(initialMtime),
-    writeFile: vi.fn()
-  })
+  const createFs = () => {
+    const readFile = vi.fn().mockResolvedValue('# Note')
+    return {
+      readFile,
+      // Mirror the real FileService: readFileBytes reads the same file as
+      // readFile, so tests that re-mock readFile flow through open() too.
+      readFileBytes: vi.fn(async (p: string) => Buffer.from(await readFile(p))),
+      getFileMtime: vi.fn().mockResolvedValue(initialMtime),
+      writeFile: vi.fn()
+    }
+  }
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -62,11 +68,15 @@ describe('DocumentManager autosave failures', () => {
 describe('DocumentManager saveContent on open documents', () => {
   const path = '/vault/note.md'
 
-  const createFs = () => ({
-    readFile: vi.fn().mockResolvedValue('# Note with [[Old Name]]'),
-    getFileMtime: vi.fn().mockResolvedValue('2026-03-30T00:00:00.000Z'),
-    writeFile: vi.fn().mockResolvedValue(undefined)
-  })
+  const createFs = () => {
+    const readFile = vi.fn().mockResolvedValue('# Note with [[Old Name]]')
+    return {
+      readFile,
+      readFileBytes: vi.fn(async (p: string) => Buffer.from(await readFile(p))),
+      getFileMtime: vi.fn().mockResolvedValue('2026-03-30T00:00:00.000Z'),
+      writeFile: vi.fn().mockResolvedValue(undefined)
+    }
+  }
 
   it('emits external-change when replacing an open doc with different content', async () => {
     const fs = createFs()

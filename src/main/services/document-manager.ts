@@ -3,6 +3,24 @@ import { FileService } from './file-service'
 const AUTOSAVE_DELAY_MS = 1000
 const PENDING_WRITE_TIMEOUT_MS = 2000
 
+/** How many leading bytes to scan when deciding if a file is binary. */
+const BINARY_SNIFF_BYTES = 8000
+
+/**
+ * Git's binary heuristic: a NUL byte in the leading window means non-text.
+ * Valid UTF-8 text never contains U+0000, so false positives on real notes are
+ * effectively nil. Scanning bytes (not a decoded string) avoids fully decoding
+ * a large binary just to reject it, and avoids the destructive UTF-8 decode
+ * entirely for the reject path.
+ */
+function isBinaryContent(bytes: Buffer): boolean {
+  const limit = Math.min(bytes.length, BINARY_SNIFF_BYTES)
+  for (let i = 0; i < limit; i++) {
+    if (bytes[i] === 0) return true
+  }
+  return false
+}
+
 interface Document {
   readonly path: string
   content: string
@@ -62,7 +80,20 @@ export class DocumentManager {
       return { content: existing.content, version: existing.version }
     }
 
-    const [content, mtime] = await Promise.all([this.fs.readFile(path), this.fs.getFileMtime(path)])
+    const [bytes, mtime] = await Promise.all([
+      this.fs.readFileBytes(path),
+      this.fs.getFileMtime(path)
+    ])
+
+    // A binary file must never become an editable, autosave-eligible Document:
+    // decoding it as UTF-8 mangles it (U+FFFD for every undecodable byte) and
+    // the first autosave writes that garbage back, destroying the file. Reject
+    // here — the single chokepoint every editor write funnels through — so no
+    // update()/saveToDisk() path can ever touch a binary file.
+    if (isBinaryContent(bytes)) {
+      throw new Error(`Refusing to open binary file as text: ${path}`)
+    }
+    const content = bytes.toString('utf-8')
 
     const doc: Document = {
       path,

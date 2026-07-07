@@ -4,11 +4,15 @@ import { DocumentManager } from '../../src/main/services/document-manager'
 // Mock FileService
 function createMockFs(files: Record<string, { content: string; mtime: string }> = {}) {
   const store = { ...files }
+  const readFile = vi.fn(async (path: string) => {
+    if (!store[path]) throw new Error(`ENOENT: ${path}`)
+    return store[path].content
+  })
   return {
-    readFile: vi.fn(async (path: string) => {
-      if (!store[path]) throw new Error(`ENOENT: ${path}`)
-      return store[path].content
-    }),
+    readFile,
+    // Delegates to readFile so open()'s read still registers as a readFile
+    // call — keeps existing call-count/arg assertions valid.
+    readFileBytes: vi.fn(async (path: string) => Buffer.from(await readFile(path))),
     writeFile: vi.fn(async (path: string, content: string) => {
       store[path] = { content, mtime: new Date().toISOString() }
     }),

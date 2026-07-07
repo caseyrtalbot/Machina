@@ -33,6 +33,15 @@ export class FileService {
     return readFile(path, 'utf-8')
   }
 
+  /**
+   * Read raw bytes without decoding. Lets callers sniff for binary content
+   * before committing to a UTF-8 decode that would replace undecodable bytes
+   * with U+FFFD and destroy the file on any write-back.
+   */
+  async readFileBytes(path: string): Promise<Buffer> {
+    return readFile(path)
+  }
+
   async writeFile(path: string, content: string): Promise<void> {
     try {
       await atomicWrite(path, content)
