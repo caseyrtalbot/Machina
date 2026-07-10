@@ -1,216 +1,169 @@
 # AGENTS.md
 
+Codex-specific instructions for `/Users/caseytalbot/Projects/thought-engine`.
+`CLAUDE.md` remains the fuller project reference. This file is intentionally curated from
+it rather than kept as a byte-identical mirror. `npm run sync:agents` is a no-op guard so
+the scoped instructions cannot be overwritten accidentally.
+
+## Read first
+
+For workstation-track work, reconstruct the live gate from disk before editing:
+
+1. `docs/architecture/workstation/HANDOFF.md` — current shipped state and next gate.
+2. `docs/architecture/workstation/PLAN.md` — locked vision, primitives, phases, invariants.
+3. The active phase spec — currently `docs/architecture/workstation/04-phase-2-specs.md`.
+4. `docs/architecture/workstation/01-interface-contracts.md` for any touched boundary.
+5. Any follow-up document named by the handoff.
+
+Trust those files over memory, older drafts, or stale line numbers. Use `rg` to re-locate
+symbols before editing. Phase 2 steps 1–7 are shipped and hardened. Casey resolved OQ7
+on 2026-07-09: Step 8 uses a curated ten-agent spectrum spanning guided, architecture,
+engineering, and raw-tool bridge roles; the active implementation must reconcile that
+decision into the handoff, PLAN, phase spec, and contracts before landing.
+
+The untracked `.agents/skills/thought-engine-council/` tree belongs to Casey. Do not edit,
+delete, stage, or commit it.
+
+## Multi-agent workflow
+
+- When two or more workstreams are independent, dispatch them in one wave with explicit,
+  non-overlapping file ownership. Keep integration and final decisions in the primary thread.
+- Give every delegated task its source-of-truth documents, acceptance criteria, and required
+  evidence. Agents may spawn narrower helpers, but they must not duplicate another agent's edits.
+- Use an independent cold read for changes to trust boundaries, attribution, harness scopes,
+  verification gates, or the built-in agent roster. Findings need file:line evidence and an
+  explicit clean/no-finding result for reviewed areas.
+- Review every agent diff before accepting it. Fresh verification is required after integration;
+  an agent's green focused test is evidence, not a completion claim for the combined tree.
+
 ## Commands
 
 ```bash
-npm run dev          # Start Electron app with HMR
-npm run dev:debug    # Dev with CDP debugging port (REMOTE_DEBUGGING_PORT=9222)
-npm run build        # Typecheck + build all (main, preload, renderer)
-npm run build:mac    # Build + package for macOS
-npm test             # Run all tests (vitest)
-npm run test:watch   # Vitest in watch mode
-npm run test:e2e     # Build + run Playwright e2e tests
-npm run test:live    # CDP health checks against running dev app
-npm run check        # lint + typecheck + test (quality gate)
-npm run typecheck    # Check both node and web tsconfigs
-npm run lint         # ESLint (flat config)
-npm run format       # Prettier
-npm run package      # Fast local .app build (no typecheck, no DMG)
-npm run package:install  # Package + copy to /Applications
-npm run mcp-server   # Build + run headless MCP CLI server
+npm run dev                 # Electron app with HMR
+npm run dev:debug           # Dev app with CDP on port 9222
+npm run check               # lint + node/web typecheck + Vitest
+npm run build               # typecheck + production build
+npm run test:e2e            # build + sequential Playwright e2e
+npm run test:live           # CDP checks against a running dev app
+npx vitest run <test-file>  # focused test
+npm audit --omit=dev        # production dependency audit
 ```
 
-Single test: `npx vitest run path/to/file.test.ts`
+For installs, use `--cache /tmp/npm-cache-te` because the normal npm cache may contain
+root-owned files.
 
-**npm workaround**: Cache has root-owned files. Use `--cache /tmp/npm-cache-te` for installs.
+## Git and change discipline
 
-## Git workflow
+- Start with `git status --short --branch` and inspect the relevant diff. Preserve all
+  unrelated dirty and untracked work.
+- Tasks land directly on `main`, one completed step per commit, when committing is in
+  scope. Do not introduce feature branches merely for ceremony.
+- Before any commit or completion claim, run fresh verification appropriate to risk. The
+  repository gate is `npm run check`, `npm run build`, dependency audit, relevant e2e or
+  built-app probe, and user-visible visual verification for UI work.
+- Some tracked files may have `skip-worktree`; inspect with `git ls-files -v | rg '^S'`
+  if an edit is missing from the diff.
+- E2E can dirty `e2e/fixtures/test-vault/.machina/state.json`; never include that runtime
+  mutation in a product change.
+- Never weaken or bypass a red gate. Record exact failures and root causes.
 
-- Commit directly to `main` per completed task. This explicitly overrides the global branch-before-commit rule (solo-dev decision by Casey; branches add ceremony without payoff here).
-- Mandatory pre-commit gate before every commit: full `npm run check` + build + dependency audit + visual verification. No shortcuts.
-- **Skip-worktree gotcha**: some files may be flagged skip-worktree, so Write/Edit changes are silently ignored by git. Check with `git ls-files -v | grep ^S` and clear with `git update-index --no-skip-worktree <file>`.
+## Architecture boundaries
 
-### Conductor worktree hygiene
+Machina has four code boundaries:
 
-Conductor (the parallel-agents Mac app) creates git worktrees outside this repo; closing a workspace window does not clean them up (2026-05-03: workspace `gwangju` left a 9.8 MB worktree + local-only branch after its work was already on main). Canonical sources of truth: local `~/Projects/thought-engine` on `main`, remote `caseyrtalbot/Machina` `main` — these must stay 0/0 ahead/behind; anything else is a hygiene failure.
+- Main/Node: `src/main/` — services, filesystem, PTYs, IPC authority.
+- Preload: `src/preload/` — typed `window.api` bridge.
+- Renderer/React: `src/renderer/src/` — panels, hooks, stores, visual state.
+- Shared: `src/shared/` — types, IPC contracts, pure engine code.
 
-- Push every Conductor branch (`git push -u origin <branch>`) before declaring work done; local-only branches are a data-loss risk.
-- Merge to `main` and push before archiving the workspace, then archive/delete through the Conductor UI (not by closing the window).
-- Verify afterward: `git worktree list && git branch` — expect only the canonical path and `main`. Clean leftovers with `git worktree remove <path>` then `git branch -D <branch>`, but never remove a worktree with unique commits or unstaged changes without showing the diff and getting explicit approval.
-- Never hand-edit a Conductor workspace directory; work in the UI or in this repo, never both.
-- If Casey says "I just made changes in Conductor," run this audit before doing anything else.
+`src/shared/engine/` must remain free of Electron and React dependencies. Renderer-only
+code may use `@renderer/*`; cross-process contracts belong under `@shared/*`.
 
-Electron app with three process boundaries:
+New IPC behavior follows the existing four-site pattern:
 
-| Process | Entry | Source |
-|---------|-------|--------|
-| Main (Node.js) | `src/main/index.ts` | IPC handlers (`ipc/`), services (`services/`) |
-| Preload (Bridge) | `src/preload/index.ts` | Exposes `window.api` with typed namespaces |
-| Renderer (Browser) | `src/renderer/src/main.tsx` | React app: `panels/`, `hooks/`, `store/`, `design/` |
-| Shared | (imported by all) | `src/shared/` — types, IPC contracts, pure engine kernel |
+1. Declare the channel/event in `src/shared/ipc-channels.ts`.
+2. Register a typed handler in `src/main/ipc/`.
+3. Expose it through `src/preload/index.ts`.
+4. Consume it through `window.api` in the renderer.
 
-**Engine kernel** (`src/shared/engine/`): Zero Electron/React dependencies. Both main process and renderer Web Workers import from here. Must stay dependency-free. `src/renderer/src/engine/` re-exports from `@shared/engine/`.
+Main owns workspace roots and security-relevant decisions. Do not trust renderer-supplied
+roots, harness identities, or approval state when main can resolve them authoritatively.
 
-**Dev/prod isolation**: `TE_DIR` (`src/shared/constants.ts`) resolves to `.machina-dev` in dev, `.machina` in production/tests.
+## Workstation safety invariants
 
-### Path Aliases
+- CLI-agent containment is post-persistence, not write prevention. Writes are already on
+  disk when reviewed; Approve commits them and Reject reverts them through git. UI and
+  docs must describe this honestly.
+- Rollback coverage is the approvals gate. Do not reintroduce the retired pre-run snapshot
+  or weaken watcher/queue/revert coverage without an equivalent evidence gate.
+- `AgentWriteWatcher` has its own ignore policy. Reusing vault-watcher ignores would blind
+  dotfiles, `.env`, and harness verification files.
+- Use `TE_DIR`; never hardcode `.machina`. Development uses `.machina-dev`. The deliberate
+  exception is `HARNESS_PROTECTED_GLOBS`, which covers both variants.
+- Harness creation is refuse-before-write. Calls with `overrides` constructively union
+  mandatory protected globs before validation; template-only calls must instead refuse a
+  defective template that omits them. In both paths, validate scope, lint, and prove the
+  generated frontmatter round-trips before `mkdir` or file output.
+- `HarnessRunRegistry` is the thread-to-agent attribution authority. Thread frontmatter is
+  display/persistence input, not authority. Bindings snapshot the authoritative adapter;
+  a positively known adapter/identity mismatch fails closed before PTY input.
+- Ad-hoc `cli-raw` remains a plain PTY with structured input disabled. A harness-bound raw
+  turn requires a main-validated, single-line invocation template containing a standalone
+  `{prompt}` command word; every placeholder is unquoted/unescaped in one hook-observable
+  simple command. Reject controls, DEL/C1 bytes, lone UTF-16 surrogates, arithmetic/
+  subscript contexts, unstable spacing/escapes, interactive history expansion, and
+  unquoted literal arguments after the executable. Prompt substitution is single-quoted,
+  the final PTY command is validated, and the executable is alias-stabilized. Same-named
+  shell functions remain an explicit shell-resolution caveat. The template is snapshotted
+  in the main-owned binding, never trusted from renderer thread state.
+- All agent-originated PTY input continues through the spawner and `writeAgentInput` so
+  write arbitration and attribution-window ordering remain intact; never write a raw
+  harness command directly to a PTY. Queue refusal must roll back both the raw expectation
+  and the turn window.
+- A harness run lints, prompts, and binds from one main-read snapshot. Required harness
+  files and `handoffs/` must remain regular, realpath-confined entries; never follow a leaf
+  symlink into prompt or verification content.
+- Preserve degrade-not-fail semantics where the contracts require them, but surface
+  degraded containment visibly and audit the coverage gap.
+- Renderer IPC timeouts are non-cancelling. A timed-out agent delivery, spawn, harness run,
+  or thread save is `indeterminate`, not retryable success/failure. Keep the late operation
+  attached, replay Stop onto late native run ids when possible, and keep sending blocked
+  until main-originated completion/refusal settles it. Thread deletion/close must tombstone
+  late work; workspace switches fence stale dispatch state without auto-killing
+  old-workspace PTYs unless OQ8 is separately ratified.
+- Extend existing stores, IPC maps, adapters, and dock patterns rather than creating a
+  parallel implementation.
 
-| Alias | Resolves to | Available in |
-|---|---|---|
-| `@shared/*` | `src/shared/*` | main, preload, renderer |
-| `@renderer/*` | `src/renderer/src/*` | renderer only |
-| `@engine/*` | `src/renderer/src/engine/*` | renderer only |
+## Implementation conventions
 
-### IPC Pattern
+- TypeScript strict mode; Prettier uses single quotes, no semicolons, 100-column width.
+- Prefer immutable updates. Zustand tests reset with
+  `store.setState(store.getInitialState())` in `beforeEach`.
+- Keep files below 800 lines. `thread-store.ts` is already over the threshold; do not grow
+  it.
+- Use `Result<T>` for expected engine failures and branded ids where established.
+- Critical renderer-to-main calls use `withTimeout(call, ms, label)`.
+- User-edit content pushes happen in user-action callbacks, never a syncing `useEffect`.
+- UI uses `design/tokens.ts`, theme CSS variables, and existing components. Do not hardcode
+  hex colors or arbitrary pixel values. Machina is dark-only with runtime accent changes.
+- Preserve terminal/block behavior and latency; PTY migration reprojects a live session
+  and must not silently kill or duplicate it.
 
-`typedHandle('channel', handler)` in main → `typedInvoke('channel', args)` in preload → `window.api.namespace.method()` in renderer. Namespaces: `fs`, `vault`, `config`, `document`, `shell`, `terminal`, `claude`, `agent`, `agentNative`, `thread`, `cliThread`, `canvas`, `health`, `app`, `lifecycle`, `on` (events).
+## Testing and UI evidence
 
-**Adding a new IPC channel (4 steps):**
-1. Declare in `IpcChannels` or `IpcEvents` in `src/shared/ipc-channels.ts`
-2. Register `typedHandle(...)` in the appropriate `src/main/ipc/*.ts` file
-3. Expose in `src/preload/index.ts` under the right namespace
-4. Call via `window.api.namespace.method()` in renderer
+- Unit tests use Vitest/happy-dom; Node integrations declare
+  `// @vitest-environment node`; e2e is serial Playwright.
+- Test contracts and failure behavior, not only successful rendering. Security-relevant
+  input paths need negative tests that prove nothing was written.
+- Built-app probes should wait for boot/reload to settle before `page.evaluate`; locator
+  waits survive navigation, evaluate contexts do not.
+- Non-packaged Electron runs share Application Support state. Treat surprising persisted
+  state as a possible test contaminant before changing product behavior.
+- Drive CDP/Playwright checks directly. Ask Casey only for genuinely visual acceptance,
+  phrased as user-visible actions rather than DevTools or localStorage instructions.
 
-All four sites bind to the same generic map — TypeScript catches mismatches at every step.
+## Compaction priorities
 
-### Data Flow: Vault File Changes
-
-```
-Disk (chokidar) → vault-watcher.ts (batches)
-  → IPC: vault:files-changed-batch → vault-event-hub.ts (fans out)
-  → useVaultWorker → vault-worker.ts (parse + graph off main thread)
-  → postMessage → vault-store.setWorkerResult (atomic update)
-```
-
-### Data Flow: Document Editing
-
-```
-User types → editor-store.setContent (dirty=true)
-  → window.api.document.update → DocumentManager (1s autosave debounce)
-  → file-service.ts (atomic write) → vault-watcher suppressed via _pendingWrites
-```
-
-Content pushes happen in user-action callbacks (`handleUpdate`, `onFrontmatterChange`), **never via useEffect**.
-
-### DocumentManager (main process)
-
-Single owner of all open file content. Renderer views are thin IPC clients via `useDocument(path)`. Channels: `doc:open/close/update/save/save-content`; events: `doc:external-change/conflict/saved`. Self-write suppression via `_pendingWrites`. Conflict detection uses content comparison (not mtime) for cloud sync compatibility.
-
-### Canvas Mutations (Snapshot-and-Plan)
-
-Automated canvas changes (folder map, ontology, agents) use optimistic concurrency:
-1. `canvas:get-snapshot` → current file + mtime
-2. Build `CanvasMutationPlan` (`canvas-mutation-types.ts`) with add/move/resize/remove ops
-3. `canvas:apply-plan` with `expectedMtime` — rejects `'stale'` if file changed
-4. `filterCanvasAdditions()` deduplicates against existing state
-
-### MCP Server
-
-Twelve tools: `vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot` (reads); `vault.write_file`, `vault.create_file`, `canvas.apply_plan` (writes gated by TimeoutHitlGate + WriteRateLimiter). The three `vault.*` tools are also registered under `workspace.*` aliases (same handlers; the invoked name flows into the Spotlighting envelope and gate prompt). Auto-denies after 30s with no user response. Tools that return raw vault-derived content (`vault.read_file`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`) wrap results in Spotlighting trust markers; structured-JSON tools (`search.query`, `graph.get_neighbors`) do not. `mcp-cli.ts` provides headless stdio mode and registers reads only (7 tools — no writes, no gate). The in-process MCP server in `mcp-lifecycle.ts` is built but not transport-connected in production. See `docs/architecture/safety-subsystem.md` for the full safety story (HITL gate, audit, Spotlighting, PathGuard) and known gaps.
-
-### Terminal Webview Isolation
-
-Terminal runs in an Electron `<webview>` with its own preload (`src/preload/terminal-webview.ts`) and separate IPC bridge. Keeps xterm.js and PTY data off the main renderer thread.
-
-### Block Protocol (structured shell sessions)
-
-Shell hooks (`resources/shell-hooks/te.{zsh,bash,fish}`) emit OSC `1337;te-…` markers around prompts and commands so the engine can convert the raw PTY stream into structured `Block` records (prompt + command + output + exit + cwd). `PtyService` exports `TE_SESSION_ID` so hooks activate inside thought-engine PTYs only. `BlockDetector` (`src/shared/engine/block-detector.ts`, pure) parses markers; `BlockWatcher` (`src/main/services/block-watcher.ts`) folds events into `Block` snapshots via the immutable transitions in `src/shared/engine/block-model.ts`. Each transition fires a `block:update` IPC event (`window.api.on.blockUpdate`). The renderer consumes these via a module-level `window.api.on.blockUpdate` subscription in `block-store` (per-session ordered list), and projects entries onto the canvas via the `terminal-block` card type. Secret spans flagged by `scanSecrets` are masked at render time using `block.outputText` offsets and `block-output-segments`; a per-card click-to-reveal toggle un-masks for that one card only. Wire format and degraded-mode behavior in `docs/architecture/block-protocol.md`. Hooks no-op when `TE_SESSION_ID` is unset, so they're safe in shared rc files.
-
-### PTY Write Arbitration
-
-All `PtyService` writes route through a per-session `PtyWriteQueue` (`src/main/services/pty-write-queue.ts`) with single-flight drain. `PtyWrite` is a discriminated union of `bytes | agent-input`, exposed as `write` / `sendRawKeys` / `writeAgentInput`. Use `writeAgentInput` for agent-originated input — keeps it distinguishable from human keystrokes for future policy gating.
-
-### Coordinated Quit (2-phase)
-
-```
-before-quit → preventDefault → typedSend('app:will-quit')
-  → renderer flushes state + canvas + dirty docs → 'app:quit-ready'
-  → main: documentManager.flushAll() + cleanup → app.quit()
-```
-
-### Key Subsystems
-
-- **Knowledge Engine** (`src/shared/engine/`): parser.ts (gray-matter, JS disabled) → graph-builder.ts (7 relationship kinds with provenance: `connection`, `cluster`, `tension`, `appears_in`, `related`, `co-occurrence`, `derived_from` — `RELATIONSHIP_KINDS` in `src/shared/types.ts`) → ghost-index.ts. search-engine.ts: MiniSearch (title x10, tags x5, body x1). All runs in vault-worker.ts Web Worker.
-- **Canvas** (`panels/canvas/`): React DOM with a CSS-transform pan-zoom layer (`CanvasSurface.tsx`: `translate(x,y) scale(zoom)`), **not** Pixi — Pixi.js drives only the graph view (`panels/graph/graph-renderer.ts`). 12 card types (`CanvasNodeType` in `src/shared/canvas-types.ts`): `text`, `note`, `terminal`, `code`, `markdown`, `image`, `pdf`, `project-file`, `system-artifact`, `file-view`, `project-folder`, `terminal-block`. Click-to-focus, click-again-to-interact. `terminal-block` cards project an entry in `block-store`; pinned via the `+` action on a `TerminalCard`.
-- **Ontology** (`engine/ontology-*`): Tag-first grouping with link-analysis fallback, computed in ontology-worker.ts. `GroupProvenance` tracks source (user tags, links, AI).
-- **Agents**: Two paths. Both run outside the MCP safety subsystem, but not equally guarded (see sub-bullets). PTY agent monitoring stays live via `pty-monitor.ts` → `agent:get-states` / `agent:states-changed`. See `docs/architecture/safety-subsystem.md`; the decision to keep path (1) on `@anthropic-ai/sdk` (no Claude Agent SDK migration) is recorded in `docs/architecture/adr/0001-native-agent-stays-on-anthropic-sdk.md`.
-  - **Path (1) — in-app native agent**: via `machina-native-agent.ts` (`@anthropic-ai/sdk` `messages.stream` with a tool loop over `NATIVE_TOOLS` / `machina-native-tools.ts`). IPC: `window.api.agentNative`.
-  - **Path (1) guards**: PathGuard (`resolveInVault`) on note ops, per-write HITL approval (skipped under autoAccept, but forced when the per-run write-velocity limiter trips), and append-only audit logging on every successful write; no read-time Spotlighting. `write_note`/`edit_note` route their final write through the shared `writeStampedNote` helper (`src/main/utils/note-write.ts`) — the single safe-write mechanics now also used by `VaultQueryFacade.writeFile` — so native writes stamp `modified_by`/`modified_at` provenance and suppress the vault-watcher self-echo via `DocumentManager.registerExternalWrite` (injected as an optional `documentManager` `ToolContext` field); the body is preserved verbatim (a leading `---` is never re-parsed). Canvas writes use a strict id regex (`CANVAS_ID_RE`, fast first reject) and then route through PathGuard (`resolveInVault`) for the symlink/traversal backstop.
-  - **Path (2) — CLI thread spawner**: via `cli-thread-spawner.ts` — owns a per-thread PTY running `cli-claude` / `cli-codex` / `cli-gemini` / `cli-raw`; invocations are formatted by the adapter registry (`src/shared/agent-adapters.ts`, pure and renderer-importable: per-adapter `formatInvocation`, optional `parseEvent`, spike-verified model rosters — gemini's roster is empty, raw has none). A model flag is emitted only for an explicit pick validated at the IPC boundary (`resolveModelPick`: membership in `adapter.models` + charset regex; absent, unknown, or the `DEFAULT_NATIVE_MODEL` filler ⇒ adapter default with no flag, rejected explicit picks audited). Harness runs compose their first-turn prompt main-side via `harness:run` (`harness-run.ts`), which records a write-once thread↔slug binding in `HarnessRunRegistry` (persisted under userData) as the attribution authority — frontmatter `agent_id` is display-only; forwarded agentIds on spawn/input are validated at the IPC boundary (`resolveRequestedAgentId`) with degrade-not-fail semantics (mismatch/unknown ⇒ adapter identity + `cli-agent:attribution-mismatch` audit + `attributionSuspect` flag, never a blocked turn). `cli-raw` is the fallback adapter for unknown CLIs: plain PTY, no parser/resume/models, thread input disabled until harness-supplied templates arrive (workstation step 8). IPC: `window.api.thread`.
-  - **Path (2) containment**: trusted to the user's level (no PathGuard, no pre-write gate); its workspace writes are contained after the fact by the post-persistence approvals gate — `cli-turn-registry.ts` attributes each turn's writes, `agent-write-watcher.ts` routes them into the approval queue, and resolving from the tray commits with `Machina-Agent`/`Machina-Session` trailers (`git-service.ts:commitApproved`), reverts via git (`discard`), or undoes an agent wholesale (`revertAgent`); the pre-run snapshot (`commitPreAgentSnapshot`) was retired in workstation step 5 after the G1–G8 evidence gate (`docs/architecture/workstation/03-snapshot-retirement-evidence.md`).
-  - **Watcher health**: five-state health model (`starting/watching/degraded/down/stopped`, `WatcherHealth` in `git-types.ts`) broadcast over `approvals:watcher-health`: failures degrade visibly — tray warning badge/banner + Retry (`approvals:watcher-retry`), capped-backoff same-root restarts in `ipc/git.ts` that preserve the queue (only workspace-switch init clears it), a recovery audit entry for the coverage gap — and never block turns; turns opened while unhealthy are flagged `gateDegraded` and surfaced on CLI thread panels (chip + one-time notice).
-- **Block Protocol**: shell hooks → OSC markers → `BlockDetector` → `BlockWatcher` → `block:update` IPC → renderer `block-store` → `terminal-block` `BlockCard` (DOM, not Pixi). See dedicated subsection above and `docs/architecture/block-protocol.md`.
-- **System Artifacts**: Structured markdown in `.machina/artifacts/{sessions,patterns,tensions}/`. Schemas in `system-artifacts.ts`.
-- **Web Workers**: vault-worker (parse+graph), graph-physics-worker (D3-force), ontology-worker (grouping+layout), project-map-worker (filesystem→canvas).
-
-### Panel Architecture
-
-KeepAlive: panels mount once, then `display: none` on tab switch (preserves terminal state). Heavy panels (Canvas, GraphView, Ghosts) use `React.lazy`.
-
-### State Management (Zustand)
-
-| Store | Owns |
-|-------|------|
-| vault-store | Files, artifacts, graph, vault path/config, fileToId map |
-| editor-store | Active note, mode (rich\|source), dirty, content, cursor, tabs, nav history |
-| canvas-store | Nodes, edges, viewport, selection, split editor |
-| graph-view-store | Viewport, hover/selected node, force params |
-| thread-store | Threads, messages, streaming, dock tabs/layout, in-flight + runId per thread |
-| block-store | Per-session ordered terminal `Block` records |
-| ui-store | Per-note UI state (backlink expansion), persisted via IPC |
-| settings-store | Accent (preset id + custom hex), opacity, blur, font sizes, density/radii/backgroundTint/canvasGrid (localStorage) |
-| claude-status-store | Claude CLI availability/status |
-| sidebar-filter-store | Sidebar file-tree filter state |
-| sidebar-selection-store | Sidebar selection state |
-| vault-health-store | Vault health monitor results |
-
-Persistence: `vault-persist.ts` → `.machina/state.json` on 1s debounce. See Coordinated Quit for shutdown.
-
-### Rich Text Editor
-
-Tiptap 3 with markdown round-tripping. Extensions: slash commands, bubble menu, callouts (`> [!TYPE]`), highlights (`==text==`), concept nodes (`<node>term</node>`), wikilinks (`[[title]]` with CMD+click), mermaid, drag handles. Only ship block types with clean markdown round-trip.
-
-### Design System
-
-Three-layer material: canvas void (darkest) → cards (semi-transparent + blur) → glass overlays (floating UI). **Dark-only**, with a runtime-selectable accent: `ACCENT_PRESETS` in `design/accent-presets.ts` (default `ember`, `#ff8c5a`) plus a `custom` hex, stored as `accentId`/`customAccentHex` in `settings-store` and applied via `applyAccentCssVars` (`design/apply-accent.ts`). `EnvironmentSettings` (`design/themes.ts`) exposes opacity, header darkness, blur, grid-dot visibility, font sizes, `density`, `radii`, `backgroundTint`, and `canvasGrid`. OKLCH palette is used for per-artifact colors via `getArtifactColor(type)`.
-
-- Import from `design/tokens.ts` — never hardcode hex or px
-- Theme CSS vars: `--color-bg-base`, `--color-text-primary`, `--color-accent-default`, etc. — resolved at startup; only accent vars are reapplied (via `applyAccentCssVars`) when the user changes accent
-- `getArtifactColor(type)` for per-type colors
-- Animation keyframes prefixed `te-`
-- For Pixi / mermaid / other non-CSS consumers that need a resolved hex, read CSS vars via `getComputedStyle`; note accent vars can change at runtime when the user picks a new accent
-
-## Type Conventions
-
-- **`Result<T>`**: `{ ok: true; value: T } | { ok: false; error: string }` — engine returns these instead of throwing (`src/shared/engine/types.ts`)
-- **Branded types**: `SessionId = string & { readonly __brand: 'SessionId' }` with constructor `sessionId(id)`. Prevents mixing IDs at compile time.
-- **Enum-like constants**: `as const` arrays + derived union type + `satisfies Record<...>` for exhaustiveness.
-
-## Testing
-
-- **Unit**: Vitest with happy-dom. `tests/` mirrors `src/` for pure logic; `src/**/__tests__/` for colocated component tests.
-- **Integration**: `// @vitest-environment node` at file top for tests needing real Node APIs.
-- **Store tests**: Reset via `store.setState(store.getInitialState())` in `beforeEach`.
-- **E2E**: Playwright with `workers:1`, `test.describe.serial`. Test vault at `e2e/fixtures/test-vault/`.
-- **Quality gate**: `npm run check` must pass clean (zero lint errors, zero type errors).
-- **Claude drives DevTools**: Casey is unfamiliar with this project's DevTools/localStorage/CDP workflows (multi-window Electron + xterm-webview + Pixi; his words, 2026-05-01). Never hand him "open DevTools, run X, flip Y in localStorage" steps. Prefer code paths over runtime toggles (build-env feature flag, settings-panel toggle, a `scripts/` CLI that flips `.machina/state.json`, or the `npm run dev:debug` CDP target Claude drives directly). If a localStorage flip is mandatory, auto-set it in code. Frame visual-verify asks in user-visible terms ("click the thread sidebar's +"), not inspector terms.
-
-## Code Style
-
-- **Prettier**: single quotes, no semicolons, 100 char width
-- **TypeScript**: Strict mode. `_`-prefixed names exempt from unused-vars lint.
-- **Tailwind v4**: Via Vite plugin. Token system in `design/tokens.ts`.
-- **Immutable data**: Return new copies, never mutate in-place.
-- **Files under 800 lines**, organized by feature/domain.
-- **IPC timeouts**: Wrap critical IPC calls with `withTimeout(call, ms, label)` to prevent renderer hangs.
-- **Buffer shim**: `main.tsx` shims `globalThis.Buffer` before gray-matter import — required for frontmatter parsing in browser context.
-
-## Compact Instructions
-
-Always preserve across context compaction:
-- IPC channel contracts and process ownership (main vs renderer vs preload)
-- Active plan file paths, current step, and completion status
-- Process boundary and data flow decisions
-- Verification evidence (test output, build results, type-check results)
-- Error corrections and root causes, especially IPC or Electron-specific
-- Design system token values and theme decisions
+Preserve the active plan and step, verification evidence, agent findings, corrected root
+causes, and architecture decisions. Deprioritize dead-end searches and raw outputs that
+have already been summarized.

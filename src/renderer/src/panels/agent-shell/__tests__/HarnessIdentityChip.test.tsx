@@ -8,6 +8,11 @@ import { render, screen, act } from '@testing-library/react'
 import { HarnessIdentityChip } from '../HarnessIdentityChip'
 
 const binding = vi.fn()
+const bound = {
+  slug: 'test-fixer',
+  adapter: 'claude' as const,
+  rawInvocationReady: false
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -17,7 +22,7 @@ beforeEach(() => {
 
 describe('HarnessIdentityChip', () => {
   it('renders the bound slug from the main-side binding', async () => {
-    binding.mockResolvedValue({ slug: 'test-fixer' })
+    binding.mockResolvedValue(bound)
     render(<HarnessIdentityChip threadId="t1" />)
     const chip = await screen.findByTestId('thread-harness-chip')
     expect(chip.textContent).toBe('harness test-fixer')
@@ -41,7 +46,7 @@ describe('HarnessIdentityChip', () => {
     await act(async () => {})
     expect(screen.queryByTestId('thread-harness-chip')).toBeNull()
 
-    binding.mockResolvedValue({ slug: 'test-fixer' })
+    binding.mockResolvedValue(bound)
     rerender(<HarnessIdentityChip threadId="t1" agentId="test-fixer" />)
     const chip = await screen.findByTestId('thread-harness-chip')
     expect(chip.textContent).toBe('harness test-fixer')
@@ -49,7 +54,7 @@ describe('HarnessIdentityChip', () => {
   })
 
   it('re-fetches on threadId change and drops the previous slug while unbound', async () => {
-    binding.mockResolvedValue({ slug: 'test-fixer' })
+    binding.mockResolvedValue(bound)
     const { rerender } = render(<HarnessIdentityChip threadId="t1" />)
     await screen.findByTestId('thread-harness-chip')
 

@@ -6,23 +6,24 @@ design, with grafts from the runners-up folded in below), grounded in four disk-
 investigation dossiers (symlinked-parent hardening — landed as `660dc56` / contracts
 v1.1.5; agentId authority; watcher health; Phase-2 seam map). Each step is one grabbable
 unit of work ending in a green `npm run check` and a main commit (repo convention: no
-feature branches; full pre-commit gate). Contracts: `01-interface-contracts.md` v1.1.5.
+feature branches; full pre-commit gate). Contracts: `01-interface-contracts.md` v1.2.8.
 Every file:line below was disk-verified at `660dc56` (the `harness-service.ts` anchors
 re-verified after that commit's own hardening shifted the file) — **re-verify with `rg`
 against disk before editing**; steps land sequentially and move each other's code (and
 this repo has used git skip-worktree bits: check `git ls-files -v` before trusting a
 silent Write).
 
-**Phase 2 scope (PLAN.md, binding — do not re-litigate):** template gallery (~5) + blank
-builder; adapter registry (Claude Code, Codex, Gemini + raw-CLI fallback); model
+**Phase 2 scope (PLAN.md, binding — do not re-litigate):** template gallery (PLAN said
+~5; OQ7 resolves the exact roster to 10) + blank builder; adapter registry (Claude Code,
+Codex, Gemini + raw-CLI fallback); model
 aliasing; two-projection agent view (structured thread ⇄ raw PTY); budget stack + kill
 switch + circuit breakers; harness linter; per-agent revert UI. Exit bar: create a
 non-template agent from blank in <5 min; kill switch halts a runaway loop; harness
 linter flags a broken scope contract.
 
 **Recorded interpretation (judge hazard, resolved here):** PLAN's "kill switch halts a
-runaway *loop*" predates the phase split — Loops are Phase 3. For Phase 2's exit bar,
-*runaway loop := runaway turn/agent* (a scripted write-loop turn). The Phase-3 loop
+runaway _loop_" predates the phase split — Loops are Phase 3. For Phase 2's exit bar,
+_runaway loop := runaway turn/agent_ (a scripted write-loop turn). The Phase-3 loop
 scheduler inherits the same kill/breaker machinery; this interpretation is recorded so
 the exit bar is not quietly weaker than PLAN's sentence.
 
@@ -50,10 +51,11 @@ Cross-step rules:
   end (parallel-session rule).
 - **Doc reconciliation is part of each step, not the phase close** (judge hazard): a step
   that adds a subsystem (health model, binding registry, breaker, linter) updates
-  CLAUDE.md's relevant section in the same commit and syncs AGENTS.md with
-  `npm run sync:agents` (a deterministic byte-identical mirror — never hand-edit, never
-  Codex; the Codex regen was retired at step 1 as pure ceremony). Phase close adds a full
-  doc-reconciliation pass (overview, safety-subsystem, HANDOFF).
+  the relevant project instructions in the same commit. `CLAUDE.md` remains the fuller
+  reference; tracked `AGENTS.md` is deliberately Codex-curated and may be edited
+  intentionally. `npm run sync:agents` is a no-op guard and must not overwrite either
+  file. Phase close adds a full doc-reconciliation pass (overview, safety-subsystem,
+  HANDOFF).
 - **Parallel-session map** (dependency-graph lens, judge-verified, tightened by the
   verify pass): **only 1∥2 and 4∥7 are parallel-safe** (disjoint files; only append-only
   hotspot ends collide — latecomer rebases trivially). Every other pair is sequential in
@@ -84,11 +86,11 @@ graph TD
 ## Step 1 — Adapter registry + session-types + model aliasing (+ raw fallback)
 
 > **DONE** (`18cc29d`, 2026-07-06, contracts v1.2). Spike-verified flags: `claude
-> --model` / `codex -m` (exec + exec resume) / `gemini -m`; gemini ships `models: []`
+--model` / `codex -m` (exec + exec resume) / `gemini -m`; gemini ships `models: []`
 > (no auth on the dev machine to verify ids — widen the roster only with a real spike).
 > Golden byte-exact invocation tables + built-app probe (real `--model` acceptance,
-> gemini reply-mirroring guard) are the regression harness. `cli-raw` thread input is
-> disabled until step 8's templates (OQ3).
+> gemini reply-mirroring guard) are the regression harness. Ad-hoc `cli-raw` thread input
+> remains disabled; v1.2.8 defines the separate main-bound raw-harness send path (OQ3).
 
 Land contracts §3 as code: `AdapterId`/`AgentAdapter`/`WorkstationSession`/
 `SessionProjection` in a new `session-types.ts`, with an adapter registry that absorbs
@@ -105,14 +107,15 @@ resume, PTY-only projection — PLAN Q8's "unknown CLIs work day one").
 
 **Contracts:** §3 flips from "Phase 2 target" to landed (v1.2). Records: the
 `cli-agent-session-types.ts` name-collision cross-reference (that module is CLI-agent
-*presence* types, unrelated — seam-map trap); `AgentAdapter.formatInvocation(prompt,
+_presence_ types, unrelated — seam-map trap); `AgentAdapter.formatInvocation(prompt,
 opts incl. model?)`; `raw` semantics (no parseEvent, no resume, invocation source per
 OQ3); a reserved optional permission-hook capability field (the OQ1 deferral seam); the
 gemini nuance restated (a heuristic parser exists in `cli-agent-parsers.ts` — "absent
-parseEvent = raw projection" is the *bridge* contract, not the file). §4's "Phase 2+"
+parseEvent = raw projection" is the _bridge_ contract, not the file). §4's "Phase 2+"
 line amended per the recorded OQ1 decision.
 
 **Model-flag trust rules (judge grafts, binding):**
+
 - A model flag is emitted ONLY for an explicit user pick validated against
   `adapter.models`; anything else — absent, unknown, or the persisted
   `DEFAULT_NATIVE_MODEL` filler that every existing CLI thread carries — falls back to
@@ -121,7 +124,7 @@ line amended per the recorded OQ1 decision.
 - Flag syntax per adapter is **spike-verified against the installed CLIs before
   landing** (5-minute terminal spike: `claude --model` / codex / gemini equivalents — do
   not trust training data), and the exit bar includes one real-invocation smoke per
-  adapter, because a probe asserting the block command *contains* the flag proves string
+  adapter, because a probe asserting the block command _contains_ the flag proves string
   construction, not CLI acceptance (judge hazard).
 
 **New:** `src/shared/session-types.ts` (§3 shapes verbatim; header cross-reference to
@@ -315,7 +318,7 @@ demoted to display-only (decode kept for UI titles). `git:revert-agent` id valid
 **trailer enumeration, not registry membership** (judge graft, explicit deviation from
 the item-3 dossier's req 4): the git-log trailer walk is the authority, so commits from
 pre-binding history, deleted harnesses, or a wiped userData stay revertable; post-binding,
-forged slugs can no longer *enter* trailers via Machina's own path, and forged-by-shell
+forged slugs can no longer _enter_ trailers via Machina's own path, and forged-by-shell
 trailers remain the accepted §4 forgery residual. §6 gains `harness:run`. v1.1.5
 residual #1 (read/exec-time realpath re-check) is discharged here and marked with a
 dated status line.
@@ -629,6 +632,7 @@ thread for maxTurns (OQ2); a breaker service escalates advisory signals to kill
 breakers contain accidents faster; they never claim prevention.
 
 **Contracts (v1.2.x):** §5 budgets ENFORCED with defined semantics —
+
 - `maxWritesPerMinute` = the limiter threshold, **per thread** (judge hazard resolved
   explicitly: `WriteRateLimiter` is keyed per thread at
   `agent-write-watcher.ts:133-134,297-300`, so N concurrent threads bound to one slug
@@ -729,36 +733,38 @@ streams to count internal turns.
 > the palette disable. `harness:lint` returns `[]` with no workspace (list semantics).
 > Fresh `npm run check` (3372 tests) + `npm run build` green. The built-app probe
 > `e2e/harness-lint.spec.ts` (exit-bar: strip protected globs on disk ⇒ lint violation
-> + palette entry greyed/aria-disabled with reason, run inert) was written in the
-> build session and EXECUTED GREEN post-merge (2026-07-07; two probe fixes: the
-> boot-settle guard against stale shared-electron-store state, and a `force: true`
-> click on the deliberately `aria-disabled` palette option, since Playwright
-> actionability otherwise waits for it to enable). The post-merge adversarial review
-> (Claude lenses + Codex cold read) found and the fix pass closed: (a)
-> `composeHarnessRun` now re-runs the lint composition main-side at run time and
-> refuses on any error-severity diagnostic — the run-time enforcement authority;
-> the palette disable is defense-in-depth against the list-time snapshot, not the
-> boundary (closes the TOCTOU where scope.json is tampered after palette open); (b)
-> a failed symlink-ancestry check now returns ONLY the ancestry error with no
-> content read through the link (name falls back to slug, adapter null — closes an
-> outside-workspace content leak into the palette); (c) new error codes
-> `scope-fields` (scope.json missing required goal/acceptance/rollback scalars —
-> also removed the unsound `as HarnessScope` cast) and `reserved-slug`
-> (hand-created adapter-identity dir now greys with reason instead of erroring at
-> run); (d) verify.sh mode-drift mask widened 0o777 → 0o7777 (setuid/sticky drift
-> visible). Review residuals recorded, not fixed: file-level symlinks inside a
-> harness dir (e.g. verify.sh symlinked outside) escape the dir-ancestry lint —
-> spec-scope was dir ancestry only, and in-app creation of such links is
-> auto-rejected by the watcher; a DANGLING agents-dir symlink still yields a silent
-> `[]` (readdir ENOENT is indistinguishable from no-agents-dir); the run-time lint
-> in `composeHarnessRun` reads real fs even when `deps.fs` is injected (no current
-> caller injects). Casey-observed flagged-harness check in the running app still
-> pending.
+>
+> - palette entry greyed/aria-disabled with reason, run inert) was written in the
+>   build session and EXECUTED GREEN post-merge (2026-07-07; two probe fixes: the
+>   boot-settle guard against stale shared-electron-store state, and a `force: true`
+>   click on the deliberately `aria-disabled` palette option, since Playwright
+>   actionability otherwise waits for it to enable). The post-merge adversarial review
+>   (Claude lenses + Codex cold read) found and the fix pass closed: (a)
+>   `composeHarnessRun` now re-runs the lint composition main-side at run time and
+>   refuses on any error-severity diagnostic — the run-time enforcement authority;
+>   the palette disable is defense-in-depth against the list-time snapshot, not the
+>   boundary (closes the TOCTOU where scope.json is tampered after palette open); (b)
+>   a failed symlink-ancestry check now returns ONLY the ancestry error with no
+>   content read through the link (name falls back to slug, adapter null — closes an
+>   outside-workspace content leak into the palette); (c) new error codes
+>   `scope-fields` (scope.json missing required goal/acceptance/rollback scalars —
+>   also removed the unsound `as HarnessScope` cast) and `reserved-slug`
+>   (hand-created adapter-identity dir now greys with reason instead of erroring at
+>   run); (d) verify.sh mode-drift mask widened 0o777 → 0o7777 (setuid/sticky drift
+>   visible). Review residuals recorded at step 7: file-level symlinks inside a
+>   harness dir (e.g. verify.sh symlinked outside) escape the dir-ancestry lint —
+>   spec-scope was dir ancestry only, and in-app creation of such links is
+>   auto-rejected by the watcher; a DANGLING agents-dir symlink still yields a silent
+>   `[]` (readdir ENOENT is indistinguishable from no-agents-dir); the run-time lint
+>   in `composeHarnessRun` reads real fs even when `deps.fs` is injected (no current
+>   caller injects). Casey-observed flagged-harness check in the running app still
+>   pending. The current unlanded step-8 hardening resolves the required-leaf-symlink and
+>   two-snapshot run-lint residuals; do not backport that claim to the step-7 commit.
 
-The linter's job is everything create-time validation cannot see (seam map §5):
-scope.json is never re-validated after create (hand-edits can strip
-`HARNESS_PROTECTED_GLOBS` undetected — `validateHarnessScope` has no post-create
-caller), verify.sh mode/presence drift is unchecked, malformed harnesses silently vanish
+The linter's job at step-7 design time was everything create-time validation could not see
+(seam map §5): scope.json was not re-validated after create (hand-edits could strip
+`HARNESS_PROTECTED_GLOBS` undetected — `validateHarnessScope` had no post-create
+caller), verify.sh mode/presence drift was unchecked, malformed harnesses silently vanished
 from the palette with no diagnostics (`harness-service.ts` skip-not-throw), and v1.1.5
 residual #2 requires flagging symlinks in the agents ancestry. Pure content lints in
 shared (renderer-importable, table-testable); fs lints (mode, symlink realpath)
@@ -800,79 +806,209 @@ never reimplements); keep Diagnostic minimal — severity-taxonomy creep is the 
 linter failure. Zero upstream deps: parallel-safe with step 4; NOT with step 5
 (palette-sources), step 6 (both restructure `listHarnesses`), or step 8 (its consumer).
 
-## Step 8 — Template gallery (~5) + blank builder
+## Step 8 — Template gallery (10) + blank builder
 
-Generalize the one hard-coded create path (`palette-sources.ts:217-232` — template id
-AND slug literal `'test-fixer'`; the run side already generalizes per-harness — do not
-rebuild it) into a gallery over `HARNESS_TEMPLATES` plus a blank builder. The builder
-widens `harness:create` to `{ template?, slug, overrides? }` (OQ4) and re-runs
-`validateHarnessScope` + `lintHarness` on the MERGED result before any write — the
-refuse-to-emit invariant on user-supplied globs is the security-relevant line of this
-step. **Scope decision (judge graft, sharpened by the Codex cold read — the union and the
-refusal cannot share one path without a caller-intent signal, and the signal is the
-presence of `overrides`):** when `overrides` are supplied (wizard or programmatic),
-createHarness ALWAYS auto-unions `HARNESS_PROTECTED_GLOBS` into forbiddenGlobs before
-validating — user input is never trusted to include them, and the constructive union
-means a stripped-glob input still produces a compliant contract; template-only creates
-(no overrides) keep Phase 1's refuse-to-emit semantics unchanged — a template missing
-the protected globs is a template BUG and must fail loudly, not be silently repaired.
-`validateHarnessScope` runs on the final scope in both paths as the belt-and-braces
-assert.
+> **DONE** (2026-07-10, contracts v1.2.8). Casey accepted the previously pending
+> gallery/task-dialog visual gate and under-five-minute blank-builder gate by direct
+> instruction on 2026-07-10. Landing evidence: focused bug gate 38 tests,
+> dispatch/session gate 131 tests, raw/bridge/harness gate 313 tests, visible-gallery UI
+> tests 20 tests, adjacent gallery/palette tests 67 tests, `npm run check` 313 files /
+> 3768 tests, production build, full E2E 25 passed / 1 existing skip, targeted
+> visible-`New Agent` built-app E2E passed, `npm audit --omit=dev` reported the existing
+> moderate `js-yaml` advisory via `gray-matter`, and whitespace/format checks were clean.
+> Recorded deviations/residuals: the primary visible entry point is the thread-sidebar
+> footer **New Agent** button with `New agent…` as a command-palette shortcut; OQ8
+> workspace-switch PTY visibility remains excluded as a follow-up graft.
 
-**Contracts (v1.2.x):** §6 `harness:create` widened (OQ4 records the single-path
-rationale — a second channel means two code paths that must stay invariant-equal
-forever). §5 wizard rules: `permissionMode` immutable `'queue-all-writes'` (PLAN Q9 — the
-wizard displays the ladder, it does not offer it); merged-scope revalidation mandatory;
-user strings must round-trip the hand-rolled frontmatter parser
-(`harness-types.ts:119-169` rejects multiline — reject, don't escape).
-`HARNESS_ADAPTERS` widened to include `'raw'` per step 1 + OQ3.
+Replace the single-template creation action with one shared catalog, category/audience
+filters, one-click instantiation for definition-complete templates, and a
+blank/configuration builder. The run side remains one generalized harness path. OQ7 is
+**RESOLVED by Casey 2026-07-09** with this exact registry order and metadata:
 
-**New:** `src/renderer/src/panels/agent-shell/HarnessGallery.tsx` — gallery (template
-cards from HARNESS_TEMPLATES) + blank-builder form: slug, description, adapter (incl.
-raw + its invocation template per OQ3), budgets, scope globs, verify command, rules —
-PLAN's creation-wizard knobs; permissionMode shown fixed; **live lint feedback (judge
-graft): the form previews `harness:lint` diagnostics on the would-be harness and
-disables create while blocking diagnostics exist**, not submit-time-only validation;
-knife-edge geometry, tokens only.
+| Category     | Template                 | Audience                                         | Adapter / configuration |
+| ------------ | ------------------------ | ------------------------------------------------ | ----------------------- |
+| Guided       | `idea-to-spec`           | non-engineer, low-code-user                      | claude                  |
+| Guided       | `docs-maintainer`        | non-engineer, low-code-user, seasoned-programmer | claude                  |
+| Guided       | `automation-builder`     | low-code-user, seasoned-programmer               | codex                   |
+| Architecture | `architecture-mapper`    | systems-thinker, architect, seasoned-programmer  | claude                  |
+| Architecture | `boundary-auditor`       | systems-thinker, architect, seasoned-programmer  | codex                   |
+| Architecture | `migration-planner`      | systems-thinker, architect                       | claude                  |
+| Engineering  | `bug-reproducer`         | seasoned-programmer                              | codex                   |
+| Engineering  | `test-fixer`             | seasoned-programmer                              | claude                  |
+| Engineering  | `vertical-slice-builder` | seasoned-programmer                              | codex                   |
+| Bridge       | `raw-tool-runner`        | seasoned-programmer, platform-builder            | raw / required          |
 
-**Edits:** `harness-templates.ts:77-79` (~4 new entries — roster per OQ7, including
-**raw-tool-runner** (judge graft) so PLAN Q8's "unknown CLIs work day one" is proven through
-the creation flow, not just the picker; every entry must pass lintHarness — invariant
-test); `harness-service.ts:50-133` (createHarness accepts overrides; merge → auto-union
-→ validateHarnessScope + lintHarness BEFORE mkdir — the existing refuse-to-emit pattern
-whose scope check sits at `:67`, and the write block + bounded partial-cleanup through
-`:133` must be preserved; frontmatter round-trip guard on user strings); `ipc-channels.ts:341-344` (request
-widened — shape edit, precedented) + preload; `palette-sources.ts:217-232` (hard-coded
-action replaced by a template loop + "New agent…" gallery opener);
-`harness-types.ts:22-23` (HARNESS_ADAPTERS + 'raw'). **Raw-harness dispatch
-cross-reference (Codex cold-read finding):** a raw harness run depends on step 1 having
-landed the registry's `raw` entry, the widened `AGENT_IDENTITIES`, and OQ3's invocation
-template — `identityForAdapter` and the invocation path know only the three hard-coded
-CLIs today, so raw templates ship in THIS step but execute through step 1's machinery;
-the raw-tool-runner template's SKILL.md frontmatter carries the OQ3 template string.
+The first nine definitions are complete enough to materialize without configuration;
+one-click creation installs a role only. Every run then requires an operator-supplied task
+brief in a dedicated launch dialog. Renderer validation prevents an orphan thread;
+`harness:run` repeats the check before main loads the binding mirror or reads harness files:
+trimmed non-empty text, no NUL, at most 4,000 characters. Main places the validated brief in
+a delimited Operator task section whose copy states that rules and scope take precedence.
+The card description is never synthesized into a task. `raw-tool-runner` is intentionally
+configuration-required: the product never invents an executable raw command. Its card
+opens the same builder used by the sidebar **New Agent** button and `New agent…` command
+palette action, and requires the raw invocation template,
+an operator-authored concrete scope (the template's "configuration required" sentinel is
+not a scope), and a verifier before creation.
 
-**Tests:** the two-path scope rule — overrides with stripped protected globs ⇒ created
-scope CONTAINS the protected globs (union) and validateHarnessScope passes on the
-result; template-only create from a mutated template missing them ⇒ structured refusal,
-NOTHING written (Phase 1 semantics locked); every shipped template lints clean (gallery-integrity invariant); frontmatter
-round-trip for wizard strings (multiline/injection rejected); `<dir>` materialization on
-custom scopes; gallery loop renders all templates; blank create produces six entries,
-verify.sh last at 0o555 (reuse Phase-1 step-6 test shapes); builder disables create on
-blocking lint diagnostics.
+**Contracts (v1.2.8):** `harness:create` accepts the closed `HarnessCreateRequest` union
+from §5: either `{ template, slug, overrides? }` or a blank `{ slug, overrides }` whose
+`BlankHarnessOverrides` is complete. `HarnessOverrides` may replace description, adapter,
+budgets, invocation template, skill body, rules, scope, verifier command, and initial
+state. Every present field replaces the template field atomically — budgets and scope are
+never deep-merged — while absent fields inherit. Unknown request/override fields refuse.
+The builder displays `permissionMode: 'queue-all-writes'` but cannot edit it. Budget inputs
+are finite integers with hard bounds: maxTurns 1–100 and maxWritesPerMinute 1–120.
 
-**Exit:** the PLAN exit bar: "create a non-template agent from blank in <5 min" —
-Casey-observed TIMED run on the running app: blank builder → configured harness →
-running on a real repo, under 5 minutes. Playwright probe: blank create with custom
-scope ⇒ six entries on disk, lints clean, appears in palette; stripped-glob programmatic
-attempt ⇒ refusal with nothing written; duplicate slug still refused. Full gate.
+`buildHarnessDraft(request, harnessDir)` is pure shared authority for both preview and
+creation. It validates the closed request, materializes every `<dir>`, builds deterministic
+files, re-parses generated frontmatter and requires exact value equality, and runs
+`lintHarness` over the candidate. Raw frontmatter requires a non-empty, single-line
+`invocationTemplate` containing a standalone literal `{prompt}` command word; every
+placeholder must be unquoted and unescaped because Machina supplies the POSIX single
+quoting. Controls, DEL/C1 bytes, lone UTF-16 surrogates, arithmetic/subscript contexts,
+unstable spacing/escapes, interactive history expansion, and compound shell syntax are
+refused so the command remains one hook-observable simple invocation. Literal arguments
+after the executable must be wholly quoted, and the final executable is escaped so normal
+and slash-path aliases cannot rewrite the observed command. Same-named shell functions can
+still resolve before a binary; that is the documented shell-resolution caveat, not a hook
+correlation failure. Structured adapters forbid the field.
+Multiline, comment-truncating, duplicate/unknown-key, and injection-shaped frontmatter are
+refused, not escaped. A one-line `verifyCommand` becomes `verify.sh`; pipelines, command
+lists, background jobs, command substitution, and POSIX `!` negation are rejected because
+portable `set -eu` cannot prove the intended red/green status propagated. Required gates
+may be joined with `&&`.
 
-**Risks:** wizard scope creep — hold to PLAN's knobs (role, budgets, verifier, scope;
-permission ladder display-only; triggers are Phase 3). Frontmatter injection via user
-strings is the real hazard — the hand-rolled parser is the guard; reject anything it
-cannot round-trip. Template quality is unproven until the harness proof method (PLAN
-Verification, curriculum 14.41) runs against the roster — recorded as a phase residual,
-not a gate. Edit-existing-harness is explicitly OUT (create never overwrites; new
-semantics + re-lint — defer).
+The renderer invokes the pure builder for live feedback: errors disable create; warnings
+remain visible but do not. IPC carries only the normalized request. Main receives that
+request, resolves the active workspace, and authoritatively rebuilds every candidate byte;
+it never trusts a renderer-materialized draft. Validation and linting finish before mkdir;
+non-overwrite, literal-vs-realpath equality, bounded partial cleanup, and verify.sh written
+last at mode 0555 remain main-owned.
+
+**Two protected-scope paths:** presence of `overrides`, including `{}`, is the constructive
+caller-intent signal. Shared assembly unions `HARNESS_PROTECTED_GLOBS` into the effective
+scope and validates the result, so an override that omits/strips them still creates a
+compliant contract. A template-only request has no constructive signal: a mutated template
+missing a protected glob is a built-in bug and refuses with nothing written. Both paths
+run `validateHarnessScope` on the final scope. This is create-time integrity only:
+`scope.json` remains advisory, same-user CLI writes still reach disk before watcher/queue/
+breaker containment, and UI copy must not imply pre-write sandboxing.
+
+**Raw harness authority and lifecycle:** one main-side inspection realpath-confines the
+harness directory and required leaf entries, rejects symlink/non-regular contract files,
+and returns both diagnostics and the exact bytes used for prompt composition. Main parses
+that linted SKILL.md snapshot, then records adapter, budgets, and the raw-only invocation
+template in the write-once `HarnessBinding`. Same-slug re-recording never refreshes the
+snapshot. The valid snapshot persists across relaunch; invalid or legacy mirror data
+degrades without harness attribution or raw-send readiness. `cli-thread:input` obtains the
+template only from main after binding/root/thread/adapter-identity checks — never from
+renderer input. The spawner refuses a live session whose identity changes, formats a
+hook-stable simple command through `ADAPTERS.raw` with a `singleQuote`-quoted prompt,
+registers that exact command with the adapter-aware bridge, opens the turn, and requires
+the PTY queue to accept the bytes. Missing/malformed data, identity mismatch, bridge
+refusal, or missing-session queue refusal executes nothing and leaves no turn/expectation.
+The bridge admits only the byte-exact expected command;
+unrelated human commands neither emit nor consume it. An admitted block keeps one id
+through running, completed, cancelled, and PTY-death finalization; message precedes turn
+completion exactly once. Ad-hoc raw remains plain PTY/input-disabled. Only a valid bound
+raw harness receives structured sends.
+
+**Task + thread targeting:** the launch dialog requires the brief before calling
+`runHarness`. Harness launch creates one thread, invokes main composition/binding with the
+validated task, requires main's authoritative adapter to match the already-created PTY,
+associates the agent, waits for the shell prompt, and appends the composed prompt with that
+thread id explicitly. Adapter drift or transport refusal does not claim a started run.
+Bounded renderer IPC timeouts are non-cancelling and therefore return `indeterminate`:
+late accept/refuse settlements are retained, Stop is replayed onto a late native run id,
+and sending remains blocked until a main-originated completion/refusal proves settlement.
+Thread deletion/close tombstones prevent late native/CLI work from resurrecting deleted
+threads; workspace-generation checks prevent workspace A creates/saves from landing under
+workspace B. Workspace switches fence stale dispatch state but do not auto-kill
+old-workspace PTYs; OQ8's visibility graft remains excluded. A user selecting another
+thread during the wait cannot retarget the first transport or persisted message.
+Interactive sends without an explicit id continue to follow the active thread.
+`HarnessSummary.scope`, when present, comes from the parsed effective on-disk `scope.json`;
+the dialog never substitutes a same-slug catalog default and labels the contract advisory
+rather than a pre-write sandbox.
+
+**Surfaces:**
+
+- Shared definition/assembly: `src/shared/harness-types.ts`,
+  `src/shared/harness-draft.ts`, `src/shared/harness-templates.ts`,
+  `src/shared/harness-templates/{common,guided,architecture,engineering,bridge}.ts`,
+  `src/shared/harness-lint.ts`, `src/shared/agent-adapters.ts`, and
+  `src/shared/ipc-channels.ts`.
+- Main authority/runtime: `src/main/services/harness-service.ts`,
+  `src/main/services/harness-run.ts`, `src/main/services/harness-run-registry.ts`,
+  `src/main/services/cli-thread-spawner.ts`,
+  `src/main/services/cli-agent-thread-bridge.ts`, `src/main/ipc/harness.ts`, and
+  `src/main/ipc/cli-thread.ts`; `src/preload/index.ts` exposes only the typed request.
+- Renderer: `src/renderer/src/panels/agent-shell/harness-gallery-model.ts` owns catalog
+  filters, builder normalization, and pure preview;
+  `src/renderer/src/panels/agent-shell/HarnessGallery.tsx` owns the cards/form/feedback;
+  `HarnessTaskBriefDialog.tsx` owns mandatory run context; `AgentShell.tsx` and
+  `CommandPalette.tsx` mount/open the creation and launch surfaces; `palette-sources.ts`
+  loops over all shared templates; `src/renderer/src/store/harness-run.ts` and
+  `src/renderer/src/store/thread-store.ts` own the explicit-thread launch sequence.
+
+**Tests:** pin the exact ten ids/order/categories/audiences, unique metadata, the one
+configuration-required raw card, and clean lint for every template. Static lint proves
+contract shape only. Executable temporary-repository fixtures separately prove artifact
+presence/structure, staged/unstaged/untracked handling, untracked whitespace, boundary
+report freshness, symlink refusal, common safety rules, repository-native engineering gate
+detection, no-test-script/setup rejection, no-product-edit bug reproduction, exact
+file-targeted bug-reproducer runners, unrelated-suite rejection, post-run mutation guards,
+setup/load/build/hook failure rejection, and timed-out child/grandchild cleanup.
+Draft/service tests pin closed-object rejection, present-null refusal, atomic override semantics,
+complete blank requests, budget
+bounds, raw-vs-structured invocation rules, exact frontmatter round-trip, verifier
+wrapping, every `<dir>` replacement, renderer-preview/main-rebuild byte identity, and no
+filesystem mutation before validation. The scope pair is mandatory: overrides with
+stripped protected globs ⇒ success and written scope contains the union; template-only
+creation from a mutated template missing them ⇒ structured refusal and nothing written.
+
+Registry/run/IPC/spawner/bridge tests pin main-only invocation authority, persisted
+adapter/invocation snapshot reload, same-slug no-refresh, corrupt/legacy degradation,
+quoted-placeholder refusal, shell quoting, no write/no turn on every preflight failure,
+exact-command admission, unrelated-command
+non-consumption, one raw block through all terminal paths, and message-before-complete.
+Renderer tests pin catalog filtering, builder error/warning behavior, raw-field visibility,
+all gallery/palette cards, mandatory task validation/routing, timeout/refusal retention,
+pending-operation dismissal locks, effective scope copy, authoritative raw readiness, and
+the selected-thread race during shell-prompt wait. Main tests prove invalid task briefs
+touch neither files nor binding state, leaf symlinks refuse, exact validated task text
+enters the prompt, and lint/binding/prompt consume one captured byte snapshot.
+
+**Exit:** the PLAN bar remains "create a non-template agent from blank in <5 min." The
+Casey-observed timed run must go from blank builder to a running harness on a real repo in
+under five minutes. Playwright must prove blank custom-scope creation writes the five files
+plus `handoffs/`, lints clean, and appears in the palette; an overrides-present
+stripped-glob request succeeds safely with protected globs in the written scope; the
+duplicate slug still refuses; and a configured raw card round-trips without executing its
+command. The deliberately mutated in-memory built-in registry cannot be reached through a
+production renderer without adding a test-only main hook, so template-only defective-scope
+refusal is assigned to the executable main service test, which also proves nothing was
+written. This is an explicit evidence-boundary choice, not a waiver of the refusal.
+The gallery/card/builder/task-dialog visual gate and the timed observation were accepted
+by Casey's direct 2026-07-10 landing instruction. Automated evidence is green: focused
+bug gate 38 tests, dispatch/session gate 131 tests, raw/bridge/harness gate 313 tests,
+visible-gallery UI tests 20 tests, adjacent gallery/palette tests 67 tests,
+`npm run check` 313 files / 3768 tests, production build, full E2E 25 passed / 1 existing
+skip, and targeted visible-`New Agent` built-app E2E passed. `npm audit --omit=dev` still
+reports one moderate `js-yaml` advisory via `gray-matter`. Engineering gates now prefer
+an explicit Make `test` target. npm/pnpm/yarn require
+an explicit non-empty test script rather than inferring one, while Bun uses its native
+test discovery. Cargo, Go, and pytest/uv roots are also detected; unsupported or
+unavailable runners fail closed and
+direct the operator to a configured blank harness rather than treating setup failure as
+test evidence.
+
+**Risks:** keep the builder to role, adapter, budgets, verifier, rules, and scope;
+permission ladder is display-only and triggers remain Phase 3. Edit-existing-harness is
+OUT: create never overwrites. Template usefulness remains unproven until the PLAN harness
+proof method (curriculum 14.41) exercises every roster entry on representative work; record
+that as a phase residual, distinct from the executable verifier fixtures now in the gate.
 
 ## Phase-2 exit bar (PLAN, with the recorded interpretation)
 
@@ -888,6 +1024,7 @@ structured⇄raw flip preserves the PTY (4), and an agent's commits revert from 
 (5). `npm run check` green at every step boundary; every PLAN invariant intact.
 
 ## Open questions (answers wanted before the affected step lands; recommendations are
+
 the default if unanswered)
 
 - **OQ1 — adapter-native permission hooks in or out?** Recommendation: OUT (deferred,
@@ -903,18 +1040,16 @@ the default if unanswered)
   stream. Options: (a) invocation count now — real counting site, Phase-3-ready, coarse
   for chatty threads; (b) defer entirely — budgets ship decorative again, the exact
   smell flagged; (c) parse adapter streams — adapter-specific, breaks model-agnosticism.
-- **OQ3 — raw adapter invocation source?** Recommendation: single-line template string
-  with `{prompt}` placeholder, per-harness frontmatter or per-session for ad-hoc,
-  `singleQuote`-quoted, round-trip-validated; no resume, no parser. Options: (a)
-  template string — general, loop-compatible, quoting mitigated; (b) binary+args array —
-  no quoting ambiguity but clumsier and still needs a prompt-position convention; (c)
-  pure type-it-yourself PTY — zero injection surface but harness/loops can never drive
-  raw agents.
-- **OQ4 — widen harness:create or add a second channel?** Recommendation: widen to
-  `{ template?, slug, overrides? }`. Why: the refuse-to-emit invariant lives in exactly
-  one place; a second channel is an invariant-drift generator. Options: (a) widen —
-  single validated path, precedented shape edit; (b) new channel — pure append-only but
-  duplicated validation forever.
+- **OQ3 — RESOLVED in v1.2.8: raw adapter invocation source.** A raw harness owns one
+  single-line frontmatter template containing literal `{prompt}`. Main validates and
+  snapshots it at bind; the spawner `singleQuote`-quotes the prompt into the exact command.
+  There is no resume, model, or parser. Ad-hoc raw has no per-session command source and
+  remains a type-it-yourself PTY with structured input disabled. Only a valid bound raw
+  harness can drive a structured send.
+- **OQ4 — RESOLVED in v1.2.8: widen the existing channel.** `harness:create` takes the
+  concrete `HarnessCreateRequest` union from §5: template + optional atomic overrides, or
+  blank + complete overrides. Main rebuilds and validates both through the same shared
+  draft path. There is no second creation channel and therefore no duplicate invariant.
 - **OQ5 — where does revert live?** Recommendation: ApprovalsTray section + palette;
   skip the thread header. Why: the tray is the git-consequences surface with the honest
   copy colocated; a thread-header button lies about scope (an agentId spans threads).
@@ -926,14 +1061,13 @@ the default if unanswered)
   flakes into outages; the sin is implying protection that is not live. Options: (a)
   degrade — consistent, no denial, gap window audited; (b) block — fake safety, outages;
   (c) per-window confirm toggle — ceremony for marginal honesty, revisit on demand.
-- **OQ7 — gallery roster?** Recommendation: test-fixer + bug-reproducer (writes ONE
-  failing test then stops), doc-writer (docs/** scope), review-notes (writes only to
-  `<dir>/handoffs/**` — near-zero blast radius, teaches scope contracts), and
-  raw-tool-runner (proves PLAN Q8 through the creation flow). Casey picks the final roster;
-  each entry must pass lintHarness and be exercised once by the harness proof method
-  before phase close. Options: (a) spectrum roster — teaches the model's range, each
-  useful day one; (b) five test/fix variations — redundant, teaches nothing about scope
-  variety; (c) ship 2 and grow — undersells the creation flow the exit bar times.
+- **OQ7 — RESOLVED by Casey 2026-07-09: exact gallery roster.** Guided:
+  `idea-to-spec`, `docs-maintainer`, `automation-builder`; Architecture:
+  `architecture-mapper`, `boundary-auditor`, `migration-planner`; Engineering:
+  `bug-reproducer`, `test-fixer`, `vertical-slice-builder`; Bridge: configuration-required
+  `raw-tool-runner`. The category/audience matrix is fixed in step 8 above. Resolution of
+  the roster does not waive semantic verifier hardening or the harness proof method before
+  phase close.
 - **OQ8 (graft, needs Casey's ratification before step 6) — workspace-switch PTY
   visibility:** live agent PTYs from a non-active workspace root keep writing unwatched
   after a switch (recorded Phase-1 product decision: no auto-kill). Recommendation: a

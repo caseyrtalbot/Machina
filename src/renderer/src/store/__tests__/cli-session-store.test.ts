@@ -34,9 +34,11 @@ const hooks: {
 }
 
 import { useCliSessionStore } from '../cli-session-store'
+import { useAgentDispatchStore } from '../agent-dispatch-store'
 
 beforeEach(() => {
   useCliSessionStore.setState({ byThread: {} })
+  useAgentDispatchStore.setState(useAgentDispatchStore.getInitialState())
   hooks.getSession.mockReset()
 })
 
@@ -99,6 +101,16 @@ describe('seed / sessionChanged / liveness', () => {
     useCliSessionStore.getState().drop('t1')
     expect(useCliSessionStore.getState().byThread['t1']).toBeUndefined()
   })
+
+  it('a late session-changed event cannot resurrect a deleted thread', () => {
+    useCliSessionStore.getState().seed('t1', 'sess-1')
+    useAgentDispatchStore.getState().dropThreadRuntime('t1')
+    useCliSessionStore.getState().drop('t1')
+
+    useCliSessionStore.getState().sessionChanged('t1', 'sess-late')
+
+    expect(useCliSessionStore.getState().byThread['t1']).toBeUndefined()
+  })
 })
 
 describe('hydrate (cli-thread:get-session pull)', () => {
@@ -122,6 +134,40 @@ describe('hydrate (cli-thread:get-session pull)', () => {
     hooks.getSession.mockRejectedValue(new Error('ipc down'))
     await expect(useCliSessionStore.getState().hydrate('t1')).resolves.toBeUndefined()
     expect(useCliSessionStore.getState().byThread['t1']).toBeUndefined()
+  })
+
+  it('does not let a stale hydrate overwrite a newer session-changed event', async () => {
+    let resolveHydrate: ((value: { sessionId: string; live: boolean } | null) => void) | undefined
+    hooks.getSession.mockReturnValue(
+      new Promise((resolve) => {
+        resolveHydrate = resolve
+      })
+    )
+    const hydration = useCliSessionStore.getState().hydrate('t1')
+    useCliSessionStore.getState().sessionChanged('t1', 'sess-new')
+    resolveHydrate?.({ sessionId: 'sess-old', live: true })
+    await hydration
+
+    expect(useCliSessionStore.getState().byThread['t1']).toEqual({
+      sessionId: 'sess-new',
+      live: true
+    })
+  })
+
+  it('does not let a pending hydrate repopulate sessions after a workspace reset', async () => {
+    let resolveHydrate: ((value: { sessionId: string; live: boolean } | null) => void) | undefined
+    hooks.getSession.mockReturnValue(
+      new Promise((resolve) => {
+        resolveHydrate = resolve
+      })
+    )
+    const hydration = useCliSessionStore.getState().hydrate('t1')
+
+    useCliSessionStore.getState().reset()
+    resolveHydrate?.({ sessionId: 'sess-old-workspace', live: true })
+    await hydration
+
+    expect(useCliSessionStore.getState().byThread).toEqual({})
   })
 })
 

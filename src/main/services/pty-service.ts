@@ -198,16 +198,21 @@ export class PtyService {
     sessionId: string,
     data: string,
     mode: 'streaming' | 'batched' = 'batched'
-  ): void {
-    this.enqueueWrite(sessionId, { kind: 'agent-input', mode, data })
+  ): boolean {
+    return this.enqueueWrite(sessionId, { kind: 'agent-input', mode, data })
   }
 
-  /** Enqueue a typed write and kick the per-session drain. */
-  private enqueueWrite(sessionId: string, write: PtyWrite): void {
+  /**
+   * Enqueue a typed write and kick the per-session drain. The return value is
+   * synchronous queue acceptance only; it does not claim node-pty completed
+   * the eventual write.
+   */
+  private enqueueWrite(sessionId: string, write: PtyWrite): boolean {
     const session = this.sessions.get(sessionId)
-    if (!session) return
+    if (!session) return false
     session.writeQueue.enqueue(write)
     void session.writeQueue.drain((w) => this.flushOne(session, w))
+    return true
   }
 
   /** Apply one queued write to the underlying node-pty handle. */

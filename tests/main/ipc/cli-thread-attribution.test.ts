@@ -102,7 +102,7 @@ function collectAudit(): { entries: AuditEntry[]; log: (entry: AuditEntry) => vo
 }
 
 describe('resolveRequestedAgentId', () => {
-  it('an absent agentId passes through untouched: no lookup, no audit, no flag', async () => {
+  it('an absent agentId on a truly unbound thread stays ad-hoc with no audit or flag', async () => {
     const registry = fakeRegistry()
     const audit = collectAudit()
     const result = await resolveRequestedAgentId(
@@ -111,14 +111,61 @@ describe('resolveRequestedAgentId', () => {
       ROOT,
       undefined,
       registry,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(result).toEqual({ agentId: undefined, attributionSuspect: false })
-    expect(registry.ensureRootReady).not.toHaveBeenCalled()
+    expect(registry.ensureRootReady).toHaveBeenCalledWith(ROOT)
     expect(audit.entries).toEqual([])
   })
 
-  it('a malformed agentId degrades before any registry access', async () => {
+  it('an omitted renderer slug recovers the modern main binding and raw snapshot', async () => {
+    const registry = fakeRegistry({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT,
+      adapter: 'raw',
+      invocationTemplate: "trusted '--ask' {prompt}"
+    })
+
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      undefined,
+      registry,
+      collectAudit(),
+      'cli-raw'
+    )
+
+    expect(result).toEqual({
+      agentId: 'raw-runner',
+      attributionSuspect: false,
+      invocationTemplate: "trusted '--ask' {prompt}"
+    })
+  })
+
+  it('an omitted renderer slug cannot bypass a modern binding adapter mismatch', async () => {
+    const registry = fakeRegistry({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT,
+      adapter: 'raw',
+      invocationTemplate: "trusted '--ask' {prompt}"
+    })
+
+    const result = await resolveRequestedAgentId(
+      'cli-thread:spawn',
+      'th1',
+      ROOT,
+      undefined,
+      registry,
+      collectAudit(),
+      'cli-claude'
+    )
+
+    expect(result).toEqual({ agentId: undefined, attributionSuspect: true, blocked: true })
+  })
+
+  it('a malformed agentId degrades after checking thread-bound adapter authority', async () => {
     const registry = fakeRegistry()
     const audit = collectAudit()
     const result = await resolveRequestedAgentId(
@@ -127,10 +174,11 @@ describe('resolveRequestedAgentId', () => {
       ROOT,
       'bad id!',
       registry,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
-    expect(registry.ensureRootReady).not.toHaveBeenCalled()
+    expect(registry.ensureRootReady).toHaveBeenCalledWith(ROOT)
     expect(audit.entries).toHaveLength(1)
     expect(audit.entries[0].tool).toBe('cli-agent:attribution-mismatch')
     expect(audit.entries[0].decision).toBe('denied')
@@ -143,7 +191,7 @@ describe('resolveRequestedAgentId', () => {
   })
 
   it('a binding match proceeds with the requested slug and no audit', async () => {
-    const registry = fakeRegistry({ slug: 'test-fixer', workspaceRoot: ROOT })
+    const registry = fakeRegistry({ slug: 'test-fixer', workspaceRoot: ROOT, adapter: 'claude' })
     const audit = collectAudit()
     const result = await resolveRequestedAgentId(
       'cli-thread:input',
@@ -151,15 +199,125 @@ describe('resolveRequestedAgentId', () => {
       ROOT,
       'test-fixer',
       registry,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(result).toEqual({ agentId: 'test-fixer', attributionSuspect: false })
     expect(registry.ensureRootReady).toHaveBeenCalledWith(ROOT)
     expect(audit.entries).toEqual([])
   })
 
+  it('a valid bound raw identity receives only the main-snapshotted invocation template', async () => {
+    const registry = fakeRegistry({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT,
+      adapter: 'raw',
+      invocationTemplate: "trusted '--ask' {prompt}"
+    })
+    const audit = collectAudit()
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      'raw-runner',
+      registry,
+      audit,
+      'cli-raw'
+    )
+    expect(result).toEqual({
+      agentId: 'raw-runner',
+      attributionSuspect: false,
+      invocationTemplate: "trusted '--ask' {prompt}"
+    })
+  })
+
+  it('a missing or corrupt bound raw template never crosses the IPC boundary', async () => {
+    for (const invocationTemplate of [undefined, 'missing-placeholder', 'mytool \x15{prompt}']) {
+      const registry = fakeRegistry({
+        slug: 'raw-runner',
+        workspaceRoot: ROOT,
+        adapter: 'raw',
+        ...(invocationTemplate !== undefined ? { invocationTemplate } : {})
+      })
+      const result = await resolveRequestedAgentId(
+        'cli-thread:input',
+        'th1',
+        ROOT,
+        'raw-runner',
+        registry,
+        collectAudit(),
+        'cli-raw'
+      )
+      expect(result).toEqual({ agentId: 'raw-runner', attributionSuspect: false })
+    }
+  })
+
+  it('an adapter-less legacy binding degrades without harness attribution', async () => {
+    const registry = fakeRegistry({ slug: 'test-fixer', workspaceRoot: ROOT })
+    const audit = collectAudit()
+
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      'test-fixer',
+      registry,
+      audit,
+      'cli-claude'
+    )
+
+    expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
+    expect(audit.entries[0].args).toMatchObject({ reason: 'adapter-unknown' })
+  })
+
+  it.each([
+    ['raw binding through a structured identity', 'raw', 'cli-claude'],
+    ['structured binding through the raw identity', 'claude', 'cli-raw']
+  ] as const)('blocks a %s', async (_label, adapter, identity) => {
+    const registry = fakeRegistry({ slug: 'bound-runner', workspaceRoot: ROOT, adapter })
+    const audit = collectAudit()
+
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      'bound-runner',
+      registry,
+      audit,
+      identity
+    )
+
+    expect(result).toEqual({ agentId: undefined, attributionSuspect: true, blocked: true })
+    expect(audit.entries[0].args).toMatchObject({
+      reason: 'adapter-mismatch',
+      boundAdapter: adapter,
+      requestedIdentity: identity
+    })
+  })
+
+  it('a stale forwarded slug cannot route around a modern adapter mismatch', async () => {
+    const registry = fakeRegistry({
+      slug: 'bound-raw-runner',
+      workspaceRoot: ROOT,
+      adapter: 'raw',
+      invocationTemplate: 'tool {prompt}'
+    })
+
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      'different-renderer-slug',
+      registry,
+      collectAudit(),
+      'cli-claude'
+    )
+
+    expect(result).toEqual({ agentId: undefined, attributionSuspect: true, blocked: true })
+  })
+
   it('a binding mismatch degrades, audits the bound slug, and flags the turn', async () => {
-    const registry = fakeRegistry({ slug: 'agent-x', workspaceRoot: ROOT })
+    const registry = fakeRegistry({ slug: 'agent-x', workspaceRoot: ROOT, adapter: 'claude' })
     const audit = collectAudit()
     const result = await resolveRequestedAgentId(
       'cli-thread:input',
@@ -167,7 +325,8 @@ describe('resolveRequestedAgentId', () => {
       ROOT,
       'agent-y',
       registry,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
     expect(audit.entries).toHaveLength(1)
@@ -187,7 +346,8 @@ describe('resolveRequestedAgentId', () => {
       ROOT,
       'agent-x',
       registry,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
     expect(audit.entries).toHaveLength(1)
@@ -210,7 +370,8 @@ describe('resolveRequestedAgentId', () => {
       ROOT,
       'agent-x',
       registry,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
     expect(audit.entries).toHaveLength(1)
@@ -230,7 +391,7 @@ describe('handler wiring (spawn + input forward the RESOLVED attribution)', () =
   it('cli-thread:spawn passes the validated slug + suspect=false to the spawner', async () => {
     registryCtl.current = {
       ensureRootReady: async () => {},
-      get: () => ({ slug: 'test-fixer', workspaceRoot: ROOT })
+      get: () => ({ slug: 'test-fixer', workspaceRoot: ROOT, adapter: 'claude' })
     }
     const handler = ipcCtl.handlers.get('cli-thread:spawn')
     expect(handler).toBeDefined()
@@ -241,7 +402,7 @@ describe('handler wiring (spawn + input forward the RESOLVED attribution)', () =
   it('cli-thread:input degrades a mismatched slug to undefined + suspect=true', async () => {
     registryCtl.current = {
       ensureRootReady: async () => {},
-      get: () => ({ slug: 'agent-x', workspaceRoot: ROOT })
+      get: () => ({ slug: 'agent-x', workspaceRoot: ROOT, adapter: 'claude' })
     }
     const handler = ipcCtl.handlers.get('cli-thread:input')
     expect(handler).toBeDefined()
@@ -256,6 +417,95 @@ describe('handler wiring (spawn + input forward the RESOLVED attribution)', () =
       ['th1', 'cli-claude', 'go', ROOT, undefined, undefined, true]
     ])
   })
+
+  it('cli-thread:input ignores a forged renderer template and forwards the bound snapshot', async () => {
+    registryCtl.current = {
+      ensureRootReady: async () => {},
+      get: () => ({
+        slug: 'raw-runner',
+        workspaceRoot: ROOT,
+        adapter: 'raw',
+        invocationTemplate: "trusted '--ask' {prompt}"
+      })
+    }
+    const handler = ipcCtl.handlers.get('cli-thread:input')
+    await handler?.({
+      threadId: 'th1',
+      identity: 'cli-raw',
+      text: 'go',
+      cwd: ROOT,
+      agentId: 'raw-runner',
+      invocationTemplate: "forged '--steal' {prompt}"
+    })
+    expect(spawnerCtl.inputs).toEqual([
+      ['th1', 'cli-raw', 'go', ROOT, 'raw-runner', undefined, false, "trusted '--ask' {prompt}"]
+    ])
+  })
+
+  it('cli-thread:spawn retrieves the valid raw snapshot from the same main binding', async () => {
+    registryCtl.current = {
+      ensureRootReady: async () => {},
+      get: () => ({
+        slug: 'raw-runner',
+        workspaceRoot: ROOT,
+        adapter: 'raw',
+        invocationTemplate: "trusted '--ask' {prompt}"
+      })
+    }
+    const handler = ipcCtl.handlers.get('cli-thread:spawn')
+    await handler?.({
+      threadId: 'th1',
+      identity: 'cli-raw',
+      cwd: ROOT,
+      agentId: 'raw-runner'
+    })
+    expect(spawnerCtl.spawns).toEqual([
+      ['th1', 'cli-raw', ROOT, 'raw-runner', undefined, false, "trusted '--ask' {prompt}"]
+    ])
+  })
+
+  it('cli-thread:spawn degrades a legacy adapter-less raw binding without harness attribution', async () => {
+    registryCtl.current = {
+      ensureRootReady: async () => {},
+      get: () => ({ slug: 'raw-runner', workspaceRoot: ROOT })
+    }
+    const handler = ipcCtl.handlers.get('cli-thread:spawn')
+    await handler?.({
+      threadId: 'th1',
+      identity: 'cli-raw',
+      cwd: ROOT,
+      agentId: 'raw-runner'
+    })
+    expect(spawnerCtl.spawns).toEqual([
+      ['th1', 'cli-raw', ROOT, undefined, undefined, true, undefined]
+    ])
+  })
+
+  it.each([
+    ['cli-thread:spawn', 'raw', 'cli-claude'],
+    ['cli-thread:input', 'claude', 'cli-raw']
+  ] as const)(
+    'a known adapter mismatch on %s never reaches the spawner',
+    async (channel, adapter, identity) => {
+      registryCtl.current = {
+        ensureRootReady: async () => {},
+        get: () => ({ slug: 'bound-runner', workspaceRoot: ROOT, adapter })
+      }
+      const handler = ipcCtl.handlers.get(channel)
+
+      const result = await handler?.({
+        threadId: 'th1',
+        identity,
+        text: 'go',
+        cwd: ROOT,
+        agentId: 'bound-runner'
+      })
+
+      expect(result).toMatchObject({ ok: false })
+      expect(spawnerCtl.spawns).toEqual([])
+      expect(spawnerCtl.inputs).toEqual([])
+    }
+  )
 })
 
 describe('frontmatter tamper repro (real registry, persisted mirror across relaunch)', () => {
@@ -279,7 +529,9 @@ describe('frontmatter tamper repro (real registry, persisted mirror across relau
       listThreadAgentIds: async () => [],
       harnessDirExists: async () => true
     })
-    expect(await first.record(ROOT, 'th-tamper', 'agent-x')).toEqual({ ok: true })
+    expect(
+      await first.record(ROOT, 'th-tamper', 'agent-x', undefined, undefined, 'claude')
+    ).toEqual({ ok: true })
 
     // Relaunch: fresh instance over the same mirror. The tampered thread
     // frontmatter now claims agent-y — the backfill must NOT re-trust it.
@@ -298,7 +550,8 @@ describe('frontmatter tamper repro (real registry, persisted mirror across relau
       ROOT,
       'agent-y',
       second,
-      audit
+      audit,
+      'cli-claude'
     )
     expect(resolved).toEqual({ agentId: undefined, attributionSuspect: true })
     expect(audit.entries).toHaveLength(1)
@@ -310,7 +563,11 @@ describe('frontmatter tamper repro (real registry, persisted mirror across relau
       boundSlug: 'agent-x'
     })
     // Write-once held: the tamper minted no binding and no backfill audit.
-    expect(second.get(ROOT, 'th-tamper')).toEqual({ slug: 'agent-x', workspaceRoot: ROOT })
+    expect(second.get(ROOT, 'th-tamper')).toEqual({
+      slug: 'agent-x',
+      workspaceRoot: ROOT,
+      adapter: 'claude'
+    })
     expect(relaunchAudit.entries).toEqual([])
 
     // The genuinely bound slug still validates cleanly after the tamper.
@@ -321,7 +578,8 @@ describe('frontmatter tamper repro (real registry, persisted mirror across relau
       ROOT,
       'agent-x',
       second,
-      clean
+      clean,
+      'cli-claude'
     )
     expect(ok).toEqual({ agentId: 'agent-x', attributionSuspect: false })
     expect(clean.entries).toEqual([])

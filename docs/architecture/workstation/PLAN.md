@@ -21,28 +21,28 @@ earned later.
 
 ## Resolved decisions (the shared vision — do not re-litigate)
 
-| # | Decision |
-|---|---|
-| Q1 | Terminal/build-loop-first skeleton; supervisor view is a lens you zoom out to, not a separate app |
-| Q2 | Vision unconstrained by prior attempts (Mandatum out of scope) |
-| Q3 | Daily driver first; Electron/TS stack |
-| Q4 | Build onto Machina in place — one codebase, repurpose scaffolding |
-| Q5 | Workspace generalization (Cursor-like): Machina opens any folder; "a vault is a workspace with the knowledge capability enabled, not the reverse" |
-| Q6 | Dock-centric IDE shell (editor center, terminal strip, agent panel, git map) + one-click session migration to canvas; zoom-out IS the supervisor lens (existing LOD rendering) |
-| Q7 | Full IDE editor: CodeMirror 6 + incremental LSP client layer (language servers as main-process children over typed IPC). Not Monaco. Diff review first-class regardless |
-| Q8 | Session primitive: everything PTY-backed is a Session; adapters add projections. Plain terminal = session with no adapter; agent = session with adapter (structured thread view ⇄ raw PTY view, one click apart). Spawn-terminal-anywhere |
-| Q9 | Loops = trigger × prompt × agent; per-loop autonomy policy; queue-all-writes is the immutable default; scoped auto-accept is deliberate opt-in |
-| Q10 | Agent creation: template gallery (~5 purpose-built) + blank escape hatch, all producing the same transparent on-disk folder |
-| Q11 | Commit-per-approval checkpointing (attributed per agent/session via commit trailers, per-agent revert); worktrees deferred until usage demands |
-| Q12 | Tracer-bullet first slice: open repo → spawn terminal → create templated agent → watch → approve diff → see attributed commit |
-| Q13 | Low knowledge-fusion + one free bridge: harness files (state, handoffs, lessons) are markdown in the workspace; knowledge capability indexes them like any note. No deeper entanglement yet |
+| #   | Decision                                                                                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Terminal/build-loop-first skeleton; supervisor view is a lens you zoom out to, not a separate app                                                                                                                                         |
+| Q2  | Vision unconstrained by prior attempts (Mandatum out of scope)                                                                                                                                                                            |
+| Q3  | Daily driver first; Electron/TS stack                                                                                                                                                                                                     |
+| Q4  | Build onto Machina in place — one codebase, repurpose scaffolding                                                                                                                                                                         |
+| Q5  | Workspace generalization (Cursor-like): Machina opens any folder; "a vault is a workspace with the knowledge capability enabled, not the reverse"                                                                                         |
+| Q6  | Dock-centric IDE shell (editor center, terminal strip, agent panel, git map) + one-click session migration to canvas; zoom-out IS the supervisor lens (existing LOD rendering)                                                            |
+| Q7  | Full IDE editor: CodeMirror 6 + incremental LSP client layer (language servers as main-process children over typed IPC). Not Monaco. Diff review first-class regardless                                                                   |
+| Q8  | Session primitive: everything PTY-backed is a Session; adapters add projections. Plain terminal = session with no adapter; agent = session with adapter (structured thread view ⇄ raw PTY view, one click apart). Spawn-terminal-anywhere |
+| Q9  | Loops = trigger × prompt × agent; per-loop autonomy policy; queue-all-writes is the immutable default; scoped auto-accept is deliberate opt-in                                                                                            |
+| Q10 | Agent creation: curated 10-role gallery spanning guided, architecture, engineering, and raw-CLI bridge work + blank escape hatch; all produce the same transparent on-disk folder and require a concrete task brief at launch             |
+| Q11 | Commit-per-approval checkpointing (attributed per agent/session via commit trailers, per-agent revert); worktrees deferred until usage demands                                                                                            |
+| Q12 | Tracer-bullet first slice: open repo → spawn terminal → create templated agent → watch → approve diff → see attributed commit                                                                                                             |
+| Q13 | Low knowledge-fusion + one free bridge: harness files (state, handoffs, lessons) are markdown in the workspace; knowledge capability indexes them like any note. No deeper entanglement yet                                               |
 
 ## The five primitives
 
 1. **Workspace** — any folder Machina opens; capabilities (knowledge, coding) light up by
    content. Kills the single global `lastVaultPath`.
 2. **Session** — a main-process PTY-backed object with identity, ring-buffer scrollback,
-   lifecycle. Dock panes and canvas cards are *projections*; dock↔canvas migration =
+   lifecycle. Dock panes and canvas cards are _projections_; dock↔canvas migration =
    re-parent a projection (PTYs already survive webview teardown).
 3. **Block** — command+output+exit structured via existing OSC shell hooks;
    navigation/copy/pin everywhere.
@@ -100,17 +100,20 @@ Step detail and per-step contracts: `01-interface-contracts.md` §7 (v1.1).
 Implementation specs: `02-phase-1-specs.md`. Exit bar (Q12): the full loop works
 end-to-end on a real repo in one sitting.
 
-### Phase 2 — The agent system
+### Phase 2 — The agent system — implementation DONE (2026-07-10)
 
-Template gallery (~5) + blank builder; adapter registry (Claude Code, Codex, Gemini +
-raw-CLI fallback); model aliasing; two-projection agent view (structured thread ⇄ raw
-PTY); budget stack + kill switch + circuit breakers; harness linter; per-agent revert UI.
+Curated 10-role gallery + blank builder; required per-run task brief; adapter registry
+(Claude Code, Codex, Gemini + raw-CLI fallback); model aliasing; two-projection agent view
+(structured thread ⇄ raw PTY); budget stack + kill switch + circuit breakers; harness
+linter; per-agent revert UI.
 Exit bar: create a non-template agent from blank in <5 min; kill switch halts a runaway
 loop; harness linter flags a broken scope contract.
 
 Implementation specs: `04-phase-2-specs.md` (8 steps, canonical order; spec pass
 2026-07-06 — records the "runaway loop := runaway turn/agent" exit-bar interpretation
-and the adapter-native-hooks deferral).
+and the adapter-native-hooks deferral). Step 8 landed the final implementation slice:
+the ten-role gallery, visible New Agent entry point, blank builder, task-brief gate, and
+raw bridge hardening.
 
 ### Phase 3 — Loops + the lens
 

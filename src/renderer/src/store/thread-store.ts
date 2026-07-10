@@ -11,7 +11,17 @@ import type { AgentIdentity } from '@shared/agent-identity'
 import { TE_DIR } from '@shared/constants'
 import { setActiveCanvas } from './canvas-store'
 import { useTerminalStripStore } from './terminal-strip-store'
-import { transportFor } from './agent-transport'
+import { useCliSessionStore } from './cli-session-store'
+import { transportFor, type DispatchStatus, type SendTurnResult } from './agent-transport'
+import {
+  captureWorkspaceDispatch,
+  threadRuntimeIsClosed,
+  threadStartIsBlocked,
+  useAgentDispatchStore,
+  workspaceDispatchIsCurrent
+} from './agent-dispatch-store'
+import { withTimeout } from '../utils/ipc-timeout'
+import { notifyError } from '../utils/error-logger'
 import {
   persistFilesPanelOpen,
   readPersistedFilesPanelOpen
@@ -25,27 +35,17 @@ interface ThreadState {
   streamingByThreadId: Record<string, string>
   pendingApprovalsByThreadId: Record<string, ToolCall[]>
   pendingToolCallsByThreadId: Record<string, Array<{ call: ToolCall; result?: ToolResult }>>
-  /** Active machina-native runId per thread (cleared on message_end / error). */
   runIdByThreadId: Record<string, string>
-  /** True while a turn is in flight for the thread (cleared when it settles). */
   inFlightByThreadId: Record<string, boolean>
   dockTabsByThreadId: Record<string, DockTab[]>
-  /** Active dock tab index per thread, restored when re-entering the thread. */
   dockActiveIndexByThreadId: Record<string, number>
   dockCollapsed: boolean
-  /** Pixel width of the thread sidebar (left pane). Persisted in vault config. */
   sidebarWidth: number
-  /** Pixel width of the chat panel. The dock flexes to fill the remainder. */
   chatWidth: number
-  /** Thread sidebar hidden. Persisted in vault config. */
   sidebarCollapsed: boolean
-  /** Chat panel hidden (dock takes the full width). Persisted in vault config. */
   chatCollapsed: boolean
-  /** Files side panel open. Persisted in localStorage (per machine, not vault). */
   filesPanelOpen: boolean
-  /** Focus mode: sidebar/chat/files hidden, dock full-bleed. Ephemeral. */
   focusMode: boolean
-  /** Panel visibility before entering focus mode, restored on exit. */
   focusSnapshot: {
     sidebarCollapsed: boolean
     chatCollapsed: boolean
@@ -64,18 +64,7 @@ interface ThreadState {
   closeFilesPanel: () => void
   toggleFocusMode: () => void
   persistLayout: () => Promise<void>
-  /**
-   * Activate a thread. `reveal` (default true) re-expands a collapsed chat
-   * panel — pass false for boot-time restoration so the persisted collapse
-   * state survives restart.
-   */
   selectThread: (id: string, opts?: { reveal?: boolean }) => Promise<void>
-  /**
-   * `agentId` (workstation step 6): attribution id for harness runs — the
-   * harness slug. Persisted on the thread and forwarded by the CLI transport
-   * on cli-thread:spawn/input. Absent for ad-hoc threads (attribution
-   * defaults to the adapter identity main-side).
-   */
   createThread: (
     agent: AgentIdentity,
     model: string,
@@ -85,25 +74,12 @@ interface ThreadState {
   archiveThread: (id: string) => Promise<void>
   unarchiveThread: (id: string) => Promise<void>
   deleteThread: (id: string) => Promise<void>
-  /** Lazily fetch the archived thread list (called when the sidebar section expands). */
   loadArchivedThreads: () => Promise<void>
-  /** Permanently delete an archived thread (restore first — thread:delete targets live threads). */
   deleteArchivedThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
-  /**
-   * Switch the model used by the thread's next turn. Persisted for every
-   * agent (workstation step 1); the CLI transport re-sends it per turn and
-   * the IPC boundary applies the trust rule (filler/off-roster => default).
-   */
   setThreadModel: (id: string, model: string) => Promise<void>
-  /**
-   * Attach the harness slug after main records the binding (workstation
-   * step 3). Display + transport forwarding only — attribution authority is
-   * main's HarnessRunRegistry, which validates the forwarded value per turn.
-   */
   setThreadAgentId: (id: string, agentId: string) => Promise<void>
-
-  appendUserMessage: (text: string) => Promise<void>
+  appendUserMessage: (text: string, targetThreadId?: string) => Promise<DispatchStatus>
   appendAssistantStreamChunk: (threadId: string, runId: string, chunk: string) => void
   startPendingToolCall: (threadId: string, call: ToolCall) => void
   appendPendingToolCall: (threadId: string, call: ToolCall, result: ToolResult) => void
@@ -114,7 +90,6 @@ interface ThreadState {
   toggleAutoAccept: (threadId: string) => void
 
   addDockTab: (tab: DockTab) => void
-  /** Open the matching tab if one already exists, otherwise add it. Activates either way. */
   openOrFocusDockTab: (tab: DockTab) => void
   removeDockTab: (index: number) => void
   removeDockTabs: (indices: readonly number[]) => void
@@ -123,10 +98,6 @@ interface ThreadState {
   toggleDock: () => void
 }
 
-/**
- * Identity used by openOrFocusDockTab to decide whether two tabs are "the same."
- * A null result means "always create a new tab" — used for fresh terminals.
- */
 function dockTabIdentity(t: DockTab): string | null {
   switch (t.kind) {
     case 'editor':
@@ -134,7 +105,6 @@ function dockTabIdentity(t: DockTab): string | null {
     case 'canvas':
       return `canvas:${t.id}`
     case 'terminal':
-      // Each terminal click should spawn a fresh session, even with the same id.
       return null
     case 'graph':
     case 'ghosts':
@@ -165,11 +135,113 @@ const initial = {
   focusSnapshot: null as ThreadState['focusSnapshot']
 }
 
-/** Sidebar pixel bounds. Min lets a single mono label + pill ellipsize cleanly. */
 const SIDEBAR_MIN = 160
-/** Chat panel pixel bounds. Min keeps the composer + a readable bubble column. */
 const CHAT_MIN = 320
 const PANE_MAX_RATIO = 0.85
+const THREAD_IPC_TIMEOUT_MS = 15_000
+
+function saveThread(vaultPath: string, thread: Thread, label: string): Promise<void> {
+  return withTimeout(window.api.thread.save(vaultPath, thread), THREAD_IPC_TIMEOUT_MS, label)
+}
+
+function addSystemMessage(thread: Thread, body: string): Thread {
+  return {
+    ...thread,
+    messages: [...thread.messages, { role: 'system', body, sentAt: new Date().toISOString() }]
+  }
+}
+
+function clearThreadInFlight(threadId: string): void {
+  useThreadStore.setState((state) => {
+    const inFlight = { ...state.inFlightByThreadId }
+    delete inFlight[threadId]
+    return { inFlightByThreadId: inFlight }
+  })
+}
+
+async function requestTransportCancel(thread: Thread, runId: string | undefined): Promise<void> {
+  try {
+    await transportFor(thread.agent).cancel(thread, runId)
+  } catch (error) {
+    notifyError(
+      'thread-stop',
+      error,
+      'Stop request failed. The run may still be active; sending remains blocked until it settles.'
+    )
+  }
+}
+
+function watchDispatchSettlement(
+  result: Extract<SendTurnResult, { status: 'indeterminate' }>,
+  thread: Thread,
+  workspace: ReturnType<typeof captureWorkspaceDispatch>
+): void {
+  void result.settlement.then((late) => {
+    const closed = threadRuntimeIsClosed(thread.id) || !workspaceDispatchIsCurrent(workspace)
+    if (late.status === 'accepted') {
+      if (late.runId !== undefined && !closed)
+        useThreadStore.setState((state) => ({
+          runIdByThreadId: { ...state.runIdByThreadId, [thread.id]: late.runId as string }
+        }))
+      if (closed || useAgentDispatchStore.getState().cancelRequestedByThreadId[thread.id])
+        void requestTransportCancel(thread, late.runId)
+      return
+    }
+    if (late.status === 'refused' && !closed) {
+      clearThreadInFlight(thread.id)
+      useAgentDispatchStore.getState().clearCancelRequest(thread.id)
+    }
+  })
+}
+
+async function dispatchPersistedTurn(
+  previousThread: Thread,
+  nextThread: Thread,
+  text: string,
+  workspace: ReturnType<typeof captureWorkspaceDispatch>
+): Promise<DispatchStatus> {
+  const id = nextThread.id
+  if (!workspaceDispatchIsCurrent(workspace) || threadRuntimeIsClosed(id)) return 'indeterminate'
+  const state = useThreadStore.getState()
+  const result = await transportFor(nextThread.agent).sendTurn(nextThread, text, {
+    vaultPath: workspace.workspacePath,
+    historyMessages: buildNativeHistory(previousThread.messages),
+    dockTabsSnapshot: state.dockTabsByThreadId[id] ?? []
+  })
+
+  if (result.status === 'accepted') {
+    const closed = threadRuntimeIsClosed(id) || !workspaceDispatchIsCurrent(workspace)
+    if (result.runId !== undefined && !closed)
+      useThreadStore.setState((current) => ({
+        runIdByThreadId: { ...current.runIdByThreadId, [id]: result.runId as string }
+      }))
+    if (closed) void requestTransportCancel(nextThread, result.runId)
+    return closed ? 'indeterminate' : 'accepted'
+  }
+
+  if (result.status === 'indeterminate') watchDispatchSettlement(result, nextThread, workspace)
+  else clearThreadInFlight(id)
+
+  const current = useThreadStore.getState().threadsById[id]
+  if (current && workspaceDispatchIsCurrent(workspace) && !threadRuntimeIsClosed(id)) {
+    const withStatus = addSystemMessage(current, result.message)
+    useThreadStore.setState((latest) => ({
+      threadsById: { ...latest.threadsById, [id]: withStatus }
+    }))
+    const statusPersistence = window.api.thread.save(workspace.workspacePath, withStatus)
+    try {
+      await withTimeout(
+        statusPersistence,
+        THREAD_IPC_TIMEOUT_MS,
+        `thread:save dispatch status ${id}`
+      )
+    } catch {
+      void statusPersistence.catch(() => {})
+      return 'indeterminate'
+    }
+  }
+  return result.status
+}
 
 function clampPaneWidth(w: number, min: number): number {
   const innerWidth = typeof window === 'undefined' ? 1920 : window.innerWidth
@@ -180,18 +252,50 @@ function clampPaneWidth(w: number, min: number): number {
 export const useThreadStore = create<ThreadState>((set, get) => ({
   ...initial,
 
-  setVaultPath: (p) => set({ vaultPath: p }),
+  setVaultPath: (p) => {
+    const current = get().vaultPath
+    if (current === p) {
+      captureWorkspaceDispatch(p)
+      return
+    }
+    const oldThreads = Object.values(get().threadsById)
+    const dispatch = useAgentDispatchStore.getState()
+    for (const thread of oldThreads) {
+      dispatch.dropThreadRuntime(thread.id)
+    }
+    useCliSessionStore.getState().reset()
+    dispatch.switchWorkspace(
+      p,
+      oldThreads.map((thread) => thread.id)
+    )
+    set({
+      vaultPath: p,
+      activeThreadId: null,
+      threadsById: {},
+      archivedThreads: [],
+      streamingByThreadId: {},
+      pendingApprovalsByThreadId: {},
+      pendingToolCallsByThreadId: {},
+      runIdByThreadId: {},
+      inFlightByThreadId: {},
+      dockTabsByThreadId: {},
+      dockActiveIndexByThreadId: {}
+    })
+  },
 
   loadThreads: async () => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
     const list = await window.api.thread.list(v)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     const byId: Record<string, Thread> = {}
     const dockByThread: Record<string, DockTab[]> = {}
+    const dispatch = useAgentDispatchStore.getState()
     for (const t of list) {
+      dispatch.setThreadStart(t.id, 'ready')
       byId[t.id] = t
       dockByThread[t.id] = t.dockState.tabs.slice()
-      // Terminal strip state rides the thread file; legacy files seed undefined (no-op).
       useTerminalStripStore.getState().seed(t.id, t.dockState.terminalStrip)
     }
     set({ threadsById: byId, dockTabsByThreadId: dockByThread })
@@ -200,8 +304,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   loadLayout: async () => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
     const cfg = await window.api.thread.readConfig(v)
-    // Never restore both chat and dock collapsed — that renders an empty shell.
+    if (!workspaceDispatchIsCurrent(workspace)) return
     const chatCollapsed = cfg.chatCollapsed ?? false
     const dockCollapsed = (cfg.dockCollapsed ?? false) && !chatCollapsed
     set({
@@ -225,8 +330,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   toggleChatCollapsed: () => {
     set((s) => ({
       chatCollapsed: !s.chatCollapsed,
-      // Collapsing chat while the dock is also collapsed would leave nothing
-      // on screen — re-expand the dock to take the freed width.
       dockCollapsed: !s.chatCollapsed ? false : s.dockCollapsed,
       focusMode: false,
       focusSnapshot: null
@@ -252,8 +355,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       set({ ...s.focusSnapshot, focusMode: false, focusSnapshot: null })
       return
     }
-    // Focus mode is ephemeral: no persistLayout / localStorage writes here, so
-    // a quit while focused restores the pre-focus layout on next launch.
     set({
       focusMode: true,
       focusSnapshot: {
@@ -265,7 +366,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       sidebarCollapsed: true,
       chatCollapsed: true,
       filesPanelOpen: false,
-      // The dock is the only surface left in focus mode — force it visible.
       dockCollapsed: false
     })
   },
@@ -273,32 +373,35 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   persistLayout: async () => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
+    const layout = get()
     const cfg = await window.api.thread.readConfig(v)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     await window.api.thread.writeConfig(v, {
       ...cfg,
-      sidebarWidth: get().sidebarWidth,
-      chatWidth: get().chatWidth,
-      sidebarCollapsed: get().sidebarCollapsed,
-      chatCollapsed: get().chatCollapsed,
-      dockCollapsed: get().dockCollapsed
+      sidebarWidth: layout.sidebarWidth,
+      chatWidth: layout.chatWidth,
+      sidebarCollapsed: layout.sidebarCollapsed,
+      chatCollapsed: layout.chatCollapsed,
+      dockCollapsed: layout.dockCollapsed
     })
   },
 
   selectThread: async (id, opts) => {
     const prev = get().activeThreadId
-    if (prev && prev !== id) await flushDockState(prev)
     const v = get().vaultPath
+    const workspace = v ? captureWorkspaceDispatch(v) : null
+    if (prev && prev !== id) await flushDockState(prev)
+    if (workspace && !workspaceDispatchIsCurrent(workspace)) return
     const tabs = get().dockTabsByThreadId[id]
     if (v && tabs && tabs.length > 0) {
       const { valid, dropped } = await validateTabs(v, tabs)
+      if (workspace && !workspaceDispatchIsCurrent(workspace)) return
       if (dropped > 0) {
         set((s) => ({ dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: valid } }))
-        // TODO: replace with toast infra once it exists.
         console.warn(`[thread-store] dropped ${dropped} dock tab(s) with missing resources`)
       }
     }
-    // Selecting a thread implies wanting to read it — surface the chat panel
-    // if it was collapsed (and drop focus mode rather than half-honoring it).
     const reveal = opts?.reveal ?? true
     set((s) =>
       reveal && s.chatCollapsed
@@ -310,12 +413,23 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   createThread: async (agent, model, title, agentId) => {
     const v = get().vaultPath
     if (!v) throw new Error('vault not set')
-    const created = await window.api.thread.create(v, agent, model, title)
-    // Overlay the attribution id BEFORE the transport starts (spawn carries
-    // it) and persist it so it survives relaunch (spawn-on-demand re-sends it
-    // on the next cli-thread:input).
+    const workspace = captureWorkspaceDispatch(v)
+    const created = await withTimeout(
+      window.api.thread.create(v, agent, model, title),
+      THREAD_IPC_TIMEOUT_MS,
+      'thread:create'
+    )
+    if (!workspaceDispatchIsCurrent(workspace)) {
+      void window.api.thread.delete(v, created.id).catch(() => {})
+      throw new Error('workspace changed while creating thread')
+    }
     const t: Thread = agentId !== undefined ? { ...created, agentId } : created
-    if (agentId !== undefined) await window.api.thread.save(v, t)
+    if (agentId !== undefined) await saveThread(v, t, `thread:save ${t.id}`)
+    if (!workspaceDispatchIsCurrent(workspace)) {
+      void window.api.thread.delete(v, t.id).catch(() => {})
+      throw new Error('workspace changed while creating thread')
+    }
+    useAgentDispatchStore.getState().setThreadStart(t.id, 'starting')
     set((s) => ({
       threadsById: { ...s.threadsById, [t.id]: t },
       dockTabsByThreadId: { ...s.dockTabsByThreadId, [t.id]: t.dockState.tabs.slice() },
@@ -325,20 +439,29 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       focusSnapshot: null
     }))
     const started = await transportFor(agent).start(t, v)
-    if (!started.ok) {
-      const sysMsg: ThreadMessage = {
-        role: 'system',
-        body: started.error,
-        sentAt: new Date().toISOString()
-      }
+    if (!workspaceDispatchIsCurrent(workspace) || threadRuntimeIsClosed(t.id)) {
+      useAgentDispatchStore.getState().dropThreadRuntime(t.id)
+      void transportFor(agent)
+        .close(t.id)
+        .catch(() => {})
+      throw new Error('workspace changed while starting thread')
+    }
+    const dispatch = useAgentDispatchStore.getState()
+    dispatch.setThreadStart(t.id, started.status === 'indeterminate' ? 'indeterminate' : 'ready')
+    if (started.status === 'indeterminate')
+      void started.settlement.then((late) => {
+        if (late.status !== 'indeterminate' && !threadRuntimeIsClosed(t.id))
+          useAgentDispatchStore.getState().setThreadStart(t.id, 'ready')
+      })
+    if (started.status !== 'accepted') {
       set((s) => {
         const cur = s.threadsById[t.id]
         if (!cur) return s
-        const next: Thread = { ...cur, messages: [...cur.messages, sysMsg] }
+        const next = addSystemMessage(cur, started.message)
         return { threadsById: { ...s.threadsById, [t.id]: next } }
       })
       const cur = get().threadsById[t.id]
-      if (cur) await window.api.thread.save(v, cur)
+      if (cur) await saveThread(v, cur, `thread:save start status ${t.id}`)
     }
     return t
   },
@@ -346,14 +469,15 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   archiveThread: async (id) => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
     await window.api.thread.archive(v, id)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     set((s) => {
       const next = { ...s.threadsById }
       const archived = next[id]
       delete next[id]
       return {
         threadsById: next,
-        // Keep the lazily loaded archive list coherent without a refetch.
         archivedThreads: archived ? [archived, ...s.archivedThreads] : s.archivedThreads,
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
@@ -363,7 +487,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   unarchiveThread: async (id) => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
     await window.api.thread.unarchive(v, id)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     set((s) => ({ archivedThreads: s.archivedThreads.filter((t) => t.id !== id) }))
     await get().loadThreads()
   },
@@ -371,26 +497,36 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   loadArchivedThreads: async () => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
     const list = await window.api.thread.listArchived(v)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     set({ archivedThreads: list })
   },
 
   deleteArchivedThread: async (id) => {
     const v = get().vaultPath
     if (!v) return
-    // ThreadStorage.deleteThread only removes live thread files, so restore
-    // the archived thread first and delete it from the live directory.
+    const workspace = captureWorkspaceDispatch(v)
     await window.api.thread.unarchive(v, id)
     await window.api.thread.delete(v, id)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     set((s) => ({ archivedThreads: s.archivedThreads.filter((t) => t.id !== id) }))
   },
 
   deleteThread: async (id) => {
     const v = get().vaultPath
     if (!v) return
+    const workspace = captureWorkspaceDispatch(v)
     const t = get().threadsById[id]
-    if (t) await transportFor(t.agent).close(id)
-    await window.api.thread.delete(v, id)
+    useAgentDispatchStore.getState().dropThreadRuntime(id)
+    if (t)
+      await withTimeout(
+        transportFor(t.agent).close(id),
+        THREAD_IPC_TIMEOUT_MS,
+        `thread:close ${id}`
+      )
+    await withTimeout(window.api.thread.delete(v, id), THREAD_IPC_TIMEOUT_MS, `thread:delete ${id}`)
+    if (!workspaceDispatchIsCurrent(workspace)) return
     set((s) => {
       const next = { ...s.threadsById }
       delete next[id]
@@ -452,59 +588,68 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     if (!t || t.agentId === agentId) return
     const next: Thread = { ...t, agentId }
     set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
-    await window.api.thread.save(v, next)
+    await saveThread(v, next, `thread:save agent ${id}`)
   },
 
-  appendUserMessage: async (text) => {
-    const id = get().activeThreadId
+  appendUserMessage: async (text, targetThreadId) => {
+    const id = targetThreadId ?? get().activeThreadId
     const v = get().vaultPath
-    if (!id || !v) return
-    const now = new Date().toISOString()
-    set((s) => {
-      const t = s.threadsById[id]
-      if (!t) return s
-      const msg: ThreadMessage = { role: 'user', body: text, sentAt: now }
-      const next: Thread = { ...t, messages: [...t.messages, msg], lastMessage: now }
-      return { threadsById: { ...s.threadsById, [id]: next } }
-    })
+    if (!id || !v) return 'refused'
+    const workspace = captureWorkspaceDispatch(v)
     const t = get().threadsById[id]
-    if (!t) return
-    await window.api.thread.save(v, t)
-
+    if (!t) return 'refused'
+    const dispatch = useAgentDispatchStore.getState()
+    if (get().inFlightByThreadId[id] || threadStartIsBlocked(dispatch.threadStartById[id]))
+      return 'indeterminate'
+    const now = new Date().toISOString()
+    const msg: ThreadMessage = { role: 'user', body: text, sentAt: now }
+    const nextThread: Thread = { ...t, messages: [...t.messages, msg], lastMessage: now }
+    set((s) => ({ threadsById: { ...s.threadsById, [id]: nextThread } }))
+    dispatch.beginTurn(id)
     set((s) => ({ inFlightByThreadId: { ...s.inFlightByThreadId, [id]: true } }))
 
-    const result = await transportFor(t.agent).sendTurn(t, text, {
-      vaultPath: v,
-      historyMessages: buildNativeHistory(t.messages.slice(0, -1)),
-      dockTabsSnapshot: get().dockTabsByThreadId[id] ?? []
-    })
-
-    if (!result.ok) {
-      // The turn never started (CLI delivery failure, IPC timeout, …). Clear
-      // the in-flight flag so the input bar unwedges, and surface why as a
-      // system message instead of silently dropping the turn.
-      set((s) => {
-        const flight = { ...s.inFlightByThreadId }
-        delete flight[id]
-        return { inFlightByThreadId: flight }
-      })
-      const failed = get().threadsById[id]
-      if (failed) {
-        const sys: ThreadMessage = {
-          role: 'system',
-          body: result.message,
-          sentAt: new Date().toISOString()
+    const persistence = window.api.thread.save(v, nextThread)
+    try {
+      await withTimeout(persistence, THREAD_IPC_TIMEOUT_MS, `thread:save user message ${id}`)
+    } catch {
+      const current = get().threadsById[id]
+      if (current)
+        set((s) => ({
+          threadsById: {
+            ...s.threadsById,
+            [id]: addSystemMessage(
+              current,
+              'Message persistence status is unknown. It was not dispatched, but the save may still complete; do not retry until you inspect this thread.'
+            )
+          }
+        }))
+      void persistence.then(
+        () => {
+          const dispatchState = useAgentDispatchStore.getState()
+          if (
+            workspaceDispatchIsCurrent(workspace) &&
+            !threadRuntimeIsClosed(id) &&
+            !dispatchState.cancelRequestedByThreadId[id]
+          ) {
+            void dispatchPersistedTurn(t, nextThread, text, workspace).catch(() => {
+              clearThreadInFlight(id)
+            })
+          } else if (workspaceDispatchIsCurrent(workspace) && !threadRuntimeIsClosed(id)) {
+            clearThreadInFlight(id)
+            dispatchState.clearCancelRequest(id)
+          }
+        },
+        () => {
+          if (workspaceDispatchIsCurrent(workspace) && !threadRuntimeIsClosed(id)) {
+            clearThreadInFlight(id)
+            useAgentDispatchStore.getState().clearCancelRequest(id)
+          }
         }
-        const next: Thread = { ...failed, messages: [...failed.messages, sys] }
-        set((s) => ({ threadsById: { ...s.threadsById, [id]: next } }))
-        await window.api.thread.save(v, next)
-      }
-      return
+      )
+      return 'indeterminate'
     }
-    if (result.runId !== undefined) {
-      const runId = result.runId
-      set((s) => ({ runIdByThreadId: { ...s.runIdByThreadId, [id]: runId } }))
-    }
+
+    return dispatchPersistedTurn(t, nextThread, text, workspace)
   },
 
   appendAssistantStreamChunk: (threadId, runId, chunk) =>
@@ -524,7 +669,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   startPendingToolCall: (threadId, call) =>
     set((s) => {
       const list = s.pendingToolCallsByThreadId[threadId] ?? []
-      // Avoid duplicates if a pending event for the same id arrives twice.
       if (list.some((e) => e.call.id === call.id)) return s
       return {
         pendingToolCallsByThreadId: {
@@ -551,6 +695,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     }),
 
   finalizeAssistantMessage: async (threadId) => {
+    useAgentDispatchStore.getState().settleThread(threadId)
     const v = get().vaultPath
     const buf = get().streamingByThreadId[threadId] ?? ''
     const pendingTools = get().pendingToolCallsByThreadId[threadId] ?? []
@@ -587,6 +732,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   },
 
   appendCliMessage: async (threadId, message) => {
+    useAgentDispatchStore.getState().settleThread(threadId)
     const v = get().vaultPath
     if (!v) return
     set((s) => {
@@ -616,12 +762,11 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   cancelActive: async (threadId) => {
     const t = get().threadsById[threadId]
     if (!t) return
-    await transportFor(t.agent).cancel(t, get().runIdByThreadId[threadId])
-    set((s) => {
-      const flight = { ...s.inFlightByThreadId }
-      delete flight[threadId]
-      return { inFlightByThreadId: flight }
-    })
+    useAgentDispatchStore.getState().requestCancel(threadId)
+    await requestTransportCancel(t, get().runIdByThreadId[threadId])
+    // Abort/Ctrl-C acknowledges a signal, not settlement. A timed-out invoke
+    // may still accept input later, so only the main-originated completion or
+    // error paths may clear inFlight and reopen sending.
   },
 
   toggleAutoAccept: (threadId) => {
@@ -755,7 +900,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       focusMode: false,
       focusSnapshot: null
     }))
-    // Fire-and-forget: persist the new collapsed state so it survives restart.
     void get().persistLayout()
   }
 }))

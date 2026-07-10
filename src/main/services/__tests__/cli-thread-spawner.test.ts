@@ -16,7 +16,7 @@ interface FakeShellService {
 
 function fakeServices(): { shell: FakeShellService; pty: FakePtyService } {
   const pty: FakePtyService = {
-    writeAgentInput: vi.fn(),
+    writeAgentInput: vi.fn(() => true),
     getActiveSessions: vi.fn().mockReturnValue(['sess-xyz'])
   }
   const shell: FakeShellService = {
@@ -88,7 +88,7 @@ describe('CliThreadSpawner', () => {
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.sessionId).toBe('sess-xyz')
     expect(shell.create).toHaveBeenCalledWith('/v', undefined, undefined, undefined, 'cli-claude')
-    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A')
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A', 'claude')
     expect(spawner.getSessionId('thread-A')).toBe('sess-xyz')
   })
 
@@ -133,7 +133,7 @@ describe('CliThreadSpawner', () => {
     const res = await spawner.input('thread-A', 'cli-claude', 'list files', '/v')
     expect(res.ok).toBe(true)
     expect(shell.create).toHaveBeenCalledTimes(1)
-    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A')
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A', 'claude')
     expect(pty.writeAgentInput).toHaveBeenCalledWith(
       'sess-xyz',
       `${CLAUDE_BASE} 'list files'\r`,
@@ -182,6 +182,91 @@ describe('CliThreadSpawner', () => {
     expect(res.ok).toBe(true)
     expect(shell.create).toHaveBeenCalledTimes(1)
     expect(pty.writeAgentInput).toHaveBeenCalledWith('sess-xyz', `${CLAUDE_BASE} 'hi'\r`, 'batched')
+  })
+
+  it('does not create a second PTY when input races an awaited explicit spawn', async () => {
+    const { shell, pty } = fakeServices()
+    let releaseDetection: ((value: ReturnType<typeof installed>[]) => void) | undefined
+    const detection = new Promise<ReturnType<typeof installed>[]>((resolve) => {
+      releaseDetection = resolve
+    })
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: vi.fn(() => detection)
+    })
+
+    const spawning = spawner.spawn('thread-A', 'cli-claude', '/v')
+    const input = spawner.input('thread-A', 'cli-claude', 'hi', '/v')
+    await vi.waitFor(() => expect(spawner.getSessionId('thread-A')).toBeUndefined())
+    releaseDetection?.([installed('claude')])
+
+    await expect(spawning).resolves.toMatchObject({ ok: true, sessionId: 'sess-xyz' })
+    await expect(input).resolves.toEqual({ ok: true })
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(pty.writeAgentInput).toHaveBeenCalledTimes(1)
+  })
+
+  it('close fences an input that is still waiting for agent detection', async () => {
+    const { shell, pty } = fakeServices()
+    let releaseDetection: ((value: ReturnType<typeof installed>[]) => void) | undefined
+    const detection = new Promise<ReturnType<typeof installed>[]>((resolve) => {
+      releaseDetection = resolve
+    })
+    const onSessionChanged = vi.fn()
+    const registry = { turnStarted: vi.fn(), threadClosed: vi.fn() }
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: vi.fn(() => detection),
+      registry,
+      onSessionChanged
+    })
+
+    const pending = spawner.input('thread-A', 'cli-claude', 'must not run', '/v')
+    spawner.close('thread-A')
+    releaseDetection?.([installed('claude')])
+
+    await expect(pending).resolves.toEqual({ ok: false })
+    expect(shell.create).not.toHaveBeenCalled()
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
+    expect(onSessionChanged).not.toHaveBeenCalled()
+    expect(registry.turnStarted).not.toHaveBeenCalled()
+    expect(registry.threadClosed).toHaveBeenCalledWith('thread-A')
+    expect(spawner.getSessionId('thread-A')).toBeUndefined()
+  })
+
+  it('refuses to retarget a live thread to a different adapter identity', async () => {
+    const { shell, pty } = fakeServices()
+    const registry = { turnStarted: vi.fn(), threadClosed: vi.fn() }
+    const bridge = {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge,
+      detect: async () => [installed('claude'), installed('codex')],
+      registry
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+
+    const spawnSwap = await spawner.spawn('thread-A', 'cli-codex', '/v')
+    const inputSwap = await spawner.input('thread-A', 'cli-codex', 'steal turn', '/v')
+
+    expect(spawnSwap).toMatchObject({ ok: false })
+    expect(inputSwap).toEqual({ ok: false })
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
+    expect(registry.turnStarted).not.toHaveBeenCalled()
   })
 
   it('input returns ok=false when the respawn fails (CLI not installed)', async () => {
@@ -556,7 +641,7 @@ describe('CliThreadSpawner raw adapter (workstation Phase 2 step 1)', () => {
     expect(result.ok).toBe(true)
     expect(detect).not.toHaveBeenCalled()
     expect(shell.create).toHaveBeenCalledWith('/v', undefined, undefined, undefined, 'cli-raw')
-    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-R')
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-R', 'raw')
   })
 
   it('sendUserMessage refuses on cli-raw: no template source exists in step 1', async () => {

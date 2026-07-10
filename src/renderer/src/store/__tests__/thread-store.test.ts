@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useThreadStore, flushDockState } from '../thread-store'
+import { threadRuntimeIsClosed, useAgentDispatchStore } from '../agent-dispatch-store'
+import { useTerminalStripStore } from '../terminal-strip-store'
 import type { Thread } from '@shared/thread-types'
+import { DEFAULT_TERMINAL_STRIP } from '@shared/dock-types'
+import { setErrorNotifier } from '../../utils/error-logger'
 
 const sampleThread = (id: string): Thread => ({
   id,
@@ -15,6 +19,8 @@ const sampleThread = (id: string): Thread => ({
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useAgentDispatchStore.setState(useAgentDispatchStore.getInitialState())
+  useTerminalStripStore.setState(useTerminalStripStore.getInitialState())
   // Minimal IPC stub so persistence-aware actions don't crash.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(window as any).api = {
@@ -29,7 +35,8 @@ beforeEach(() => {
       delete: vi.fn().mockResolvedValue(undefined),
       readConfig: vi.fn(),
       writeConfig: vi.fn().mockResolvedValue(undefined)
-    }
+    },
+    terminal: { kill: vi.fn().mockResolvedValue(undefined) }
   }
 })
 
@@ -66,6 +73,9 @@ describe('thread-store', () => {
       threadsById: { a: sampleThread('a') },
       streamingByThreadId: { a: 'Hello' }
     })
+    useAgentDispatchStore
+      .getState()
+      .setHarnessLaunch('/v', 'test-fixer', { status: 'indeterminate', threadId: 'a' })
     await useThreadStore.getState().finalizeAssistantMessage('a')
     const msgs = useThreadStore.getState().threadsById['a'].messages
     expect(msgs).toHaveLength(1)
@@ -73,6 +83,9 @@ describe('thread-store', () => {
     if (msgs[0].role !== 'assistant') return
     expect(msgs[0].body).toBe('Hello')
     expect(useThreadStore.getState().streamingByThreadId['a']).toBeUndefined()
+    expect(
+      useAgentDispatchStore.getState().harnessLaunchByWorkspace['/v']?.['test-fixer']
+    ).toBeUndefined()
   })
 
   it('addDockTab and removeDockTab mutate the active thread tab list', () => {
@@ -83,7 +96,7 @@ describe('thread-store', () => {
     expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
   })
 
-  it('cancelActive on a machina-native thread calls agentNative.abort with the runId', async () => {
+  it('cancelActive requests native abort and waits for main settlement before unlocking', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.agentNative = { abort: vi.fn().mockResolvedValue(undefined) }
     useThreadStore.setState({
@@ -94,10 +107,10 @@ describe('thread-store', () => {
     await useThreadStore.getState().cancelActive('a')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((window as any).api.agentNative.abort).toHaveBeenCalledWith('r-7')
-    expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
   })
 
-  it('cancelActive on a CLI thread calls cliThread.cancel with the threadId', async () => {
+  it('cancelActive requests CLI interrupt and waits for main settlement before unlocking', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.cliThread = { cancel: vi.fn().mockResolvedValue({ ok: true }) }
     const cliThread = { ...sampleThread('a'), agent: 'cli-claude' as const }
@@ -108,7 +121,179 @@ describe('thread-store', () => {
     await useThreadStore.getState().cancelActive('a')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((window as any).api.cliThread.cancel).toHaveBeenCalledWith('a')
-    expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+    expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+  })
+
+  it('surfaces a rejected Stop request without rejecting or unlocking the turn', async () => {
+    const notify = vi.fn()
+    setErrorNotifier(notify)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.agentNative = {
+        abort: vi.fn().mockRejectedValue(new Error('abort IPC unavailable'))
+      }
+      useThreadStore.setState({
+        threadsById: { a: sampleThread('a') },
+        runIdByThreadId: { a: 'r-fail' },
+        inFlightByThreadId: { a: true }
+      })
+
+      await expect(useThreadStore.getState().cancelActive('a')).resolves.toBeUndefined()
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+      expect(useAgentDispatchStore.getState().cancelRequestedByThreadId['a']).toBe(true)
+      expect(notify).toHaveBeenCalledWith(expect.stringMatching(/stop request failed/i))
+    } finally {
+      setErrorNotifier(() => {})
+    }
+  })
+
+  it('does not unlock a timed-out native turn when Stop has no runId and run resolves late', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveRun: ((value: { runId: string }) => void) | undefined
+      const abort = vi.fn().mockResolvedValue(undefined)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.agentNative = {
+        run: vi.fn(
+          () =>
+            new Promise<{ runId: string }>((resolve) => {
+              resolveRun = resolve
+            })
+        ),
+        abort
+      }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: sampleThread('a') }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      await useThreadStore.getState().cancelActive('a')
+      expect(abort).not.toHaveBeenCalled()
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+
+      resolveRun?.({ runId: 'late-run' })
+      await vi.waitFor(() => expect(abort).toHaveBeenCalledWith('late-run'))
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('replays Stop even while persistence of the timeout status is stalled', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveRun: ((value: { runId: string }) => void) | undefined
+      const abort = vi.fn().mockResolvedValue(undefined)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.agentNative = {
+        run: vi.fn(
+          () =>
+            new Promise<{ runId: string }>((resolve) => {
+              resolveRun = resolve
+            })
+        ),
+        abort
+      }
+      // First save persists the user turn. The diagnostic save after the run
+      // timeout never settles.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.thread.save = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockReturnValueOnce(new Promise(() => {}))
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: sampleThread('a') }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await useThreadStore.getState().cancelActive('a')
+      resolveRun?.({ runId: 'late-during-save' })
+      await vi.waitFor(() => expect(abort).toHaveBeenCalledWith('late-during-save'))
+
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not unlock a timed-out CLI turn after Stop and a late accepted input', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveInput: ((value: { ok: true }) => void) | undefined
+      const cancel = vi.fn().mockResolvedValue({ ok: true })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.cliThread = {
+        input: vi.fn(
+          () =>
+            new Promise<{ ok: true }>((resolve) => {
+              resolveInput = resolve
+            })
+        ),
+        cancel
+      }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: { ...sampleThread('a'), agent: 'cli-claude' as const } }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      await useThreadStore.getState().cancelActive('a')
+      expect(cancel).toHaveBeenCalledWith('a')
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+
+      resolveInput?.({ ok: true })
+      await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(2))
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('preserves Stop through deletion and aborts a native run that accepts late', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveRun: ((value: { runId: string }) => void) | undefined
+      const abort = vi.fn().mockResolvedValue(undefined)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.agentNative = {
+        run: vi.fn(
+          () =>
+            new Promise<{ runId: string }>((resolve) => {
+              resolveRun = resolve
+            })
+        ),
+        abort
+      }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: sampleThread('a') }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      await useThreadStore.getState().cancelActive('a')
+      await useThreadStore.getState().deleteThread('a')
+      expect(useThreadStore.getState().threadsById['a']).toBeUndefined()
+
+      resolveRun?.({ runId: 'late-after-delete' })
+      await vi.waitFor(() => expect(abort).toHaveBeenCalledWith('late-after-delete'))
+      expect(useThreadStore.getState().runIdByThreadId['a']).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renameThread updates the title and persists', async () => {
@@ -133,7 +318,7 @@ describe('thread-store', () => {
     expect((window as any).api.thread.save).not.toHaveBeenCalled()
   })
 
-  it('clears in-flight and appends a system message when agentNative.run never returns a runId', async () => {
+  it('keeps a timed-out native run indeterminate because it may resolve late', async () => {
     vi.useFakeTimers()
     try {
       // run() returns a promise that never resolves — simulates the main process
@@ -148,13 +333,14 @@ describe('thread-store', () => {
       const p = useThreadStore.getState().appendUserMessage('hello')
       // Advance past the 15s start-timeout, flushing microtasks along the way.
       await vi.advanceTimersByTimeAsync(15_000)
-      await p
+      await expect(p).resolves.toBe('indeterminate')
 
-      expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
       const msgs = useThreadStore.getState().threadsById['a'].messages
       const sys = msgs.find((m) => m.role === 'system')
       expect(sys).toBeDefined()
-      expect(sys?.body).toContain('failed to start')
+      expect(sys?.body).toMatch(/status is unknown.*may still execute.*do not retry/i)
+      expect(sys?.body).toMatch(/Stop cannot confirm cancellation.*wait for the thread to settle/i)
     } finally {
       vi.useRealTimers()
     }
@@ -291,13 +477,148 @@ describe('thread-store', () => {
       activeThreadId: 'a',
       threadsById: { a: cliThread }
     })
-    await useThreadStore.getState().appendUserMessage('hello')
+    const accepted = await useThreadStore.getState().appendUserMessage('hello')
+    expect(accepted).toBe('refused')
     expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
     const msgs = useThreadStore.getState().threadsById['a'].messages
     const sys = msgs.find((m) => m.role === 'system')
     expect(sys?.body).toContain('not delivered')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((window as any).api.thread.save).toHaveBeenCalled()
+  })
+
+  it('keeps a timed-out CLI input indeterminate and blocks a duplicate turn', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveInput: ((value: { ok: true }) => void) | undefined
+      const input = vi.fn(
+        () =>
+          new Promise<{ ok: true }>((resolve) => {
+            resolveInput = resolve
+          })
+      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.cliThread = { input }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: { ...sampleThread('a'), agent: 'cli-claude' as const } }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+      const sys = useThreadStore
+        .getState()
+        .threadsById['a'].messages.find((message) => message.role === 'system')
+      expect(sys?.body).toMatch(/may still execute.*do not retry/i)
+
+      resolveInput?.({ ok: true })
+      await Promise.resolve()
+      expect(input).toHaveBeenCalledOnce()
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('bounds user-message persistence without dispatching an unpersisted turn', async () => {
+    vi.useFakeTimers()
+    try {
+      const input = vi.fn()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.thread.save = vi.fn(() => new Promise(() => {}))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.cliThread = { input }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: { ...sampleThread('a'), agent: 'cli-claude' as const } }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      expect(input).not.toHaveBeenCalled()
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+      expect(
+        useThreadStore
+          .getState()
+          .threadsById['a'].messages.find((message) => message.role === 'system')?.body
+      ).toMatch(/persistence status is unknown.*not dispatched.*do not retry/i)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('dispatches the same turn once when timed-out user-message persistence succeeds late', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveSave: (() => void) | undefined
+      const input = vi.fn().mockResolvedValue({ ok: true })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.thread.save = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSave = resolve
+          })
+      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.cliThread = { input }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: { ...sampleThread('a'), agent: 'cli-claude' as const } }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      expect(input).not.toHaveBeenCalled()
+
+      resolveSave?.()
+      await vi.waitFor(() => expect(input).toHaveBeenCalledOnce())
+      expect(input).toHaveBeenCalledWith(expect.objectContaining({ threadId: 'a', text: 'hello' }))
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('unlocks without dispatch when timed-out user-message persistence fails late', async () => {
+    vi.useFakeTimers()
+    try {
+      let rejectSave: ((error: Error) => void) | undefined
+      const input = vi.fn()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.thread.save = vi.fn(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectSave = reject
+          })
+      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.cliThread = { input }
+      useThreadStore.setState({
+        vaultPath: '/v',
+        activeThreadId: 'a',
+        threadsById: { a: { ...sampleThread('a'), agent: 'cli-claude' as const } }
+      })
+
+      const pending = useThreadStore.getState().appendUserMessage('hello')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(pending).resolves.toBe('indeterminate')
+      expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
+
+      rejectSave?.(new Error('late disk failure'))
+      await vi.waitFor(() =>
+        expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
+      )
+      expect(input).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('a failed send into a cli-raw thread explains raw semantics, not a missing CLI', async () => {
@@ -311,10 +632,32 @@ describe('thread-store', () => {
       activeThreadId: 'a',
       threadsById: { a: rawThread }
     })
-    await useThreadStore.getState().appendUserMessage('hello')
+    const accepted = await useThreadStore.getState().appendUserMessage('hello')
+    expect(accepted).toBe('refused')
     expect(useThreadStore.getState().inFlightByThreadId['a']).toBeUndefined()
     const sys = useThreadStore.getState().threadsById['a'].messages.find((m) => m.role === 'system')
     expect(sys?.body).toContain('Interact via the terminal')
+    expect(sys?.body).not.toContain('installed')
+  })
+
+  it('a refused bound raw invocation points to harness configuration, not terminal-only semantics', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: false }) }
+    const rawThread = {
+      ...sampleThread('a'),
+      agent: 'cli-raw' as const,
+      agentId: 'local-raw-tool'
+    }
+    useThreadStore.setState({
+      vaultPath: '/v',
+      activeThreadId: 'a',
+      threadsById: { a: rawThread }
+    })
+    const accepted = await useThreadStore.getState().appendUserMessage('hello')
+    expect(accepted).toBe('refused')
+    const sys = useThreadStore.getState().threadsById['a'].messages.find((m) => m.role === 'system')
+    expect(sys?.body).toContain('bound raw harness invocation was refused')
+    expect(sys?.body).toContain('invocation template')
     expect(sys?.body).not.toContain('installed')
   })
 
@@ -382,6 +725,145 @@ describe('thread-store', () => {
     )
   })
 
+  it('does not insert a thread from workspace A after switching to workspace B', async () => {
+    let resolveCreate: ((value: Thread) => void) | undefined
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.create = vi.fn(
+      () =>
+        new Promise<Thread>((resolve) => {
+          resolveCreate = resolve
+        })
+    )
+    useThreadStore.getState().setVaultPath('/workspace-a')
+
+    const pending = useThreadStore
+      .getState()
+      .createThread('machina-native', 'claude-sonnet-4-6', 'from A')
+    useThreadStore.getState().setVaultPath('/workspace-b')
+    resolveCreate?.(sampleThread('from-a'))
+
+    await expect(pending).rejects.toThrow(/workspace changed/i)
+    expect(useThreadStore.getState().vaultPath).toBe('/workspace-b')
+    expect(useThreadStore.getState().threadsById['from-a']).toBeUndefined()
+  })
+
+  it('workspace switch fences old thread dispatch without auto-closing PTYs', () => {
+    const close = vi.fn().mockResolvedValue(undefined)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = { close }
+    const oldThread = { ...sampleThread('old-cli'), agent: 'cli-claude' as const }
+    useThreadStore.setState({
+      vaultPath: '/workspace-a',
+      activeThreadId: 'old-cli',
+      threadsById: { 'old-cli': oldThread }
+    })
+    useTerminalStripStore.setState({
+      byThreadId: {
+        'old-cli': {
+          ...DEFAULT_TERMINAL_STRIP,
+          sessions: [{ tabId: 'tab-1', sessionId: 'pty-old', cwd: '/workspace-a' }],
+          activeTabId: 'tab-1'
+        }
+      }
+    })
+
+    useThreadStore.getState().setVaultPath('/workspace-b')
+
+    expect(close).not.toHaveBeenCalled()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((window as any).api.terminal.kill).not.toHaveBeenCalled()
+    expect(threadRuntimeIsClosed('old-cli')).toBe(true)
+    expect(useThreadStore.getState().threadsById).toEqual({})
+    expect(useThreadStore.getState().vaultPath).toBe('/workspace-b')
+  })
+
+  it('loadThreads reopens persisted thread ids after a workspace-switch fence', async () => {
+    const restored = { ...sampleThread('old-cli'), agent: 'cli-claude' as const }
+    useAgentDispatchStore.getState().dropThreadRuntime('old-cli')
+    expect(threadRuntimeIsClosed('old-cli')).toBe(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.list = vi.fn().mockResolvedValue([restored])
+    useThreadStore.setState({ vaultPath: '/workspace-a' })
+
+    await useThreadStore.getState().loadThreads()
+
+    expect(threadRuntimeIsClosed('old-cli')).toBe(false)
+    expect(useThreadStore.getState().threadsById['old-cli']).toEqual(restored)
+  })
+
+  it('does not dispatch input while the new CLI thread spawn is still pending', async () => {
+    const created = { ...sampleThread('h1'), agent: 'cli-claude' as const }
+    let resolveSpawn:
+      | ((value: { ok: true; sessionId: string } | { ok: false; error: string }) => void)
+      | undefined
+    const input = vi.fn()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.thread.create = vi.fn().mockResolvedValue(created)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.cliThread = {
+      spawn: vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveSpawn = resolve
+          })
+      ),
+      input
+    }
+    useThreadStore.setState({ vaultPath: '/v' })
+
+    const creating = useThreadStore
+      .getState()
+      .createThread('cli-claude', 'claude-sonnet-4-6', 'pending')
+    await vi.waitFor(() => expect(useThreadStore.getState().activeThreadId).toBe('h1'))
+    expect(useAgentDispatchStore.getState().threadStartById['h1']).toBe('starting')
+    await expect(useThreadStore.getState().appendUserMessage('too early')).resolves.toBe(
+      'indeterminate'
+    )
+    expect(input).not.toHaveBeenCalled()
+    expect(useThreadStore.getState().threadsById['h1'].messages).toEqual([])
+
+    resolveSpawn?.({ ok: true, sessionId: 's1' })
+    await creating
+    expect(useAgentDispatchStore.getState().threadStartById['h1']).toBe('ready')
+  })
+
+  it('keeps a timed-out spawn blocked until its late settlement', async () => {
+    vi.useFakeTimers()
+    try {
+      const created = { ...sampleThread('h1'), agent: 'cli-claude' as const }
+      let resolveSpawn:
+          | ((value: { ok: true; sessionId: string } | { ok: false; error: string }) => void)
+          | undefined
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.thread.create = vi.fn().mockResolvedValue(created)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.cliThread = {
+        spawn: vi.fn(
+          () =>
+            new Promise((resolve) => {
+              resolveSpawn = resolve
+            })
+        ),
+        input: vi.fn()
+      }
+      useThreadStore.setState({ vaultPath: '/v' })
+
+      const creating = useThreadStore
+        .getState()
+        .createThread('cli-claude', 'claude-sonnet-4-6', 'pending')
+      await vi.advanceTimersByTimeAsync(15_000)
+      await creating
+      expect(useAgentDispatchStore.getState().threadStartById['h1']).toBe('indeterminate')
+
+      resolveSpawn?.({ ok: true, sessionId: 's-late' })
+      await vi.waitFor(() =>
+        expect(useAgentDispatchStore.getState().threadStartById['h1']).toBe('ready')
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps in-flight set when CLI input delivery succeeds', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.cliThread = { input: vi.fn().mockResolvedValue({ ok: true }) }
@@ -391,7 +873,8 @@ describe('thread-store', () => {
       activeThreadId: 'a',
       threadsById: { a: cliThread }
     })
-    await useThreadStore.getState().appendUserMessage('hello')
+    const accepted = await useThreadStore.getState().appendUserMessage('hello')
+    expect(accepted).toBe('accepted')
     expect(useThreadStore.getState().inFlightByThreadId['a']).toBe(true)
     expect(
       useThreadStore.getState().threadsById['a'].messages.some((m) => m.role === 'system')

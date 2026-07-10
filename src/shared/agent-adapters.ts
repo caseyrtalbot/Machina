@@ -31,6 +31,339 @@ export function singleQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`
 }
 
+export type RawInvocationTemplateValidation =
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false; readonly error: string }
+
+const RAW_PROMPT_PLACEHOLDER = '{prompt}'
+
+interface TerminalControlCharacter {
+  readonly index: number
+  readonly codePoint: number
+}
+
+interface LoneSurrogate {
+  readonly index: number
+  readonly codeUnit: number
+  readonly kind: 'high' | 'low'
+}
+
+const RAW_UNQUOTED_ATOM_RE = /^[A-Za-z0-9_./:@%+=,-]$/
+const RAW_BARE_EXECUTABLE_RE = /^[A-Za-z0-9_][A-Za-z0-9_.@%+:,-]*$/
+const RAW_PATH_EXECUTABLE_RE = /^[A-Za-z0-9_./][A-Za-z0-9_./@%+:,-]*$/
+
+function findLoneSurrogate(value: string): LoneSurrogate | null {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index)
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        index += 1
+        continue
+      }
+      return { index, codeUnit, kind: 'high' }
+    }
+    if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      return { index, codeUnit, kind: 'low' }
+    }
+  }
+  return null
+}
+
+function describeLoneSurrogate(surrogate: LoneSurrogate): string {
+  const code = surrogate.codeUnit.toString(16).toUpperCase().padStart(4, '0')
+  return `lone ${surrogate.kind} surrogate U+${code} at index ${surrogate.index}`
+}
+
+/**
+ * PTYs apply line editing before the shell sees a command. C0 bytes, DEL, and
+ * C1 controls can erase or rewrite the bytes the bridge registered (Ctrl-U is
+ * the concrete regression), so they cannot appear literally in a template.
+ * The final formatted command may contain LF only because the harness prompt
+ * is intentionally a POSIX single-quoted, multi-line argument.
+ */
+function findTerminalControl(
+  value: string,
+  allowLineFeed: boolean
+): TerminalControlCharacter | null {
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.charCodeAt(index)
+    const isControl = codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
+    if (isControl && !(allowLineFeed && codePoint === 0x0a)) {
+      return { index, codePoint }
+    }
+  }
+  return null
+}
+
+function terminalControlName(codePoint: number): string {
+  const named: Readonly<Record<number, string>> = {
+    0x00: 'NUL',
+    0x07: 'BEL',
+    0x08: 'BS',
+    0x09: 'TAB',
+    0x0a: 'LF',
+    0x0b: 'VT',
+    0x0c: 'FF',
+    0x0d: 'CR',
+    0x1b: 'ESC',
+    0x7f: 'DEL'
+  }
+  const known = named[codePoint]
+  if (known !== undefined) return known
+  if (codePoint >= 0x01 && codePoint <= 0x1a) {
+    return `Ctrl-${String.fromCharCode(0x40 + codePoint)}`
+  }
+  if (codePoint === 0x1c) return 'Ctrl-\\'
+  if (codePoint === 0x1d) return 'Ctrl-]'
+  if (codePoint === 0x1e) return 'Ctrl-^'
+  if (codePoint === 0x1f) return 'Ctrl-_'
+  return 'C1 control'
+}
+
+function describeTerminalControl(control: TerminalControlCharacter): string {
+  const code = control.codePoint.toString(16).toUpperCase().padStart(4, '0')
+  return `${terminalControlName(control.codePoint)} (U+${code}) at index ${control.index}`
+}
+
+/**
+ * Conservatively admit one hook-stable shell command. Quotes are allowed for
+ * ordinary literal arguments, but every prompt placeholder must occur in the
+ * unquoted shell context so `singleQuote(prompt)` remains shell syntax rather
+ * than literal quote bytes inside a surrounding quote. Compound commands are
+ * refused because Bash's DEBUG hook reports only their first simple command,
+ * breaking the bridge's byte-exact correlation.
+ */
+function validateRawTemplateShellShape(template: string): string | null {
+  let quote: 'single' | 'double' | null = null
+  let placeholders = 0
+  const firstWordBoundary = template.indexOf(' ')
+
+  for (let i = 0; i < template.length; i += 1) {
+    if (template.startsWith(RAW_PROMPT_PLACEHOLDER, i)) {
+      if (quote !== null) return 'raw prompt placeholder must be unquoted and unescaped'
+      const before = i === 0 ? null : template[i - 1]
+      const afterIndex = i + RAW_PROMPT_PLACEHOLDER.length
+      const after = afterIndex === template.length ? null : template[afterIndex]
+      if ((before !== null && before !== ' ') || (after !== null && after !== ' ')) {
+        return 'raw prompt placeholder must be a standalone command word'
+      }
+      placeholders += 1
+      i += RAW_PROMPT_PLACEHOLDER.length - 1
+      continue
+    }
+
+    const char = template[i]
+    if (quote === 'single') {
+      if (char === "'") {
+        quote = null
+        const after = i + 1 === template.length ? null : template[i + 1]
+        if (after !== null && after !== ' ') {
+          return 'raw invocation template literal arguments must be wholly quoted'
+        }
+      }
+      continue
+    }
+    if (quote === 'double') {
+      if (char === '"') {
+        quote = null
+        const after = i + 1 === template.length ? null : template[i + 1]
+        if (after !== null && after !== ' ') {
+          return 'raw invocation template literal arguments must be wholly quoted'
+        }
+      } else if (char === '$' || char === '`' || char === '\\' || char === '!') {
+        return 'raw invocation template quoted arguments must contain literal text only'
+      }
+      continue
+    }
+
+    if (char === "'") {
+      if (firstWordBoundary !== -1 && i > firstWordBoundary && template[i - 1] !== ' ') {
+        return 'raw invocation template literal arguments must be wholly quoted'
+      }
+      quote = 'single'
+      continue
+    }
+    if (char === '"') {
+      if (firstWordBoundary !== -1 && i > firstWordBoundary && template[i - 1] !== ' ') {
+        return 'raw invocation template literal arguments must be wholly quoted'
+      }
+      quote = 'double'
+      continue
+    }
+    if (char === '\\') {
+      if (template.startsWith(RAW_PROMPT_PLACEHOLDER, i + 1)) {
+        return 'raw prompt placeholder must be unquoted and unescaped'
+      }
+      return 'raw invocation template must not use unquoted shell escapes'
+    }
+    if (char === ' ') {
+      if (i === 0 || i === template.length - 1 || template[i - 1] === ' ') {
+        return 'raw invocation template must use exactly one unquoted space between command words'
+      }
+      continue
+    }
+    if (firstWordBoundary !== -1 && i > firstWordBoundary) {
+      return 'raw invocation template literal arguments must be quoted to prevent shell alias expansion'
+    }
+    if (!RAW_UNQUOTED_ATOM_RE.test(char)) {
+      return 'raw invocation template contains unsupported unquoted shell syntax'
+    }
+  }
+
+  if (quote !== null) return 'raw invocation template has unbalanced quoting'
+  if (placeholders === 0) {
+    return `raw invocation template is missing the '${RAW_PROMPT_PLACEHOLDER}' placeholder`
+  }
+  const firstSpace = template.indexOf(' ')
+  const executable = firstSpace === -1 ? template : template.slice(0, firstSpace)
+  if (
+    executable.length === 0 ||
+    (executable.includes('/')
+      ? !RAW_PATH_EXECUTABLE_RE.test(executable)
+      : !RAW_BARE_EXECUTABLE_RE.test(executable))
+  ) {
+    return 'raw invocation template must name an unquoted executable first'
+  }
+  return null
+}
+
+function validateRawPtyCommandShellShape(command: string): string | null {
+  const firstSpace = command.indexOf(' ')
+  const executable = firstSpace === -1 ? command : command.slice(0, firstSpace)
+  const escapedExecutable = executable.startsWith('\\') ? executable.slice(1) : ''
+  const stableExecutable =
+    escapedExecutable.length > 0 &&
+    (escapedExecutable.includes('/')
+      ? RAW_PATH_EXECUTABLE_RE.test(escapedExecutable)
+      : RAW_BARE_EXECUTABLE_RE.test(escapedExecutable))
+  if (!stableExecutable) {
+    return 'raw PTY command executable must be alias-stable with one leading escape'
+  }
+
+  let quote: 'single' | 'double' | null = null
+  for (let i = 0; i < command.length; i += 1) {
+    const char = command[i]
+    if (quote === 'single') {
+      if (char === "'") quote = null
+      continue
+    }
+    if (quote === 'double') {
+      if (char === '"') {
+        quote = null
+      } else if (char === '$' || char === '`' || char === '\\' || char === '!') {
+        return 'raw PTY command quoted arguments must contain literal text only'
+      }
+      continue
+    }
+
+    if (char === "'") {
+      quote = 'single'
+      continue
+    }
+    if (char === '"') {
+      quote = 'double'
+      continue
+    }
+    if (char === '\\') {
+      if (i === 0) continue
+      // `singleQuote` represents an apostrophe as the hook-stable `\'\\''`
+      // sequence: close quote, escaped apostrophe, reopen quote.
+      if (command[i - 1] === "'" && command[i + 1] === "'" && command[i + 2] === "'") {
+        i += 1
+        continue
+      }
+      return 'raw PTY command contains an unsupported unquoted shell escape'
+    }
+    if (char === ' ') {
+      if (i === 0 || i === command.length - 1 || command[i - 1] === ' ') {
+        return 'raw PTY command must use exactly one unquoted space between command words'
+      }
+      continue
+    }
+    if (char === '\n') return 'raw PTY command line feeds must remain inside a quoted argument'
+    if (firstSpace !== -1 && i > firstSpace) {
+      return 'raw PTY command literal arguments must remain quoted'
+    }
+    if (!RAW_UNQUOTED_ATOM_RE.test(char)) {
+      return 'raw PTY command contains unsupported unquoted shell syntax'
+    }
+  }
+  if (quote !== null) return 'raw PTY command has unbalanced quoting'
+  return null
+}
+
+function stabilizeRawExecutable(command: string): string {
+  return `\\${command}`
+}
+
+/**
+ * Validate the executable template used by the raw adapter (OQ3).
+ *
+ * Draft creation, frontmatter parsing, lint, and final formatting all call
+ * this function so the raw-command contract cannot drift between boundaries.
+ * The command itself is intentionally user-authored; prompt bytes are quoted
+ * separately by `formatRawInvocation`.
+ */
+export function validateRawInvocationTemplate(template: unknown): RawInvocationTemplateValidation {
+  if (typeof template !== 'string' || template.length === 0) {
+    return { ok: false, error: 'raw invocationTemplate is required' }
+  }
+  const surrogate = findLoneSurrogate(template)
+  if (surrogate !== null) {
+    return {
+      ok: false,
+      error: `raw invocation template must contain well-formed Unicode (${describeLoneSurrogate(surrogate)})`
+    }
+  }
+  const control = findTerminalControl(template, false)
+  if (control !== null) {
+    const detail = describeTerminalControl(control)
+    if (control.codePoint === 0x0a || control.codePoint === 0x0d) {
+      return { ok: false, error: `raw invocation template must be a single line (${detail})` }
+    }
+    return {
+      ok: false,
+      error: `raw invocation template must not contain terminal control characters (${detail})`
+    }
+  }
+  const shellError = validateRawTemplateShellShape(template)
+  if (shellError !== null) return { ok: false, error: shellError }
+  return { ok: true, value: template }
+}
+
+/**
+ * Defense at the last pre-PTY boundary. Template validation catches unsafe
+ * source syntax; this second check also catches controls or malformed Unicode
+ * introduced by operator/harness prompt bytes after placeholder substitution,
+ * and refuses command bytes a shell hook can normalize. LF is the sole control
+ * exception because the prompt is one quoted multi-line shell argument. The
+ * carriage return that submits the command is appended later by the spawner
+ * and is deliberately not part of the registered command.
+ */
+export function validateRawPtyCommand(command: unknown): RawInvocationTemplateValidation {
+  if (typeof command !== 'string' || command.length === 0) {
+    return { ok: false, error: 'raw PTY command is required' }
+  }
+  const surrogate = findLoneSurrogate(command)
+  if (surrogate !== null) {
+    return {
+      ok: false,
+      error: `raw PTY command must contain well-formed Unicode (${describeLoneSurrogate(surrogate)})`
+    }
+  }
+  const control = findTerminalControl(command, true)
+  if (control !== null) {
+    return {
+      ok: false,
+      error: `raw PTY command must not contain terminal control characters (${describeTerminalControl(control)})`
+    }
+  }
+  const shellError = validateRawPtyCommandShellShape(command)
+  if (shellError !== null) return { ok: false, error: shellError }
+  return { ok: true, value: command }
+}
+
 // -- Model-flag trust rule (step 1, binding) ---------------------------------
 
 /** Conservative charset for a model id that is safe on a shell line. */
@@ -112,21 +445,19 @@ function formatGeminiInvocation(prompt: string, opts: CliInvocationOptions): str
  * raw (OQ3): the whole command line comes from a single-line template
  * carrying the literal `{prompt}` placeholder; the prompt is single-quote-
  * escaped into every occurrence. No resume, no models, no parser. A missing,
- * multiline, or placeholder-less template is a caller bug — thrown here,
- * surfaced as a structured error upstream.
+ * malformed, terminal-control-bearing, or placeholder-less template is a
+ * caller bug — thrown here and surfaced as a structured error upstream. The
+ * final command is checked again after prompt substitution.
  */
 function formatRawInvocation(prompt: string, opts: CliInvocationOptions): string {
-  const template = opts.invocationTemplate
-  if (template === undefined) {
-    throw new Error('raw adapter requires opts.invocationTemplate (workstation OQ3)')
-  }
-  if (/[\r\n]/.test(template)) {
-    throw new Error('raw invocation template must be a single line')
-  }
-  if (!template.includes('{prompt}')) {
-    throw new Error(`raw invocation template is missing the '{prompt}' placeholder`)
-  }
-  return template.split('{prompt}').join(singleQuote(prompt))
+  const validated = validateRawInvocationTemplate(opts.invocationTemplate)
+  if (!validated.ok) throw new Error(validated.error)
+  const command = stabilizeRawExecutable(
+    validated.value.split('{prompt}').join(singleQuote(prompt))
+  )
+  const ptySafe = validateRawPtyCommand(command)
+  if (!ptySafe.ok) throw new Error(ptySafe.error)
+  return ptySafe.value
 }
 
 // -- Structured stream parsing (ported from cli-agent-thread-bridge.ts) -------

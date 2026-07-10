@@ -82,6 +82,16 @@ describe('lintHarness', () => {
     expect(hasLintErrors(diags)).toBe(true)
   })
 
+  it('blank scope scalar fields are blocking errors', () => {
+    for (const field of ['goal', 'acceptance', 'rollback'] as const) {
+      const scope = { ...materializeScope(TEMPLATE, DIR), [field]: '   ' }
+      const diags = lintHarness({ ...cleanInput(), scopeJson: JSON.stringify(scope) })
+      expect(diags).toContainEqual(
+        expect.objectContaining({ severity: 'error', code: 'scope-fields', file: 'scope.json' })
+      )
+    }
+  })
+
   it('<dir> placeholder leaked into materialized scope globs ⇒ warning naming the globs', () => {
     const scope = {
       ...materializeScope(TEMPLATE, DIR),
@@ -124,10 +134,23 @@ describe('lintHarness', () => {
     expect(hasLintErrors(diags)).toBe(false)
   })
 
-  it('verify.sh without a shebang ⇒ warning', () => {
+  it('empty skill body and rules are blocking errors', () => {
+    const frontmatterOnly = frontmatterFor(TEMPLATE, 'test-fixer')
+    expect(lintHarness({ ...cleanInput(), skillMd: frontmatterOnly })).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'skill-body-empty' })
+    )
+    expect(lintHarness({ ...cleanInput(), rulesMd: ' \n' })).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'rules-empty' })
+    )
+  })
+
+  it('empty or shebang-less verify.sh is a blocking error', () => {
+    expect(lintHarness({ ...cleanInput(), verifySh: '' })).toContainEqual(
+      expect.objectContaining({ severity: 'error', code: 'verify-empty', file: 'verify.sh' })
+    )
     const diags = lintHarness({ ...cleanInput(), verifySh: 'npm test\n' })
     expect(diags).toEqual([
-      expect.objectContaining({ severity: 'warning', code: 'verify-shebang', file: 'verify.sh' })
+      expect.objectContaining({ severity: 'error', code: 'verify-shebang', file: 'verify.sh' })
     ])
   })
 

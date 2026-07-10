@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { join } from 'node:path'
 import {
   ADAPTERS,
   identityForAdapter,
   resolveModelPick,
   MODEL_PICK_RE,
   SAFE_AGENT_SESSION_ID_RE,
-  singleQuote
+  singleQuote,
+  validateRawInvocationTemplate,
+  validateRawPtyCommand
 } from '@shared/agent-adapters'
 import type { AgentAdapter, CliInvocationOptions } from '@shared/session-types'
 import { AGENT_IDENTITIES, isAgentIdentity } from '@shared/agent-identity'
+import { createBlockDetector } from '@shared/engine/block-detector'
 import { getAgentSpec, RAW_AGENT_SPEC, CLI_AGENTS } from '@shared/cli-agents'
 import { identityForAdapter as identityForAdapterReExport } from '@shared/harness-types'
 
@@ -214,11 +219,11 @@ describe('raw adapter semantics', () => {
 
   it('single-quotes the prompt into every {prompt} occurrence of the template', () => {
     expect(
-      ADAPTERS.raw.formatInvocation(`don't stop`, { invocationTemplate: 'mycli --ask {prompt}' })
-    ).toBe(`mycli --ask 'don'\\''t stop'`)
+      ADAPTERS.raw.formatInvocation(`don't stop`, { invocationTemplate: "mycli '--ask' {prompt}" })
+    ).toBe(`\\mycli '--ask' 'don'\\''t stop'`)
     expect(
-      ADAPTERS.raw.formatInvocation('x', { invocationTemplate: 'a {prompt} b {prompt}' })
-    ).toBe(`a 'x' b 'x'`)
+      ADAPTERS.raw.formatInvocation('x', { invocationTemplate: "a {prompt} 'b' {prompt}" })
+    ).toBe(`\\a 'x' 'b' 'x'`)
   })
 
   it('rejects a missing template', () => {
@@ -233,8 +238,289 @@ describe('raw adapter semantics', () => {
 
   it('rejects a template without the {prompt} placeholder', () => {
     expect(() =>
-      ADAPTERS.raw.formatInvocation(PROMPT, { invocationTemplate: 'mycli --version' })
+      ADAPTERS.raw.formatInvocation(PROMPT, { invocationTemplate: "mycli '--version'" })
     ).toThrow(/\{prompt\}/)
+  })
+
+  it('uses one shared structural validator, including NUL rejection', () => {
+    expect(validateRawInvocationTemplate('mycli {prompt}')).toEqual({
+      ok: true,
+      value: 'mycli {prompt}'
+    })
+    expect(validateRawInvocationTemplate(undefined)).toMatchObject({ ok: false })
+    expect(validateRawInvocationTemplate('mycli {prompt}\0tail')).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('NUL')
+    })
+  })
+
+  it('rejects every C0, DEL, and C1 terminal control in a raw template', () => {
+    const controls = [
+      ...Array.from({ length: 0x20 }, (_, codePoint) => codePoint),
+      ...Array.from({ length: 0x21 }, (_, offset) => 0x7f + offset)
+    ]
+    for (const codePoint of controls) {
+      const invocationTemplate = `mycli ${String.fromCharCode(codePoint)}{prompt}`
+      expect(
+        validateRawInvocationTemplate(invocationTemplate),
+        `expected U+${codePoint.toString(16).padStart(4, '0')} to be refused`
+      ).toMatchObject({ ok: false })
+      if (codePoint !== 0x0a) {
+        expect(
+          validateRawPtyCommand(`\\mycli '${String.fromCharCode(codePoint)}'`),
+          `expected final PTY command U+${codePoint.toString(16).padStart(4, '0')} to be refused`
+        ).toMatchObject({ ok: false })
+      }
+    }
+  })
+
+  it.each([
+    ['Ctrl-U', '\x15', 'Ctrl-U', 'U+0015'],
+    ['ESC', '\x1b', 'ESC', 'U+001B'],
+    ['DEL', '\x7f', 'DEL', 'U+007F'],
+    ['C1 CSI', '\u009b', 'C1 control', 'U+009B']
+  ])('reports the exact %s terminal control', (_label, control, name, codePoint) => {
+    const result = validateRawInvocationTemplate(`mycli ${control}{prompt}`)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain('terminal control characters')
+      expect(result.error).toContain(name)
+      expect(result.error).toContain(codePoint)
+    }
+  })
+
+  it('guards the final PTY command while allowing the quoted prompt line feeds', () => {
+    expect(validateRawPtyCommand("\\mycli 'line one\nline two'")).toEqual({
+      ok: true,
+      value: "\\mycli 'line one\nline two'"
+    })
+    expect(validateRawPtyCommand("\\mycli 'before\x15after'")).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Ctrl-U')
+    })
+    expect(() =>
+      ADAPTERS.raw.formatInvocation('before\x15after', {
+        invocationTemplate: "mycli '--ask' {prompt}"
+      })
+    ).toThrow(/Ctrl-U/)
+  })
+
+  it('refuses quoted or escaped prompt placeholders before shell expansion is possible', () => {
+    for (const invocationTemplate of [
+      'mycli \'--ask\' "{prompt}"',
+      "mycli '--ask' '{prompt}'",
+      "mycli '--ask' \\{prompt}"
+    ]) {
+      expect(validateRawInvocationTemplate(invocationTemplate)).toMatchObject({
+        ok: false,
+        error: expect.stringContaining('unquoted and unescaped')
+      })
+      expect(() =>
+        ADAPTERS.raw.formatInvocation('$(printf injected)', { invocationTemplate })
+      ).toThrow(/unquoted and unescaped/)
+    }
+  })
+
+  it('allows balanced literal argument quotes while keeping an unquoted placeholder safe', () => {
+    const invocationTemplate = 'printf "%s" {prompt}'
+    expect(validateRawInvocationTemplate(invocationTemplate)).toEqual({
+      ok: true,
+      value: invocationTemplate
+    })
+    const command = ADAPTERS.raw.formatInvocation('$(printf injected)', { invocationTemplate })
+    expect(command).toBe(`\\printf "%s" '$(printf injected)'`)
+    expect(execFileSync('/bin/sh', ['-c', command], { encoding: 'utf8' })).toBe(
+      '$(printf injected)'
+    )
+  })
+
+  it('rejects history expansion inside double-quoted template arguments', () => {
+    // Interactive Bash and zsh can expand `!` before DEBUG/preexec observes
+    // the command, so the registered bytes would no longer match the hook.
+    for (const invocationTemplate of ['mycli "!!" {prompt}', 'mycli "prefix!suffix" {prompt}']) {
+      expect(validateRawInvocationTemplate(invocationTemplate), invocationTemplate).toMatchObject({
+        ok: false,
+        error: expect.stringContaining('literal text only')
+      })
+      expect(() => ADAPTERS.raw.formatInvocation('safe', { invocationTemplate })).toThrow(
+        /literal text only/
+      )
+    }
+
+    expect(validateRawPtyCommand('\\mycli "!!" \'safe\'')).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('literal text only')
+    })
+  })
+
+  it('requires every prompt placeholder to be one standalone simple-command word', () => {
+    for (const invocationTemplate of [
+      'printf "%s" $[{prompt}]',
+      'printf "%s" $[ {prompt} ]',
+      'mycli arr[{prompt}]',
+      'mycli arr[ {prompt} ]',
+      'mycli --ask={prompt}',
+      'mycli {prompt}suffix',
+      'mycli ${value:-{prompt}}'
+    ]) {
+      expect(validateRawInvocationTemplate(invocationTemplate), invocationTemplate).toMatchObject({
+        ok: false
+      })
+      expect(() =>
+        ADAPTERS.raw.formatInvocation('$(/usr/bin/printf injected)', { invocationTemplate })
+      ).toThrow()
+    }
+  })
+
+  it('rejects hook-unstable spacing and makes a bare executable alias-stable', () => {
+    for (const invocationTemplate of [
+      ' mycli {prompt}',
+      'mycli {prompt} ',
+      'mycli  {prompt}',
+      "mycli {prompt}  '--final'"
+    ]) {
+      expect(validateRawInvocationTemplate(invocationTemplate), invocationTemplate).toMatchObject({
+        ok: false,
+        error: expect.stringContaining('exactly one unquoted space')
+      })
+    }
+
+    expect(validateRawInvocationTemplate('mycli "two  spaces" {prompt}')).toMatchObject({
+      ok: true
+    })
+    expect(validateRawPtyCommand("mycli 'safe'")).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('leading escape')
+    })
+    expect(ADAPTERS.raw.formatInvocation('safe', { invocationTemplate: 'mycli {prompt}' })).toBe(
+      "\\mycli 'safe'"
+    )
+  })
+
+  it('matches the formatted bytes observed by a real Bash DEBUG hook despite an alias', () => {
+    const prompt = "hello 'world'\nsecond line"
+    const command = ADAPTERS.raw.formatInvocation(prompt, {
+      invocationTemplate: 'printf "%s" {prompt}'
+    })
+    const hookPath = join(__dirname, '..', '..', 'resources', 'shell-hooks', 'te.bash')
+    const script = [
+      `source ${singleQuote(hookPath)}`,
+      `alias printf='builtin printf "ALIASED"'`,
+      'shopt -s expand_aliases',
+      // Close the setup command captured after the production DEBUG trap was
+      // installed, then observe the formatted raw invocation as its own block.
+      '__te_prompt_command',
+      command,
+      '__te_prompt_command'
+    ].join('\n')
+
+    const observed = spawnSync('/bin/bash', ['--noprofile', '--norc', '-c', script], {
+      encoding: 'utf8',
+      env: { ...process.env, TE_SESSION_ID: 'raw-hook-test' }
+    })
+    expect(observed.error).toBeUndefined()
+    expect(observed.status).toBe(0)
+    const events = createBlockDetector().consume(observed.stdout)
+    const starts = events.filter((event) => event.kind === 'command-start')
+    expect(
+      starts.some((event) => event.kind === 'command-start' && event.command === command)
+    ).toBe(true)
+    const output = events
+      .filter((event) => event.kind === 'output-chunk')
+      .map((event) => (event.kind === 'output-chunk' ? event.text : ''))
+      .join('')
+    expect(output).toContain(prompt)
+  })
+
+  it('prevents zsh global and slash-path aliases from rewriting the command', () => {
+    const command = ADAPTERS.raw.formatInvocation('PROMPT', {
+      invocationTemplate: "/bin/echo 'G' {prompt}"
+    })
+    expect(command).toBe("\\/bin/echo 'G' 'PROMPT'")
+
+    const script = [
+      `alias -g G='; print GLOBAL_EXECUTED; print'`,
+      `alias '/bin/echo=print PATH_ALIAS'`,
+      `eval ${singleQuote(command)}`
+    ].join('\n')
+    const observed = spawnSync('zsh', ['-f', '-c', script], { encoding: 'utf8' })
+
+    expect(observed.error).toBeUndefined()
+    expect(observed.status).toBe(0)
+    expect(observed.stdout.trim()).toBe('G PROMPT')
+    expect(observed.stdout).not.toContain('GLOBAL_EXECUTED')
+    expect(observed.stdout).not.toContain('PATH_ALIAS')
+  })
+
+  it('requires quoted literal arguments and escapes both bare and path executables', () => {
+    for (const invocationTemplate of [
+      'mycli --ask {prompt}',
+      'mycli GLOBAL {prompt}',
+      'mycli "safe"suffix {prompt}'
+    ]) {
+      expect(validateRawInvocationTemplate(invocationTemplate), invocationTemplate).toMatchObject({
+        ok: false
+      })
+    }
+
+    expect(
+      ADAPTERS.raw.formatInvocation('safe', {
+        invocationTemplate: "mycli '--ask' {prompt}"
+      })
+    ).toBe("\\mycli '--ask' 'safe'")
+    expect(
+      ADAPTERS.raw.formatInvocation('safe', {
+        invocationTemplate: "/usr/local/bin/mycli '--ask' {prompt}"
+      })
+    ).toBe("\\/usr/local/bin/mycli '--ask' 'safe'")
+    expect(validateRawPtyCommand("\\mycli --ask 'safe'")).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('remain quoted')
+    })
+  })
+
+  it('rejects lone UTF-16 surrogates before formatting or PTY registration', () => {
+    const cases = [
+      ['high', '\ud800', 'U+D800'],
+      ['low', '\udfff', 'U+DFFF']
+    ] as const
+    for (const [kind, surrogate, codePoint] of cases) {
+      const template = validateRawInvocationTemplate(`mycli '${surrogate}' {prompt}`)
+      expect(template.ok).toBe(false)
+      if (!template.ok) {
+        expect(template.error).toContain(`lone ${kind} surrogate`)
+        expect(template.error).toContain(codePoint)
+      }
+      expect(validateRawPtyCommand(`\\mycli '${surrogate}'`)).toMatchObject({ ok: false })
+      expect(() =>
+        ADAPTERS.raw.formatInvocation(surrogate, { invocationTemplate: 'mycli {prompt}' })
+      ).toThrow(/well-formed Unicode/)
+    }
+
+    expect(validateRawInvocationTemplate("mycli '😀' {prompt}")).toMatchObject({ ok: true })
+    expect(ADAPTERS.raw.formatInvocation('😀', { invocationTemplate: 'mycli {prompt}' })).toBe(
+      "\\mycli '😀'"
+    )
+  })
+
+  it('refuses unbalanced quoting, command substitution, and hook-unstable compound commands', () => {
+    for (const invocationTemplate of [
+      'mycli "label {prompt}',
+      "mycli 'label' {prompt} '",
+      'mycli {prompt} | tee output.log',
+      'mycli {prompt}; true',
+      'mycli {prompt} && true',
+      'mycli {prompt} &',
+      '(mycli {prompt})',
+      'echo $(mycli {prompt})',
+      'echo `mycli {prompt}`',
+      '! mycli {prompt}',
+      'mycli {prompt} > output.log'
+    ]) {
+      expect(validateRawInvocationTemplate(invocationTemplate), invocationTemplate).toMatchObject({
+        ok: false
+      })
+    }
   })
 })
 

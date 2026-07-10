@@ -9,12 +9,12 @@ import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeStatusStore } from '../../store/claude-status-store'
 import { useHarnessStore } from '../../store/harness-store'
-import { runHarness } from '../../store/harness-run'
 import { notifyError } from '../../utils/error-logger'
 import { showToast } from '../../components/Toast'
 import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
 import { openStripTerminal, openStripTerminalInFolder } from './terminal-migration'
 import { REVERT_AGENT_EVENT } from './RevertAgentSection'
+import { HARNESS_CATALOG } from './harness-gallery-model'
 
 export type PaletteItemKind = 'thread' | 'file' | 'surface' | 'action' | 'note'
 
@@ -41,6 +41,10 @@ interface IndexDoc {
 
 interface PaletteSourcesOptions {
   readonly closePalette: () => void
+  /** Open the local harness gallery, optionally seeded from a catalog card. */
+  readonly openHarnessGallery?: (templateId?: string) => void
+  /** Open the mandatory task-brief gate for an installed harness. */
+  readonly openHarnessTaskBrief?: (summary: HarnessSummary) => void
   /**
    * Harness summaries snapshot (workstation step 6). The palette passes the
    * subscribed harness-store state so the item list rebuilds when a refresh
@@ -223,27 +227,59 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
         openArtifactInEditor(path, path.split('/').pop() ?? path)
       }
     },
-    // Harness create (workstation step 6). Phase 1 ships one template; the
-    // default slug is the template id. Failures (duplicate create, invalid
-    // slug) are expected Result errors and surface as a toast — never an
-    // overwrite.
     {
-      id: 'action:harness-create:test-fixer',
+      id: 'action:harness-gallery',
       kind: 'action',
-      title: 'Create test-fixer harness',
-      subtitle: `harness template · ${TE_DIR}/agents/test-fixer`,
-      run: async () => {
+      title: 'New agent…',
+      subtitle: 'local harness gallery · templates and blank builder',
+      run: () => {
         opts.closePalette()
-        const res = await window.api.harness.create('test-fixer', 'test-fixer')
-        if (!res.ok) {
-          notifyError('harness-create', new Error(res.error), `Harness create failed: ${res.error}`)
-          return
-        }
-        showToast(`Harness created: ${res.root}`)
-        void useHarnessStore.getState().refresh()
+        opts.openHarnessGallery?.()
       }
     }
   )
+
+  // Step 8 gallery parity: every built-in template has a searchable action.
+  // Configuration-required templates open the exact same seeded builder as
+  // their gallery card. Complete templates retain a safe one-click create;
+  // main owns duplicate checks and all filesystem authority.
+  for (const template of HARNESS_CATALOG) {
+    items.push({
+      id: `action:harness-create:${template.id}`,
+      kind: 'action',
+      title: `Create ${template.label} harness`,
+      subtitle: `${template.category} · ${template.audience.join(', ')} · ${TE_DIR}/agents/${template.id}`,
+      run: async () => {
+        opts.closePalette()
+        if (template.requiresConfiguration) {
+          opts.openHarnessGallery?.(template.id)
+          return
+        }
+        try {
+          const res = await window.api.harness.create({
+            template: template.id,
+            slug: template.id
+          })
+          if (!res.ok) {
+            notifyError(
+              'harness-create',
+              new Error(res.error),
+              `Harness create failed: ${res.error}`
+            )
+            return
+          }
+          showToast(`Harness created: ${res.root}`)
+          await useHarnessStore.getState().refresh()
+        } catch (error) {
+          notifyError(
+            'harness-create',
+            error,
+            'Harness create failed before it reached the workspace'
+          )
+        }
+      }
+    })
+  }
 
   // One run item per on-disk harness (step 6): reads the harness files,
   // composes the prompt, and starts a CLI thread attributed to the slug.
@@ -267,9 +303,9 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       kind: 'action',
       title: `Run harness: ${h.name}`,
       subtitle: `harness · ${h.adapter} · ${h.description}`,
-      run: async () => {
+      run: () => {
         opts.closePalette()
-        await runHarness(h)
+        opts.openHarnessTaskBrief?.(h)
       }
     })
   }

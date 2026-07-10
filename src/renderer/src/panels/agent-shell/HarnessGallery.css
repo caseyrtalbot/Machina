@@ -1,0 +1,730 @@
+.harness-gallery-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+
+.harness-gallery-dialog {
+  width: min(1080px, 100%);
+  max-height: min(900px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--r-tool);
+  font-family: var(--font-body, system-ui, sans-serif);
+}
+
+.harness-task-dialog {
+  width: min(680px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--r-tool);
+  font-family: var(--font-body, system-ui, sans-serif);
+}
+
+.harness-gallery-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line-subtle);
+  background: var(--color-bg-chrome);
+}
+
+.harness-gallery-header h1,
+.harness-gallery-section-heading h2,
+.harness-card h3,
+.harness-diagnostics h3,
+.harness-raw-warning h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.harness-gallery-header h1 {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.harness-gallery-header p,
+.harness-gallery-section-heading p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.harness-gallery-eyebrow,
+.harness-card-kicker,
+.harness-field > span,
+.harness-card-facts dt,
+.harness-preview dt {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.harness-gallery-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.harness-gallery-close:hover,
+.harness-gallery-close:focus-visible {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent-default);
+  outline: none;
+}
+
+.harness-gallery-mode-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line-subtle);
+  background: var(--color-bg-surface);
+}
+
+.harness-gallery-mode-tabs button,
+.harness-tab {
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.harness-gallery-mode-tabs button[aria-current='page'],
+.harness-tab[aria-pressed='true'] {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent-default);
+}
+
+.harness-gallery-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 24px 28px;
+  background: var(--color-bg-base);
+}
+
+.harness-gallery-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.harness-gallery-section-heading h2 {
+  font-size: 16px;
+}
+
+.harness-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.harness-catalog-filters {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.harness-audience-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.harness-audience-filter span {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.harness-audience-filter select {
+  padding: 5px 7px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  background: var(--color-bg-surface);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-tab {
+  padding: 7px 9px;
+}
+
+.harness-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.harness-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-tool);
+  background: var(--color-bg-surface);
+}
+
+.harness-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.harness-card-kicker {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.harness-card h3 {
+  font-size: 14px;
+}
+
+.harness-card-description,
+.harness-card-details p,
+.harness-raw-warning p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.harness-audience-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.harness-audience-list span {
+  padding: 3px 6px;
+  color: var(--color-text-muted);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-inline);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+}
+
+.harness-card-facts,
+.harness-preview dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.harness-card-facts div,
+.harness-preview dl div {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.harness-card-facts dd,
+.harness-preview dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-card-details {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border-left: 2px solid var(--color-accent-line);
+  background: var(--color-bg-elevated);
+}
+
+.harness-card-details strong {
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.harness-card-details pre,
+.harness-preview pre {
+  max-height: 180px;
+  margin: 3px 0 0;
+  overflow: auto;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.harness-card-actions,
+.harness-builder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.harness-button {
+  padding: 7px 10px;
+  border-radius: var(--r-inline);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.harness-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.harness-button-primary {
+  color: var(--color-bg-base);
+  border: 1px solid var(--color-accent-default);
+  background: var(--color-accent-default);
+}
+
+.harness-button-secondary {
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+}
+
+.harness-builder {
+  display: grid;
+  gap: 16px;
+}
+
+.harness-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.harness-field {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.harness-field-wide {
+  grid-column: 1 / -1;
+}
+
+.harness-field input,
+.harness-field select,
+.harness-field textarea,
+.harness-fixed-value {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 9px;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  background: var(--color-bg-surface);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.harness-field textarea {
+  resize: vertical;
+}
+
+.harness-field input:focus,
+.harness-field select:focus,
+.harness-field textarea:focus {
+  border-color: var(--color-accent-default);
+  outline: 1px solid var(--color-accent-line);
+}
+
+.harness-field small {
+  color: var(--signal-danger);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-shell-warning {
+  padding: 7px 8px;
+  color: var(--signal-warn);
+  border-left: 2px solid var(--signal-warn);
+  background: color-mix(in srgb, var(--signal-warn) 6%, transparent);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.harness-fixed-value {
+  color: var(--color-text-muted);
+}
+
+.harness-builder-disclosure,
+.harness-preview,
+.harness-diagnostics,
+.harness-raw-warning {
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-tool);
+  background: var(--color-bg-surface);
+}
+
+.harness-builder-disclosure summary,
+.harness-preview summary {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.harness-builder-disclosure[open] summary,
+.harness-preview[open] summary {
+  margin-bottom: 12px;
+}
+
+.harness-raw-warning {
+  display: grid;
+  gap: 9px;
+  border-color: var(--signal-warn);
+  background: color-mix(in srgb, var(--signal-warn) 7%, var(--color-bg-surface));
+}
+
+.harness-raw-warning h3,
+.harness-diagnostics h3 {
+  font-size: 12px;
+}
+
+.harness-raw-warning code {
+  font-family: var(--font-mono, monospace);
+}
+
+.harness-diagnostics ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.harness-diagnostics li,
+.harness-diagnostic-ok {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.harness-diagnostics li[data-severity='error'] {
+  color: var(--signal-danger);
+}
+
+.harness-diagnostics li[data-severity='warning'] {
+  color: var(--signal-warn);
+}
+
+.harness-diagnostic-ok {
+  margin-top: 7px;
+  color: var(--signal-success);
+}
+
+.harness-builder-actions {
+  padding-top: 12px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.harness-builder-actions > span {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-create-error,
+.harness-create-success {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-left: 2px solid;
+  background: var(--color-bg-surface);
+  font-size: 12px;
+}
+
+.harness-create-error {
+  border-color: var(--signal-danger);
+  color: var(--signal-danger);
+}
+
+.harness-create-success {
+  border-color: var(--signal-success);
+  color: var(--signal-success);
+}
+
+.harness-create-error span,
+.harness-create-success span,
+.harness-create-success > div {
+  min-width: 0;
+}
+
+.harness-create-success > div {
+  display: grid;
+  gap: 3px;
+}
+
+.harness-create-success span {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-create-success small {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.harness-task-body {
+  min-height: 0;
+  display: grid;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  background: var(--color-bg-base);
+}
+
+.harness-task-role,
+.harness-task-scope {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-tool);
+  background: var(--color-bg-surface);
+}
+
+.harness-task-role {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.harness-task-role h2,
+.harness-task-scope h2 {
+  margin: 0 0 6px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.harness-task-role strong {
+  font-size: 13px;
+}
+
+.harness-task-role p,
+.harness-task-scope p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.harness-task-scope .harness-task-scope-boundary {
+  margin: 0;
+  padding: 7px 8px;
+  color: var(--signal-warn);
+  border-left: 2px solid var(--signal-warn);
+  background: color-mix(in srgb, var(--signal-warn) 6%, transparent);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-task-role dl {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  margin: 0;
+}
+
+.harness-task-role dl div {
+  display: grid;
+  grid-template-columns: 56px auto;
+  gap: 8px;
+}
+
+.harness-task-role dt,
+.harness-task-scope strong {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.harness-task-role dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-task-scope > div {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.harness-task-scope code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-task-field {
+  display: grid;
+  gap: 7px;
+}
+
+.harness-task-field > span {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.harness-task-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  padding: 10px;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  outline: none;
+  background: var(--color-bg-surface);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.harness-task-field textarea:focus {
+  border-color: var(--color-accent-default);
+  outline: 1px solid var(--color-accent-line);
+}
+
+.harness-task-validation-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -8px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-task-validation-row [data-valid='false'],
+.harness-task-validation-row [data-over-limit='true'] {
+  color: var(--signal-danger);
+}
+
+.harness-task-validation-row [data-valid='true'] {
+  color: var(--signal-success);
+}
+
+.harness-task-progress {
+  min-height: 1.5em;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.harness-task-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+@media (max-width: 760px) {
+  .harness-gallery-backdrop {
+    padding: 8px;
+  }
+
+  .harness-gallery-dialog {
+    max-height: calc(100vh - 16px);
+  }
+
+  .harness-task-dialog {
+    max-height: calc(100vh - 16px);
+  }
+
+  .harness-gallery-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .harness-catalog-filters {
+    justify-items: start;
+  }
+
+  .harness-card-grid,
+  .harness-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .harness-field-wide {
+    grid-column: auto;
+  }
+
+  .harness-task-role {
+    grid-template-columns: 1fr;
+  }
+}

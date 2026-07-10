@@ -2,7 +2,12 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import type { AgentIdentity } from '@shared/agent-identity'
 import type { AdapterId } from '@shared/session-types'
-import { ADAPTERS, resolveModelPick } from '@shared/agent-adapters'
+import {
+  ADAPTERS,
+  identityForAdapter,
+  resolveModelPick,
+  validateRawInvocationTemplate
+} from '@shared/agent-adapters'
 import { SAFE_ID_RE } from '@shared/git-types'
 import { typedHandle, typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
@@ -109,14 +114,13 @@ export function resolveRequestedModel(
 
 /**
  * Attribution trust rule at the IPC boundary (workstation Phase 2 step 3,
- * contracts §4 v1.2.2). Degrade-not-fail: the turn ALWAYS proceeds. An absent
- * agentId is the unbound ad-hoc case — no lookup, no audit; the spawner
- * defaults to the adapter identity. A forwarded value must match the thread's
- * write-once binding: malformed, mismatched, forwarded on an unbound
- * thread, or unresolvable because the registry itself failed (backfill scan
- * or mirror persist threw) ⇒ fall back to adapter identity
- * (`agentId: undefined`), audit `cli-agent:attribution-mismatch`, and tag
- * the turn attributionSuspect.
+ * contracts §4 v1.2.2). Every spawn/input checks the thread's main binding,
+ * even when renderer agentId is absent: truly unbound threads remain clean
+ * ad-hoc turns, while a modern binding recovers its authoritative slug and
+ * adapter. A malformed, stale, legacy-adapter-less, unbound-forwarded, or
+ * registry-unresolvable value degrades to adapter attribution and tags the
+ * turn suspect. A known binding adapter that does not map exactly to the
+ * requested CLI identity fails closed.
  * `ensureRootReady` runs the one-time trust-on-upgrade backfill first, so the
  * first post-relaunch turn of a legacy thread never degrades falsely.
  * Exported for handler-level tests.
@@ -130,11 +134,21 @@ export async function resolveRequestedAgentId(
     ensureRootReady(root: string): Promise<void>
     get(root: string, threadId: string): HarnessBinding | undefined
   },
-  audit: Pick<AuditLogger, 'log'>
-): Promise<{ agentId: string | undefined; attributionSuspect: boolean }> {
-  if (requested === undefined) return { agentId: undefined, attributionSuspect: false }
+  audit: Pick<AuditLogger, 'log'>,
+  identity: AgentIdentity
+): Promise<{
+  agentId: string | undefined
+  attributionSuspect: boolean
+  invocationTemplate?: string
+  blocked?: true
+}> {
   const degrade = (
-    reason: 'malformed' | 'binding-mismatch' | 'unbound-thread' | 'registry-error',
+    reason:
+      | 'malformed'
+      | 'binding-mismatch'
+      | 'unbound-thread'
+      | 'registry-error'
+      | 'adapter-unknown',
     extra: Readonly<Record<string, unknown>> = {}
   ): { agentId: undefined; attributionSuspect: true } => {
     audit.log({
@@ -147,7 +161,6 @@ export async function resolveRequestedAgentId(
     })
     return { agentId: undefined, attributionSuspect: true }
   }
-  if (!SAFE_ID_RE.test(requested)) return degrade('malformed')
   let binding: HarnessBinding | undefined
   try {
     await registry.ensureRootReady(cwd)
@@ -158,9 +171,63 @@ export async function resolveRequestedAgentId(
     // never hard-fails the turn.
     return degrade('registry-error', { error: String(err) })
   }
+  // Adapter authority is thread-bound, so enforce it before trusting (or
+  // degrading) any renderer-forwarded slug. A stale/malformed slug must not
+  // become a route around a modern raw↔structured adapter lock.
+  if (binding?.adapter !== undefined) {
+    const boundIdentity = identityForAdapter(binding.adapter)
+    if (boundIdentity !== identity) {
+      audit.log({
+        ts: new Date().toISOString(),
+        tool: 'cli-agent:attribution-mismatch',
+        args: {
+          channel,
+          threadId,
+          requested,
+          reason: 'adapter-mismatch',
+          boundAdapter: binding.adapter,
+          boundIdentity,
+          requestedIdentity: identity
+        },
+        affectedPaths: [],
+        decision: 'denied',
+        error: 'requested CLI identity does not match the harness binding adapter; turn blocked'
+      })
+      return { agentId: undefined, attributionSuspect: true, blocked: true }
+    }
+  }
+  if (requested === undefined) {
+    if (binding === undefined) return { agentId: undefined, attributionSuspect: false }
+    if (binding.adapter === undefined) {
+      return degrade('adapter-unknown', { boundSlug: binding.slug })
+    }
+    const rawTemplate =
+      binding.adapter === 'raw'
+        ? validateRawInvocationTemplate(binding.invocationTemplate)
+        : { ok: false as const }
+    return {
+      agentId: binding.slug,
+      attributionSuspect: false,
+      ...(rawTemplate.ok ? { invocationTemplate: rawTemplate.value } : {})
+    }
+  }
+  if (!SAFE_ID_RE.test(requested)) return degrade('malformed')
   if (binding === undefined) return degrade('unbound-thread')
   if (binding.slug !== requested) return degrade('binding-mismatch', { boundSlug: binding.slug })
-  return { agentId: requested, attributionSuspect: false }
+  if (binding.adapter === undefined) {
+    // Trust-on-upgrade and pre-step-8 bindings have no durable adapter fact.
+    // Keep the ad-hoc turn usable, but never attribute it to the harness slug.
+    return degrade('adapter-unknown', { boundSlug: binding.slug })
+  }
+  const rawTemplate =
+    binding.adapter === 'raw'
+      ? validateRawInvocationTemplate(binding.invocationTemplate)
+      : { ok: false as const }
+  return {
+    agentId: requested,
+    attributionSuspect: false,
+    ...(rawTemplate.ok ? { invocationTemplate: rawTemplate.value } : {})
+  }
 }
 
 /**
@@ -230,16 +297,36 @@ export function registerCliThreadIpc(): void {
       cwd,
       agentId,
       getHarnessRunRegistry(),
+      getCliAuditLogger(),
+      identity
+    )
+    if (attribution.blocked === true) {
+      return { ok: false as const, error: 'harness adapter identity mismatch' }
+    }
+    const resolvedModel = resolveRequestedModel(
+      'cli-thread:spawn',
+      identity,
+      model,
       getCliAuditLogger()
     )
-    return getSpawner().spawn(
-      threadId,
-      identity,
-      cwd,
-      attribution.agentId,
-      resolveRequestedModel('cli-thread:spawn', identity, model, getCliAuditLogger()),
-      attribution.attributionSuspect
-    )
+    return identity === 'cli-raw'
+      ? getSpawner().spawn(
+          threadId,
+          identity,
+          cwd,
+          attribution.agentId,
+          resolvedModel,
+          attribution.attributionSuspect,
+          attribution.invocationTemplate
+        )
+      : getSpawner().spawn(
+          threadId,
+          identity,
+          cwd,
+          attribution.agentId,
+          resolvedModel,
+          attribution.attributionSuspect
+        )
   })
 
   typedHandle('cli-thread:input', async ({ threadId, identity, text, cwd, agentId, model }) => {
@@ -253,17 +340,36 @@ export function registerCliThreadIpc(): void {
       cwd,
       agentId,
       getHarnessRunRegistry(),
+      getCliAuditLogger(),
+      identity
+    )
+    if (attribution.blocked === true) return { ok: false as const }
+    const resolvedModel = resolveRequestedModel(
+      'cli-thread:input',
+      identity,
+      model,
       getCliAuditLogger()
     )
-    return getSpawner().input(
-      threadId,
-      identity,
-      text,
-      cwd,
-      attribution.agentId,
-      resolveRequestedModel('cli-thread:input', identity, model, getCliAuditLogger()),
-      attribution.attributionSuspect
-    )
+    return identity === 'cli-raw'
+      ? getSpawner().input(
+          threadId,
+          identity,
+          text,
+          cwd,
+          attribution.agentId,
+          resolvedModel,
+          attribution.attributionSuspect,
+          attribution.invocationTemplate
+        )
+      : getSpawner().input(
+          threadId,
+          identity,
+          text,
+          cwd,
+          attribution.agentId,
+          resolvedModel,
+          attribution.attributionSuspect
+        )
   })
 
   typedHandle('cli-thread:close', async ({ threadId }) => {

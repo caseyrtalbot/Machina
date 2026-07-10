@@ -75,6 +75,18 @@ export class CliThreadSpawner {
   /** threadId → sessionId of the bound PTY. */
   private readonly sessionByThread = new Map<string, string>()
   /**
+   * Thread deletion is permanent for a spawner instance. Async detection may
+   * finish after `close()`; this tombstone keeps that stale continuation from
+   * creating a PTY or writing a command after the renderer has deleted it.
+   */
+  private readonly closedThreads = new Set<string>()
+  /**
+   * Identity that created the currently live PTY. A live thread may never be
+   * retargeted to a different adapter: that would let one harness binding
+   * write through another adapter's already-open shell.
+   */
+  private readonly identityByThread = new Map<string, CliAgentIdentity>()
+  /**
    * Threads that already received at least one turn in this app run.
    * Deliberately not cleared on close(): conversation continuity outlives
    * the PTY (the next turn resumes the agent session in a fresh shell).
@@ -99,6 +111,12 @@ export class CliThreadSpawner {
    */
   private readonly modelByThread = new Map<string, string>()
   /**
+   * Main-resolved raw invocation template snapshotted in HarnessRunRegistry.
+   * Every spawn/input request sets or clears this slot; renderer state is never
+   * a source. Structured adapters never consult it.
+   */
+  private readonly invocationTemplateByThread = new Map<string, string>()
+  /**
    * Per-thread attribution-suspect tag (contracts §4 v1.2.2). Arrives
    * PRE-RESOLVED from the IPC boundary (`resolveRequestedAgentId`) on every
    * spawn/input — suspect=false clears, so a thread is only tagged while its
@@ -114,20 +132,38 @@ export class CliThreadSpawner {
     cwd: string,
     agentId?: string,
     model?: string,
-    attributionSuspect?: boolean
+    attributionSuspect?: boolean,
+    invocationTemplate?: string
   ): Promise<SpawnResult> {
     if (!isCliAgentIdentity(identity)) {
       return { ok: false, error: `not a CLI agent: ${identity}` }
     }
-    this.cwdByThread.set(threadId, cwd)
-    this.setAttribution(threadId, agentId, attributionSuspect)
-    this.setModel(threadId, model)
+    if (this.closedThreads.has(threadId)) {
+      return { ok: false, error: `thread ${threadId} is closed` }
+    }
+    if (this.hasLiveSession(threadId)) {
+      const boundIdentity = this.identityByThread.get(threadId)
+      if (boundIdentity !== identity) {
+        return {
+          ok: false,
+          error: `thread ${threadId} already has a live ${boundIdentity ?? 'unknown'} session`
+        }
+      }
+      this.cwdByThread.set(threadId, cwd)
+      this.setAttribution(threadId, agentId, attributionSuspect)
+      this.setModel(threadId, model)
+      this.setInvocationTemplate(threadId, identity === 'cli-raw' ? invocationTemplate : undefined)
+      return { ok: true, sessionId: this.sessionByThread.get(threadId)! }
+    }
     // `cli-raw` has no binary to probe (RAW_AGENT_SPEC.alwaysAvailable): the
     // whole command line comes from an invocation template (OQ3), so the
     // installed-binary check is skipped — a raw session is a plain PTY.
     if (identity !== 'cli-raw') {
       const detect = this.opts.detect ?? detectInstalledAgents
       const installations = await detect()
+      if (this.closedThreads.has(threadId)) {
+        return { ok: false, error: `thread ${threadId} is closed` }
+      }
       const specId = specIdForIdentity(identity)
       const inst = installations.find((i) => i.id === specId)
       if (!inst || !inst.installed) {
@@ -136,17 +172,47 @@ export class CliThreadSpawner {
           error: missingBinaryHint(identity)
         }
       }
+      // Detection yields to the event loop. A concurrent input may have
+      // completed this thread's spawn while we waited, so re-check before the
+      // synchronous create/bind sequence to preserve one PTY per thread.
+      if (this.hasLiveSession(threadId)) {
+        const boundIdentity = this.identityByThread.get(threadId)
+        if (boundIdentity !== identity) {
+          return {
+            ok: false,
+            error: `thread ${threadId} already has a live ${boundIdentity ?? 'unknown'} session`
+          }
+        }
+        this.cwdByThread.set(threadId, cwd)
+        this.setAttribution(threadId, agentId, attributionSuspect)
+        this.setModel(threadId, model)
+        this.setInvocationTemplate(threadId, invocationTemplate)
+        return { ok: true, sessionId: this.sessionByThread.get(threadId)! }
+      }
     }
 
     const sessionId = this.opts.shellService.create(cwd, undefined, undefined, undefined, identity)
-    this.opts.bridge.bind(sessionId, threadId)
+    this.opts.bridge.bind(sessionId, threadId, adapterForIdentity(identity).id)
     this.sessionByThread.set(threadId, sessionId)
+    this.identityByThread.set(threadId, identity)
+    this.cwdByThread.set(threadId, cwd)
+    this.setAttribution(threadId, agentId, attributionSuspect)
+    this.setModel(threadId, model)
+    this.setInvocationTemplate(threadId, identity === 'cli-raw' ? invocationTemplate : undefined)
     return { ok: true, sessionId }
   }
 
   private setModel(threadId: string, model: string | undefined): void {
     if (model !== undefined) this.modelByThread.set(threadId, model)
     else this.modelByThread.delete(threadId)
+  }
+
+  private setInvocationTemplate(threadId: string, invocationTemplate: string | undefined): void {
+    if (invocationTemplate !== undefined) {
+      this.invocationTemplateByThread.set(threadId, invocationTemplate)
+    } else {
+      this.invocationTemplateByThread.delete(threadId)
+    }
   }
 
   /**
@@ -179,16 +245,33 @@ export class CliThreadSpawner {
     cwd: string,
     agentId?: string,
     model?: string,
-    attributionSuspect?: boolean
+    attributionSuspect?: boolean,
+    invocationTemplate?: string
   ): Promise<{ ok: boolean }> {
+    if (!isCliAgentIdentity(identity)) return { ok: false }
+    if (this.closedThreads.has(threadId)) return { ok: false }
+    if (this.hasLiveSession(threadId) && this.identityByThread.get(threadId) !== identity) {
+      return { ok: false }
+    }
     this.cwdByThread.set(threadId, cwd)
     this.setAttribution(threadId, agentId, attributionSuspect)
     this.setModel(threadId, model)
+    this.setInvocationTemplate(threadId, identity === 'cli-raw' ? invocationTemplate : undefined)
     if (!this.hasLiveSession(threadId)) {
-      const spawned = await this.spawn(threadId, identity, cwd, agentId, model, attributionSuspect)
+      const spawned = await this.spawn(
+        threadId,
+        identity,
+        cwd,
+        agentId,
+        model,
+        attributionSuspect,
+        invocationTemplate
+      )
       if (!spawned.ok) return { ok: false }
+      if (this.closedThreads.has(threadId)) return { ok: false }
       this.opts.onSessionChanged?.(threadId, spawned.sessionId)
     }
+    if (this.closedThreads.has(threadId)) return { ok: false }
     return { ok: this.sendUserMessage(threadId, identity, text) }
   }
 
@@ -203,53 +286,92 @@ export class CliThreadSpawner {
   }
 
   sendUserMessage(threadId: string, identity: AgentIdentity, text: string): boolean {
+    if (this.closedThreads.has(threadId)) return false
     const sessionId = this.sessionByThread.get(threadId)
     if (!sessionId) return false
     if (!isCliAgentIdentity(identity)) {
       throw new Error(`sendUserMessage: not a CLI agent identity: ${identity}`)
     }
-    // Step-1 raw semantics: ad-hoc raw threads have NO invocation template
-    // source (harness-supplied templates arrive in step 8 — OQ3). Formatting
-    // would throw inside the adapter; writing anything else into the PTY
-    // would run a broken command as the user. Refuse instead: the thread
-    // input surface shows "no structured view — interact via the terminal"
-    // with sending disabled, and this is the main-process backstop for it.
-    if (identity === 'cli-raw') return false
+    if (this.identityByThread.get(threadId) !== identity) return false
     // Per-thread continuity: resume the agent's own session when the bridge
     // captured its id from structured output; fall back to most-recent-in-cwd
     // continuation when a turn was sent but no id is known. The model pick
     // (if any) was validated at the IPC boundary — see `modelByThread`.
     const model = this.modelByThread.get(threadId)
-    const command = adapterForIdentity(identity).formatInvocation(text, {
-      resumeSessionId: this.opts.bridge.getAgentSessionId(threadId),
-      continueConversation: this.turnsSent.has(threadId),
-      ...(model !== undefined ? { model } : {})
-    })
+    const adapter = adapterForIdentity(identity)
+    let command: string
+    let rawExpectationRegistered = false
+    if (identity === 'cli-raw') {
+      const invocationTemplate = this.invocationTemplateByThread.get(threadId)
+      if (invocationTemplate === undefined) return false
+      try {
+        command = adapter.formatInvocation(text, { invocationTemplate })
+      } catch {
+        // A missing/corrupt template never opens a turn or writes to the PTY.
+        return false
+      }
+      // Mark the exact next raw block BEFORE the turn window and PTY write.
+      // If the adapter-aware bridge binding is absent/stale, fail closed.
+      if (!this.opts.bridge.expectRawInvocation(sessionId, command)) return false
+      rawExpectationRegistered = true
+    } else {
+      command = adapter.formatInvocation(text, {
+        resumeSessionId: this.opts.bridge.getAgentSessionId(threadId),
+        continueConversation: this.turnsSent.has(threadId),
+        ...(model !== undefined ? { model } : {})
+      })
+    }
     // Open the attribution window BEFORE the PTY write: headShaAtStart must
     // be captured before the agent can move HEAD, and the first write must
     // never land ahead of its turn window.
     const cwd = this.cwdByThread.get(threadId)
-    if (this.opts.registry !== undefined && cwd !== undefined) {
-      this.opts.registry.turnStarted({
-        threadId,
-        agentId: this.agentIdByThread.get(threadId) ?? identity,
-        cwd,
-        attributionSuspect: this.attributionSuspectByThread.get(threadId) === true
-      })
+    try {
+      if (this.opts.registry !== undefined && cwd !== undefined) {
+        this.opts.registry.turnStarted({
+          threadId,
+          agentId: this.agentIdByThread.get(threadId) ?? identity,
+          cwd,
+          attributionSuspect: this.attributionSuspectByThread.get(threadId) === true
+        })
+      }
+      const accepted = this.opts.shellService
+        .getPtyService()
+        .writeAgentInput(sessionId, `${command}\r`, 'batched')
+      if (!accepted) {
+        if (rawExpectationRegistered) {
+          this.opts.bridge.cancelExpectedRawInvocation(sessionId, command)
+        }
+        this.opts.registry?.threadClosed(threadId)
+        return false
+      }
+    } catch {
+      if (rawExpectationRegistered) {
+        this.opts.bridge.cancelExpectedRawInvocation(sessionId, command)
+      }
+      // If turnStarted succeeded but the write failed, do not leave an open
+      // attribution window for unrelated workspace edits.
+      this.opts.registry?.threadClosed(threadId)
+      return false
     }
-    this.opts.shellService.getPtyService().writeAgentInput(sessionId, `${command}\r`, 'batched')
     this.turnsSent.add(threadId)
     return true
   }
 
   close(threadId: string): void {
+    this.closedThreads.add(threadId)
     const sid = this.sessionByThread.get(threadId)
-    if (!sid) return
-    this.opts.shellService.kill(brandSessionId(sid))
     this.sessionByThread.delete(threadId)
+    this.identityByThread.delete(threadId)
+    this.cwdByThread.delete(threadId)
+    this.agentIdByThread.delete(threadId)
+    this.modelByThread.delete(threadId)
+    this.invocationTemplateByThread.delete(threadId)
+    this.attributionSuspectByThread.delete(threadId)
+    this.turnsSent.delete(threadId)
     // A killed PTY cannot write: drop the turn window immediately (no
     // linger) so later user edits are never attributed to a dead agent.
     this.opts.registry?.threadClosed(threadId)
+    if (sid) this.opts.shellService.kill(brandSessionId(sid))
   }
 
   /**

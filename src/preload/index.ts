@@ -16,6 +16,7 @@ import type { VaultMachinaConfig } from '../shared/thread-storage-types'
 import type { IpcEventData } from '../shared/ipc-channels'
 import type { DockTab } from '../shared/dock-types'
 import type { CommitApprovedOpts } from '../shared/git-types'
+import type { HarnessCreateRequest } from '../shared/harness-types'
 
 const api = {
   config: {
@@ -244,9 +245,10 @@ const api = {
   // Agent harness (workstation contracts §5/§6, step 6). No root in either
   // call — main resolves it from the current workspace.
   harness: {
-    create: (template: string, slug: string) => typedInvoke('harness:create', { template, slug }),
+    create: (request: HarnessCreateRequest) => typedInvoke('harness:create', request),
     list: () => typedInvoke('harness:list'),
-    run: (slug: string, threadId: string) => typedInvoke('harness:run', { slug, threadId }),
+    run: (slug: string, threadId: string, taskBrief: string) =>
+      typedInvoke('harness:run', { slug, threadId, taskBrief }),
     binding: (threadId: string) => typedInvoke('harness:binding', { threadId }),
     lint: (slug: string) => typedInvoke('harness:lint', { slug })
   },

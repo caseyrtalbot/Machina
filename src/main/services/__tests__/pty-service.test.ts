@@ -127,8 +127,9 @@ describe('PtyService', () => {
 
   it('writeAgentInput() routes through pty.write with the agent payload', () => {
     service.create('s1', '/tmp')
-    service.writeAgentInput('s1', '/help\r', 'batched')
+    const accepted = service.writeAgentInput('s1', '/help\r', 'batched')
 
+    expect(accepted).toBe(true)
     expect(pty.write).toHaveBeenCalledWith('/help\r')
   })
 
@@ -147,7 +148,7 @@ describe('PtyService', () => {
 
   it('drops writes for unknown sessions without throwing', () => {
     expect(() => service.write('missing', 'x')).not.toThrow()
-    expect(() => service.writeAgentInput('missing', 'x')).not.toThrow()
+    expect(service.writeAgentInput('missing', 'x')).toBe(false)
     expect(() => service.sendRawKeys('missing', 'x')).not.toThrow()
     expect(pty.write).not.toHaveBeenCalled()
   })

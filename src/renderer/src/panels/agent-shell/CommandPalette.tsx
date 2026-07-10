@@ -13,6 +13,7 @@ import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { searchVault } from '../../engine/vault-search'
 import type { SearchHit } from '@shared/engine/search-engine'
 import type { AgentCommits } from '@shared/git-types'
+import type { HarnessSummary } from '@shared/harness-types'
 import {
   buildIndex,
   buildPaletteItems,
@@ -49,10 +50,14 @@ function PaletteFooterHint({
 
 export function CommandPalette({
   open,
-  onClose
+  onClose,
+  onOpenHarnessGallery,
+  onOpenHarnessTaskBrief
 }: {
   readonly open: boolean
   readonly onClose: () => void
+  readonly onOpenHarnessGallery?: (templateId?: string) => void
+  readonly onOpenHarnessTaskBrief?: (summary: HarnessSummary) => void
 }) {
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
@@ -104,9 +109,15 @@ export function CommandPalette({
   const items = useMemo(
     () =>
       open
-        ? buildPaletteItems({ closePalette: onClose, harnesses: harnessSummaries, agentCommits })
+        ? buildPaletteItems({
+            closePalette: onClose,
+            openHarnessGallery: onOpenHarnessGallery,
+            openHarnessTaskBrief: onOpenHarnessTaskBrief,
+            harnesses: harnessSummaries,
+            agentCommits
+          })
         : [],
-    [open, onClose, harnessSummaries, agentCommits]
+    [open, onClose, onOpenHarnessGallery, onOpenHarnessTaskBrief, harnessSummaries, agentCommits]
   )
   const index = useMemo(() => (open ? buildIndex(items) : null), [open, items])
 

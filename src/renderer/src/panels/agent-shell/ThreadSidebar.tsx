@@ -8,10 +8,12 @@ import { AgentBadge } from './agent-badge'
 import type { AgentIdentity } from '@shared/agent-identity'
 import type { Thread } from '@shared/thread-types'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
+import { Bot } from 'lucide-react'
 
 interface ThreadSidebarProps {
   readonly width?: number
   readonly onChangeVault?: () => void
+  readonly onOpenHarnessGallery?: () => void
 }
 
 interface MenuTarget {
@@ -21,7 +23,11 @@ interface MenuTarget {
   readonly archived: boolean
 }
 
-export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps = {}) {
+export function ThreadSidebar({
+  width = 240,
+  onChangeVault,
+  onOpenHarnessGallery
+}: ThreadSidebarProps = {}) {
   const threadsById = useThreadStore((s) => s.threadsById)
   const activeId = useThreadStore((s) => s.activeThreadId)
   const selectThread = useThreadStore((s) => s.selectThread)
@@ -132,7 +138,13 @@ export function ThreadSidebar({ width = 240, onChangeVault }: ThreadSidebarProps
             onCancel={() => setPickerOpen(false)}
           />
         ) : (
-          <NewThreadButton disabled={!vaultPath} onClick={() => setPickerOpen(true)} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <NewThreadButton disabled={!vaultPath} onClick={() => setPickerOpen(true)} />
+            <NewAgentButton
+              disabled={!vaultPath || !onOpenHarnessGallery}
+              onClick={() => onOpenHarnessGallery?.()}
+            />
+          </div>
         )}
       </footer>
       {menu && (
@@ -553,6 +565,28 @@ function ThreadRow({
       </div>
       <AgentBadge agent={agent} />
     </li>
+  )
+}
+
+function NewAgentButton({
+  onClick,
+  disabled = false
+}: {
+  readonly onClick: () => void
+  readonly disabled?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="Create a local agent"
+      title={disabled ? 'Open a vault first (use Open Folder)' : 'Create a local agent'}
+      className="te-new-thread-button"
+      style={disabled ? { opacity: 0.45, cursor: 'default' } : undefined}
+    >
+      <Bot size={12} strokeWidth={1.6} aria-hidden style={{ flexShrink: 0 }} />
+      <span>New Agent</span>
+    </button>
   )
 }
 

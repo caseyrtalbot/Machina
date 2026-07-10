@@ -2,59 +2,63 @@
  * Main-side harness-run composition (workstation contracts §4/§6, v1.2.2).
  *
  * The renderer creates the thread and keeps the send timing; MAIN validates
- * the slug, re-checks the harness path at read time, composes the first-turn
- * prompt, and records the write-once thread↔slug binding — the binding is
+ * the slug, inspects each run-critical leaf once, composes the first-turn
+ * prompt from those exact linted bytes, and records the write-once
+ * thread↔slug binding — the binding is
  * recorded ONLY after main's own validation, so a forged renderer request can
  * never mint one. Each failure returns a structured error and records no
  * binding. The realpath re-check discharges contracts v1.1.5 residual #1
  * (read/exec-time re-check): equality, not containment — same rationale as
  * harness-service invariant 4.
  *
- * fs and registry are injected so composition unit-tests without Electron.
+ * Inspection and registry are injected so composition unit-tests without
+ * Electron and can prove one-snapshot authority.
  */
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import { TE_DIR } from '../../shared/constants'
 import {
   buildHarnessPrompt,
   isReservedHarnessSlug,
   isValidHarnessSlug,
-  parseHarnessFrontmatter,
+  validateHarnessTaskBrief,
+  type HarnessAdapter,
   type HarnessBudgets
 } from '../../shared/harness-types'
 import { SAFE_ID_RE } from '../../shared/git-types'
 import { hasLintErrors } from '../../shared/harness-lint'
-import { getHarnessRunRegistry } from './harness-run-registry'
-import { lintHarnessOnDisk } from './harness-service'
+import { getHarnessRunRegistry, type HarnessBinding } from './harness-run-registry'
+import { inspectHarnessOnDisk, type HarnessInspection } from './harness-service'
 
 export type HarnessRunResult =
-  | { readonly ok: true; readonly prompt: string }
+  | { readonly ok: true; readonly prompt: string; readonly adapter: HarnessAdapter | null }
   | { readonly ok: false; readonly error: string }
 
 export interface HarnessRunDeps {
-  readonly fs?: {
-    readonly readFile: (filePath: string, encoding: 'utf8') => Promise<string>
-    readonly realpath: (filePath: string) => Promise<string>
-  }
+  readonly inspect?: (workspaceRoot: string, slug: string) => Promise<HarnessInspection>
   readonly registry?: {
     record(
       workspaceRoot: string,
       threadId: string,
       slug: string,
-      budgets?: HarnessBudgets
+      budgets?: HarnessBudgets,
+      invocationTemplate?: string,
+      adapter?: HarnessAdapter
     ): Promise<{ ok: true } | { ok: false; error: string }>
+    get(workspaceRoot: string, threadId: string): HarnessBinding | undefined
   }
 }
-
-const PROMPT_FILES = ['SKILL.md', 'rules.md', 'scope.json', 'state.md'] as const
 
 export async function composeHarnessRun(
   workspaceRoot: string,
   slug: string,
   threadId: string,
+  taskBrief: string,
   deps: HarnessRunDeps = {}
 ): Promise<HarnessRunResult> {
-  const io = deps.fs ?? fs
+  // Mandatory per-run goal validation is first: direct service callers must
+  // not touch the filesystem or mint/load a binding for an invalid brief.
+  const validatedTaskBrief = validateHarnessTaskBrief(taskBrief)
+  if (!validatedTaskBrief.ok) return { ok: false, error: validatedTaskBrief.error }
+
   if (!isValidHarnessSlug(slug)) {
     return { ok: false, error: `invalid harness slug: ${JSON.stringify(slug)}` }
   }
@@ -70,72 +74,55 @@ export async function composeHarnessRun(
     return { ok: false, error: `invalid thread id: ${JSON.stringify(threadId)}` }
   }
 
-  const dir = path.join(workspaceRoot, TE_DIR, 'agents', slug)
-  let realDir: string
-  let realRoot: string
-  try {
-    ;[realDir, realRoot] = await Promise.all([io.realpath(dir), io.realpath(workspaceRoot)])
-  } catch (err) {
-    return { ok: false, error: `harness "${slug}" is unreadable: ${String(err)}` }
-  }
-  if (realDir !== path.join(realRoot, TE_DIR, 'agents', slug)) {
-    return {
-      ok: false,
-      error: `harness path escapes its contract location (symlinked parent?): ${slug}`
-    }
-  }
-
-  // All four files, refuse on any failure — a harness prompt missing its
-  // rules or scope must never reach an agent.
-  const contents: string[] = []
-  for (const file of PROMPT_FILES) {
-    try {
-      contents.push(await io.readFile(path.join(dir, file), 'utf8'))
-    } catch (err) {
-      return { ok: false, error: `harness "${slug}" is unreadable (${file}): ${String(err)}` }
-    }
-  }
-  const [skillMd, rulesMd, scopeJson, stateMd] = contents
-
-  // Run-time lint authority: the palette disable is enforced renderer-side
-  // against the LIST-time snapshot, so a scope.json hand-tampered after the
-  // palette opened (e.g. HARNESS_PROTECTED_GLOBS stripped) would still compose
-  // a prompt and mint a binding. Re-run the same lint composition here — the
-  // same fs∘shared checks harness:list uses, never reimplemented — and refuse
-  // on any error-severity diagnostic. The read loop above already caught a
-  // missing file; this catches tamper the fs reads cannot see.
-  const diagnostics = await lintHarnessOnDisk(workspaceRoot, slug)
-  if (hasLintErrors(diagnostics)) {
-    const firstError = diagnostics.find((d) => d.severity === 'error')
+  // One authoritative inspection owns both content lint and composition.
+  // There is no second read whose result can diverge after lint passes.
+  const inspect = deps.inspect ?? inspectHarnessOnDisk
+  const inspection = await inspect(workspaceRoot, slug)
+  if (hasLintErrors(inspection.diagnostics)) {
+    const firstError = inspection.diagnostics.find((d) => d.severity === 'error')
     return {
       ok: false,
       error: `harness "${slug}" failed its run-time lint — run refused: ${firstError?.message} (${firstError?.file})`
     }
   }
+  if (inspection.files === undefined || inspection.frontmatter === null) {
+    return {
+      ok: false,
+      error: `harness "${slug}" has no stable validated snapshot — run refused`
+    }
+  }
+  const { skillMd, rulesMd, scopeJson, stateMd } = inspection.files
 
   const prompt = buildHarnessPrompt({
     slug,
     harnessDir: `${TE_DIR}/agents/${slug}`,
+    taskBrief: validatedTaskBrief.value,
     skillMd,
     rulesMd,
     scopeJson,
     stateMd
   })
 
-  // Budgets snapshot at bind (step 6, contracts §5 v1.2.6): the frontmatter
-  // read ABOVE is the snapshot source — post-bind SKILL.md edits affect the
-  // next run only. The run-time lint just passed with zero errors, so the
-  // frontmatter parses; a parse failure here (racing hand-edit between the
-  // lint and this read) degrades to no snapshot rather than refusing a run
-  // the lint already blessed.
-  const parsedFrontmatter = parseHarnessFrontmatter(skillMd)
-  const budgets = parsedFrontmatter.ok ? parsedFrontmatter.value.budgets : undefined
+  // Adapter, budgets, and raw invocation are parsed from the same SKILL.md
+  // bytes above and snapshotted together. Later edits affect a future binding.
+  const { adapter, budgets, invocationTemplate } = inspection.frontmatter
 
   // Binding recorded LAST — only after every validation above passed.
   const registry = deps.registry ?? getHarnessRunRegistry()
-  const recorded = await registry.record(workspaceRoot, threadId, slug, budgets)
+  const recorded = await registry.record(
+    workspaceRoot,
+    threadId,
+    slug,
+    budgets,
+    invocationTemplate,
+    adapter
+  )
   if (!recorded.ok) {
     return { ok: false, error: recorded.error }
   }
-  return { ok: true, prompt }
+  const authoritative = registry.get(workspaceRoot, threadId)
+  if (authoritative === undefined || authoritative.slug !== slug) {
+    return { ok: false, error: 'harness binding authority unavailable after record' }
+  }
+  return { ok: true, prompt, adapter: authoritative.adapter ?? null }
 }

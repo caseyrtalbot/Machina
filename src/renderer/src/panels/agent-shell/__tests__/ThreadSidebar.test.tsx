@@ -60,6 +60,24 @@ describe('ThreadSidebar', () => {
     expect(screen.getByText('native')).toBeTruthy()
   })
 
+  it('exposes a visible New Agent button that opens the local gallery', () => {
+    const openGallery = vi.fn()
+    render(<ThreadSidebar onOpenHarnessGallery={openGallery} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create a local agent' }))
+
+    expect(openGallery).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables New Agent when no workspace is open', () => {
+    useVaultStore.setState({ vaultPath: null })
+    render(<ThreadSidebar onOpenHarnessGallery={vi.fn()} />)
+
+    expect(
+      (screen.getByRole('button', { name: 'Create a local agent' }) as HTMLButtonElement).disabled
+    ).toBe(true)
+  })
+
   it('clicking a row calls selectThread', async () => {
     render(<ThreadSidebar />)
     const rowB = screen.getAllByTestId('thread-row')[0]

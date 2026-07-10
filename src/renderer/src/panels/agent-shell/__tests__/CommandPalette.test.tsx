@@ -10,12 +10,7 @@ import { CommandPalette } from '../CommandPalette'
 import { useHarnessStore } from '../../../store/harness-store'
 import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
-import { runHarness } from '../../../store/harness-run'
 import type { HarnessSummary } from '@shared/harness-types'
-
-vi.mock('../../../store/harness-run', () => ({
-  runHarness: vi.fn().mockResolvedValue(undefined)
-}))
 
 vi.mock('../../../engine/vault-search', () => ({
   searchVault: vi.fn().mockResolvedValue([])
@@ -51,16 +46,23 @@ beforeEach(() => {
 describe('CommandPalette — broken-harness rendering (step 7)', () => {
   it('renders the broken harness greyed with its reason, aria-disabled, and run inert', async () => {
     const onClose = vi.fn()
-    render(<CommandPalette open onClose={onClose} />)
+    const onOpenHarnessTaskBrief = vi.fn()
+    render(
+      <CommandPalette open onClose={onClose} onOpenHarnessTaskBrief={onOpenHarnessTaskBrief} />
+    )
+
+    fireEvent.change(screen.getByPlaceholderText(/Find anything/i), {
+      target: { value: 'stripped' }
+    })
 
     const item = await screen.findByRole('option', { name: /Run harness: stripped/ })
     expect(item.getAttribute('aria-disabled')).toBe('true')
     expect(item.textContent).toContain('broken harness')
     expect(item.textContent).toContain('missing protected forbiddenGlobs')
 
-    // Run disabled: clicking neither runs the harness nor closes the palette.
+    // Run disabled: clicking neither opens the task gate nor closes the palette.
     fireEvent.click(item)
-    expect(runHarness).not.toHaveBeenCalled()
+    expect(onOpenHarnessTaskBrief).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
 })

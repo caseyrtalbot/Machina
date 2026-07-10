@@ -4,6 +4,8 @@ import { useThreadStore } from '../../../store/thread-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { AgentShell } from '../AgentShell'
 import type { VaultMachinaConfig } from '@shared/thread-storage-types'
+import type { HarnessSummary } from '@shared/harness-types'
+import { useHarnessStore } from '../../../store/harness-store'
 
 const baseConfig: VaultMachinaConfig = {
   defaultAgent: 'machina-native',
@@ -12,8 +14,18 @@ const baseConfig: VaultMachinaConfig = {
   customKeybindings: {}
 }
 
+const runnableHarness: HarnessSummary = {
+  slug: 'test-fixer',
+  name: 'test-fixer',
+  description: 'Fixes one failing test and stops.',
+  adapter: 'claude',
+  budgets: { maxTurns: 6, maxWritesPerMinute: 5 },
+  diagnostics: []
+}
+
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useHarnessStore.setState(useHarnessStore.getInitialState())
   useVaultStore.setState({ vaultPath: '/v' })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(window as any).api = {
@@ -46,6 +58,13 @@ beforeEach(() => {
         attempts: 0
       }),
       watcherRetry: vi.fn().mockResolvedValue(undefined)
+    },
+    harness: {
+      list: vi.fn().mockResolvedValue([]),
+      create: vi.fn()
+    },
+    git: {
+      listAgentCommits: vi.fn().mockResolvedValue({ ok: true, agents: [] })
     },
     on: {
       approvalsChanged: vi.fn().mockReturnValue(() => {}),
@@ -120,5 +139,45 @@ describe('AgentShell welcome tooltip', () => {
       expect(writeConfig).toHaveBeenCalledWith('/v', { ...baseConfig, welcomed: true })
     })
     expect(tooltip).toBeTruthy()
+  })
+
+  it('owns the local gallery state opened from the New agent palette action', async () => {
+    render(<AgentShell />)
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    const paletteInput = await screen.findByPlaceholderText(/Find anything/i)
+    fireEvent.change(paletteInput, { target: { value: 'New agent' } })
+    fireEvent.click(await screen.findByRole('option', { name: /New agent/i }))
+
+    expect(screen.queryByRole('dialog', { name: 'command palette' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Create a local agent' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    expect(screen.queryByRole('dialog', { name: 'command palette' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Create a local agent' })).toBeTruthy()
+  })
+
+  it('opens the local gallery from the visible New Agent sidebar button', async () => {
+    render(<AgentShell />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create a local agent' }))
+
+    expect(screen.getByRole('dialog', { name: 'Create a local agent' })).toBeTruthy()
+  })
+
+  it('routes palette harness runs into the AgentShell-owned task brief gate', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.harness.list.mockResolvedValue([runnableHarness])
+    render(<AgentShell />)
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    const paletteInput = await screen.findByPlaceholderText(/Find anything/i)
+    fireEvent.change(paletteInput, { target: { value: 'Run harness test fixer' } })
+    fireEvent.click(await screen.findByRole('option', { name: /Run harness: test-fixer/i }))
+
+    expect(screen.queryByRole('dialog', { name: 'command palette' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Brief test-fixer' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    expect(screen.queryByRole('dialog', { name: 'command palette' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Brief test-fixer' })).toBeTruthy()
   })
 })

@@ -4,7 +4,7 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the three docs it points at, and you can start building without
 asking questions.
 
-## Where things stand (2026-07-07, Phase 2 steps 1–7 shipped)
+## Where things stand (2026-07-10, Phase 2 steps 1–8 shipped)
 
 The vision is locked and the design is verified. Phase 0 (seam audit + interface
 contracts) shipped to main. The Phase 0 docs were then adversarially re-verified by an
@@ -68,27 +68,25 @@ passed / 1 known fixme-skip, including both new built-app probes executed green
 (`HANDOFF-PHASE2-STEPS-5-6.md`) was deleted per its own instruction — see "What
 Phase 2 step 5/6 changed under you" below.
 
+**Step 8 (template gallery + blank builder) is SHIPPED 2026-07-10** as the final Phase 2
+implementation step (contracts v1.2.8). Casey resolved OQ7 on 2026-07-09: the roster is
+the exact ten-role Guided / Architecture / Engineering / Bridge catalog recorded in
+contracts §5 and the step-8 spec. Casey accepted the previously pending visual/timed gate
+by direct instruction on 2026-07-10. Fresh landing evidence: focused UI tests, adjacent
+gallery/palette tests, `npm run check`, production build, full built-app E2E, targeted
+visible-`New Agent` built-app E2E, dependency audit, and whitespace/format checks. Do not
+reconstruct or replace the roster from older ~5-template text.
+
 **Next work order for the incoming team(s):**
 
-- **Next = step 8** (follows 7 and consumes 1, both landed) — **but it needs the
-  OQ7 call first**; do not start it without the roster decision. Steps 5 and 6
-  are DONE; the only other Phase-2 build item is the severable OQ8 graft below.
-- **Blocked on Casey, do not land without the call**: OQ8 (workspace-switch PTY
+- **Next = Phase 3 planning / follow-up hardening selection.** Candidate follow-ups:
+  Phase 3 loop scheduler, OQ8 workspace-switch PTY visibility graft, dependabot triage
+  (`npm audit --omit=dev` reports 1 moderate production vuln — js-yaml via gray-matter —
+  re-confirmed during the step-8 landing), or any remaining Casey-observed polish gates
+  that the owner wants to close before starting Phase 3.
+- **Still not part of step 8**: OQ8 (workspace-switch PTY
   visibility graft — severable; step 6 landed green without it, and after
-  ratification the graft becomes its own small follow-up commit), OQ7
-  (gallery roster — before step 8). Also pending Casey: the step-2 exit-bar dev-app
-  observation (degraded banner + Retry while a simulated failure is driven), the
-  step-3 harness-identity chip observation on a bound thread in the running app, the
-  Phase-1 step-4 tick-counter acceptance, the Phase-2 step-4 one-click thread↔raw
-  flip on a live harness run (scrollback both ways), the Phase-2 step-7
-  hand-broken-harness observation (greyed with reason, run disabled, in the running
-  app), the Phase-2 step-5 tray-revert observation (reverting an agent's commits
-  from the tray without touching the DevTools console), the Phase-2 step-6
-  kill-switch observation (pressing Kill on a running agent visibly stops output
-  in the running app), the OPTIONAL step-6 breaker-notice-row observation (a tray
-  notice row on a driven ambiguous-signal trip — the e2e probe covers it; observe
-  if convenient), and dependabot triage (`npm audit --omit=dev` reports 1 moderate
-  production vuln — js-yaml via gray-matter — re-confirmed 2026-07-07).
+  ratification the graft becomes its own small follow-up commit).
 - Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
   leave it alone, do not commit or delete it.
 
@@ -114,8 +112,62 @@ Phase 2 step 5/6 changed under you" below.
    block with its recorded deviations. Steps 4 (`61f8ce3`) and 7 (`065d312`) are
    DONE (2026-07-07, parallel worktree sessions + post-merge review fix commit).
    Steps 5 (`5b1589d`) and 6 (`24d53e1`) are DONE (2026-07-07, the second parallel
-   pair, hardened post-merge at `c1b21c8`, contracts v1.2.7). Next = step 8 after
-   the OQ7 call.**
+   pair, hardened post-merge at `c1b21c8`, contracts v1.2.7). **Step 8 is DONE
+   (2026-07-10, contracts v1.2.8)\*\* — exact ten-role roster, visible sidebar New Agent
+   entry point, mandatory task brief, raw bridge hardening, and blank builder shipped.
+
+## What step 8 changed (`2026-07-10`, contracts v1.2.8)
+
+1. **The gallery is an exact ten-role spectrum**, not a generic agent-name list:
+   `idea-to-spec`, `docs-maintainer`, `automation-builder`, `architecture-mapper`,
+   `boundary-auditor`, `migration-planner`, `bug-reproducer`, `test-fixer`,
+   `vertical-slice-builder`, and configuration-required `raw-tool-runner`. Category and
+   audience filters cover non-engineers, low-code users, systems thinkers, architects,
+   seasoned programmers, and platform builders. All ten still materialize the same
+   transparent harness folder and generalized run path. The primary visible entry point is
+   the thread-sidebar footer **New Agent** button; the command palette `New agent…` action
+   remains a secondary shortcut into the same gallery.
+2. **Installing a role is not starting a task.** Every launch opens a mandatory task-brief
+   dialog; renderer and main both reject blank/NUL/oversized input, main delimits the exact
+   brief beneath rules/scope authority, and the first turn targets the created thread
+   explicitly. A transport refusal or bounded IPC failure must retain the brief rather
+   than claim the run started.
+3. **Raw is a configured bridge, not an escape from authority.** The product never invents
+   its command or scope. A valid raw harness uses a standalone unquoted `{prompt}`
+   placeholder in one hook-observable simple command, rejects controls/lone surrogates and
+   unstable shell forms, requires literal arguments to be quoted, and emits an
+   alias-stabilized executable. Main snapshots adapter + invocation in the write-once
+   binding, exposes only readiness, rejects identity drift, validates the final PTY command,
+   and rolls back a missing-session queue refusal. Shell functions with the executable's
+   name remain a documented shell-resolution caveat; hook correlation stays byte-exact.
+   Ad-hoc raw remains terminal-only.
+4. **Creation and launch are fail-closed.** Shared draft assembly owns preview/main byte
+   construction, protected-glob union, frontmatter round-trip, budgets, and verifier
+   admission. Main creation never overwrites and writes verify.sh last at 0555. Launch uses
+   one realpath-confined inspection snapshot for lint, prompt, and binding; redirected
+   required leaf entries refuse.
+5. **Dispatch timeout and workspace fences are explicit.** Non-cancelling renderer IPC
+   timeouts now return `indeterminate`, retain late settlements, replay Stop onto late
+   native run ids, and keep sending blocked until a main-originated completion/refusal.
+   Thread deletion/close tombstones prevent late session resurrection; workspace switches
+   fence stale state without auto-killing old-workspace PTYs (OQ8 remains excluded).
+6. **The bug-reproducer gate is exact-path evidence, not whole-suite red.** JS/Python/Go/
+   Rust runners are file-targeted where safe; unsupported setup, discovery, load, hook,
+   build, or unrelated-suite failures refuse as non-evidence. The verifier enforces
+   pre-run and post-run dirty-tree guards and kills timed-out child/grandchild process
+   trees before reporting failure.
+7. **Exit evidence is split honestly.** The built-app Playwright probe covers exact cards,
+   filters, blank/custom-scope creation, file/mode shape, protected union, duplicate
+   preservation, mandatory task persistence, and raw configuration without command
+   execution. Deliberate mutation of the in-memory built-in registry remains a main-service
+   test because production IPC cannot mutate that registry without adding a test-only hook.
+   Fresh evidence on 2026-07-10: focused bug gate 38 tests, dispatch/session gate 131
+   tests, raw/bridge/harness gate 313 tests, visible-gallery UI tests 20 tests, adjacent
+   gallery/palette tests 67 tests, `npm run check` 313 files / 3768 tests, build green,
+   full E2E 25 passed / 1 existing skip, targeted visible-`New Agent` built-app E2E
+   passed, and `npm audit --omit=dev` still reports one moderate `js-yaml` advisory via
+   `gray-matter`. Casey accepted the under-five-minute visual/timed gate by direct
+   instruction on 2026-07-10.
 
 ## What step 1 changed under you (`76d0699`)
 
@@ -182,7 +234,7 @@ Phase 2 step 5/6 changed under you" below.
 2. **PTY lifetime across surfaces.** Migration = the existing
    `terminal:reconnect` seam (contracts §3): `stripToCanvas`/`canvasToStrip`
    (`terminal-migration.ts`) never kill; `canvas-store.removeNode(id,
-   { preserveSession: true })` is the kill opt-out. The load-bearing tests
+{ preserveSession: true })` is the kill opt-out. The load-bearing tests
    assert kill is NEVER called on detach/migration — keep them honest.
 3. **The close-before-bind race is handled by pendingKill parking.** Closing a
    strip tab whose webview has not yet reported `session-created` parks the
@@ -284,7 +336,7 @@ Phase 2 step 5/6 changed under you" below.
    `isAutoCommitOptedOut` are deleted from `git-service.ts`. `isGitRepo` and the
    whole §2 substrate are unchanged. `cwdByThread` was NOT orphaned (it still
    feeds `registry.turnStarted`) and stays. `rg 'commitPreAgentSnapshot' src
-   tests` is zero — do not reintroduce it; rollback is the approvals gate
+tests` is zero — do not reintroduce it; rollback is the approvals gate
    (commitApproved trailers / discard / revertAgent).
 2. **The retirement was evidence-gated, not assumed.** All of G1–G8 passed
    fresh at the landing HEAD — including G6 (hooks physically absent: writes
@@ -366,7 +418,7 @@ Phase 2 step 5/6 changed under you" below.
    (`supportsStructuredOutput` is now `!!adapter.parseEvent`), and `models` rosters are
    spike-verified. Session shapes live in `src/shared/session-types.ts` (contracts §3
    landed) — do NOT confuse with `cli-agent-session-types.ts`, which is CLI-agent
-   *presence* types (the seam-map trap the spec warns about).
+   _presence_ types (the seam-map trap the spec warns about).
 2. **The model-flag trust rule lives at the IPC boundary** (`resolveModelPick`,
    `src/main/ipc/cli-thread.ts`): a flag is emitted ONLY for an explicit user pick that
    passes membership in `adapter.models` plus a charset regex. Absent, unknown, or the
@@ -374,8 +426,10 @@ Phase 2 step 5/6 changed under you" below.
    explicit picks are audited. The **golden byte-exact invocation tables** in the
    spawner tests are the regression harness — extend them when you touch invocation
    construction; never bypass them.
-3. **`cli-raw` exists but is input-disabled** until step 8 lands harness-supplied
-   invocation templates (OQ3): plain PTY, no parser, no resume, no models.
+3. **Historical step-1 baseline:** ad-hoc `cli-raw` is input-disabled: plain PTY, no
+   parser, no resume, no models. The current unlanded step-8 worktree adds only the
+   harness-bound structured path, backed by a main-snapshotted invocation template;
+   ad-hoc raw stays disabled.
 4. **`Thread.model` is real for CLI threads now** — `setThreadModel` is un-no-op'd and
    the model round-trips through thread-md encode/decode. Gemini's roster ships EMPTY
    (`models: []` — no auth on the dev machine to verify ids); widen it only with a
@@ -504,8 +558,8 @@ Phase 2 step 5/6 changed under you" below.
 
 1. **The linter is a two-layer composition, and main is the run-time authority.**
    Pure content lints in `src/shared/harness-lint.ts` (`lintHarness(files) →
-   Diagnostic[]`, renderer-importable; `Diagnostic` is exactly `{ severity, code,
-   message, file }` with two severities — resist taxonomy creep) composed with
+Diagnostic[]`, renderer-importable; `Diagnostic` is exactly `{ severity, code,
+message, file }` with two severities — resist taxonomy creep) composed with
    main-side fs lints in `harness-service.ts` (`inspectHarness`: presence, verify.sh
    mode drift masked `0o7777`, handoffs/ presence, symlink-ancestry realpath). Main
    never reimplements a shared check. **`composeHarnessRun` re-runs the lint
@@ -668,11 +722,11 @@ now, and ThreadMessage keys are thread-scoped. **Known residuals for a later pas
 
 Repo gotchas the step-1 team hit (they will bite you too):
 
-- **CLAUDE.md is gitignored in this repo.** `AGENTS.md` is the tracked copy: a
-  byte-identical mirror of CLAUDE.md (only the `#` H1 title differs). After editing
-  CLAUDE.md, sync it with `npm run sync:agents` — never hand-edit AGENTS.md, and do NOT
-  use Codex for this. The mirror is a deterministic file copy, not a model task; a Codex
-  round-trip wastes tokens and (observed at step 1) can delete unrelated files.
+- **CLAUDE.md is gitignored in this repo; AGENTS.md is now deliberately curated.**
+  Casey changed the policy on 2026-07-09: `CLAUDE.md` remains the fuller reference,
+  while tracked `AGENTS.md` carries only the instructions Codex needs. They are no
+  longer byte-identical. `npm run sync:agents` is a no-op guard; update `AGENTS.md`
+  intentionally when a Codex-relevant rule changes instead of regenerating it.
 - **The e2e suite was stale-red on main before step 1** (6 of 18 failing at `bc86377`):
   it predated the titlebar Files toggle (the file tree lives in a right-edge side panel,
   closed by default — helpers `openFilesPanel`/`closeFilesPanel` in `e2e/app.spec.ts`
@@ -723,8 +777,9 @@ Repo gotchas the step-1 team hit (they will bite you too):
 - Commit directly to main, one step per commit, no feature branches. Full pre-commit
   gate: `npm run check` + `npm run build`, fresh runs, evidence not transcription.
 - Every deliberate deviation from the contracts amends `01-interface-contracts.md` in
-  the same commit. CLAUDE.md changes propagate to AGENTS.md via `npm run sync:agents` (a
-  deterministic mirror, not a Codex call) — never hand-edit AGENTS.md.
+  the same commit. `CLAUDE.md` is the fuller reference and `AGENTS.md` is the tracked,
+  Codex-scoped instruction file; update each intentionally when its audience needs the
+  change. `npm run sync:agents` never overwrites the curated file.
 - Dev-app/DevTools smoke checks are driven by the agent, not handed to Casey as steps.
   Electron visual verification is Casey observing the running app — no programmatic
   Electron screenshots. The step 4 dock↔canvas migration acceptance (tick-counter

@@ -17,8 +17,11 @@
  *   - `CliAgentThreadBridge` — stateful wrapper with a `sessionId → threadId`
  *     binding map. Observes blocks, streams interim assistant-text deltas
  *     while a block is running, and emits the final message exactly once per
- *     completed block. Sessions started outside of a thread (e.g. user typing
- *     `claude` directly into a terminal) produce no thread events.
+ *     completed block. Raw-adapter bindings additionally require the spawner
+ *     to mark the exact next invocation; arbitrary commands typed by the user
+ *     into the same PTY never become agent turns. Sessions started outside of
+ *     a thread (e.g. user typing `claude` directly into a terminal) produce no
+ *     thread events.
  *   - `getAgentSessionId(threadId)` — the agent CLI's own session id
  *     (claude `session_id` / codex `thread_id`) captured from structured
  *     output, used by the spawner to resume the conversation on later turns.
@@ -36,7 +39,7 @@ import {
   type CLIAgentSpec,
   type ToolCall as ParsedToolCall
 } from '@shared/cli-agents'
-import { ADAPTERS } from '@shared/agent-adapters'
+import { ADAPTERS, validateRawPtyCommand } from '@shared/agent-adapters'
 import type { AdapterId, AgentAdapter, AgentStreamEvent } from '@shared/session-types'
 import { TRUNCATION_MARKER, type Block } from '@shared/engine/block-model'
 import type { AssistantMessage, ToolCall, ToolResult } from '@shared/thread-types'
@@ -91,8 +94,17 @@ function newStreamState(): StreamState {
 
 interface BindingState {
   readonly threadId: string
+  /** Optional adapter declared by the spawner. Only `raw` changes command
+   *  recognition; known-agent detection remains command-based. */
+  readonly adapterId?: AdapterId
   /** Block ids we have already emitted a final message for (idempotency). */
   readonly emittedBlockIds: Set<string>
+  /** Raw blocks admitted by an exact expected-invocation match. Once admitted,
+   *  later snapshots of the same block remain recognizable after the one-shot
+   *  expectation has been consumed. */
+  readonly admittedRawBlockIds: Set<string>
+  /** One-shot raw command marker set immediately before the future PTY write. */
+  expectedRawInvocation: string | null
   /** Per-block incremental parse state for interim streaming. */
   readonly streamStates: Map<string, StreamState>
   /** Last observed still-running agent block, if any. Used by closeSession to
@@ -110,13 +122,43 @@ export class CliAgentThreadBridge {
 
   /** Associate `sessionId` with `threadId`. Subsequent block updates on this
    *  session emit thread messages addressed to `threadId`. */
-  bind(sessionId: string, threadId: string): void {
+  bind(sessionId: string, threadId: string, adapterId?: AdapterId): void {
     this.bindings.set(sessionId, {
       threadId,
+      ...(adapterId !== undefined ? { adapterId } : {}),
       emittedBlockIds: new Set(),
+      admittedRawBlockIds: new Set(),
+      expectedRawInvocation: null,
       streamStates: new Map(),
       runningBlock: null
     })
+  }
+
+  /**
+   * Mark the exact command the raw adapter is about to write to this session's
+   * PTY. The marker is one-shot and is consumed only by a byte-equal block
+   * command; unrelated human commands neither emit nor consume it. Returns
+   * false for an unbound/non-raw session or a terminal-control-bearing command
+   * so the spawner fails closed before writing.
+   */
+  expectRawInvocation(sessionId: string, command: string): boolean {
+    const binding = this.bindings.get(sessionId)
+    if (binding?.adapterId !== 'raw') return false
+    // Defense in depth at the final registration boundary: never retain an
+    // expectation for bytes the terminal line editor can rewrite before the
+    // shell hook reports the executed command.
+    if (!validateRawPtyCommand(command).ok) return false
+    // One expected command maps to one future block. Refuse overlap instead of
+    // replacing the first marker and silently orphaning its turn.
+    if (binding.expectedRawInvocation !== null) return false
+    binding.expectedRawInvocation = command
+    return true
+  }
+
+  /** Roll back an expectation when the spawner fails before the PTY write. */
+  cancelExpectedRawInvocation(sessionId: string, command: string): void {
+    const binding = this.bindings.get(sessionId)
+    if (binding?.expectedRawInvocation === command) binding.expectedRawInvocation = null
   }
 
   /** Agent-native session id captured from structured output, if any. */
@@ -128,7 +170,7 @@ export class CliAgentThreadBridge {
     const binding = this.bindings.get(sessionId)
     if (!binding) return
 
-    const agent = detectAgentFromCommand(block.command)
+    const agent = resolveAgentForBlock(binding, block)
     if (agent === null) return
 
     const blockId = block.id as string
@@ -186,7 +228,7 @@ export class CliAgentThreadBridge {
     if (block === null) return
     const blockId = block.id as string
     if (binding.emittedBlockIds.has(blockId)) return
-    const agent = detectAgentFromCommand(block.command)
+    const agent = resolveAgentForBlock(binding, block)
     if (agent === null) return
     const state = binding.streamStates.get(blockId) ?? newStreamState()
     const parseEvent = adapterForAgent(agent.id)?.parseEvent
@@ -425,6 +467,29 @@ function stateFinishedAt(block: Block): number {
     return block.state.finishedAt
   }
   return Date.now()
+}
+
+/**
+ * Resolve the agent responsible for one block without broadening the existing
+ * known-CLI heuristic. A raw-bound PTY is special: its executable is arbitrary,
+ * so only an exact command explicitly marked before the PTY write is admitted.
+ * The admitted block id then carries that identity through later running/final
+ * snapshots and closeSession's synthetic finalization.
+ */
+function resolveAgentForBlock(binding: BindingState, block: Block): CLIAgentSpec | null {
+  if (binding.adapterId !== 'raw') return detectAgentFromCommand(block.command)
+
+  const blockId = block.id as string
+  if (binding.admittedRawBlockIds.has(blockId)) return getAgentSpec('raw')
+  if (binding.expectedRawInvocation === null || block.command !== binding.expectedRawInvocation) {
+    return null
+  }
+
+  const raw = getAgentSpec('raw')
+  if (raw === null) return null
+  binding.expectedRawInvocation = null
+  binding.admittedRawBlockIds.add(blockId)
+  return raw
 }
 
 function detectAgentFromCommand(command: string): CLIAgentSpec | null {

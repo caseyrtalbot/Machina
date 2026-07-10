@@ -8,6 +8,8 @@ import { ThreadSidebar } from './ThreadSidebar'
 import { ThreadPanel } from './ThreadPanel'
 import { SurfaceDock } from './SurfaceDock'
 import { CommandPalette } from './CommandPalette'
+import { HarnessGallery } from './HarnessGallery'
+import { HarnessTaskBriefDialog } from './HarnessTaskBriefDialog'
 import { SideDockRibbon } from './SideDockRibbon'
 import { HeaderFilesSidePanel, HeaderFilesToggleButton } from './HeaderFilesSidePanel'
 import { ApprovalsTray } from './ApprovalsTray'
@@ -19,6 +21,7 @@ import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 import { TitlebarBreadcrumb } from '../../components/TitlebarBreadcrumb'
 import { Statusbar } from '../../components/Statusbar'
+import type { HarnessSummary } from '@shared/harness-types'
 
 const WINDOW_HEADER_HEIGHT = 39
 const WINDOW_CONTROLS_CONTAINER_WIDTH = 148
@@ -76,8 +79,26 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   useThreadStreaming()
 
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const openPalette = useCallback(() => setPaletteOpen(true), [])
+  const [galleryState, setGalleryState] = useState<{
+    readonly templateId?: string
+    readonly revision: number
+  } | null>(null)
+  const [taskBriefHarness, setTaskBriefHarness] = useState<HarnessSummary | null>(null)
+  const openPalette = useCallback(() => {
+    if (galleryState === null && taskBriefHarness === null) setPaletteOpen(true)
+  }, [galleryState, taskBriefHarness])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
+  const openHarnessGallery = useCallback((templateId?: string) => {
+    setPaletteOpen(false)
+    setGalleryState((current) => ({ templateId, revision: (current?.revision ?? 0) + 1 }))
+  }, [])
+  const closeHarnessGallery = useCallback(() => setGalleryState(null), [])
+  const openHarnessTaskBrief = useCallback((summary: HarnessSummary) => {
+    setPaletteOpen(false)
+    setGalleryState(null)
+    setTaskBriefHarness(summary)
+  }, [])
+  const closeHarnessTaskBrief = useCallback(() => setTaskBriefHarness(null), [])
 
   const keybindingOpts = useMemo(
     () => ({ toggleDock, openPalette, closePalette }),
@@ -120,7 +141,11 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}>
         {!sidebarCollapsed && (
           <>
-            <ThreadSidebar width={sidebarWidth} onChangeVault={onChangeVault} />
+            <ThreadSidebar
+              width={sidebarWidth}
+              onChangeVault={onChangeVault}
+              onOpenHarnessGallery={() => openHarnessGallery()}
+            />
             <ResizeHandle
               side="sidebar"
               width={sidebarWidth}
@@ -156,7 +181,28 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
         />
       </div>
       <Statusbar />
-      <CommandPalette open={paletteOpen} onClose={closePalette} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={closePalette}
+        onOpenHarnessGallery={openHarnessGallery}
+        onOpenHarnessTaskBrief={openHarnessTaskBrief}
+      />
+      {galleryState !== null && (
+        <HarnessGallery
+          key={galleryState.revision}
+          open
+          initialTemplateId={galleryState.templateId}
+          onClose={closeHarnessGallery}
+          onRequestRun={openHarnessTaskBrief}
+        />
+      )}
+      {taskBriefHarness !== null && (
+        <HarnessTaskBriefDialog
+          key={taskBriefHarness.slug}
+          summary={taskBriefHarness}
+          onClose={closeHarnessTaskBrief}
+        />
+      )}
       <WelcomeTooltip vaultPath={vaultPath} />
     </div>
   )

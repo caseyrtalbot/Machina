@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { threadRuntimeIsClosed } from './agent-dispatch-store'
 
 /**
  * CLI-thread session authority (workstation Phase 2 step 4, contracts §3/§6).
@@ -36,43 +37,80 @@ interface CliSessionState {
   markExited: (sessionId: string) => void
   /** Thread deleted: forget the binding entirely. */
   drop: (threadId: string) => void
+  /** Workspace reset: forget every binding and fence pending hydrations. */
+  reset: () => void
   /** Pull hydration via cli-thread:get-session (late subscriber / relaunch). */
   hydrate: (threadId: string) => Promise<void>
+}
+
+const generationByThread = new Map<string, number>()
+let resetGeneration = 0
+
+function generation(threadId: string): number {
+  return generationByThread.get(threadId) ?? 0
+}
+
+function bumpGeneration(threadId: string): void {
+  generationByThread.set(threadId, generation(threadId) + 1)
 }
 
 export const useCliSessionStore = create<CliSessionState>((set) => ({
   byThread: {},
 
-  seed: (threadId, sessionId) =>
+  seed: (threadId, sessionId) => {
+    if (threadRuntimeIsClosed(threadId)) return
+    bumpGeneration(threadId)
     set((s) => ({
       byThread: { ...s.byThread, [threadId]: { sessionId, live: true } }
-    })),
+    }))
+  },
 
-  sessionChanged: (threadId, sessionId) =>
+  sessionChanged: (threadId, sessionId) => {
+    if (threadRuntimeIsClosed(threadId)) return
+    bumpGeneration(threadId)
     set((s) => ({
       byThread: { ...s.byThread, [threadId]: { sessionId, live: true } }
-    })),
+    }))
+  },
 
   markExited: (sessionId) =>
     set((s) => {
       const hit = Object.entries(s.byThread).find(([, e]) => e.sessionId === sessionId)
       if (!hit || !hit[1].live) return s
+      bumpGeneration(hit[0])
       return {
         byThread: { ...s.byThread, [hit[0]]: { sessionId, live: false } }
       }
     }),
 
-  drop: (threadId) =>
+  drop: (threadId) => {
+    bumpGeneration(threadId)
     set((s) => {
       if (!(threadId in s.byThread)) return s
       const { [threadId]: _removed, ...rest } = s.byThread
       return { byThread: rest }
-    }),
+    })
+  },
+
+  reset: () => {
+    resetGeneration += 1
+    set({ byThread: {} })
+  },
 
   hydrate: async (threadId) => {
+    if (threadRuntimeIsClosed(threadId)) return
+    const startedAtGeneration = generation(threadId)
+    const startedAtResetGeneration = resetGeneration
     try {
       const current = await window.api.cliThread.getSession(threadId)
-      if (current === null) return
+      if (
+        current === null ||
+        threadRuntimeIsClosed(threadId) ||
+        resetGeneration !== startedAtResetGeneration ||
+        generation(threadId) !== startedAtGeneration
+      )
+        return
+      bumpGeneration(threadId)
       set((s) => ({
         byThread: {
           ...s.byThread,

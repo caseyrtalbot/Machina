@@ -18,7 +18,12 @@
  * two severities only. Severity-taxonomy creep is the classic linter
  * failure mode; grow this contract only through a contracts amendment.
  */
-import { parseHarnessFrontmatter, validateHarnessScope, type HarnessScope } from './harness-types'
+import {
+  parseHarnessFrontmatter,
+  stripFrontmatter,
+  validateHarnessScope,
+  validateHarnessScopeContract
+} from './harness-types'
 
 export const DIAGNOSTIC_SEVERITIES = ['error', 'warning'] as const
 export type DiagnosticSeverity = (typeof DIAGNOSTIC_SEVERITIES)[number]
@@ -67,6 +72,13 @@ export function lintHarness(input: HarnessLintInput): Diagnostic[] {
         message: `SKILL.md frontmatter unreadable: ${parsed.error}`,
         file: 'SKILL.md'
       })
+    } else if (stripFrontmatter(input.skillMd).trim().length === 0) {
+      out.push({
+        severity: 'error',
+        code: 'skill-body-empty',
+        message: 'SKILL.md must contain non-empty operating instructions after frontmatter',
+        file: 'SKILL.md'
+      })
     } else if (parsed.value.name !== input.slug) {
       // name is display-only (v1.2.2 demoted it from attribution), so a
       // mismatch is a tamper/drift signal, not a broken run.
@@ -80,16 +92,25 @@ export function lintHarness(input: HarnessLintInput): Diagnostic[] {
   }
 
   if (input.rulesMd !== undefined) {
-    const badLines = input.rulesMd
-      .split(/\r?\n/)
-      .filter((line) => line.trim() !== '' && !RULE_LINE_RE.test(line))
-    if (badLines.length > 0) {
+    if (input.rulesMd.trim().length === 0) {
       out.push({
-        severity: 'warning',
-        code: 'rules-format',
-        message: `${badLines.length} rules.md line(s) missing the "- [severity] text" tag format (first: ${JSON.stringify(badLines[0])})`,
+        severity: 'error',
+        code: 'rules-empty',
+        message: 'rules.md must contain at least one rule',
         file: 'rules.md'
       })
+    } else {
+      const badLines = input.rulesMd
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== '' && !RULE_LINE_RE.test(line))
+      if (badLines.length > 0) {
+        out.push({
+          severity: 'warning',
+          code: 'rules-format',
+          message: `${badLines.length} rules.md line(s) missing the "- [severity] text" tag format (first: ${JSON.stringify(badLines[0])})`,
+          file: 'rules.md'
+        })
+      }
     }
   }
 
@@ -97,20 +118,25 @@ export function lintHarness(input: HarnessLintInput): Diagnostic[] {
     out.push(...lintScope(input.scopeJson))
   }
 
-  if (input.verifySh !== undefined && !input.verifySh.startsWith('#!')) {
-    out.push({
-      severity: 'warning',
-      code: 'verify-shebang',
-      message: 'verify.sh does not start with a shebang line',
-      file: 'verify.sh'
-    })
+  if (input.verifySh !== undefined) {
+    if (input.verifySh.trim().length === 0) {
+      out.push({
+        severity: 'error',
+        code: 'verify-empty',
+        message: 'verify.sh must contain a deterministic verification command',
+        file: 'verify.sh'
+      })
+    } else if (!input.verifySh.startsWith('#!')) {
+      out.push({
+        severity: 'error',
+        code: 'verify-shebang',
+        message: 'verify.sh must start with a shebang line',
+        file: 'verify.sh'
+      })
+    }
   }
 
   return out
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
 function lintScope(scopeJson: string): Diagnostic[] {
@@ -127,54 +153,23 @@ function lintScope(scopeJson: string): Diagnostic[] {
       }
     ]
   }
-  const scope = parsed as Partial<HarnessScope> | null
-  if (
-    scope === null ||
-    typeof scope !== 'object' ||
-    !isStringArray(scope.allowedGlobs) ||
-    !isStringArray(scope.forbiddenGlobs)
-  ) {
+  const contract = validateHarnessScopeContract(parsed)
+  if (!contract.ok) {
     return [
       {
         severity: 'error',
-        code: 'scope-unparseable',
-        message: 'scope.json is not a scope contract object (allowedGlobs/forbiddenGlobs missing)',
+        code: contract.kind === 'fields' ? 'scope-fields' : 'scope-unparseable',
+        message: contract.error,
         file: 'scope.json'
       }
     ]
   }
-
+  const scope = contract.value
   const out: Diagnostic[] = []
-
-  // Required scalar fields: a hand-edit that guts goal/acceptance/rollback
-  // leaves allowedGlobs/forbiddenGlobs intact (so the structural guard above
-  // passes) yet composes a broken first-turn prompt. The create-time cast never
-  // re-checked these; the lint does.
-  const missingFields = (['goal', 'acceptance', 'rollback'] as const).filter(
-    (key) => typeof scope[key] !== 'string'
-  )
-  if (missingFields.length > 0) {
-    out.push({
-      severity: 'error',
-      code: 'scope-fields',
-      message: `scope.json is missing required string field(s): ${missingFields.join(', ')}`,
-      file: 'scope.json'
-    })
-  }
 
   // The exit-bar check: re-run the create-time superset validation on the
   // on-disk contract. Reuses validateHarnessScope — never reimplemented.
-  // validateHarnessScope consults only forbiddenGlobs (validated above), so the
-  // argument is built from the validated arrays plus empty placeholders for the
-  // fields it never reads — no unsound `as HarnessScope` cast smuggling
-  // unchecked shapes past the compiler.
-  const supersetCheck = validateHarnessScope({
-    goal: '',
-    acceptance: '',
-    rollback: '',
-    allowedGlobs: scope.allowedGlobs,
-    forbiddenGlobs: scope.forbiddenGlobs
-  })
+  const supersetCheck = validateHarnessScope(scope)
   if (!supersetCheck.ok) {
     out.push({
       severity: 'error',

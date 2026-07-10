@@ -22,6 +22,10 @@ const state = vi.hoisted(() => ({
     hasLiveSession: vi.fn().mockReturnValue(false)
   },
   readAppConfigValue: vi.fn(),
+  registry: {
+    ensureRootReady: vi.fn(async () => {}),
+    get: vi.fn(() => undefined)
+  },
   auditEntries: [] as unknown[]
 }))
 
@@ -53,6 +57,11 @@ vi.mock('../../services/audit-logger', () => ({
     }
   }
 }))
+
+vi.mock('../../services/harness-run-registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/harness-run-registry')>()
+  return { ...actual, getHarnessRunRegistry: () => state.registry }
+})
 
 vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/nonexistent-test-userdata') }

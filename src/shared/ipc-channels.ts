@@ -346,7 +346,7 @@ export interface IpcChannels {
   // WorkspaceService.current(). Result-style responses: duplicate/invalid
   // slug are expected failures, not throws.
   'harness:create': {
-    request: { template: string; slug: string }
+    request: import('./harness-types').HarnessCreateRequest
     response: import('./harness-types').HarnessCreateResult
   }
   'harness:list': {
@@ -372,14 +372,27 @@ export interface IpcChannels {
   // MAIN-SIDE and records the write-once thread↔slug binding only after
   // main's own validation; the renderer keeps the send timing.
   'harness:run': {
-    request: { slug: string; threadId: string }
-    response: { ok: true; prompt: string } | { ok: false; error: string }
+    request: import('./harness-types').HarnessRunRequest
+    response:
+      | {
+          ok: true
+          prompt: string
+          /** Main binding authority, null only for a legacy adapter-less binding. */
+          adapter: import('./harness-types').HarnessAdapter | null
+        }
+      | { ok: false; error: string }
   }
   // Read path for the main-binding-sourced harness-identity chip. Null when
   // the thread is unbound or bound under a different workspace root.
   'harness:binding': {
     request: { threadId: string }
-    response: { slug: string } | null
+    response: {
+      slug: string
+      /** Null only for a pre-step-8 or trust-on-upgrade binding. */
+      adapter: import('./harness-types').HarnessAdapter | null
+      /** Capability bit only; the executable template never crosses IPC. */
+      rawInvocationReady: boolean
+    } | null
   }
 
   // --- Two-projection agent view (workstation contracts §3/§6, Phase 2 step 4) ---

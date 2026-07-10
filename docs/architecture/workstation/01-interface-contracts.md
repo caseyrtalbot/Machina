@@ -54,7 +54,7 @@ release; config keys `lastVaultPath` → `lastWorkspacePath` **and `vaultHistory
 `workspaceHistory`** (the history key is load-bearing: PathGuard bypass allowlist +
 recent-vaults UI) with an absent-only read fallback — a stored `null` must NOT resurrect
 the legacy value. PathGuard's API is untouched — only its construction moves. Naming note:
-the renderer already uses "workspace" for the vault folder *filter*
+the renderer already uses "workspace" for the vault folder _filter_
 (`vault-store.activeWorkspace`) — no compile collision, but the filter concept should be
 renamed in a later cleanup; recorded so the overload is a decision, not an accident.
 
@@ -78,9 +78,16 @@ export type GitOpResult =
   | { readonly ok: false; readonly reason: string }
 
 export type GitFileState = 'modified' | 'added' | 'deleted' | 'renamed'
-export interface GitStatusEntry { readonly path: string; readonly state: GitFileState; readonly origPath?: string }
+export interface GitStatusEntry {
+  readonly path: string
+  readonly state: GitFileState
+  readonly origPath?: string
+}
 /** isRepo lets the renderer surface "non-repo = no rollback protection" honestly. */
-export interface GitStatusResult { readonly isRepo: boolean; readonly entries: readonly GitStatusEntry[] }
+export interface GitStatusResult {
+  readonly isRepo: boolean
+  readonly entries: readonly GitStatusEntry[]
+}
 
 /**
  * v1.2.5 — one agent's unreverted attributed commits (listAgentCommits). Ids are
@@ -123,7 +130,11 @@ export interface GitService {
    * revert sha on open turn windows), and the final commit is PATHSPEC-LIMITED to
    * those paths so user-staged bystander files are never swept in.
    */
-  revertAgent(root: string, agentId: string, onWillRevert?: (paths: readonly string[]) => void): GitOpResult
+  revertAgent(
+    root: string,
+    agentId: string,
+    onWillRevert?: (paths: readonly string[]) => void
+  ): GitOpResult
   /**
    * v1.2.5 — read-only twin of revertAgent's enumeration (the SAME single git-log
    * trailer walk, factored into a shared reader): every unreverted agent-attributed
@@ -139,7 +150,11 @@ export interface GitService {
    * `shell.trashItem` so deletion stays recoverable — no non-recoverable default exists).
    * Fails closed: an ls-files failure returns git-failed rather than trashing tracked files.
    */
-  discard(root: string, paths: readonly string[], removeFile: (absPath: string) => Promise<void>): Promise<GitOpResult>
+  discard(
+    root: string,
+    paths: readonly string[],
+    removeFile: (absPath: string) => Promise<void>
+  ): Promise<GitOpResult>
 }
 ```
 
@@ -232,28 +247,40 @@ What landed, point by point:
 
 - **Name-collision cross-reference** (seam-map trap, recorded in the `session-types.ts`
   header): `src/shared/cli-agent-session-types.ts` is a different, unrelated module — the
-  CLI-agent *presence* wire types for the external-process session listener (Move 8).
+  CLI-agent _presence_ wire types for the external-process session listener (Move 8).
   `session-types.ts` types workstation terminal sessions and the adapter seam.
 - **`formatInvocation(prompt, opts incl. model?)`**: pure, trusts its input — the model
   flag is emitted whenever `opts.model` is set. Validation lives at the IPC boundary
   (`resolveRequestedModel` in `src/main/ipc/cli-thread.ts`, backed by the shared
   `resolveModelPick`); see the v1.2 changelog entry for the full trust rule.
-- **`raw` semantics (OQ3, recorded)**: the whole command line comes from a single-line
-  template string carrying the literal `{prompt}` placeholder; the prompt is
-  `singleQuote`-escaped into every occurrence; a missing, multiline, or placeholder-less
-  template is a structured error. No parser, no resume, no models. In step 1 ad-hoc raw
-  threads have no template source: picking raw spawns a plain PTY and the thread input
-  surface disables sending with honest "no structured view" copy — harness-supplied
-  templates arrive in step 8.
+- **`raw` semantics (OQ3, resolved by the step-8 contract)**: the whole command line
+  comes from a single-line template string carrying the literal `{prompt}` placeholder;
+  every occurrence must be unquoted/unescaped in one hook-observable simple command, and
+  the prompt is `singleQuote`-escaped into it. No parser, no resume, no models. Ad-hoc raw
+  remains a plain PTY with structured input disabled: the renderer
+  cannot nominate a command. A bound raw harness is the only structured-send path. Main
+  reads and validates that harness's frontmatter during `harness:run`, snapshots adapter +
+  `invocationTemplate` into the write-once `HarnessBinding`, and serves the snapshot to
+  the CLI input path only when root, thread, slug, and raw identity still agree. Missing,
+  malformed, legacy, or corrupt-mirror snapshots expose no raw-send readiness and execute
+  nothing.
+  The spawner formats the exact command through `ADAPTERS.raw`, registers that byte string
+  with the adapter-aware bridge **before** opening a turn or writing PTY input, then sends
+  it. A preflight/registration or missing-session queue refusal opens/leaves no turn and
+  writes no bytes. The bridge admits
+  only the byte-exact expected shell command; unrelated human commands neither emit an
+  agent event nor consume the expectation. Once admitted, the same raw block id survives
+  running, completion, cancellation, and PTY-death finalization, with `onMessage` before
+  `onTurnComplete` exactly once.
 - **`permissionHooks` (OQ1, recorded)**: reserved optional capability field — the seam
   for adapter-native pre-write enforcement, deferred to a dedicated follow-on phase.
   Phase 2 never sets or reads it (§4).
 - **Gemini nuance, restated**: the heuristic parser still exists in
-  `cli-agent-parsers.ts`; "absent `parseEvent` = raw projection" is the *bridge*
+  `cli-agent-parsers.ts`; "absent `parseEvent` = raw projection" is the _bridge_
   contract, not a claim about that file. Adapters without `parseEvent` (gemini, raw) get
   byte-for-byte plain PTY passthrough — the legacy `toolCallParser` path.
 - **Identity mapping, superseded**: `AGENT_IDENTITIES` gained `'cli-raw'` (appended), so
-  `CLI_AGENT_IDENTITIES` now maps 1:1 onto `AdapterId` *including* `raw`;
+  `CLI_AGENT_IDENTITIES` now maps 1:1 onto `AdapterId` _including_ `raw`;
   `identityForAdapter` moved to `agent-adapters.ts` (re-exported by `harness-types.ts`).
 
 **Projection** is not a new subsystem — it names the existing seam:
@@ -287,7 +314,7 @@ reattach-ONLY: see the §4 dead-PTY no-respawn contract point.
 CLI children write to disk directly (audit §3); in-process interception is impossible.
 The gate is **post-persistence containment**: the write is live on disk (and visible to
 open editors via the vault watcher) the moment the agent makes it. What the queue governs
-is whether the write gets *blessed into history* (commit with trailers) or *reverted*.
+is whether the write gets _blessed into history_ (commit with trailers) or _reverted_.
 Queue UI copy must say exactly this and never claim writes are blocked.
 
 **This is not a security boundary.** The CLI child is a full shell at the user's
@@ -358,8 +385,8 @@ Contract points (each traceable to a verified finding):
   (`DEFAULT_IGNORE_PATTERNS` ignores TE_DIR and every dotpath, which would blind the
   `verify.sh` auto-reject and all dotfile writes). Excluded: `.git`, `node_modules`,
   `dist/build/out`, and the app's own churn (`<TE_DIR>/state.json`, `threads/`,
-  `artifacts/`, `embeddings/`). Watched: everything else **including dotfiles, `.env`,
-  `.gitignore` itself, and `<TE_DIR>/agents/**`**. `.gitignore` is NOT honored — an agent
+  `artifacts/`, `embeddings/`). Watched: everything else, including dotfiles, `.env`,
+  `.gitignore` itself, and `<TE_DIR>/agents/**`. `.gitignore` is NOT honored — an agent
   write to an ignored `.env` must not be invisible (git can't diff/commit it, but the
   queue shows it). Self-writes suppressed via a `DocumentManager.hasPendingWrite` seam so
   user autosaves during a turn aren't misattributed (timing race accepted + documented).
@@ -368,9 +395,9 @@ Contract points (each traceable to a verified finding):
   "no rollback" flag. Never render the queue as protection there.
 - **Unattributed writes** (outside any turn window) are not queued; they get an audit
   entry (`cli-agent:unattributed-write`) so escapes are logged, not silent.
-- **Gate reuse**: the queue is a `HitlGate` implementation (`QueueHitlGate implements
-  HitlGate`, `hitl-gate.ts:22`), so native-agent and MCP writes can converge on the same
-  queue UI later. `WriteRateLimiter` runs per thread → `highVelocity` flag.
+- **Gate reuse**: the queue implements `HitlGate` (`hitl-gate.ts:22`), so native-agent and
+  MCP writes can converge on it later. `WriteRateLimiter` runs per thread →
+  `highVelocity` flag.
 - **Scope limits, stated honestly**: watching sees only the workspace root; out-of-root
   writes and the excluded TE_DIR app-state subpaths remain at the user's OS trust level —
   unchanged from today, documented in the queue UI footer.
@@ -443,11 +470,11 @@ export interface WatcherHealth {
 
 **Flag taxonomy** (three near-synonyms, reconciled):
 
-| Flag | Meaning | Set where |
-| --- | --- | --- |
-| `degradedAttribution` | shell hooks absent; PTY-alive window attribution | `CliTurnRegistry.windowState` per match |
-| `gateDegraded` | turn opened while watcher state ∉ {watching} | `turnStarted` via the gate-health probe |
-| `attributionSuspect` | agentId failed main-side binding validation | `turnStarted`, from the IPC-boundary resolution (v1.2.2 — LANDED) |
+| Flag                  | Meaning                                          | Set where                                                         |
+| --------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
+| `degradedAttribution` | shell hooks absent; PTY-alive window attribution | `CliTurnRegistry.windowState` per match                           |
+| `gateDegraded`        | turn opened while watcher state ∉ {watching}     | `turnStarted` via the gate-health probe                           |
+| `attributionSuspect`  | agentId failed main-side binding validation      | `turnStarted`, from the IPC-boundary resolution (v1.2.2 — LANDED) |
 
 ### Attribution authority (Phase 2 step 3, v1.2.2)
 
@@ -457,7 +484,8 @@ reassigned every future commit trailer and corrupted `revertAgent` scope. Main i
 binding authority:
 
 - **HarnessRunRegistry** (`src/main/services/harness-run-registry.ts`): a **write-once
-  threadId→slug binding**, persisted under userData (`harness-bindings.json`, atomic
+  threadId→slug+adapter binding** (plus budgets and raw invocation when applicable),
+  persisted under userData (`harness-bindings.json`, atomic
   writes) keyed workspace root + threadId. A binding is minted ONLY inside `harness:run`
   (`composeHarnessRun`, `src/main/services/harness-run.ts`) after main's own validation —
   slug format (adapter-identity names like `cli-claude` are reserved: a colliding slug's
@@ -469,15 +497,19 @@ binding authority:
   user-level agent could theoretically reach userData and edit the mirror — same class
   as trailer forgery; this is accident containment, not a security boundary.
 - **Degrade-not-fail** (`resolveRequestedAgentId`, `src/main/ipc/cli-thread.ts`, wired
-  into BOTH `cli-thread:spawn` and `cli-thread:input`): an absent agentId is the unbound
-  ad-hoc case — no lookup, no audit, adapter identity as today. A forwarded agentId that
+  into BOTH `cli-thread:spawn` and `cli-thread:input`): every request loads the main binding.
+  An absent agentId on a truly unbound thread is the clean ad-hoc case; on a modern binding,
+  main recovers the authoritative slug/template when identity matches and blocks when it
+  does not. A forwarded agentId that
   is malformed, mismatches the thread's binding, arrives on an unbound thread, or cannot
   be resolved because the registry itself threw (reason `registry-error`)
   degrades to adapter identity + a `cli-agent:attribution-mismatch` audit entry
   (decision `denied`; mismatch includes the `boundSlug`) + the turn tagged
   `attributionSuspect` — flowing `turnStarted` → `ActiveTurnMatch` →
-  `PendingChangeFlags` → tray chip exactly as `gateDegraded` does. The turn is NEVER
-  blocked.
+  `PendingChangeFlags` → tray chip exactly as `gateDegraded` does. Those legacy/slug
+  attribution failures do not block the underlying ad-hoc turn. A positively known
+  binding-adapter mismatch is different: it is refused before PTY input, because allowing
+  it would execute a different CLI under a harness contract and can strand the bridge.
 - **One-time trust-on-upgrade backfill** (`ensureRootReady`): on a root's first touch,
   every existing thread whose persisted `agent_id` is a valid non-reserved slug naming a
   real (realpath-checked) harness dir gets a binding backfilled, each audited
@@ -499,7 +531,7 @@ binding authority:
   authority — an unknown-but-well-formed id yields `no-commits-for-agent` — so commits
   from pre-binding history, deleted harnesses, or a wiped userData stay revertable.
   No code change was needed: `git-service.ts` already enumerates trailers; a test pins
-  it. Post-binding, forged slugs can no longer *enter* trailers via Machina's own path;
+  it. Post-binding, forged slugs can no longer _enter_ trailers via Machina's own path;
   forged-by-shell trailers remain the accepted §4 forgery residual.
 
 ### Two-projection agent view (Phase 2 step 4, v1.2.3)
@@ -550,14 +582,30 @@ permissionMode: queue-all-writes # immutable default (Q9)
 budgets: { maxTurns: 10, maxWritesPerMinute: 10 }
 ```
 
+The exact frontmatter keys are `name`, `description`, `adapter`, `permissionMode`,
+`budgets`, and (raw only) `invocationTemplate`. Raw harnesses require a non-empty,
+single-line invocation template containing a standalone literal `{prompt}` command word;
+structured adapters forbid the field. The raw grammar rejects controls, DEL/C1 bytes,
+lone UTF-16 surrogates, arithmetic/subscript contexts, unstable spacing/escapes,
+interactive history expansion, unquoted literal arguments after the executable, and
+compound shell syntax. The final executable is escaped so normal and slash-path aliases
+cannot rewrite the observed command; same-named shell functions remain an explicit
+shell-resolution caveat. The hand-rolled parser rejects duplicate/unknown keys and invalid
+budget values. Generated frontmatter is parsed back and compared field-for-field before
+creation, so multiline, comment-truncating, or injection-shaped user strings are rejected
+rather than escaped into a different meaning.
+
 `scope.json`: `{ goal, allowedGlobs, forbiddenGlobs, acceptance, rollback }` — the
-curriculum 14.36 shape. `forbiddenGlobs` always contains `HARNESS_PROTECTED_GLOBS`
-(verify.sh + rules.md under **both** `.machina/` and `.machina-dev/` — TE_DIR flips per
-runtime, the on-disk contract must not); the harness generator refuses to emit a contract
-without them, and `AgentWriteWatcher` auto-rejects (and audits) any pending change touching
-`verify.sh` regardless of contract — reachable only because §4's watcher explicitly
-include-lists `<TE_DIR>/agents/**`. `verify.sh` also ships mode `0o555` (defense-in-depth,
-not a boundary — a same-user shell can chmod it back).
+curriculum 14.36 shape. The final `forbiddenGlobs` always contains
+`HARNESS_PROTECTED_GLOBS` (verify.sh + rules.md under **both** `.machina/` and
+`.machina-dev/` — TE_DIR flips per runtime, the on-disk contract must not). A template-only
+request refuses a template missing any protected glob; it never silently repairs a broken
+built-in. Presence of an `overrides` object — including `{}` — instead selects the
+constructive path: shared draft assembly unions the protected globs into the effective
+scope and then validates the final result. `AgentWriteWatcher` auto-rejects (and audits)
+any pending change touching `verify.sh` regardless of contract — reachable only because
+§4's watcher explicitly include-lists `<TE_DIR>/agents/**`. `verify.sh` also ships mode
+`0o555` (defense-in-depth, not a boundary — a same-user shell can chmod it back).
 
 **Corrections (adversarial pass):** the "indexed by knowledge capability, zero extra
 wiring" claim was false — vault-watcher ignores the whole TE_DIR subtree, so `state.md`
@@ -567,12 +615,165 @@ agents subtree as the future path. `scope.json` is advisory in Phase 1: nothing 
 write path enforces globs — the watcher's auto-reject and the queue are the only teeth,
 and UI copy must not imply more.
 
+### Template gallery + blank builder (Phase 2 step 8, v1.2.8)
+
+OQ7 is **RESOLVED by Casey 2026-07-09** with one frozen, shared registry in this exact
+order. Category and audience are contract metadata used by the gallery filters, not
+free-form display strings:
+
+| Category     | Template                 | Audience                                         | Adapter / setup              | Purpose                                                                        |
+| ------------ | ------------------------ | ------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------------------ |
+| Guided       | `idea-to-spec`           | non-engineer, low-code-user                      | claude                       | Turns a plain-language product idea into one buildable requirements brief.     |
+| Guided       | `docs-maintainer`        | non-engineer, low-code-user, seasoned-programmer | claude                       | Reconciles one documentation gap against current repository evidence.          |
+| Guided       | `automation-builder`     | low-code-user, seasoned-programmer               | codex                        | Builds one transparent shell or Make automation with a short runbook.          |
+| Architecture | `architecture-mapper`    | systems-thinker, architect, seasoned-programmer  | claude                       | Maps one current system slice with evidence-linked boundaries and flows.       |
+| Architecture | `boundary-auditor`       | systems-thinker, architect, seasoned-programmer  | codex                        | Performs a read-only boundary review and writes severity-ranked findings.      |
+| Architecture | `migration-planner`      | systems-thinker, architect                       | claude                       | Designs one phased migration with compatibility, rollback, and evidence gates. |
+| Engineering  | `bug-reproducer`         | seasoned-programmer                              | codex                        | Captures one minimal failing test for a reported defect without fixing it.     |
+| Engineering  | `test-fixer`             | seasoned-programmer                              | claude                       | Runs the test suite, fixes the first failure, stops.                           |
+| Engineering  | `vertical-slice-builder` | seasoned-programmer                              | codex                        | Implements one acceptance-tested feature slice without unrelated refactoring.  |
+| Bridge       | `raw-tool-runner`        | seasoned-programmer, platform-builder            | raw / configuration required | Runs an explicitly configured unknown agent CLI through the raw PTY adapter.   |
+
+The first nine entries are definition-complete creation candidates; one-click creation
+only installs the role. Every run requires a dedicated task brief: trimmed non-empty text,
+no NUL, at most 4,000 characters. Renderer validation happens before thread creation and
+main repeats it before loading a binding mirror or reading harness files. The validated
+brief is delimited in the prompt and cannot override rules or scope. `raw-tool-runner`
+deliberately carries no fabricated executable command: its card opens the builder and
+requires an invocation template, an operator-authored concrete scope rather than the
+template's configuration sentinel, and a verifier. The blank builder and configurable-
+card builder are reached from the visible thread-sidebar **New Agent** button or the
+`New agent…` command-palette shortcut; both open the same gallery. They expose role text,
+adapter, budgets, skill body, rules, scope, verifier, and raw
+invocation when applicable. `permissionMode` is visible but immutable at
+`'queue-all-writes'`.
+
+Static `lintHarness` success proves contract shape only. Executable verifier fixtures prove
+the roster's artifact presence and structure, staged/unstaged/untracked handling, stale
+boundary-report rejection, and wrong-failure paths. Engineering gates prefer a Make `test`
+target, then detect npm/pnpm/yarn/bun, Cargo, Go, or pytest/uv roots. npm/pnpm/yarn require
+an explicit non-empty test script; missing pytest and other setup/discovery failures are
+classified as infrastructure. Unsupported/missing runners fail closed and direct the
+operator to a configured blank harness. The bug reproducer refuses simultaneous
+product/dependency edits, targets exactly the changed test file where a safe runner exists,
+rejects unrelated-suite/setup/load/build/hook failures as non-evidence, checks the working
+tree again after execution, and kills timed-out child/grandchild process trees.
+
+The creation wire shape is concrete and closed:
+
+```ts
+interface HarnessOverrides {
+  description?: string
+  adapter?: HarnessAdapter
+  budgets?: HarnessBudgets
+  invocationTemplate?: string
+  skillBody?: string
+  rules?: string
+  scope?: HarnessScope
+  verifyCommand?: string
+  initialState?: string
+}
+
+type BlankHarnessOverrides =
+  | {
+      description: string
+      adapter: 'raw'
+      budgets: HarnessBudgets
+      invocationTemplate: string
+      skillBody: string
+      rules: string
+      scope: HarnessScope
+      verifyCommand: string
+      initialState?: string
+    }
+  | {
+      description: string
+      adapter: Exclude<HarnessAdapter, 'raw'>
+      budgets: HarnessBudgets
+      invocationTemplate?: never
+      skillBody: string
+      rules: string
+      scope: HarnessScope
+      verifyCommand: string
+      initialState?: string
+    }
+
+type HarnessCreateRequest =
+  | { template: string; slug: string; overrides?: HarnessOverrides }
+  | { template?: undefined; slug: string; overrides: BlankHarnessOverrides }
+
+interface HarnessRunRequest {
+  slug: string
+  threadId: string
+  taskBrief: string
+}
+```
+
+Request and override objects reject unknown keys at runtime. For a template request, every
+present override replaces that template field atomically; `budgets` and `scope` are whole
+field replacements, never deep merges. An absent field inherits. A blank request supplies
+all required fields in `BlankHarnessOverrides`. A configuration-required template must
+explicitly override `invocationTemplate`, `scope`, and `verifyCommand`. Effective budgets
+must be finite integers: `maxTurns` is 1–100 and `maxWritesPerMinute` is 1–120.
+Present-but-null or wrong-type fields are invalid; presence never silently means inherit.
+
+`buildHarnessDraft(request, harnessDir)` is the one pure assembly function. It validates
+the closed request, slug, complete effective fields, adapter/frontmatter rules, budgets,
+scope, verifier command, and every candidate file; replaces every `<dir>` occurrence with
+the materialized harness directory; wraps one non-empty, single-line `verifyCommand` in
+`verify.sh`; rejects pipelines, command lists, background jobs, and command substitution
+or POSIX `!` negation that could invert/mask an earlier red exit (required gates may use
+`&&`); requires raw `{prompt}` placeholders to be standalone and unquoted/unescaped in one
+hook-stable simple command; requires literal raw arguments to be quoted; validates the
+final PTY command after prompt substitution; round-trips the generated frontmatter; and
+runs the shared
+content linter. The renderer uses that function only to preview the exact request and
+disable create on errors. IPC sends the request, **not** a renderer-materialized draft.
+Main rebuilds the candidate from the request, then writes only beneath the authoritative
+active workspace; it trusts no renderer-provided file bytes. No directory is created until
+all pure checks pass;
+non-overwrite, canonical-path equality, write ordering, `verify.sh`-last mode `0o555`, and
+bounded partial cleanup remain main-owned.
+
+The two protected-scope paths are intentional. `overrides !== undefined`, including `{}`,
+constructively unions `HARNESS_PROTECTED_GLOBS` before final validation; a caller that
+omits them still receives a compliant scope. A template-only request has no constructive
+signal, so a mutated built-in missing a protected glob is refused with nothing written.
+This is creation-time contract integrity, not a wider security claim: `scope.json` remains
+advisory at runtime, and CLI writes remain post-persistence containment by the watcher,
+queue, and breaker.
+
+Run creation preserves the same authority split. Main validates and normalizes the
+operator task before filesystem or binding work, then performs one inspection that rejects
+symlink/non-regular required entries and returns both diagnostics and the exact bytes used
+for prompt composition. It records a write-once `HarnessBinding` containing slug,
+authoritative adapter, budget snapshot, and raw-only invocation snapshot. A same-slug
+re-record never refreshes those snapshots; valid data persists in the userData mirror,
+while legacy/corrupt adapter or invocation data degrades without harness attribution or
+raw-send readiness. The renderer cannot supply or replace them on `cli-thread:input`. A
+harness launch also targets its first prompt explicitly: the task dialog supplies
+`taskBrief`; `runHarness` creates the thread, asks main to compose/bind the run, verifies
+main's returned adapter matches the created PTY, associates the agent, waits for the shell
+prompt, then calls `appendUserMessage(prompt, threadId)`. Non-cancelling IPC timeouts
+return `indeterminate`, keep late settlements attached, replay Stop onto a late native run
+id, and keep sending blocked until a main-originated completion/refusal settles the turn.
+Thread delete/close tombstones stop late native/CLI work from resurrecting the thread;
+workspace-generation checks prevent workspace A creates/saves from landing under
+workspace B while preserving the Phase-1 no-auto-kill-on-switch decision. Changing the
+selected thread during that wait cannot retarget transport or persistence; ordinary
+interactive sends may continue to omit the explicit id and follow the active thread. The
+main binding read exposes only slug, authoritative adapter, and raw-send readiness, never
+the invocation template. `HarnessSummary.scope` is the parsed effective on-disk contract
+for launch copy;
+template defaults are never substituted for an installed override, and the UI must call
+the scope advisory rather than an enforced sandbox.
+
 ### Harness linter (Phase 2 step 7, v1.2.4)
 
-Everything create-time validation cannot see is the linter's job: scope.json is never
-re-validated after create (a hand-edit can strip `HARNESS_PROTECTED_GLOBS` undetected),
-verify.sh mode/presence drift is unchecked, and malformed harnesses used to vanish from
-the palette silently.
+Everything create-time validation cannot see is the linter's job: it re-validates an
+on-disk scope after hand edits, rejects empty core contract content and an unusable
+verifier, reports verify.sh mode/presence drift, and prevents malformed harnesses from
+vanishing from the palette silently.
 
 ```ts
 type DiagnosticSeverity = 'error' | 'warning'
@@ -684,9 +885,10 @@ unambiguous signal may escalate to the one kill. (3) It NEVER kills on a
 bare headMoved signal (v1.2.7, orchestrator decision): the user's own
 `git commit`/`pull`/`checkout` during a writing turn is indistinguishable
 from agent git activity, so headMoved joins the notice-latch class — notice
-+ audit + tray row on the first signal, escalation to the single kill only
-on a later unambiguous kill-class signal in the same episode. The watcher's
-head-moved audit entry and the queue's `headMoved` flag are unchanged.
+
+- audit + tray row on the first signal, escalation to the single kill only
+  on a later unambiguous kill-class signal in the same episode. The watcher's
+  head-moved audit entry and the queue's `headMoved` flag are unchanged.
 
 **Kill switch** = the existing hard-kill path surfaced: a Kill button on CLI
 thread headers (`agent-breaker-kill-switch.tsx`, liveness from the
@@ -711,12 +913,12 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'git:commit-approved':   { request: CommitApprovedOpts; response: GitOpResult }
 'git:revert-agent':      { request: { agentId: string }; response: GitOpResult }
 'fs:select-file':        { request: void; response: string | null } // editor-center open, guard-checked
-'harness:create':        { request: { template: string; slug: string }
+'harness:create':        { request: HarnessCreateRequest // v1.2.8 — template + atomic overrides OR complete blank request; main rebuilds the draft
                            response: { ok: true; root: string } | { ok: false; error: string } } // Result-style: duplicate/invalid slug are expected failures
 'harness:list':          { request: void; response: HarnessSummary[] }
-'harness:run':           { request: { slug: string; threadId: string } // v1.2.2 — main-side composition; records the write-once binding
-                           response: { ok: true; prompt: string } | { ok: false; error: string } }
-'harness:binding':       { request: { threadId: string }; response: { slug: string } | null } // v1.2.2 — recorded deviation: the main-binding-sourced identity chip needs a read path
+'harness:run':           { request: HarnessRunRequest // v1.2.8 — required validated task + main-side composition; records the write-once binding
+                           response: { ok: true; prompt: string; adapter: HarnessAdapter } | { ok: false; error: string } }
+'harness:binding':       { request: { threadId: string }; response: { slug: string; adapter: HarnessAdapter | null; rawInvocationReady: boolean } | null } // v1.2.8 — authority/readiness only; never exposes the raw command
 'approvals:list':        { request: void; response: PendingChange[] }
 'approvals:resolve':     { request: { id: string; approve: boolean; message?: string }; response: GitOpResult }
 'approvals:watcher-status': { request: void; response: WatcherHealth } // v1.2.1 — pull mirror for late subscribers
@@ -748,19 +950,49 @@ Reordered after the adversarial pass: the original order had gate parity (old st
 consuming GitService/approvals artifacts assigned to old step 4 — the two specs
 double-built the same files with contradictory shapes. Canonical order:
 
-| Phase 1 step | Contracts consumed |
-| --- | --- |
-| 1 Workspace generalization | §1 (+ `vault.*`→`workspace.*` MCP aliases, audit §2) |
-| 2 Git substrate | §2 full GitService + ApprovalQueue + §6 git/approvals channels (queue empty until step 3) |
-| 3 Gate parity | §4 (CliTurnRegistry, AgentWriteWatcher, QueueHitlGate, tray) + §2 per-turn snapshot in `input()` |
-| 4 Dock IDE shell | §3 projection (existing seam only; independent of 2–3, may land in parallel after 1) |
-| 5 Retire snapshot | §2/§4 never-regress rule — evidence gate (G1–G8), no new interface |
-| 6 test-fixer template | §5 folder schema + §6 harness channels + agentId(slug) → turn registry → trailers |
+| Phase 1 step               | Contracts consumed                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1 Workspace generalization | §1 (+ `vault.*`→`workspace.*` MCP aliases, audit §2)                                             |
+| 2 Git substrate            | §2 full GitService + ApprovalQueue + §6 git/approvals channels (queue empty until step 3)        |
+| 3 Gate parity              | §4 (CliTurnRegistry, AgentWriteWatcher, QueueHitlGate, tray) + §2 per-turn snapshot in `input()` |
+| 4 Dock IDE shell           | §3 projection (existing seam only; independent of 2–3, may land in parallel after 1)             |
+| 5 Retire snapshot          | §2/§4 never-regress rule — evidence gate (G1–G8), no new interface                               |
+| 6 test-fixer template      | §5 folder schema + §6 harness channels + agentId(slug) → turn registry → trailers                |
 
 Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.2.8 (2026-07-10, Phase 2 step 8 landed)** —
+  OQ7 RESOLVED by Casey with the exact ten-template registry across Guided,
+  Architecture, Engineering, and Bridge plus the six audience tags recorded in §5;
+  `raw-tool-runner` is the sole configuration-required card and never fabricates an
+  executable. §5/§6 define the closed `HarnessCreateRequest` union, complete blank
+  request, field-atomic overrides, hard budget bounds, raw-vs-structured frontmatter
+  rules, exact parse/serialize round-trip, and the intentional protected-scope split:
+  overrides-present (even `{}`) constructively unions protected globs, while a
+  template-only mutation refuses with nothing written. Renderer preview and main creation
+  share the pure draft builder, but IPC carries only the request and main authoritatively
+  rebuilds all file bytes. One main inspection rejects redirected required entries and
+  supplies the exact lint/prompt/binding snapshot. Adapter and raw invocation are main-read
+  and snapshotted in the write-once binding; identity mismatch fails closed. Raw templates
+  require standalone unquoted placeholders in one hook-stable simple command, reject
+  controls/surrogates/alias-prone literal args, and validate the final PTY command. The
+  adapter-aware bridge admits only the registered byte-exact command, PTY queue refusal
+  rolls the marker and turn back, and one block identity survives every terminal state.
+  Ad-hoc raw remains structured-input-disabled; bound raw harnesses are the sole structured
+  raw-send path. Every run requires a main-revalidated, bounded task brief; the prompt
+  delimits it below rules/scope authority, and harness launch explicitly targets its created
+  thread after the shell-prompt wait. The launch surface reads effective on-disk scope from
+  `HarnessSummary`, never catalog defaults. Runtime scope remains advisory and write
+  containment remains post-persistence. Non-cancelling dispatch timeouts are
+  indeterminate; late settlements remain attached, Stop is replayed when possible, and
+  workspace switches fence stale state without auto-killing PTYs. Executable verifier
+  fixtures cover artifact, symlink, wrong-failure semantics, exact bug-reproducer
+  targeting, post-run dirty guards, and process-tree timeout cleanup. Automated gates are
+  green as of 2026-07-10 (`npm run check`, build, full E2E, targeted visible-gallery E2E,
+  audit recorded). Casey accepted the previously pending timed/visual gate by direct
+  landing instruction on 2026-07-10.
 - **v1.2.7 (2026-07-07, post-merge review hardening — Phase 2 steps 5+6)** —
   fixes from the adversarial review of `24d53e1`, applied as one hardening
   pass (two fix agents: git surface + breaker seam).
@@ -895,7 +1127,7 @@ Implementation detail per step: `02-phase-1-specs.md`.
   structured reasons.
 - **v1.2.4 (2026-07-07, Phase 2 step 7 landing)** — §5 gains
   the harness-linter subsection: `Diagnostic { severity: 'error' | 'warning', code,
-  message, file }` (deliberately minimal — severity-taxonomy creep is the named linter
+message, file }` (deliberately minimal — severity-taxonomy creep is the named linter
   failure mode), pure content lints in `src/shared/harness-lint.ts`
   (`lintHarness(files) → Diagnostic[]`, renderer-importable: scope superset
   re-validation reusing `validateHarnessScope`, rules.md severity-tag format, `<dir>`
@@ -1088,9 +1320,10 @@ Implementation detail per step: `02-phase-1-specs.md`.
   rule maps to "no flag". **raw fallback:** `'cli-raw'` APPENDED to `AGENT_IDENTITIES`;
   `RAW_AGENT_SPEC` is `alwaysAvailable` and kept out of the probeable `CLI_AGENTS`
   (nothing to probe, detection never runs for raw); raw spawn skips the
-  installed-binary check and opens a plain PTY, `sendUserMessage` refuses on raw until
-  harness-supplied templates arrive (step 8, OQ3), and the thread input surface shows
-  the honest no-structured-view copy with sending disabled.
+  installed-binary check and opens a plain PTY. Ad-hoc raw keeps the honest
+  no-structured-view copy with sending disabled; v1.2.8 adds a distinct bound-harness
+  route whose main-owned invocation snapshot is required before a structured raw send
+  (OQ3).
 
 - **v1.1.5 (2026-07-06, pre-Phase-2 hardening)** — §5 hardening: `createHarness`
   refuses (structured error, no harness content written, empty slug dir removed
@@ -1100,7 +1333,7 @@ Implementation detail per step: `02-phase-1-specs.md`.
   `<canonicalRoot>/<TE_DIR>/agents/<slug>`. Rationale: a symlink at `<TE_DIR>`
   or `<TE_DIR>/agents` redirected every harness write — verify.sh included —
   outside the watched root, where the approvals watcher (`followSymlinks:
-  false`) and the `HARNESS_PROTECTED_GLOBS` auto-reject can never see it.
+false`) and the `HARNESS_PROTECTED_GLOBS` auto-reject can never see it.
   Realpath EQUALITY, not containment: the glob matcher is literal-relative-path
   based, so even an intra-root alias defeats it. `listHarnesses` gets the same
   guard skip-not-throw style (symlinked agents dir ⇒ `[]`). Slug-level

@@ -12,6 +12,7 @@ import { getWorkspaceService } from '../services/workspace-service'
 import { createHarness, lintHarnessOnDisk, listHarnesses } from '../services/harness-service'
 import { composeHarnessRun } from '../services/harness-run'
 import { getHarnessRunRegistry } from '../services/harness-run-registry'
+import { validateHarnessTaskBrief } from '../../shared/harness-types'
 
 function currentRoot(): string | null {
   return getWorkspaceService().current()?.root ?? null
@@ -21,7 +22,7 @@ export function registerHarnessIpc(): void {
   typedHandle('harness:create', async (args) => {
     const root = currentRoot()
     if (root === null) return { ok: false as const, error: 'no-workspace' }
-    return createHarness(root, args.template, args.slug)
+    return createHarness(root, args)
   })
 
   typedHandle('harness:list', async () => {
@@ -31,13 +32,18 @@ export function registerHarnessIpc(): void {
   })
 
   typedHandle('harness:run', async (args) => {
+    // Validate the untrusted per-run goal before loading the binding mirror or
+    // touching harness files. composeHarnessRun repeats this at its direct-call
+    // boundary so neither main entry point can bypass the rule.
+    const taskBrief = validateHarnessTaskBrief(args.taskBrief)
+    if (!taskBrief.ok) return { ok: false as const, error: taskBrief.error }
     const root = currentRoot()
     if (root === null) return { ok: false as const, error: 'no-workspace' }
     try {
       // Backfill precedes the first bind after upgrade: a legacy thread's
       // frontmatter slug must already hold its binding before record() runs.
       await getHarnessRunRegistry().ensureRootReady(root)
-      return await composeHarnessRun(root, args.slug, args.threadId)
+      return await composeHarnessRun(root, args.slug, args.threadId, taskBrief.value)
     } catch (err) {
       // A throwing registry (backfill scan, mirror persist) stays inside the
       // structured-error contract — nothing throws across the boundary.
@@ -58,7 +64,13 @@ export function registerHarnessIpc(): void {
       return null
     }
     const binding = registry.get(root, args.threadId)
-    return binding === undefined ? null : { slug: binding.slug }
+    return binding === undefined
+      ? null
+      : {
+          slug: binding.slug,
+          adapter: binding.adapter ?? null,
+          rawInvocationReady: binding.adapter === 'raw' && binding.invocationTemplate !== undefined
+        }
   })
 
   typedHandle('harness:lint', async (args) => {

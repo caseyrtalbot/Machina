@@ -372,4 +372,268 @@ describe('budgets snapshot at bind (step 6)', () => {
     await h.registry.ensureRootReady(ROOT)
     expect(h.registry.get(ROOT, 'th1')).toEqual({ slug: 'test-fixer', workspaceRoot: ROOT })
   })
+
+  it.each([
+    { maxTurns: 1.5, maxWritesPerMinute: 10 },
+    { maxTurns: 101, maxWritesPerMinute: 10 },
+    { maxTurns: 10, maxWritesPerMinute: 0 },
+    { maxTurns: 10, maxWritesPerMinute: 10, surprise: true }
+  ])(
+    'rejects persisted budgets outside the shared integer/bounds contract: %j',
+    async (budgets) => {
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({
+          version: 1,
+          backfilledRoots: [ROOT],
+          bindings: {
+            [ROOT + '\u0000' + 'th-bad-budgets']: {
+              slug: 'test-fixer',
+              workspaceRoot: ROOT,
+              budgets
+            }
+          }
+        }),
+        'utf8'
+      )
+      const h = makeRegistry()
+      await h.registry.ensureRootReady(ROOT)
+      expect(h.registry.get(ROOT, 'th-bad-budgets')).toEqual({
+        slug: 'test-fixer',
+        workspaceRoot: ROOT
+      })
+    }
+  )
+})
+
+describe('raw invocation template snapshot at bind (step 8)', () => {
+  const TEMPLATE = "mytool '--ask' {prompt}"
+
+  it('records the validated template and round-trips it through the persisted mirror', async () => {
+    const first = makeRegistry()
+    expect(
+      await first.registry.record(ROOT, 'th-raw', 'raw-runner', undefined, TEMPLATE, 'raw')
+    ).toEqual({ ok: true })
+    expect(first.registry.get(ROOT, 'th-raw')?.adapter).toBe('raw')
+    expect(first.registry.get(ROOT, 'th-raw')?.invocationTemplate).toBe(TEMPLATE)
+
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th-raw')?.adapter).toBe('raw')
+    expect(reloaded.registry.get(ROOT, 'th-raw')?.invocationTemplate).toBe(TEMPLATE)
+  })
+
+  it('same-slug re-record never refreshes the bind-time template snapshot', async () => {
+    const h = makeRegistry()
+    await h.registry.record(ROOT, 'th-raw', 'raw-runner', undefined, TEMPLATE, 'raw')
+    expect(
+      await h.registry.record(ROOT, 'th-raw', 'raw-runner', undefined, 'other {prompt}', 'raw')
+    ).toEqual({ ok: true })
+    expect(h.registry.get(ROOT, 'th-raw')?.invocationTemplate).toBe(TEMPLATE)
+
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th-raw')?.invocationTemplate).toBe(TEMPLATE)
+  })
+
+  it('refuses a malformed template on a new binding without minting it', async () => {
+    const h = makeRegistry()
+    const result = await h.registry.record(
+      ROOT,
+      'th-raw',
+      'raw-runner',
+      undefined,
+      'no prompt',
+      'raw'
+    )
+    expect(result.ok).toBe(false)
+    expect(h.registry.get(ROOT, 'th-raw')).toBeUndefined()
+  })
+
+  it('refuses a terminal-control template on a new binding without minting it', async () => {
+    const h = makeRegistry()
+    const result = await h.registry.record(
+      ROOT,
+      'th-controlled',
+      'raw-runner',
+      undefined,
+      'mytool \x15{prompt}',
+      'raw'
+    )
+
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('Ctrl-U') })
+    expect(h.registry.get(ROOT, 'th-controlled')).toBeUndefined()
+  })
+
+  it('malformed persisted templates degrade to absent while the binding survives', async () => {
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        backfilledRoots: [ROOT],
+        bindings: {
+          [ROOT + '\u0000' + 'th-raw']: {
+            slug: 'raw-runner',
+            workspaceRoot: ROOT,
+            adapter: 'raw',
+            invocationTemplate: 'missing-placeholder'
+          }
+        }
+      }),
+      'utf8'
+    )
+    const h = makeRegistry()
+    await h.registry.ensureRootReady(ROOT)
+    expect(h.registry.get(ROOT, 'th-raw')).toEqual({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT,
+      adapter: 'raw'
+    })
+  })
+
+  it('persisted terminal-control templates degrade to no raw-send readiness', async () => {
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        backfilledRoots: [ROOT],
+        bindings: {
+          [ROOT + '\u0000' + 'th-controlled']: {
+            slug: 'raw-runner',
+            workspaceRoot: ROOT,
+            adapter: 'raw',
+            invocationTemplate: 'mytool \x15{prompt}'
+          }
+        }
+      }),
+      'utf8'
+    )
+
+    const h = makeRegistry()
+    await h.registry.ensureRootReady(ROOT)
+    expect(h.registry.get(ROOT, 'th-controlled')).toEqual({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT,
+      adapter: 'raw'
+    })
+  })
+
+  it('trust-on-upgrade backfills never acquire an invocation template', async () => {
+    const h = makeRegistry({
+      listThreadAgentIds: async () => [{ threadId: 'th-legacy', agentId: 'raw-runner' }],
+      harnessDirExists: async () => true
+    })
+    await h.registry.ensureRootReady(ROOT)
+    expect(h.registry.get(ROOT, 'th-legacy')).toEqual({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT
+    })
+  })
+})
+
+describe('adapter snapshot at bind (step 8)', () => {
+  it('persists a structured adapter and refuses a same-slug adapter change', async () => {
+    const first = makeRegistry()
+    expect(
+      await first.registry.record(ROOT, 'th-adapter', 'test-fixer', undefined, undefined, 'claude')
+    ).toEqual({ ok: true })
+
+    const mismatch = await first.registry.record(
+      ROOT,
+      'th-adapter',
+      'test-fixer',
+      undefined,
+      undefined,
+      'codex'
+    )
+    expect(mismatch.ok).toBe(false)
+    if (!mismatch.ok) expect(mismatch.error).toContain('already bound to adapter "claude"')
+
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th-adapter')).toEqual({
+      slug: 'test-fixer',
+      workspaceRoot: ROOT,
+      adapter: 'claude'
+    })
+  })
+
+  it('an invalid persisted adapter degrades to legacy and cannot carry a raw template', async () => {
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        backfilledRoots: [ROOT],
+        bindings: {
+          [ROOT + '\u0000' + 'th-invalid-adapter']: {
+            slug: 'raw-runner',
+            workspaceRoot: ROOT,
+            adapter: 'shell',
+            invocationTemplate: 'must-not-cross {prompt}'
+          }
+        }
+      }),
+      'utf8'
+    )
+
+    const h = makeRegistry()
+    await h.registry.ensureRootReady(ROOT)
+    expect(h.registry.get(ROOT, 'th-invalid-adapter')).toEqual({
+      slug: 'raw-runner',
+      workspaceRoot: ROOT
+    })
+  })
+
+  it('a same-slug record never upgrades an adapter-less legacy binding', async () => {
+    const first = makeRegistry()
+    await first.registry.record(ROOT, 'th-legacy-adapter', 'test-fixer')
+
+    expect(
+      await first.registry.record(
+        ROOT,
+        'th-legacy-adapter',
+        'test-fixer',
+        { maxTurns: 3, maxWritesPerMinute: 4 },
+        undefined,
+        'claude'
+      )
+    ).toEqual({ ok: true })
+    expect(first.registry.get(ROOT, 'th-legacy-adapter')).toEqual({
+      slug: 'test-fixer',
+      workspaceRoot: ROOT
+    })
+
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th-legacy-adapter')).toEqual({
+      slug: 'test-fixer',
+      workspaceRoot: ROOT
+    })
+  })
+
+  it('refuses raw adapter/template shape mismatches before minting a binding', async () => {
+    const h = makeRegistry()
+    expect(
+      await h.registry.record(
+        ROOT,
+        'th-missing-template',
+        'raw-runner',
+        undefined,
+        undefined,
+        'raw'
+      )
+    ).toMatchObject({ ok: false })
+    expect(
+      await h.registry.record(
+        ROOT,
+        'th-structured-template',
+        'test-fixer',
+        undefined,
+        'tool {prompt}',
+        'claude'
+      )
+    ).toMatchObject({ ok: false })
+    expect(h.registry.get(ROOT, 'th-missing-template')).toBeUndefined()
+    expect(h.registry.get(ROOT, 'th-structured-template')).toBeUndefined()
+  })
 })

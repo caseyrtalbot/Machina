@@ -1,6 +1,7 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useThreadStore } from '../../store/thread-store'
+import { threadStartIsBlocked, useAgentDispatchStore } from '../../store/agent-dispatch-store'
 import { AgentPicker } from './AgentPicker'
 import type { AgentIdentity } from '@shared/agent-identity'
 import type { Thread } from '@shared/thread-types'
@@ -9,13 +10,23 @@ import { ADAPTERS, identityForAdapter } from '@shared/agent-adapters'
 import { DEFAULT_NATIVE_MODEL, NATIVE_MODEL_OPTIONS } from '@shared/machina-native-tools'
 import { formatModelLabel } from '@shared/format-model-label'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
+import { useHarnessBinding } from './use-harness-binding'
 
 const MIN_INPUT_HEIGHT = 22
 const MAX_INPUT_HEIGHT = 200
 
-/** Honest copy for raw threads (workstation step 1, OQ3): no template source
- * exists yet for ad-hoc raw sessions, so structured sends are disabled. */
-const RAW_INPUT_COPY = 'No structured view for raw sessions. Interact via the terminal.'
+/** Honest copy for ad-hoc raw threads. Bound raw harnesses have a validated
+ * invocation template and may use the structured send path. */
+const AD_HOC_RAW_INPUT_COPY =
+  'No structured view for ad-hoc raw sessions. Interact via the terminal.'
+const RAW_BINDING_PENDING_COPY = 'Checking the main-owned raw harness binding…'
+const RAW_BINDING_UNAVAILABLE_COPY =
+  'Unable to verify the raw harness binding. Switch threads and return to retry.'
+const RAW_INVOCATION_NOT_READY_COPY =
+  'Raw harness input is not ready. Configure a valid invocation template, then reopen it.'
+const SESSION_STARTING_COPY = 'Starting the agent session…'
+const SESSION_START_UNKNOWN_COPY =
+  'Session start status is unknown. Wait for it to settle before sending.'
 
 /** Reverse of identityForAdapter: the registry adapter behind a CLI thread
  * identity; null for 'machina-native' (no adapter runs the native agent). */
@@ -79,13 +90,35 @@ export function ThreadInputBar() {
   const inFlight = useThreadStore((s) =>
     activeId ? Boolean(s.inFlightByThreadId[activeId]) : false
   )
+  const threadStart = useAgentDispatchStore((state) =>
+    activeId ? state.threadStartById[activeId] : undefined
+  )
   const [text, setText] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
-  // Raw threads have no structured send path in step 1 (no invocation
-  // template source until step 8) — input is disabled with honest copy.
+  // Step 8 gives MAIN-bound raw threads a validated invocation template.
+  // Persisted agentId is display-only, so it can invalidate this read but can
+  // never enable input by itself.
   const isRaw = activeThread?.agent === 'cli-raw'
+  const rawBinding = useHarnessBinding(isRaw ? activeThread?.id : undefined, activeThread?.agentId)
+  const hasMatchingRawBinding =
+    isRaw &&
+    rawBinding.status === 'bound' &&
+    rawBinding.binding.slug === activeThread.agentId &&
+    rawBinding.binding.adapter === 'raw' &&
+    rawBinding.binding.rawInvocationReady
+  const isRawInputDisabled = isRaw && !hasMatchingRawBinding
+  const isSessionStartBlocked = threadStartIsBlocked(threadStart)
+  const rawInputCopy =
+    rawBinding.status === 'loading'
+      ? RAW_BINDING_PENDING_COPY
+      : rawBinding.status === 'unavailable'
+        ? RAW_BINDING_UNAVAILABLE_COPY
+        : rawBinding.status === 'bound' &&
+            (rawBinding.binding.adapter !== 'raw' || !rawBinding.binding.rawInvocationReady)
+          ? RAW_INVOCATION_NOT_READY_COPY
+          : AD_HOC_RAW_INPUT_COPY
   const modelChoices = activeThread !== undefined ? modelChoicesFor(activeThread) : null
 
   useLayoutEffect(() => {
@@ -97,8 +130,8 @@ export function ThreadInputBar() {
   }, [text])
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    // Belt-and-braces with the disabled textarea: raw threads never send.
-    if (isRaw) return
+    // Belt-and-braces with the disabled textarea: ad-hoc raw never sends.
+    if (isRawInputDisabled || isSessionStartBlocked) return
     if (text === '' && e.key === '/') {
       e.preventDefault()
       setPickerOpen(true)
@@ -158,12 +191,20 @@ export function ThreadInputBar() {
           ref={ref}
           value={text}
           rows={1}
-          disabled={isRaw}
+          disabled={isRawInputDisabled || isSessionStartBlocked}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={isRaw ? RAW_INPUT_COPY : 'Ask anything about your vault…'}
+          placeholder={
+            isSessionStartBlocked
+              ? threadStart === 'starting'
+                ? SESSION_STARTING_COPY
+                : SESSION_START_UNKNOWN_COPY
+              : isRawInputDisabled
+                ? rawInputCopy
+                : 'Ask anything about your vault…'
+          }
           className="thread-input-textarea"
           style={{
             flex: 1,
@@ -186,7 +227,7 @@ export function ThreadInputBar() {
             aria-label="Model"
             title="Model for this thread's next turn"
             value={modelChoices.value}
-            disabled={inFlight}
+            disabled={inFlight || isSessionStartBlocked}
             onChange={(e) => void setThreadModel(activeId, e.target.value)}
             style={{
               flexShrink: 0,
@@ -216,7 +257,7 @@ export function ThreadInputBar() {
             type="button"
             data-testid="thread-input-stop"
             aria-label="Stop"
-            title="Stop the in-flight agent run"
+            title="Request stop; sending stays blocked until the run settles"
             onClick={() => void cancelActive(activeId)}
             style={{
               flexShrink: 0,

@@ -4,7 +4,8 @@ import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { buildPaletteItems, buildIndex, noteHitItems, searchPalette } from '../palette-sources'
 import { openStripTerminal, openStripTerminalInFolder } from '../terminal-migration'
-import { runHarness } from '../../../store/harness-run'
+import { useHarnessStore } from '../../../store/harness-store'
+import { HARNESS_TEMPLATES } from '@shared/harness-templates'
 import type { Thread } from '@shared/thread-types'
 import type { HarnessSummary } from '@shared/harness-types'
 import type { SearchHit } from '@shared/engine/search-engine'
@@ -13,10 +14,6 @@ import type { AgentCommits } from '@shared/git-types'
 vi.mock('../terminal-migration', () => ({
   openStripTerminal: vi.fn(),
   openStripTerminalInFolder: vi.fn().mockResolvedValue(null)
-}))
-
-vi.mock('../../../store/harness-run', () => ({
-  runHarness: vi.fn().mockResolvedValue(undefined)
 }))
 
 const sampleThread = (id: string, title: string): Thread => ({
@@ -83,7 +80,7 @@ describe('palette-sources', () => {
     const items = buildPaletteItems({ closePalette: () => {} })
     const idx = buildIndex(items)
     const hits = searchPalette(idx, items, '')
-    expect(hits.length).toBe(items.length)
+    expect(hits.length).toBe(Math.min(items.length, 20))
   })
 
   it('selecting a thread item closes the palette and selects the thread', async () => {
@@ -181,6 +178,63 @@ describe('palette-sources', () => {
     canvas!.run()
     const tabs = useThreadStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'default' })
+  })
+})
+
+describe('palette-sources — step 8 harness gallery actions', () => {
+  const create = vi.fn()
+  const refresh = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    create.mockResolvedValue({ ok: true, root: '/v/.machina/agents/test-fixer' })
+    refresh.mockResolvedValue(undefined)
+    useHarnessStore.setState({ summaries: [], refresh })
+    // @ts-expect-error focused IPC test stub
+    window.api = { harness: { create } }
+  })
+
+  it('emits one searchable create action for all ten shared templates', () => {
+    const items = buildPaletteItems({ closePalette: () => {} })
+    const creates = items.filter((item) => item.id.startsWith('action:harness-create:'))
+    expect(creates).toHaveLength(10)
+    expect(new Set(creates.map((item) => item.id))).toEqual(
+      new Set(Object.keys(HARNESS_TEMPLATES).map((id) => `action:harness-create:${id}`))
+    )
+    const index = buildIndex(items)
+    expect(searchPalette(index, items, 'architecture mapper')[0]?.id).toBe(
+      'action:harness-create:architecture-mapper'
+    )
+  })
+
+  it('opens the blank gallery from New agent', () => {
+    const closePalette = vi.fn()
+    const openHarnessGallery = vi.fn()
+    const item = buildPaletteItems({ closePalette, openHarnessGallery }).find(
+      (candidate) => candidate.id === 'action:harness-gallery'
+    )
+    item!.run()
+    expect(closePalette).toHaveBeenCalledOnce()
+    expect(openHarnessGallery).toHaveBeenCalledWith()
+  })
+
+  it('routes configuration-required templates to the seeded builder without creating', async () => {
+    const openHarnessGallery = vi.fn()
+    const item = buildPaletteItems({ closePalette: vi.fn(), openHarnessGallery }).find(
+      (candidate) => candidate.id === 'action:harness-create:raw-tool-runner'
+    )
+    await item!.run()
+    expect(openHarnessGallery).toHaveBeenCalledWith('raw-tool-runner')
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('creates complete templates with the structured request and refreshes summaries', async () => {
+    const item = buildPaletteItems({ closePalette: vi.fn() }).find(
+      (candidate) => candidate.id === 'action:harness-create:test-fixer'
+    )
+    await item!.run()
+    expect(create).toHaveBeenCalledWith({ template: 'test-fixer', slug: 'test-fixer' })
+    expect(refresh).toHaveBeenCalledOnce()
   })
 })
 
@@ -295,32 +349,47 @@ describe('palette-sources — step 7 harness lint diagnostics', () => {
     expect(item!.subtitle).toContain('missing protected forbiddenGlobs')
   })
 
-  it('error severity disables run: activating the broken item never calls runHarness', async () => {
+  it('error severity disables run: activating the broken item never opens the task gate', async () => {
     const close = vi.fn()
-    const items = buildPaletteItems({ closePalette: close, harnesses: [broken] })
+    const openHarnessTaskBrief = vi.fn()
+    const items = buildPaletteItems({
+      closePalette: close,
+      openHarnessTaskBrief,
+      harnesses: [broken]
+    })
     const item = items.find((i) => i.id === 'action:harness-run:stripped')
     await item!.run()
-    expect(runHarness).not.toHaveBeenCalled()
+    expect(openHarnessTaskBrief).not.toHaveBeenCalled()
     // The palette stays open — nothing ran.
     expect(close).not.toHaveBeenCalled()
   })
 
-  it('a clean harness stays enabled and runs', async () => {
+  it('a clean harness stays enabled and opens the mandatory task gate', async () => {
     const close = vi.fn()
-    const items = buildPaletteItems({ closePalette: close, harnesses: [clean] })
+    const openHarnessTaskBrief = vi.fn()
+    const items = buildPaletteItems({
+      closePalette: close,
+      openHarnessTaskBrief,
+      harnesses: [clean]
+    })
     const item = items.find((i) => i.id === 'action:harness-run:test-fixer')
     expect(item!.disabledReason).toBeUndefined()
     await item!.run()
     expect(close).toHaveBeenCalled()
-    expect(runHarness).toHaveBeenCalledWith(clean)
+    expect(openHarnessTaskBrief).toHaveBeenCalledWith(clean)
   })
 
   it('warning-only diagnostics do not disable run', async () => {
-    const items = buildPaletteItems({ closePalette: () => {}, harnesses: [warned] })
+    const openHarnessTaskBrief = vi.fn()
+    const items = buildPaletteItems({
+      closePalette: () => {},
+      openHarnessTaskBrief,
+      harnesses: [warned]
+    })
     const item = items.find((i) => i.id === 'action:harness-run:warned')
     expect(item!.disabledReason).toBeUndefined()
     await item!.run()
-    expect(runHarness).toHaveBeenCalledWith(warned)
+    expect(openHarnessTaskBrief).toHaveBeenCalledWith(warned)
   })
 })
 

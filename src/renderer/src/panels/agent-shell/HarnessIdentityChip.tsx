@@ -8,8 +8,8 @@
  * value stays main-binding-sourced. Renders nothing while unbound (ad-hoc
  * threads) or bound under a different workspace root.
  */
-import { useEffect, useState } from 'react'
 import { borderRadius, colors, typography } from '../../design/tokens'
+import { useHarnessBinding } from './use-harness-binding'
 
 export function HarnessIdentityChip({
   threadId,
@@ -18,21 +18,9 @@ export function HarnessIdentityChip({
   readonly threadId: string
   readonly agentId?: string
 }) {
-  // Keyed by threadId so a stale slug never bleeds across a thread switch —
-  // the render-time comparison hides it without a setState-in-effect reset.
-  const [bound, setBound] = useState<{ threadId: string; slug: string } | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    void window.api.harness.binding(threadId).then((binding) => {
-      if (!cancelled && binding !== null) setBound({ threadId, slug: binding.slug })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [threadId, agentId])
-
-  const slug = bound !== null && bound.threadId === threadId ? bound.slug : null
-  if (slug === null) return null
+  const lookup = useHarnessBinding(threadId, agentId)
+  if (lookup.status !== 'bound') return null
+  const slug = lookup.binding.slug
   return (
     <span
       data-testid="thread-harness-chip"

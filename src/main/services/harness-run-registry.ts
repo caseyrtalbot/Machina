@@ -28,9 +28,13 @@ import { app } from 'electron'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { TE_DIR, THREADS_DIR } from '../../shared/constants'
+import { validateRawInvocationTemplate } from '../../shared/agent-adapters'
 import {
+  isHarnessAdapter,
   isReservedHarnessSlug,
   isValidHarnessSlug,
+  validateHarnessBudgets,
+  type HarnessAdapter,
   type HarnessBudgets
 } from '../../shared/harness-types'
 import type { AuditEntry } from '../../shared/agent-types'
@@ -42,6 +46,13 @@ export interface HarnessBinding {
   readonly slug: string
   readonly workspaceRoot: string
   /**
+   * Adapter identity snapshotted from the same validated SKILL.md bytes as
+   * budgets and the raw invocation. Absent only on pre-step-8 bindings and
+   * trust-on-upgrade backfills; those legacy bindings may attribute only to
+   * the adapter identity, never to the persisted harness slug.
+   */
+  readonly adapter?: HarnessAdapter
+  /**
    * Snapshot of the harness budgets AT BIND TIME (step 6, contracts §5
    * v1.2.6). SKILL.md frontmatter is agent-writable (HARNESS_PROTECTED_GLOBS
    * covers only verify.sh and rules.md), so a running agent could edit its
@@ -52,6 +63,13 @@ export interface HarnessBinding {
    * threshold with no maxTurns enforcement.
    */
   readonly budgets?: HarnessBudgets
+  /**
+   * Validated raw invocation template snapshotted at bind time (step 8, OQ3).
+   * Main sources this only from parsed harness frontmatter; renderer/thread
+   * frontmatter never supplies it. Same-slug re-records cannot refresh it.
+   * Absent for structured adapters, legacy bindings, and backfills.
+   */
+  readonly invocationTemplate?: string
 }
 
 export interface HarnessRunRegistryDeps {
@@ -83,15 +101,18 @@ function bindingKey(workspaceRoot: string, threadId: string): string {
  * never a throw).
  */
 function decodeBudgets(value: unknown): HarnessBudgets | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
-  const budgets = value as Partial<HarnessBudgets>
-  if (!Number.isFinite(budgets.maxTurns) || !Number.isFinite(budgets.maxWritesPerMinute)) {
-    return undefined
-  }
-  return {
-    maxTurns: budgets.maxTurns as number,
-    maxWritesPerMinute: budgets.maxWritesPerMinute as number
-  }
+  const validated = validateHarnessBudgets(value)
+  return validated.ok ? (value as HarnessBudgets) : undefined
+}
+
+function decodeInvocationTemplate(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  const validated = validateRawInvocationTemplate(value)
+  return validated.ok ? validated.value : undefined
+}
+
+function decodeAdapter(value: unknown): HarnessAdapter | undefined {
+  return isHarnessAdapter(value) ? value : undefined
 }
 
 export class HarnessRunRegistry {
@@ -117,18 +138,31 @@ export class HarnessRunRegistry {
   /**
    * WRITE-ONCE record: an existing binding with the same slug is idempotent
    * ok; a different slug is an error — a binding is never overwritten.
-   * Persists on every successful record. `budgets` is the bind-time snapshot
-   * (step 6): write-once covers it too — a same-slug re-record never
-   * refreshes an existing binding's snapshot (snapshot-at-BIND, not at
-   * latest run request).
+   * Persists on every successful record. `adapter`, `budgets`, and
+   * `invocationTemplate` are bind-time snapshots: write-once covers all three,
+   * so a same-slug re-record never refreshes an existing binding from later
+   * SKILL.md edits. That includes legacy/backfilled bindings: missing adapter
+   * or budget fields stay missing rather than being silently upgraded from
+   * mutable harness files on a later run.
    */
   async record(
     workspaceRoot: string,
     threadId: string,
     slug: string,
-    budgets?: HarnessBudgets
+    budgets?: HarnessBudgets,
+    invocationTemplate?: string,
+    adapter?: HarnessAdapter
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     await this.load()
+    if (adapter === undefined && invocationTemplate !== undefined) {
+      return { ok: false, error: 'raw invocation template requires a snapshotted adapter' }
+    }
+    if (adapter === 'raw' && invocationTemplate === undefined) {
+      return { ok: false, error: 'raw binding requires a validated invocation template' }
+    }
+    if (adapter !== undefined && adapter !== 'raw' && invocationTemplate !== undefined) {
+      return { ok: false, error: 'invocation template is only valid for a raw binding' }
+    }
     const key = bindingKey(workspaceRoot, threadId)
     const existing = this.bindings.get(key)
     if (existing !== undefined && existing.slug !== slug) {
@@ -137,11 +171,30 @@ export class HarnessRunRegistry {
         error: `thread ${threadId} is already bound to harness "${existing.slug}" (bindings are write-once)`
       }
     }
+    if (
+      existing !== undefined &&
+      existing.adapter !== undefined &&
+      adapter !== undefined &&
+      existing.adapter !== adapter
+    ) {
+      return {
+        ok: false,
+        error: `thread ${threadId} is already bound to adapter "${existing.adapter}" (bindings are write-once)`
+      }
+    }
     if (existing === undefined) {
+      let validatedTemplate: string | undefined
+      if (invocationTemplate !== undefined) {
+        const validated = validateRawInvocationTemplate(invocationTemplate)
+        if (!validated.ok) return { ok: false, error: validated.error }
+        validatedTemplate = validated.value
+      }
       this.bindings.set(key, {
         slug,
         workspaceRoot,
-        ...(budgets !== undefined ? { budgets } : {})
+        ...(adapter !== undefined ? { adapter } : {}),
+        ...(budgets !== undefined ? { budgets } : {}),
+        ...(validatedTemplate !== undefined ? { invocationTemplate: validatedTemplate } : {})
       })
     }
     await this.persist()
@@ -226,11 +279,16 @@ export class HarnessRunRegistry {
           typeof binding.slug === 'string' &&
           typeof binding.workspaceRoot === 'string'
         ) {
+          const adapter = decodeAdapter(binding.adapter)
           const budgets = decodeBudgets(binding.budgets)
+          const invocationTemplate =
+            adapter === 'raw' ? decodeInvocationTemplate(binding.invocationTemplate) : undefined
           this.bindings.set(key, {
             slug: binding.slug,
             workspaceRoot: binding.workspaceRoot,
-            ...(budgets !== undefined ? { budgets } : {})
+            ...(adapter !== undefined ? { adapter } : {}),
+            ...(budgets !== undefined ? { budgets } : {}),
+            ...(invocationTemplate !== undefined ? { invocationTemplate } : {})
           })
         }
       }

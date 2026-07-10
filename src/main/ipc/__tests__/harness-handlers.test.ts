@@ -76,8 +76,13 @@ describe('harness IPC handlers', () => {
     state.createHarness.mockResolvedValue({ ok: true, root: '/ws/.machina/agents/test-fixer' })
     state.listHarnesses.mockResolvedValue([])
 
-    await invoke('harness:create', { template: 'test-fixer', slug: 'test-fixer' })
-    expect(state.createHarness).toHaveBeenCalledWith('/ws', 'test-fixer', 'test-fixer')
+    const request = {
+      template: 'test-fixer',
+      slug: 'custom-fixer',
+      overrides: { budgets: { maxTurns: 3, maxWritesPerMinute: 4 } }
+    }
+    await invoke('harness:create', request)
+    expect(state.createHarness).toHaveBeenCalledWith('/ws', request)
 
     await invoke('harness:list', undefined)
     expect(state.listHarnesses).toHaveBeenCalledWith('/ws')
@@ -86,13 +91,45 @@ describe('harness IPC handlers', () => {
   it('harness:run runs the backfill first and forwards to composeHarnessRun', async () => {
     state.current.mockReturnValue({ root: '/ws' })
     state.ensureRootReady.mockResolvedValue(undefined)
-    state.composeHarnessRun.mockResolvedValue({ ok: true, prompt: 'P' })
+    state.composeHarnessRun.mockResolvedValue({ ok: true, prompt: 'P', adapter: 'codex' })
 
-    const result = await invoke('harness:run', { slug: 'test-fixer', threadId: 'th1' })
-    expect(result).toEqual({ ok: true, prompt: 'P' })
+    const result = await invoke('harness:run', {
+      slug: 'test-fixer',
+      threadId: 'th1',
+      taskBrief: '  Fix the checkout regression.  '
+    })
+    expect(result).toEqual({ ok: true, prompt: 'P', adapter: 'codex' })
     expect(state.ensureRootReady).toHaveBeenCalledWith('/ws')
-    expect(state.composeHarnessRun).toHaveBeenCalledWith('/ws', 'test-fixer', 'th1')
+    expect(state.composeHarnessRun).toHaveBeenCalledWith(
+      '/ws',
+      'test-fixer',
+      'th1',
+      'Fix the checkout regression.'
+    )
   })
+
+  it.each([
+    ['absent', {}],
+    ['blank', { taskBrief: ' \n\t ' }],
+    ['oversized', { taskBrief: 'x'.repeat(4001) }],
+    ['NUL', { taskBrief: 'fix\0anything' }]
+  ])(
+    'harness:run rejects an %s task brief before backfill or composition',
+    async (_label, extra) => {
+      state.current.mockReturnValue({ root: '/ws' })
+
+      const result = await invoke<{ ok: boolean; error?: string }>('harness:run', {
+        slug: 'test-fixer',
+        threadId: 'th1',
+        ...extra
+      })
+
+      expect(result.ok).toBe(false)
+      expect(result.error).toContain('task brief')
+      expect(state.ensureRootReady).not.toHaveBeenCalled()
+      expect(state.composeHarnessRun).not.toHaveBeenCalled()
+    }
+  )
 
   it('harness:run folds a throwing registry into the structured-error contract', async () => {
     state.current.mockReturnValue({ root: '/ws' })
@@ -100,7 +137,8 @@ describe('harness IPC handlers', () => {
 
     const result = await invoke<{ ok: boolean; error?: string }>('harness:run', {
       slug: 'test-fixer',
-      threadId: 'th1'
+      threadId: 'th1',
+      taskBrief: 'Fix the checkout regression.'
     })
     expect(result.ok).toBe(false)
     expect(result.error).toContain('scan exploded')
@@ -123,11 +161,38 @@ describe('harness IPC handlers', () => {
     expect(state.lintHarnessOnDisk).toHaveBeenCalledWith('/ws', 'test-fixer')
   })
 
-  it('harness:binding returns the binding slug, and null when the registry throws', async () => {
+  it('harness:binding returns only authoritative adapter capability, and null when the registry throws', async () => {
     state.current.mockReturnValue({ root: '/ws' })
     state.ensureRootReady.mockResolvedValue(undefined)
-    state.registryGet.mockReturnValue({ slug: 'test-fixer', workspaceRoot: '/ws' })
-    expect(await invoke('harness:binding', { threadId: 'th1' })).toEqual({ slug: 'test-fixer' })
+    state.registryGet.mockReturnValue({
+      slug: 'raw-runner',
+      workspaceRoot: '/ws',
+      adapter: 'raw',
+      invocationTemplate: 'private-tool {prompt}'
+    })
+    expect(await invoke('harness:binding', { threadId: 'th1' })).toEqual({
+      slug: 'raw-runner',
+      adapter: 'raw',
+      rawInvocationReady: true
+    })
+
+    state.registryGet.mockReturnValue({
+      slug: 'test-fixer',
+      workspaceRoot: '/ws',
+      adapter: 'claude'
+    })
+    expect(await invoke('harness:binding', { threadId: 'th1' })).toEqual({
+      slug: 'test-fixer',
+      adapter: 'claude',
+      rawInvocationReady: false
+    })
+
+    state.registryGet.mockReturnValue({ slug: 'legacy-runner', workspaceRoot: '/ws' })
+    expect(await invoke('harness:binding', { threadId: 'th1' })).toEqual({
+      slug: 'legacy-runner',
+      adapter: null,
+      rawInvocationReady: false
+    })
 
     state.ensureRootReady.mockRejectedValue(new Error('mirror unreadable'))
     expect(await invoke('harness:binding', { threadId: 'th1' })).toBeNull()

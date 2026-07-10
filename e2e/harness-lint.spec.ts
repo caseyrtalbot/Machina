@@ -88,14 +88,17 @@ test.describe.serial('Harness linter (built app)', () => {
           window as unknown as {
             api: {
               harness: {
-                create: (t: string, s: string) => Promise<{ ok: boolean; error?: string }>
+                create: (request: {
+                  template: string
+                  slug: string
+                }) => Promise<{ ok: boolean; error?: string }>
               }
             }
           }
         ).api
-        return api.harness.create('test-fixer', 'test-fixer')
+        return api.harness.create({ template: 'test-fixer', slug: 'test-fixer' })
       })
-      expect(created.ok).toBe(true)
+      expect(created, created.error).toEqual(expect.objectContaining({ ok: true }))
 
       // A fresh harness lints clean.
       const cleanDiags = await lintViaApi(page)

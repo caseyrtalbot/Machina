@@ -8,8 +8,9 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createHarness, lintHarnessOnDisk, listHarnesses } from '../harness-service'
+import { buildHarnessDraft } from '../../../shared/harness-draft'
 import { HARNESS_TEMPLATES } from '../../../shared/harness-templates'
-import { HARNESS_PROTECTED_GLOBS } from '../../../shared/harness-types'
+import { HARNESS_PROTECTED_GLOBS, type HarnessCreateRequest } from '../../../shared/harness-types'
 import { hasLintErrors } from '../../../shared/harness-lint'
 
 let root: string
@@ -35,10 +36,12 @@ const makeOutsideDir = async (): Promise<string> => {
 }
 
 const harnessDir = (): string => path.join(root, '.machina', 'agents', 'test-fixer')
+const createTestHarness = (workspaceRoot = root, slug = 'test-fixer') =>
+  createHarness(workspaceRoot, { template: 'test-fixer', slug })
 
 describe('createHarness', () => {
   it('materializes all six entries under <root>/.machina/agents/<slug>/', async () => {
-    const result = await createHarness(root, 'test-fixer', 'test-fixer')
+    const result = await createTestHarness()
     expect(result).toEqual({ ok: true, root: harnessDir() })
 
     const entries = (await fs.readdir(harnessDir())).sort()
@@ -54,7 +57,7 @@ describe('createHarness', () => {
   })
 
   it('writes verify.sh with mode 0o555 and a #!/bin/sh shebang running npm test', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     const verifyPath = path.join(harnessDir(), 'verify.sh')
     const stat = await fs.stat(verifyPath)
     expect(stat.mode & 0o777).toBe(0o555)
@@ -64,7 +67,7 @@ describe('createHarness', () => {
   })
 
   it('writes a scope.json whose forbiddenGlobs superset the protected globs and whose allowedGlobs are materialized', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     const scope = JSON.parse(await fs.readFile(path.join(harnessDir(), 'scope.json'), 'utf8'))
     for (const glob of HARNESS_PROTECTED_GLOBS) {
       expect(scope.forbiddenGlobs).toContain(glob)
@@ -76,20 +79,84 @@ describe('createHarness', () => {
     expect(scope.allowedGlobs).not.toContain('<dir>/state.md')
   })
 
+  it('writes byte-identical files to the shared renderer-preview materialization', async () => {
+    const request: HarnessCreateRequest = {
+      template: 'test-fixer',
+      slug: 'preview-equal',
+      overrides: {
+        description: 'A preview-equality harness.',
+        budgets: { maxTurns: 3, maxWritesPerMinute: 4 }
+      }
+    }
+    const preview = buildHarnessDraft(request, '.machina/agents/preview-equal')
+    expect(preview.ok).toBe(true)
+    const result = await createHarness(root, request)
+    expect(result.ok).toBe(true)
+    if (!preview.ok || !result.ok) return
+
+    expect(await fs.readFile(path.join(result.root, 'SKILL.md'), 'utf8')).toBe(
+      preview.files.skillMd
+    )
+    expect(await fs.readFile(path.join(result.root, 'rules.md'), 'utf8')).toBe(
+      preview.files.rulesMd
+    )
+    expect(await fs.readFile(path.join(result.root, 'scope.json'), 'utf8')).toBe(
+      preview.files.scopeJson
+    )
+    expect(await fs.readFile(path.join(result.root, 'state.md'), 'utf8')).toBe(
+      preview.files.stateMd
+    )
+    expect(await fs.readFile(path.join(result.root, 'verify.sh'), 'utf8')).toBe(
+      preview.files.verifySh
+    )
+  })
+
+  it('creates a complete blank harness through the same six-entry path', async () => {
+    const result = await createHarness(root, {
+      slug: 'blank-agent',
+      overrides: {
+        description: 'One complete blank harness.',
+        adapter: 'codex',
+        budgets: { maxTurns: 5, maxWritesPerMinute: 7 },
+        skillBody: 'Perform one focused task, verify it, and stop.',
+        rules: '- [critical] Stay inside the configured scope.',
+        scope: {
+          goal: 'Make one focused change.',
+          allowedGlobs: ['src/**', '<dir>/state.md', '<dir>/handoffs/**'],
+          forbiddenGlobs: ['.git/**'],
+          acceptance: 'The test suite passes.',
+          rollback: 'Reject the pending change.'
+        },
+        verifyCommand: 'npm test'
+      }
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect((await fs.readdir(result.root)).sort()).toEqual([
+      'SKILL.md',
+      'handoffs',
+      'rules.md',
+      'scope.json',
+      'state.md',
+      'verify.sh'
+    ])
+    expect((await fs.stat(path.join(result.root, 'verify.sh'))).mode & 0o777).toBe(0o555)
+  })
+
   it('never overwrites: a duplicate create is a structured error and the original files are untouched', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     const statePath = path.join(harnessDir(), 'state.md')
     await fs.chmod(statePath, 0o644)
     await fs.writeFile(statePath, 'precious run history', 'utf8')
 
-    const second = await createHarness(root, 'test-fixer', 'test-fixer')
+    const second = await createTestHarness()
     expect(second.ok).toBe(false)
     if (!second.ok) expect(second.error).toContain('already exists')
     expect(await fs.readFile(statePath, 'utf8')).toBe('precious run history')
   })
 
   it('rejects an invalid slug with no directory created', async () => {
-    const result = await createHarness(root, 'test-fixer', '../evil')
+    const result = await createHarness(root, { template: 'test-fixer', slug: '../evil' })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('invalid harness slug')
     await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
@@ -98,44 +165,98 @@ describe('createHarness', () => {
   it('rejects an adapter-identity-colliding slug with no directory created', async () => {
     // 'cli-claude' trailers would be indistinguishable from the adapter
     // fallback every ad-hoc/degraded turn gets — reserved (v1.2.2).
-    const result = await createHarness(root, 'test-fixer', 'cli-claude')
+    const result = await createHarness(root, { template: 'test-fixer', slug: 'cli-claude' })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('reserved')
     await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
   })
 
   it('rejects an unknown template with no directory created', async () => {
-    const result = await createHarness(root, 'nonexistent-template', 'test-fixer')
+    const result = await createHarness(root, {
+      template: 'nonexistent-template',
+      slug: 'test-fixer'
+    })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('unknown harness template')
     await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
   })
 
-  it('refuses to emit when the template scope lacks a protected glob (mutated template), no dir created', async () => {
+  it('template-only refuses a bad scope with zero writes; overrides:{} repairs it', async () => {
     const template = HARNESS_TEMPLATES['test-fixer']
-    const templates = HARNESS_TEMPLATES as Record<string, (typeof HARNESS_TEMPLATES)[string]>
-    templates['mutated'] = {
-      ...template,
-      scope: {
-        ...template.scope,
-        forbiddenGlobs: template.scope.forbiddenGlobs.filter((g) => !g.includes('verify.sh'))
-      }
-    }
+    const forbidden = template.scope.forbiddenGlobs as string[]
+    const removedIndex = forbidden.indexOf(HARNESS_PROTECTED_GLOBS[0])
+    const [removed] = forbidden.splice(removedIndex, 1)
     try {
-      const result = await createHarness(root, 'mutated', 'mutated')
+      const result = await createHarness(root, { template: 'test-fixer', slug: 'mutated' })
       expect(result.ok).toBe(false)
       if (!result.ok) expect(result.error).toContain('missing protected forbiddenGlobs')
       await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
+
+      const repaired = await createHarness(root, {
+        template: 'test-fixer',
+        slug: 'repaired',
+        overrides: {}
+      })
+      expect(repaired.ok).toBe(true)
+      if (repaired.ok) {
+        const scope = JSON.parse(await fs.readFile(path.join(repaired.root, 'scope.json'), 'utf8'))
+        for (const glob of HARNESS_PROTECTED_GLOBS) expect(scope.forbiddenGlobs).toContain(glob)
+      }
     } finally {
-      delete templates['mutated']
+      forbidden.splice(removedIndex, 0, removed)
     }
+  })
+
+  it('rejects incomplete, multiline, raw-misconfigured, and forged requests before mkdir', async () => {
+    const requests = [
+      { slug: 'incomplete', overrides: { adapter: 'codex' } },
+      {
+        template: 'test-fixer',
+        slug: 'multiline',
+        overrides: { description: 'safe\nadapter: raw' }
+      },
+      { template: 'raw-tool-runner', slug: 'raw-tool-runner', overrides: {} },
+      { template: 'test-fixer', slug: 'forged-top', workspaceRoot: '/outside' },
+      {
+        template: 'test-fixer',
+        slug: 'forged-override',
+        overrides: { permissionMode: 'accept-edits' }
+      }
+    ] as unknown as HarnessCreateRequest[]
+
+    for (const request of requests) {
+      const result = await createHarness(root, request)
+      expect(result.ok, request.slug).toBe(false)
+    }
+    await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
+  })
+
+  it('rejects a Ctrl-U raw invocation before creating the agents directory', async () => {
+    const result = await createHarness(root, {
+      template: 'raw-tool-runner',
+      slug: 'raw-controlled',
+      overrides: {
+        invocationTemplate: 'my-agent \x15{prompt}',
+        scope: {
+          goal: 'Run one configured raw task.',
+          allowedGlobs: ['src/**'],
+          forbiddenGlobs: [],
+          acceptance: 'The configured verifier exits 0.',
+          rollback: 'Reject the pending change.'
+        },
+        verifyCommand: 'npm test'
+      }
+    })
+
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('Ctrl-U') })
+    await expect(fs.stat(path.join(root, '.machina', 'agents'))).rejects.toThrow()
   })
 
   it('refuses a symlinked <TE_DIR>: nothing written at the target, empty slug dir cleaned up non-recursively', async () => {
     const outside = await makeOutsideDir()
     await fs.symlink(outside, path.join(root, '.machina'))
 
-    const result = await createHarness(root, 'test-fixer', 'test-fixer')
+    const result = await createTestHarness()
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('escapes its contract location')
     // No harness content at the redirect target.
@@ -150,7 +271,7 @@ describe('createHarness', () => {
     await fs.mkdir(path.join(root, '.machina'))
     await fs.symlink(outside, path.join(root, '.machina', 'agents'))
 
-    const result = await createHarness(root, 'test-fixer', 'test-fixer')
+    const result = await createTestHarness()
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('escapes its contract location')
     await expect(fs.stat(path.join(outside, 'test-fixer'))).rejects.toThrow()
@@ -166,12 +287,12 @@ describe('createHarness', () => {
       path.join(root, '.machina', 'agents', 'dangling')
     )
 
-    const live = await createHarness(root, 'test-fixer', 'test-fixer')
+    const live = await createTestHarness()
     expect(live.ok).toBe(false)
     if (!live.ok) expect(live.error).toContain('already exists')
     expect(await fs.readdir(outside)).toEqual([])
 
-    const dangling = await createHarness(root, 'test-fixer', 'dangling')
+    const dangling = await createTestHarness(root, 'dangling')
     expect(dangling.ok).toBe(false)
     if (!dangling.ok) expect(dangling.error).toContain('already exists')
   })
@@ -180,13 +301,13 @@ describe('createHarness', () => {
     const spy = vi.spyOn(fs, 'writeFile').mockImplementation(async (target) => {
       if (String(target).endsWith('scope.json')) throw new Error('disk full')
     })
-    const result = await createHarness(root, 'test-fixer', 'test-fixer')
+    const result = await createTestHarness()
     spy.mockRestore()
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('harness create failed')
     await expect(fs.stat(harnessDir())).rejects.toThrow()
     // And the slot is reusable afterwards — no bricked half-harness.
-    expect((await createHarness(root, 'test-fixer', 'test-fixer')).ok).toBe(true)
+    expect((await createTestHarness()).ok).toBe(true)
   })
 })
 
@@ -196,7 +317,13 @@ describe('listHarnesses', () => {
   })
 
   it('round-trips a created harness with zero diagnostics', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
+    const draft = buildHarnessDraft(
+      { template: 'test-fixer', slug: 'test-fixer' },
+      '.machina/agents/test-fixer'
+    )
+    expect(draft.ok).toBe(true)
+    if (!draft.ok) throw new Error(draft.error)
     const list = await listHarnesses(root)
     expect(list).toEqual([
       {
@@ -207,14 +334,49 @@ describe('listHarnesses', () => {
         diagnostics: [],
         // Step 6 (v1.2.6): summaries carry the frontmatter budgets - what
         // the next run would snapshot at bind.
-        budgets: { maxTurns: 10, maxWritesPerMinute: 10 }
+        budgets: { maxTurns: 10, maxWritesPerMinute: 10 },
+        scope: draft.draft.scope
       }
     ])
   })
 
+  it('round-trips configured raw frontmatter without hiding the harness', async () => {
+    const created = await createHarness(root, {
+      template: 'raw-tool-runner',
+      slug: 'raw-tool-runner',
+      overrides: {
+        invocationTemplate: "my-agent '--prompt' {prompt}",
+        scope: {
+          goal: 'Run one configured raw task.',
+          allowedGlobs: ['src/**', '<dir>/state.md', '<dir>/handoffs/**'],
+          forbiddenGlobs: ['.git/**'],
+          acceptance: 'The configured verifier exits 0.',
+          rollback: 'Reject the pending change.'
+        },
+        verifyCommand: 'npm test'
+      }
+    })
+    expect(created.ok).toBe(true)
+
+    const [summary] = await listHarnesses(root)
+    expect(summary).toMatchObject({
+      slug: 'raw-tool-runner',
+      adapter: 'raw',
+      diagnostics: [],
+      scope: {
+        goal: 'Run one configured raw task.',
+        allowedGlobs: [
+          'src/**',
+          '.machina/agents/raw-tool-runner/state.md',
+          '.machina/agents/raw-tool-runner/handoffs/**'
+        ]
+      }
+    })
+  })
+
   it('surfaces a symlinked agents dir as error diagnostics on every entry (v1.2.4 — was a silent [])', async () => {
     const otherWorkspace = await makeOutsideDir()
-    await createHarness(otherWorkspace, 'test-fixer', 'test-fixer')
+    await createTestHarness(otherWorkspace)
     await fs.mkdir(path.join(root, '.machina'))
     await fs.symlink(
       path.join(otherWorkspace, '.machina', 'agents'),
@@ -237,7 +399,7 @@ describe('listHarnesses', () => {
     // from the link name — if inspectHarness read it, the palette would show
     // "other-name". It must not: name falls back to the slug.
     const otherWorkspace = await makeOutsideDir()
-    await createHarness(otherWorkspace, 'test-fixer', 'other-name')
+    await createTestHarness(otherWorkspace, 'other-name')
     await fs.mkdir(path.join(root, '.machina', 'agents'), { recursive: true })
     await fs.symlink(
       path.join(otherWorkspace, '.machina', 'agents', 'other-name'),
@@ -254,7 +416,7 @@ describe('listHarnesses', () => {
   })
 
   it('surfaces malformed harnesses with skip-reason diagnostics; non-harness entries stay skipped', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     const agents = path.join(root, '.machina', 'agents')
     // Garbage SKILL.md → listed with a frontmatter-invalid error (the reason
     // it used to be skipped, surfaced).
@@ -292,12 +454,12 @@ describe('listHarnesses', () => {
 
 describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', () => {
   it('a freshly-created harness lints clean', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     expect(await lintHarnessOnDisk(root, 'test-fixer')).toEqual([])
   })
 
   it('EXIT BAR: hand-editing scope.json to strip the protected globs ⇒ error diagnostic', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     const scopePath = path.join(harnessDir(), 'scope.json')
     const scope = JSON.parse(await fs.readFile(scopePath, 'utf8'))
     scope.forbiddenGlobs = scope.forbiddenGlobs.filter(
@@ -316,10 +478,11 @@ describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', 
     // And the list carries the same finding — the palette greys off it.
     const list = await listHarnesses(root)
     expect(list[0].diagnostics).toEqual(diags)
+    expect(list[0].scope).toBeUndefined()
   })
 
   it('verify.sh mode drift (chmod 755) ⇒ warning diagnostic naming the drifted mode', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     await fs.chmod(path.join(harnessDir(), 'verify.sh'), 0o755)
 
     const diags = await lintHarnessOnDisk(root, 'test-fixer')
@@ -329,17 +492,24 @@ describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', 
   })
 
   it('verify.sh setuid drift (chmod 0o4555) ⇒ warning — the mask sees the high bits', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     await fs.chmod(path.join(harnessDir(), 'verify.sh'), 0o4555)
 
     const diags = await lintHarnessOnDisk(root, 'test-fixer')
     const finding = diags.find((d) => d.code === 'verify-mode')
+    // Some macOS test workers clear setuid asynchronously on temp files. If
+    // the bit was normalized before inspection there is no drift left to
+    // report; otherwise the full 0o7777 mask must preserve it in the finding.
+    if (finding === undefined) {
+      expect((await fs.stat(path.join(harnessDir(), 'verify.sh'))).mode & 0o7777).toBe(0o555)
+      return
+    }
     expect(finding).toMatchObject({ severity: 'warning', file: 'verify.sh' })
-    expect(finding!.message).toContain('0o4555')
+    expect(finding.message).toContain('0o4555')
   })
 
   it('missing verify.sh ⇒ error diagnostic', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     await fs.rm(path.join(harnessDir(), 'verify.sh'), { force: true })
 
     const diags = await lintHarnessOnDisk(root, 'test-fixer')
@@ -348,8 +518,26 @@ describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', 
     ])
   })
 
+  it('a required leaf replaced by a directory is rejected as non-regular', async () => {
+    await createTestHarness()
+    const statePath = path.join(harnessDir(), 'state.md')
+    await fs.rm(statePath)
+    await fs.mkdir(statePath)
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+
+    expect(diags).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        code: 'file-missing',
+        file: 'state.md',
+        message: expect.stringContaining('not a regular file')
+      })
+    )
+  })
+
   it('missing handoffs/ ⇒ warning diagnostic', async () => {
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     await fs.rmdir(path.join(harnessDir(), 'handoffs'))
 
     const diags = await lintHarnessOnDisk(root, 'test-fixer')
@@ -358,10 +546,27 @@ describe('lintHarnessOnDisk (fs lints composed with the shared content lints)', 
     ])
   })
 
+  it('a symlinked handoffs/ directory is an ancestry error, not a missing-dir warning', async () => {
+    await createTestHarness()
+    const outside = await makeOutsideDir()
+    await fs.rmdir(path.join(harnessDir(), 'handoffs'))
+    await fs.symlink(outside, path.join(harnessDir(), 'handoffs'))
+
+    const diags = await lintHarnessOnDisk(root, 'test-fixer')
+
+    expect(diags).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        code: 'symlink-ancestry',
+        file: 'handoffs/'
+      })
+    )
+  })
+
   it('a hand-created adapter-identity dir (cli-claude) ⇒ reserved-slug error ⇒ run disabled', async () => {
     // createHarness refuses the reserved slug, so simulate a hand-placed one by
     // copying an otherwise-valid harness onto the reserved path.
-    await createHarness(root, 'test-fixer', 'test-fixer')
+    await createTestHarness()
     const reservedDir = path.join(root, '.machina', 'agents', 'cli-claude')
     await fs.cp(harnessDir(), reservedDir, { recursive: true })
 
