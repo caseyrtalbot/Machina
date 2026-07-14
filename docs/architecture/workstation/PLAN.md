@@ -123,6 +123,12 @@ migration; zoom-out supervisor lens via existing LOD; propose-then-commit for ir
 ops. Exit bar: an on-fail loop fixes a broken test unattended with every write queued; a
 live session migrates dock→canvas→dock without losing scrollback.
 
+Implementation specs: `06-phase-3-specs.md` (9 steps, canonical order; spec pass
+2026-07-14 from a 4-designer + 2-judge workflow over six disk-verified investigation
+dossiers — records the two-tier propose-then-commit interpretation, the queue-scope
+decision "global = visibility, never cross-root resolution", and the corrected
+cost-observable fact that unlocks the max-$ budget claude-only).
+
 ### Phase 4 — Earned depth
 
 LSP languages incrementally (TS first); visual git map on the Pixi renderer;

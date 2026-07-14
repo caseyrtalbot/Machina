@@ -4,7 +4,7 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the three docs it points at, and you can start building without
 asking questions.
 
-## Where things stand (2026-07-10, Phase 2 steps 1–8 shipped)
+## Where things stand (2026-07-14, Phase 2 shipped; Phase 3 spec pass landed)
 
 The vision is locked and the design is verified. Phase 0 (seam audit + interface
 contracts) shipped to main. The Phase 0 docs were then adversarially re-verified by an
@@ -77,16 +77,28 @@ gallery/palette tests, `npm run check`, production build, full built-app E2E, ta
 visible-`New Agent` built-app E2E, dependency audit, and whitespace/format checks. Do not
 reconstruct or replace the roster from older ~5-template text.
 
+**The Phase 3 spec pass LANDED 2026-07-14**: `06-phase-3-specs.md` (9 steps, canonical
+order) distilled from a 4-designer + 2-judge workflow over six disk-verified
+investigation dossiers — both judges independently selected the risk-lens design;
+grafts from the three runners-up are folded in and attributed inline. The spec carries
+a stale-claim ledger (cost observable now EXISTS for claude — the old "no cost
+observable" deferral rationale is corrected at step 5; FilesDockAdapter split-brain
+follow-up verified FIXED on disk; `thread-store.ts` is actually 1009 lines, remediated
+by step 3's dock-store extraction).
+
 **Next work order for the incoming team(s):**
 
-- **Next = Phase 3 planning / follow-up hardening selection.** Candidate follow-ups:
-  Phase 3 loop scheduler, OQ8 workspace-switch PTY visibility graft, dependabot triage
-  (`npm audit --omit=dev` reports 1 moderate production vuln — js-yaml via gray-matter —
-  re-confirmed during the step-8 landing), or any remaining Casey-observed polish gates
-  that the owner wants to close before starting Phase 3.
-- **Still not part of step 8**: OQ8 (workspace-switch PTY
-  visibility graft — severable; step 6 landed green without it, and after
-  ratification the graft becomes its own small follow-up commit).
+- **Next = Phase 3 step 1** (`06-phase-3-specs.md` — global approval queue v2 core:
+  multi-root scope + persistence + gate-confirm root-binding, contracts v1.3.0).
+  Steps land in canonical order; the two-session schedule in the spec's parallel map
+  names the only sanctioned parallel pairs.
+- **Casey answers wanted (recommendations are the defaults if unanswered):** OQ8
+  ratification at kickoff (blocker-class now — loops + canvas cards multiply
+  cross-root PTYs; step 6 carries a root fence as the interim), plus OQ-A through
+  OQ-E in the spec's open-questions section.
+- Dependabot triage still open: `npm audit --omit=dev` reports 1 moderate production
+  vuln (js-yaml via gray-matter); Phase 3 step 6 must take the scoped fix or record
+  why not (spec cross-step rule).
 - Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
   leave it alone, do not commit or delete it.
 
@@ -115,6 +127,11 @@ reconstruct or replace the roster from older ~5-template text.
    pair, hardened post-merge at `c1b21c8`, contracts v1.2.7). **Step 8 is DONE
    (2026-07-10, contracts v1.2.8)\*\* — exact ten-role roster, visible sidebar New Agent
    entry point, mandatory task brief, raw bridge hardening, and blank builder shipped.
+6. **06-phase-3-specs.md** — the Phase 3 work queue (9 steps, canonical order; spec
+   pass 2026-07-14 from a 4-designer + 2-judge workflow over six disk-verified
+   investigation dossiers; both judges picked the risk design). Phase 2 is COMPLETE —
+   new sessions start here. Carries its own stale-claim ledger, safety-invariant gate
+   ledger, exit-bar coverage map, and open questions OQ8 + OQ-A–E.
 
 ## What step 8 changed (`2026-07-10`, contracts v1.2.8)
 
@@ -785,7 +802,9 @@ Repo gotchas the step-1 team hit (they will bite you too):
   Electron screenshots. The step 4 dock↔canvas migration acceptance (tick-counter
   continuity) explicitly needs Casey watching.
 - Surgical scope: every changed line traces to the step's spec. Files under 800 lines
-  (thread-store.ts is already at 825 — do not grow it; the specs route around it).
+  (thread-store.ts is at 1009 as of 2026-07-14 — the "route around it" mitigation
+  failed twice; Phase 3 step 3 extracts a dock-store to get under the cap, and no
+  other step may grow it).
 
 ## Definition of done for Phase 1 — **MET (2026-07-06, Casey-confirmed)**
 
@@ -817,14 +836,12 @@ with import-graph evidence is in 00-seam-audit.md §1.
 
 ## Known follow-ups from the step 1 review (dual review: Claude adversarial + Codex cold-read)
 
-- **FilesDockAdapter vault switching bypasses `workspace.open()`** (pre-existing, NOT
-  introduced by step 1): `handleOpenVaultPicker` / `handleSelectVault`
-  (`FilesDockAdapter.tsx` ~305–330) call `vault.watchStop()/watchStart()` and
-  `setVaultPath()` directly, so PathGuard, MCP, index, and health stay bound to the OLD
-  root while the renderer (and therefore the CLI agent's per-turn cwd) follows the new
-  one — a split-brain switch. Fix by routing those handlers through `workspace.open()`.
-  Natural home: step 4 (dock shell touches this surface) or a standalone small fix
-  before it.
+- **FilesDockAdapter vault switching bypasses `workspace.open()` — FIXED on disk**
+  (verified 2026-07-14 during the Phase 3 spec pass): `handleOpenVaultPicker` /
+  `handleSelectVault` now dispatch `te:open-vault` → `orchestrateLoad` →
+  `workspace.open()`, the one full-switch path, with the step-1 review finding named
+  in the comment (`dock-adapters/FilesDockAdapter.tsx:306-325`). No action remains;
+  recorded here so nobody re-fixes it.
 - `WorkspaceService.open()` re-entrancy was flagged in the same review and is FIXED on
   main (serialized open chain, last caller wins; regression tests in the
   workspace-service suite). No action needed — noted so nobody re-litigates it.
