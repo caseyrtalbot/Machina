@@ -23,6 +23,7 @@ import {
   listAgentCommits,
   discard
 } from '../../src/main/services/git-service'
+import { isDiffUnavailable } from '../../src/shared/git-types'
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), 'machina-git-service-test-'))
@@ -147,6 +148,21 @@ describe('git-service', () => {
   })
 
   describe('diff', () => {
+    it('failure markers are recognized by the shared isDiffUnavailable predicate (v1.3.0)', () => {
+      // Pins builder ↔ detector: the queue's rehydrate gate treats a marker
+      // diff as failed verification, so a marker the predicate cannot see
+      // would silently retain unverifiable items across restarts.
+      // A nonexistent path in a non-repo root: --no-index produces no
+      // output, so diff() falls back to the visible failure marker.
+      const marker = diff(vaultRoot, ['missing.txt'])
+      expect(marker).toContain('[diff unavailable')
+      expect(isDiffUnavailable(marker)).toBe(true)
+
+      initGitRepo(vaultRoot)
+      writeFileSync(join(vaultRoot, 'real.md'), 'real content\n')
+      expect(isDiffUnavailable(diff(vaultRoot, ['real.md']))).toBe(false)
+    })
+
     it('produces a non-empty diff for an untracked file (the load-bearing case)', () => {
       initGitRepo(vaultRoot)
       writeFileSync(join(vaultRoot, 'fresh.md'), 'brand new agent file\n')

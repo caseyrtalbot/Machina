@@ -42,6 +42,26 @@ function makeHarness(opts?: { headSha?: (root: string) => string | null }): Harn
 }
 
 describe('CliTurnRegistry', () => {
+  describe('turnId run-uniqueness (v1.3.0)', () => {
+    it('two registries (= two app runs) never mint colliding turnIds', () => {
+      // The queue's disk mirror rehydrates items under their ORIGINAL
+      // `pc_<turnId>` ids; a bare per-run counter would let this run's first
+      // turn coalesce into a persisted item from an earlier run.
+      const runA = makeHarness()
+      const runB = makeHarness()
+      const a = runA.registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+      const b = runB.registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+      expect(a.turnId).not.toBe(b.turnId)
+    })
+
+    it('turnIds stay sequence-distinct within one registry', () => {
+      const h = makeHarness()
+      const first = h.registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
+      const second = h.registry.turnStarted({ threadId: 'th2', agentId: 'claude', cwd: ROOT })
+      expect(first.turnId).not.toBe(second.turnId)
+    })
+  })
+
   describe('linger boundary after turnEnded', () => {
     it('attributes within LINGER_MS, including exactly at the boundary, but not past it', () => {
       const h = makeHarness()

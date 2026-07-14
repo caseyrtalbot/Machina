@@ -158,7 +158,7 @@ export interface AgentWriteWatcherDeps {
     activeTurnFor(root: string, nowMs?: number): ActiveTurnMatch | null
   }
   readonly queue: {
-    recordWrites(opts: RecordWritesOpts): PendingChange
+    recordWrites(opts: RecordWritesOpts): PendingChange | null
     autoReject(opts: RecordWritesOpts, expectedRoot?: string): Promise<GitOpResult>
   }
   readonly audit: { log(entry: AuditEntry): void }
@@ -415,12 +415,17 @@ export class AgentWriteWatcher {
         gateDegraded: match.turn.gateDegradedAtStart === true,
         attributionSuspect: match.attributionSuspect
       }
+      // capturedRoot = the watcher's OWN root (the autoReject expectedRoot
+      // discipline): a batch flushing after a workspace switch flipped
+      // getRoot() must bind to the tree it was captured against, never the
+      // new active root (v1.3.0 root-binding invariant).
       this.deps.queue.recordWrites({
         turnId: match.turn.turnId,
         threadId: match.turn.threadId,
         agentId: match.turn.agentId,
         paths,
-        flags
+        flags,
+        capturedRoot: this.deps.root
       })
       // Breaker signal (step 6): one velocity observation per attributed
       // batch — consecutive exceeded observations trip, a single one only

@@ -3,6 +3,7 @@ import { createHash } from 'crypto'
 import { existsSync, realpathSync } from 'fs'
 import { dirname, isAbsolute, join, normalize, resolve, sep } from 'path'
 import {
+  DIFF_UNAVAILABLE_PREFIX,
   MACHINA_TRAILER_PREFIX,
   SAFE_ID_RE,
   TRAILER_AGENT,
@@ -232,7 +233,7 @@ function truncateDiff(text: string): string {
 function noIndexDiff(root: string, relPath: string): string {
   const res = runGit(root, ['diff', '--no-index', '--', '/dev/null', relPath])
   if (res.ok || res.stdout.length > 0) return res.stdout
-  return `[diff unavailable: ${relPath}]\n`
+  return `${DIFF_UNAVAILABLE_PREFIX}: ${relPath}]\n`
 }
 
 /**
@@ -276,13 +277,13 @@ export function diff(root: string, paths?: readonly string[]): string {
     if (tracked.length > 0) {
       const res = runGit(root, ['diff', 'HEAD', '--', ...literalPathspecs(tracked)])
       if (res.ok || res.stdout.length > 0) parts.push(res.stdout)
-      else parts.push(`[diff unavailable: ${tracked.join(', ')}]\n`)
+      else parts.push(`${DIFF_UNAVAILABLE_PREFIX}: ${tracked.join(', ')}]\n`)
     }
     for (const p of synthesized) parts.push(noIndexDiff(root, p))
   } else {
     const res = runGit(root, ['diff', 'HEAD'])
     if (res.ok || res.stdout.length > 0) parts.push(res.stdout)
-    else parts.push('[diff unavailable]\n')
+    else parts.push(`${DIFF_UNAVAILABLE_PREFIX}]\n`)
     const untracked = parsePorcelain(root).filter((e) => e.code === '??')
     for (const e of untracked) parts.push(noIndexDiff(root, e.path))
   }

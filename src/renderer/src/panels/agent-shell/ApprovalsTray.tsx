@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import type { PendingChange } from '@shared/git-types'
-import { isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
+import { isForeignRoot, isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
+import { useVaultStore } from '../../store/vault-store'
 import { AgentBreakerNotices } from './agent-breaker-notice'
 import { flagChips } from './approval-flags'
 import { REVERT_AGENT_EVENT, RevertAgentSection } from './RevertAgentSection'
@@ -21,6 +22,7 @@ const TRIGGER_BUTTON_SIZE = 26
 export function ApprovalsTray() {
   const pending = useApprovalsStore((s) => s.pending)
   const items = useApprovalsStore((s) => s.items)
+  const activeRoot = useApprovalsStore((s) => s.activeRoot)
   const notice = useApprovalsStore((s) => s.notice)
   const resolving = useApprovalsStore((s) => s.resolving)
   const refresh = useApprovalsStore((s) => s.refresh)
@@ -39,11 +41,14 @@ export function ApprovalsTray() {
   const unhealthy = isWatcherUnhealthy(watcherHealth)
 
   // Initial badge count + health snapshot; afterwards approvals:changed and
-  // approvals:watcher-health keep the store live.
+  // approvals:watcher-health keep the store live. vaultPath is a dep so a
+  // workspace switch re-fetches activeRoot (v1.3.0 multi-root queue: items
+  // survive the switch, but which of them read as foreign just flipped).
+  const vaultPath = useVaultStore((s) => s.vaultPath)
   useEffect(() => {
     void refresh()
     void refreshWatcherHealth()
-  }, [refresh, refreshWatcherHealth])
+  }, [refresh, refreshWatcherHealth, vaultPath])
 
   useEffect(() => {
     if (!open) return
@@ -80,6 +85,14 @@ export function ApprovalsTray() {
     setOpen((v) => !v)
     clearNotice()
   }, [clearNotice])
+
+  // Foreign-root switch affordance (contracts §4 v1.3.0, OQ-A option (a)):
+  // never resolve across roots — route through the ONE full-switch path
+  // (te:open-vault → orchestrateLoad → workspace.open(); the FilesDockAdapter
+  // precedent) so PathGuard/MCP/index/health all rebind to the new root.
+  const switchToRoot = useCallback((root: string) => {
+    window.dispatchEvent(new CustomEvent('te:open-vault', { detail: root }))
+  }, [])
 
   return (
     <div ref={popoverRef} style={{ position: 'relative', display: 'inline-flex' }}>
@@ -282,8 +295,10 @@ export function ApprovalsTray() {
                 <ApprovalItem
                   key={item.id}
                   item={item}
+                  foreign={isForeignRoot(item, activeRoot)}
                   busy={resolving !== null}
                   onResolve={(approve) => void resolve(item.id, approve)}
+                  onSwitchRoot={switchToRoot}
                 />
               ))
             )}
@@ -310,18 +325,28 @@ export function ApprovalsTray() {
   )
 }
 
-interface ApprovalItemProps {
-  readonly item: PendingChange
-  readonly busy: boolean
-  readonly onResolve: (approve: boolean) => void
+/** Last path segment for compact root labels; full path stays in the title. */
+function rootBasename(root: string): string {
+  const segments = root.split('/').filter((s) => s.length > 0)
+  return segments[segments.length - 1] ?? root
 }
 
-function ApprovalItem({ item, busy, onResolve }: ApprovalItemProps) {
+interface ApprovalItemProps {
+  readonly item: PendingChange
+  /** capturedRoot ≠ active root: resolution would refuse ('workspace-changed'). */
+  readonly foreign: boolean
+  readonly busy: boolean
+  readonly onResolve: (approve: boolean) => void
+  readonly onSwitchRoot: (root: string) => void
+}
+
+function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: ApprovalItemProps) {
   const chips = flagChips(item)
   // Gate-confirms always accept a deny; cli-changes need git to revert.
   const rejectDisabled = busy || (item.kind === 'cli-change' && !item.revertible)
   const shownPaths = item.paths.slice(0, PATHS_SHOWN_MAX)
   const hiddenCount = item.paths.length - shownPaths.length
+  const capturedRoot = item.capturedRoot ?? null
 
   return (
     <div
@@ -347,6 +372,24 @@ function ApprovalItem({ item, busy, onResolve }: ApprovalItemProps) {
         <span style={{ color: colors.text.muted }}>{item.threadId}</span>
         {item.kind === 'gate-confirm' && (
           <span style={{ color: colors.text.muted }}>gate confirm</span>
+        )}
+        {foreign && capturedRoot !== null && (
+          <span
+            data-testid="approval-root-label"
+            title={capturedRoot}
+            style={{
+              marginLeft: 'auto',
+              padding: '1px 6px',
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.inline,
+              color: colors.text.secondary,
+              fontSize: 10,
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {rootBasename(capturedRoot)}
+          </span>
         )}
       </div>
 
@@ -447,36 +490,76 @@ function ApprovalItem({ item, busy, onResolve }: ApprovalItemProps) {
         </pre>
       )}
 
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          data-testid="approval-reject"
-          disabled={rejectDisabled}
-          title={
-            item.kind === 'cli-change' && !item.revertible
-              ? 'Not a git repository — nothing to revert from'
-              : 'Revert these files via git'
-          }
-          onClick={() => onResolve(false)}
-          style={actionButtonStyle(colors.claude.error, rejectDisabled)}
+      {/* Foreign-root items (v1.3.0, OQ-A option (a)): resolution is bound to
+          the item's capturedRoot — main refuses cross-root with
+          'workspace-changed' — so the tray offers the switch, never a resolve
+          that would fail. Copy stays honest: writes are on disk either way. */}
+      {foreign ? (
+        <div
+          data-testid="approval-foreign-root"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            justifyContent: 'space-between'
+          }}
         >
-          Reject
-        </button>
-        <button
-          type="button"
-          data-testid="approval-approve"
-          disabled={busy}
-          title={
-            item.revertible || item.kind === 'gate-confirm'
-              ? 'Record these changes as a commit'
-              : 'Acknowledge — non-repo workspace, no commit is possible'
-          }
-          onClick={() => onResolve(true)}
-          style={actionButtonStyle(colors.claude.ready, busy)}
-        >
-          Approve
-        </button>
-      </div>
+          <span
+            style={{
+              color: colors.text.muted,
+              fontFamily: typography.fontFamily.body,
+              fontSize: 11.5,
+              lineHeight: 1.5
+            }}
+          >
+            {capturedRoot === null
+              ? 'Captured with no workspace open — it cannot be resolved from here.'
+              : 'Captured in a different workspace.'}
+          </span>
+          {capturedRoot !== null && (
+            <button
+              type="button"
+              data-testid="approval-switch-root"
+              title={`Open ${capturedRoot} to resolve this change`}
+              onClick={() => onSwitchRoot(capturedRoot)}
+              style={{ ...actionButtonStyle(colors.accent.default, false), whiteSpace: 'nowrap' }}
+            >
+              Switch to {rootBasename(capturedRoot)} to resolve
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            data-testid="approval-reject"
+            disabled={rejectDisabled}
+            title={
+              item.kind === 'cli-change' && !item.revertible
+                ? 'Not a git repository — nothing to revert from'
+                : 'Revert these files via git'
+            }
+            onClick={() => onResolve(false)}
+            style={actionButtonStyle(colors.claude.error, rejectDisabled)}
+          >
+            Reject
+          </button>
+          <button
+            type="button"
+            data-testid="approval-approve"
+            disabled={busy}
+            title={
+              item.revertible || item.kind === 'gate-confirm'
+                ? 'Record these changes as a commit'
+                : 'Acknowledge — non-repo workspace, no commit is possible'
+            }
+            onClick={() => onResolve(true)}
+            style={actionButtonStyle(colors.claude.ready, busy)}
+          >
+            Approve
+          </button>
+        </div>
+      )}
     </div>
   )
 }

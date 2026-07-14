@@ -22,6 +22,7 @@
  * Dependencies (head sha capture, PTY liveness, clock) are injected so the
  * registry unit-tests without git or PTYs.
  */
+import { randomUUID } from 'node:crypto'
 import { sep } from 'path'
 import { canonicalizePath } from '../utils/paths'
 import { headSha } from './git-service'
@@ -32,7 +33,14 @@ export const LINGER_MS = 1500
 export const DEGRADED_AFTER_MS = 30_000
 
 export interface CliTurn {
-  /** Monotonic per-registry id; the queue coalesces writes into `pc_<turnId>`. */
+  /**
+   * Run-unique id (`t<seq>-<run tag>`); the queue coalesces writes into
+   * `pc_<turnId>`. The random per-registry tag is load-bearing (v1.3.0): the
+   * queue's disk mirror rehydrates items under their ORIGINAL ids, so a
+   * bare per-run counter would let this run's first turn collide with a
+   * persisted `pc_t1` from an earlier run and coalesce writes across
+   * runs/roots.
+   */
   readonly turnId: string
   readonly threadId: string
   /** Harness slug when provided (step 6 seam), else the adapter identity. */
@@ -164,6 +172,8 @@ export class CliTurnRegistry {
    */
   private readonly invocationCounts = new Map<string, number>()
   private seq = 0
+  /** Per-registry (= per-app-run) tag making turnIds run-unique — see CliTurn.turnId. */
+  private readonly runTag = randomUUID().slice(0, 8)
 
   constructor(private readonly deps: CliTurnRegistryDeps) {}
 
@@ -171,7 +181,7 @@ export class CliTurnRegistry {
   turnStarted(opts: TurnStartedOpts): CliTurn {
     this.seq += 1
     const turn: CliTurn = {
-      turnId: `t${this.seq}`,
+      turnId: `t${this.seq}-${this.runTag}`,
       threadId: opts.threadId,
       agentId: opts.agentId,
       cwd: opts.cwd,

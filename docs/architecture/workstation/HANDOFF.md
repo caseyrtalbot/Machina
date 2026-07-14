@@ -86,12 +86,26 @@ observable" deferral rationale is corrected at step 5; FilesDockAdapter split-br
 follow-up verified FIXED on disk; `thread-store.ts` is actually 1009 lines, remediated
 by step 3's dock-store extraction).
 
+**Phase 3 step 1 is SHIPPED 2026-07-14** (contracts v1.3.0, same-day as the spec
+pass): the approval queue is multi-root (nothing clears it; resolution stays
+root-bound per item), cli-change items persist to a userData mirror and rehydrate
+with fresh-diff re-validation, gate-confirms are root-bound and never serialized,
+and the tray shows root labels + the switch-to-resolve affordance. Built by a
+13-agent workflow (4 implementers, gate loop, 4 review lenses incl. Codex cold
+read, findings fix, final full gate); all 6 blocker/major review findings fixed
+in-tree — including run-unique turn ids (`t<seq>-<runTag>`), a cross-cutting
+change every future step inherits. Full record: the step-1 DONE block in
+`06-phase-3-specs.md` (recorded deviations + 4 residual minors). Casey-observed
+acceptance pending: multi-root tray survival + foreign-root affordance on the
+running app.
+
 **Next work order for the incoming team(s):**
 
-- **Next = Phase 3 step 1** (`06-phase-3-specs.md` — global approval queue v2 core:
-  multi-root scope + persistence + gate-confirm root-binding, contracts v1.3.0).
-  Steps land in canonical order; the two-session schedule in the spec's parallel map
-  names the only sanctioned parallel pairs.
+- **Next = Phase 3 step 2** (notifications + propose-surface convergence, v1.3.1;
+  Session A) — and **step 3** (migration substrate + tick-counter + dock-store
+  extraction, v1.3.2; Session B) is parallel-safe with it per the spec's
+  two-session schedule (step 3 must land before step 4 starts — the
+  `thread-store.ts` collision).
 - **Casey answers wanted (recommendations are the defaults if unanswered):** OQ8
   ratification at kickoff (blocker-class now — loops + canvas cards multiply
   cross-root PTYs; step 6 carries a root fence as the interim), plus OQ-A through

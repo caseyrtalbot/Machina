@@ -17,6 +17,7 @@ import type {
 const api = vi.hoisted(() => {
   const stub = {
     approvals: { list: vi.fn(), resolve: vi.fn(), watcherStatus: vi.fn(), watcherRetry: vi.fn() },
+    workspace: { current: vi.fn() },
     on: { approvalsChanged: vi.fn(), watcherHealth: vi.fn() }
   }
   ;(window as unknown as Record<string, unknown>).api = stub
@@ -24,7 +25,12 @@ const api = vi.hoisted(() => {
 })
 
 // Imported AFTER the hoisted stub so the subscription guard sees window.api.
-import { useApprovalsStore, noticeForFailure, isWatcherUnhealthy } from '../approvals-store'
+import {
+  useApprovalsStore,
+  noticeForFailure,
+  isWatcherUnhealthy,
+  isForeignRoot
+} from '../approvals-store'
 
 const noFlags: PendingChangeFlags = {
   highVelocity: false,
@@ -61,6 +67,8 @@ beforeEach(() => {
   api.approvals.resolve.mockReset()
   api.approvals.watcherStatus.mockReset()
   api.approvals.watcherRetry.mockReset()
+  api.workspace.current.mockReset()
+  api.workspace.current.mockResolvedValue(null)
   useApprovalsStore.setState(useApprovalsStore.getInitialState())
 })
 
@@ -199,6 +207,44 @@ describe('useApprovalsStore', () => {
     useApprovalsStore.getState().clearNotice()
 
     expect(useApprovalsStore.getState().notice).toBeNull()
+  })
+})
+
+describe('multi-root queue display (contracts §4 v1.3.0)', () => {
+  it('refresh() records the active workspace root alongside the items', async () => {
+    api.approvals.list.mockResolvedValue([makeItem({ capturedRoot: '/ws/a' })])
+    api.workspace.current.mockResolvedValue({ id: 'w1', root: '/ws/a', capabilities: [] })
+
+    await useApprovalsStore.getState().refresh()
+
+    expect(useApprovalsStore.getState().activeRoot).toBe('/ws/a')
+    expect(useApprovalsStore.getState().pending).toBe(1)
+  })
+
+  it('refresh() degrades activeRoot to null when the workspace read fails or is empty', async () => {
+    api.approvals.list.mockResolvedValue([])
+    api.workspace.current.mockRejectedValue(new Error('ipc boom'))
+    await useApprovalsStore.getState().refresh()
+    expect(useApprovalsStore.getState().activeRoot).toBeNull()
+
+    api.workspace.current.mockResolvedValue(null)
+    await useApprovalsStore.getState().refresh()
+    expect(useApprovalsStore.getState().activeRoot).toBeNull()
+  })
+
+  it('isForeignRoot mirrors the main-side resolve() root check', () => {
+    // Same root: resolvable from this workspace.
+    expect(isForeignRoot(makeItem({ capturedRoot: '/ws/a' }), '/ws/a')).toBe(false)
+    // Different root: main would refuse with 'workspace-changed'.
+    expect(isForeignRoot(makeItem({ capturedRoot: '/ws/b' }), '/ws/a')).toBe(true)
+    // Captured with no workspace open: foreign in every open workspace…
+    expect(isForeignRoot(makeItem({ capturedRoot: null }), '/ws/a')).toBe(true)
+    // …and matches the null-root state (main refuses with 'no-workspace'
+    // before the root check, so the tray's affordance choice is moot there).
+    expect(isForeignRoot(makeItem({ capturedRoot: null }), null)).toBe(false)
+    // Pre-v1.3.0 item shape (no capturedRoot recorded): treated as same-root;
+    // main remains the enforcement authority.
+    expect(isForeignRoot(makeItem(), '/ws/a')).toBe(false)
   })
 })
 

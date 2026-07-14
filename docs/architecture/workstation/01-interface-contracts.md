@@ -409,6 +409,75 @@ Contract points (each traceable to a verified finding):
   boxes checked; parity ledger records the never-covered cases honestly), and the
   snapshot was retired in the same step. Rollback coverage never gapped.
 
+### Global queue scope: multi-root visibility + persistence (Phase 3 step 1, v1.3.0)
+
+The queue scope contract, rewritten. The queue is **genuinely global**: items survive
+workspace switches (NO path clears the queue on switch — `initApprovalsForRoot` no longer
+calls `clear()`, and the method itself is gone) and survive app restarts via a disk
+mirror. "Global" = **visibility across roots, never cross-root resolution**: `resolve()`
+refuses when the item's capturedRoot does not match the active workspace
+(`'workspace-changed'`). That refusal is the unweakened v1.1.1 workspace-binding
+invariant, restated verbatim as this rewrite's floor; it is checked BEFORE the
+stale-diff recompute, exactly as before.
+
+- **`PendingChange.capturedRoot?: string | null`** — the workspace root the item was
+  captured against (`null` = captured with no workspace open). Populated on every item,
+  cli-change AND gate-confirm, and delivered through the existing `approvals:list` /
+  `approvals:changed` surfaces. Display + persistence data only; enforcement stays the
+  queue's private root map, written from the same value in the same statement.
+- **Capture binds to the CAPTURING root, not the flush-time active root** —
+  `recordWrites` takes the watcher's own root (`RecordWritesOpts.capturedRoot`, the
+  same discipline as `autoReject`'s `expectedRoot`): during a workspace switch the old
+  watcher can flush a batch after the active root already flipped, and stamping
+  `getRoot()` then would bind old-root paths to the new root with a diff recomputed
+  against the wrong tree — a resolvable wrong-root item, the exact hazard the retired
+  clear-on-init used to mask. `autoReject`'s failed-discard visibility fallback binds
+  to its entry root for the same reason (discard is awaited; the switch can complete
+  mid-await). Coalescing is root-guarded: a batch whose root differs from an existing
+  item's capturedRoot is refused with an `approvals:record-refused` audit entry
+  (`'captured-root-mismatch'`) — an item's capturedRoot is never silently rebound and
+  paths never union across trees. Turn ids are run-unique (`t<seq>-<random run tag>`,
+  `CliTurnRegistry`) so a rehydrated item's `pc_<turnId>` id can never collide with a
+  new run's turn — the guard above stays defense in depth, not the primary fence.
+- **Persistence** (`<userData>/approval-queue.json`, `{ version: 1, items }`,
+  HarnessRunRegistry file pattern: versioned shape, atomic serialized persist chain,
+  degrade-not-fail load): **cli-change items only**. On the first
+  `initApprovalsForRoot` of an app run, the mirror rehydrates once; every restored item
+  is re-validated against a fresh diff of ITS capturedRoot via the same stale-diff
+  machinery `resolve()` uses. Drift while the app was closed drops the item with an
+  `approvals:rehydrate-drop` audit entry (`'stale-diff'` | `'no-captured-root'` |
+  `'diff-failed'` | `'gate-confirm-never-rehydrated'` | `'malformed'`) — never
+  silently kept or resolved. A fresh diff carrying the §2 `[diff unavailable]` marker
+  counts as `'diff-failed'`: GitService.diff stringifies failures rather than
+  throwing, and two identical markers are a failed verification, not a match (the
+  shared `isDiffUnavailable` predicate in `git-types.ts` pins detector to builder).
+  Conservative by design: dropping loses convenience, never data (the writes remain on
+  disk). Whole-file corruption (or a missing mirror — the normal first run) degrades
+  to an empty load; per-ITEM decode failures are surfaced as drop diagnostics and
+  audited (below).
+- **Gate-confirm items are NEVER serialized** — they hold live Promise waiters; a
+  rehydrated confirm is an unanswerable zombie row and resurrects the stale-click
+  hazard the 30s remove-on-timeout exists to kill. One smuggled in via a tampered
+  mirror is dropped at mirror DECODE — the production load path refuses the kind
+  before the queue sees it — and `ipc/git.ts` audits each decode-level drop with the
+  same `approvals:rehydrate-drop` tool (`{ at: 'mirror-decode' }`, reason
+  `'gate-confirm-never-rehydrated'`; undecodable entries audit `'malformed'`). The
+  queue-side `rehydrate()` refusal remains as defense in depth for callers that
+  bypass the mirror.
+- **Gate-confirm root-binding** — `enqueueGateConfirm` records the same captured root
+  as cli-change items (previously it recorded none); answering a confirm from a
+  different workspace refuses `'workspace-changed'` with item and waiter retained. The
+  remove-on-timeout still bounds a cross-root confirm's life. (Behavior delta, recorded:
+  a pending confirm now survives a workspace switch for up to its 30s timeout, where the
+  retired `clear()` denied it instantly on switch.)
+- **Tray affordance (OQ-A option (a))** — foreign-root items (capturedRoot ≠ active
+  root, mirrored renderer-side by `isForeignRoot` in `approvals-store.ts` against the
+  `workspace:current` root) display a root label and a "Switch to <root> to resolve"
+  action that routes through the ONE full-switch path (`te:open-vault` →
+  `workspace.open()`); Approve/Reject are not offered on foreign items. No new IPC was
+  minted — the existing `workspace:open` invoke suffices. Copy stays inside the §4
+  framing: the writes are already on disk; nothing is phrased as blocked.
+
 ### Watcher health (Phase 2 step 2, v1.2.1)
 
 "Containment + visibility" with zero visibility into its own death is a
@@ -441,10 +510,11 @@ export interface WatcherHealth {
   timeout and THROWS on failure (was an un-timed await that could hang vault init) —
   the init catch marks `down` while the workspace stays live.
 - **Restart-preserves-queue rule**: same-root `restartWatcher()` (ipc/git.ts) is a
-  watcher-only rebuild and must NOT call `getApprovalQueue().clear()` — a crash
-  recovery that cleared the queue would silently drop captured-but-unreviewed writes.
-  The clear-on-init in `initApprovalsForRoot` stays load-bearing for root-binding on
-  workspace switch; the two paths are mutation-tested as genuinely separate.
+  watcher-only rebuild that never clears the queue — a crash recovery that cleared it
+  would silently drop captured-but-unreviewed writes. (v1.3.0: this rule now holds on
+  EVERY path — `ApprovalQueue.clear()` is removed and nothing clears the queue;
+  root-binding on workspace switch is enforced per item at `resolve()`, not by a
+  clear-on-init. See "Global queue scope" above.)
 - **Backoff**: automatic restarts at 1s/5s/30s (30s repeating), cap 5 failed attempts,
   then down-until-manual; the tray Retry (`approvals:watcher-retry`) resets the cap.
   A pending backoff timer is cancelled in `stopApprovals` (the reconfigureForVault
@@ -963,6 +1033,44 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.3.0 (2026-07-14, Phase 3 step 1 landed)** —
+  the structural bump: §4 queue scope contract rewritten (new subsection; the v1.2.1
+  restart-preserves-queue bullet reconciled in place — its "clear-on-init stays
+  load-bearing" clause was superseded). The approval
+  queue is genuinely global — ONE queue, multi-root: `initApprovalsForRoot` no longer
+  clears it on workspace switch (`ApprovalQueue.clear()` removed outright: zero callers
+  remained and its denial copy contradicted the multi-root contract), and cli-change
+  items persist to `<userData>/approval-queue.json` (versioned shape, atomic persist
+  chain, degrade-not-fail load) with one-shot rehydrate-revalidate per app run — each
+  restored item re-diffed against its own capturedRoot; any drift/unverifiability drops
+  it with an `approvals:rehydrate-drop` audit entry, never a silent keep or resolve. The
+  resolution invariant is deliberately UNWEAKENED and its evidence lands in this same
+  commit (safety-invariant gate): visibility is cross-root, resolution never is —
+  `resolve()` still refuses `'workspace-changed'` on a capturedRoot mismatch, now for
+  gate-confirm items too (`enqueueGateConfirm` gains the same captured-root discipline;
+  item + waiter retained on refusal, 30s remove-on-timeout still bounds a cross-root
+  confirm). Gate-confirm items are NEVER serialized (live Promise waiters; a rehydrated
+  confirm is an unanswerable zombie row) — mandatory in this commit, not a refinement.
+  `PendingChange` gains `capturedRoot?: string | null` (display/persistence data;
+  enforcement stays main-side). Tray: root labels + the OQ-A option (a) "switch to
+  workspace X to resolve" affordance on foreign-root items via the one full-switch path
+  (`te:open-vault` → `workspace.open()`); Approve/Reject withheld there; no new IPC
+  minted (§6 unchanged). Copy honesty preserved throughout — queued for review, never
+  blocked. **Pre-landing adversarial-review hardening (same commit):** (a) capture
+  binds to the CAPTURING root — `recordWrites` takes the watcher's own root and
+  `autoReject`'s failed-discard fallback binds to its entry root, so a batch flushing
+  after a workspace switch (or a discard rejecting mid-switch) can never mint an item
+  whose capturedRoot names the new root over old-root paths; cross-root coalescing is
+  refused + audited (`approvals:record-refused`, `'captured-root-mismatch'`). (b)
+  Turn ids are run-unique (`t<seq>-<random run tag>`) so a rehydrated `pc_<turnId>`
+  can never collide with — and be silently rebound by — a new run's turn. (c)
+  Decode-level mirror drops are audited through `ipc/git.ts` (`approvals:rehydrate-
+  drop`, `{ at: 'mirror-decode' }`, reasons `'gate-confirm-never-rehydrated'` /
+  `'malformed'`); the earlier claim that the smuggled-confirm audit happened inside
+  `rehydrate()` was unreachable in the production pipeline. (d) A fresh rehydrate
+  diff carrying the §2 `[diff unavailable]` marker counts as `'diff-failed'` (marker
+  equality is not verification); the marker prefix + `isDiffUnavailable` predicate
+  moved to shared `git-types.ts` so builder and detector cannot drift.
 - **v1.2.8 (2026-07-10, Phase 2 step 8 landed)** —
   OQ7 RESOLVED by Casey with the exact ten-template registry across Guided,
   Architecture, Engineering, and Bridge plus the six audience tags recorded in §5;

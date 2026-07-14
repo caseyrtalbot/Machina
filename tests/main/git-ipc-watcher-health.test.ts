@@ -4,15 +4,22 @@
  * the module under test is re-imported per test so its module-level health
  * state starts fresh (same pattern as agent-ipc.test.ts).
  *
- * The load-bearing pair here is mutation-tested by construction: same-root
- * restartWatcher must NEVER clear the approval queue, while workspace-switch
- * initApprovalsForRoot MUST — collapsing the two paths fails one assertion
- * or the other.
+ * Queue scope (contracts §4 v1.3.0): the queue is multi-root — NEITHER a
+ * same-root restartWatcher NOR a workspace-switch initApprovalsForRoot may
+ * clear it (captured-but-unreviewed writes must never evaporate); resolution
+ * stays root-bound per item inside ApprovalQueue. The first init of an app
+ * run rehydrates the userData disk mirror.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import type { AuditEntry } from '../../src/shared/agent-types'
 
 const auditLog = vi.hoisted(() => vi.fn())
+
+/** Per-test userData dir: the queue's disk mirror must not leak across tests. */
+const userDataCtl = vi.hoisted(() => ({ dir: '' }))
 
 const watcherCtl = vi.hoisted(() => ({
   instances: [] as Array<{
@@ -33,7 +40,7 @@ const ipcCtl = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  app: { getPath: vi.fn(() => '/tmp/te-watcher-health-userdata') },
+  app: { getPath: vi.fn(() => userDataCtl.dir) },
   shell: { trashItem: vi.fn() }
 }))
 
@@ -123,6 +130,7 @@ beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
   vi.useFakeTimers()
+  userDataCtl.dir = mkdtempSync(join(tmpdir(), 'te-watcher-health-userdata-'))
   watcherCtl.instances.length = 0
   watcherCtl.startBehavior = 'resolve'
   watcherCtl.deferredStarts.length = 0
@@ -132,6 +140,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  rmSync(userDataCtl.dir, { recursive: true, force: true })
 })
 
 describe('watcher health state + broadcast', () => {
@@ -166,14 +175,11 @@ describe('watcher health state + broadcast', () => {
   })
 })
 
-describe('same-root restart preserves the queue; workspace switch clears it', () => {
-  it('restartWatcher never calls queue.clear; initApprovalsForRoot does', async () => {
+describe('queue scope v1.3.0: same-root restart AND workspace switch both preserve items', () => {
+  it('items survive restartWatcher and a workspace-switch initApprovalsForRoot', async () => {
     const mod = await loadModule()
     const queue = mod.getApprovalQueue()
-    const clearSpy = vi.spyOn(queue, 'clear')
-
     await mod.initApprovalsForRoot('/ws')
-    expect(clearSpy).toHaveBeenCalledTimes(1)
 
     // Seed a captured-but-unreviewed item, then restart against the same root.
     queue.recordWrites({ turnId: 't1', threadId: 'th1', agentId: 'a', paths: ['src/x.ts'] })
@@ -181,13 +187,100 @@ describe('same-root restart preserves the queue; workspace switch clears it', ()
 
     const result = await mod.restartWatcher()
     expect(result.ok).toBe(true)
-    expect(clearSpy).toHaveBeenCalledTimes(1) // untouched by restart
-    expect(queue.list()).toHaveLength(1) // the item survived the restart
+    expect(queue.list()).toHaveLength(1) // same-root restart semantics preserved exactly
 
-    // Workspace switch: clear-on-init stays load-bearing.
+    // Workspace switch (v1.3.0): the queue is multi-root — the item survives
+    // with its capturedRoot; resolution stays root-bound inside the queue.
     await mod.initApprovalsForRoot('/ws2')
-    expect(clearSpy).toHaveBeenCalledTimes(2)
-    expect(queue.list()).toHaveLength(0)
+    expect(queue.list()).toHaveLength(1)
+    expect(queue.list()[0]?.capturedRoot).toBe('/ws')
+  })
+
+  it('first init of an app run rehydrates the disk mirror; later inits do not re-run it', async () => {
+    // Seed a mirror whose item's diff matches a FRESH recompute of its own
+    // capturedRoot — the rehydrate-revalidate gate must pass it through.
+    // The fixture root is a REAL directory with a REAL file: a nonexistent
+    // root would recompute to the [diff unavailable] marker, which counts as
+    // failed verification (diff-failed drop), not a match (v1.3.0).
+    const fixtureRoot = join(userDataCtl.dir, 'fixture-root')
+    mkdirSync(fixtureRoot, { recursive: true })
+    writeFileSync(join(fixtureRoot, 'x.txt'), 'agent write\n')
+    const { diff } = await import('../../src/main/services/git-service')
+    const freshDiff = diff(fixtureRoot, ['x.txt'])
+    expect(freshDiff).toContain('agent write') // a real diff, not the marker
+    writeFileSync(
+      join(userDataCtl.dir, 'approval-queue.json'),
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'pc_prev',
+            kind: 'cli-change',
+            threadId: 'th-prev',
+            agentId: 'a',
+            paths: ['x.txt'],
+            diff: freshDiff,
+            capturedAt: '2026-07-14T00:00:00.000Z',
+            revertible: false,
+            flags: {
+              highVelocity: false,
+              headMoved: false,
+              concurrentTurns: false,
+              degradedAttribution: false,
+              gateDegraded: false,
+              attributionSuspect: false,
+              forbidden: false
+            },
+            capturedRoot: fixtureRoot
+          }
+        ]
+      })
+    )
+
+    const mod = await loadModule()
+    await mod.initApprovalsForRoot('/ws')
+    expect(
+      mod
+        .getApprovalQueue()
+        .list()
+        .map((i) => i.id)
+    ).toEqual(['pc_prev'])
+
+    // A later workspace switch neither clears nor re-rehydrates (one-shot).
+    await mod.initApprovalsForRoot('/ws2')
+    expect(
+      mod
+        .getApprovalQueue()
+        .list()
+        .map((i) => i.id)
+    ).toEqual(['pc_prev'])
+  })
+
+  it('a gate-confirm smuggled into the mirror is dropped at decode WITH an audit entry', async () => {
+    // Contracts §4 v1.3.0: decode-level drops are audited, never silent —
+    // the production load path refuses the kind before the queue's own
+    // rehydrate check can see it, so the audit must come from this pipeline.
+    writeFileSync(
+      join(userDataCtl.dir, 'approval-queue.json'),
+      JSON.stringify({
+        version: 1,
+        items: [{ id: 'gc_9', kind: 'gate-confirm' }]
+      })
+    )
+
+    const mod = await loadModule()
+    await mod.initApprovalsForRoot('/ws')
+
+    expect(mod.getApprovalQueue().list()).toEqual([])
+    const drops = auditLog.mock.calls
+      .map((c) => c[0] as AuditEntry)
+      .filter((e) => e.tool === 'approvals:rehydrate-drop')
+    expect(drops).toHaveLength(1)
+    expect(drops[0]).toMatchObject({
+      decision: 'error',
+      error: 'gate-confirm-never-rehydrated',
+      args: { id: 'gc_9', at: 'mirror-decode' }
+    })
   })
 
   it('restartWatcher without a bound root returns no-workspace', async () => {

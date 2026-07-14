@@ -145,6 +145,92 @@ describe('ApprovalsTray popover', () => {
   })
 })
 
+describe('ApprovalsTray multi-root items (contracts §4 v1.3.0)', () => {
+  const seedWithRoot = (items: readonly PendingChange[], activeRoot: string | null) => {
+    useApprovalsStore.setState({ items, pending: items.length, activeRoot })
+  }
+
+  it('same-root items render unchanged: no root label, Approve/Reject live', () => {
+    seedWithRoot([makeItem({ capturedRoot: '/ws/alpha' })], '/ws/alpha')
+    render(<ApprovalsTray />)
+    openTray()
+
+    expect(screen.queryByTestId('approval-root-label')).toBeNull()
+    expect(screen.queryByTestId('approval-foreign-root')).toBeNull()
+    expect(screen.getByTestId<HTMLButtonElement>('approval-approve').disabled).toBe(false)
+    expect(screen.getByTestId<HTMLButtonElement>('approval-reject').disabled).toBe(false)
+  })
+
+  it('pre-v1.3.0 items (no capturedRoot) render unchanged too', () => {
+    seedWithRoot([makeItem()], '/ws/alpha')
+    render(<ApprovalsTray />)
+    openTray()
+
+    expect(screen.queryByTestId('approval-root-label')).toBeNull()
+    expect(screen.getByTestId('approval-approve')).toBeTruthy()
+  })
+
+  it('a foreign-root item shows its root label and the switch affordance, never Approve/Reject', () => {
+    seedWithRoot([makeItem({ capturedRoot: '/ws/beta' })], '/ws/alpha')
+    render(<ApprovalsTray />)
+    openTray()
+
+    const label = screen.getByTestId('approval-root-label')
+    expect(label.textContent).toBe('beta')
+    expect(label.getAttribute('title')).toBe('/ws/beta')
+
+    const switchBtn = screen.getByTestId('approval-switch-root')
+    expect(switchBtn.textContent).toBe('Switch to beta to resolve')
+    expect(screen.queryByTestId('approval-approve')).toBeNull()
+    expect(screen.queryByTestId('approval-reject')).toBeNull()
+  })
+
+  it('clicking the switch affordance dispatches te:open-vault with the capturedRoot (never resolve)', () => {
+    seedWithRoot([makeItem({ capturedRoot: '/ws/beta' })], '/ws/alpha')
+    const opened: string[] = []
+    const onOpenVault = (e: Event) => opened.push((e as CustomEvent<string>).detail)
+    window.addEventListener('te:open-vault', onOpenVault)
+    try {
+      render(<ApprovalsTray />)
+      openTray()
+      fireEvent.click(screen.getByTestId('approval-switch-root'))
+    } finally {
+      window.removeEventListener('te:open-vault', onOpenVault)
+    }
+
+    expect(opened).toEqual(['/ws/beta'])
+    expect(useApprovalsStore.getState().resolve).not.toHaveBeenCalled()
+  })
+
+  it('an item captured with no workspace open shows honest copy and no actions at all', () => {
+    seedWithRoot([makeItem({ capturedRoot: null })], '/ws/alpha')
+    render(<ApprovalsTray />)
+    openTray()
+
+    const block = screen.getByTestId('approval-foreign-root')
+    expect(block.textContent).toContain('Captured with no workspace open')
+    expect(screen.queryByTestId('approval-switch-root')).toBeNull()
+    expect(screen.queryByTestId('approval-approve')).toBeNull()
+    expect(screen.queryByTestId('approval-reject')).toBeNull()
+  })
+
+  it('mixed queue: each item keeps its own affordance', () => {
+    seedWithRoot(
+      [
+        makeItem({ id: 'pc_here', capturedRoot: '/ws/alpha' }),
+        makeItem({ id: 'pc_there', capturedRoot: '/ws/beta', threadId: 'thread-2' })
+      ],
+      '/ws/alpha'
+    )
+    render(<ApprovalsTray />)
+    openTray()
+
+    expect(screen.getAllByTestId('approval-item')).toHaveLength(2)
+    expect(screen.getAllByTestId('approval-approve')).toHaveLength(1)
+    expect(screen.getAllByTestId('approval-switch-root')).toHaveLength(1)
+  })
+})
+
 describe('ApprovalsTray watcher health (contracts §4 v1.2.1)', () => {
   it('shows no warning badge or banner while watching, stopped, or unknown', () => {
     for (const health of [

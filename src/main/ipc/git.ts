@@ -12,6 +12,7 @@ import { typedHandle, typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { getWorkspaceService } from '../services/workspace-service'
 import { ApprovalQueue } from '../services/approval-queue'
+import { ApprovalQueuePersistence } from '../services/approval-queue-persistence'
 import { AgentWriteWatcher } from '../services/agent-write-watcher'
 import { AuditLogger } from '../services/audit-logger'
 import {
@@ -55,6 +56,9 @@ function broadcastApprovalsChanged(pending: number): void {
 let approvalQueue: ApprovalQueue | null = null
 let auditLogger: AuditLogger | null = null
 let agentWriteWatcher: AgentWriteWatcher | null = null
+let queuePersistence: ApprovalQueuePersistence | null = null
+/** One-shot guard: the disk mirror rehydrates once per app run. */
+let queueRehydrated = false
 
 /**
  * The one AuditLogger, shared by the queue and the agent write watcher. It
@@ -66,6 +70,47 @@ function getAuditLogger(): AuditLogger {
     auditLogger = new AuditLogger(join(app.getPath('userData'), 'audit'))
   }
   return auditLogger
+}
+
+/**
+ * Disk mirror for the queue's cli-change items (contracts §4 v1.3.0). Lives
+ * under userData beside harness-bindings.json — outside any workspace watch
+ * root, so mirror writes never self-trigger the watcher.
+ */
+function getApprovalQueuePersistence(): ApprovalQueuePersistence {
+  if (queuePersistence === null) {
+    queuePersistence = new ApprovalQueuePersistence(
+      join(app.getPath('userData'), 'approval-queue.json')
+    )
+  }
+  return queuePersistence
+}
+
+/**
+ * One-shot rehydrate at the first workspace bind of this app run. Every
+ * restored item is re-validated against a fresh diff of ITS capturedRoot
+ * inside ApprovalQueue.rehydrate — drift while the app was closed drops the
+ * item with an audit entry, never a silent keep or resolve. Entries the
+ * mirror DECODE refused (a smuggled gate-confirm, a malformed item) are
+ * audited here with the same `approvals:rehydrate-drop` tool — decode-level
+ * drops must not be silent either (contracts §4 v1.3.0). Degrade-not-fail:
+ * a failed load leaves the queue empty; it must never block workspace init.
+ */
+async function rehydrateApprovalQueueOnce(): Promise<void> {
+  if (queueRehydrated) return
+  queueRehydrated = true
+  const { items, dropped } = await getApprovalQueuePersistence().load()
+  for (const drop of dropped) {
+    getAuditLogger().log({
+      ts: new Date().toISOString(),
+      tool: 'approvals:rehydrate-drop',
+      args: { id: drop.id, at: 'mirror-decode' },
+      affectedPaths: [],
+      decision: 'error',
+      error: drop.reason
+    })
+  }
+  if (items.length > 0) getApprovalQueue().rehydrate(items)
 }
 
 /**
@@ -101,7 +146,15 @@ export function getApprovalQueue(): ApprovalQueue {
       },
       audit,
       getRoot: currentRoot,
-      notify: broadcastApprovalsChanged
+      notify: broadcastApprovalsChanged,
+      // v1.3.0: mirror cli-change items to disk on every mutation so the
+      // queue survives restarts. Fire-and-forget — a failed mirror write
+      // must never fail a queue mutation; the next mutation retries.
+      persist: (items) => {
+        void getApprovalQueuePersistence()
+          .persist(items)
+          .catch(() => undefined)
+      }
     })
   }
   return approvalQueue
@@ -145,11 +198,12 @@ export function checkHeadMovedAtTurnEnd(turn: {
 }
 
 /**
- * (Re)bind the approvals surface to a workspace root (workstation step 3):
- * stop the old agent write watcher, clear the queue (items are
- * workspace-root-bound — resolving them against a new root is forbidden by
- * contract), and start a fresh watcher at `root`. Called from
- * reconfigureForVault on every workspace open.
+ * (Re)bind the approvals surface to a workspace root: stop the old agent
+ * write watcher and start a fresh one at `root`. The queue itself is
+ * multi-root (contracts §4 v1.3.0) and survives the switch — items stay
+ * visible with their capturedRoot, and resolution stays root-bound per item
+ * inside ApprovalQueue.resolve. Called from reconfigureForVault on every
+ * workspace open.
  */
 // ── Watcher health + restart with backoff (step 2, contracts §4 v1.2.1) ────
 
@@ -289,9 +343,9 @@ function buildWatcher(root: string): AgentWriteWatcher {
 
 /**
  * Watcher-only rebuild against the SAME root (contracts §4 v1.2.1). The queue
- * is deliberately untouched: clear-on-init is load-bearing for workspace
- * switches (initApprovalsForRoot) and must NEVER run here — a crash recovery
- * that cleared the queue would silently drop captured-but-unreviewed writes.
+ * is deliberately untouched — as of v1.3.0 NO path clears it (items are
+ * multi-root, root-bound at resolution) — so neither a crash recovery nor a
+ * workspace switch can drop captured-but-unreviewed writes.
  */
 export async function restartWatcher(): Promise<GitOpResult> {
   const root = watcherRoot
@@ -353,7 +407,11 @@ export async function initApprovalsForRoot(root: string): Promise<void> {
   watcherRetryAttempts = 0
   watcherDownSince = null
   await agentWriteWatcher?.stop()
-  getApprovalQueue().clear()
+  // v1.3.0: the queue is multi-root — a workspace switch never clears it.
+  // The first bind of this app run rehydrates the disk mirror instead
+  // (restored items are re-validated against fresh diffs of their own
+  // capturedRoot; drift while the app was closed drops + audits).
+  await rehydrateApprovalQueueOnce().catch(() => undefined)
   // v1.2.7: the watcher's getWriteBudget provider reads the bindings mirror
   // SYNCHRONOUSLY — load it (and run the root's one-time backfill) before
   // any batch can route, so bound threads never fall back to the default

@@ -67,6 +67,28 @@ export interface PendingChange {
   readonly revertible: boolean
   readonly flags: PendingChangeFlags
   readonly description?: string
+  /**
+   * Workspace root the item was captured against (v1.3.0, multi-root queue);
+   * null when no workspace was open. Surfaced for renderer root labels and
+   * the disk mirror. Resolution keeps its own main-side root check and
+   * refuses a mismatch ('workspace-changed') — this field is display data,
+   * never the enforcement input.
+   */
+  readonly capturedRoot?: string | null
+}
+
+/**
+ * GitService.diff embeds this marker (as a line of its own) when git could
+ * produce no output for a path — a failed diff must be visible, never a
+ * silent ''. Shared so the queue's rehydrate-revalidate gate can recognize
+ * an UNVERIFIABLE fresh diff: two identical markers are a failed
+ * verification, not a match (v1.3.0).
+ */
+export const DIFF_UNAVAILABLE_PREFIX = '[diff unavailable'
+
+/** True when a GitService.diff result contains the failure marker line. */
+export function isDiffUnavailable(diff: string): boolean {
+  return diff.split('\n').some((line) => line.startsWith(DIFF_UNAVAILABLE_PREFIX))
 }
 
 /** Commit-trailer keys used for agent attribution (survive rebase, no ref pollution). */

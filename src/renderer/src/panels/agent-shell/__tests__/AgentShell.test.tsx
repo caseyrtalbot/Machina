@@ -49,6 +49,11 @@ beforeEach(() => {
       readConfig: vi.fn().mockResolvedValue(baseConfig),
       writeConfig: vi.fn().mockResolvedValue(undefined)
     },
+    // refresh() (approvals-store) reads the active root alongside the item
+    // list; null degrades to "no workspace known" (step 1 root-bound queue).
+    workspace: {
+      current: vi.fn().mockResolvedValue(null)
+    },
     approvals: {
       list: vi.fn().mockResolvedValue([]),
       resolve: vi.fn().mockResolvedValue({ ok: true }),

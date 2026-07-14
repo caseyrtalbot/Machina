@@ -27,6 +27,8 @@ interface Harness {
   readonly queue: ApprovalQueue
   readonly audit: AuditEntry[]
   readonly notifications: number[]
+  /** Every persist-hook snapshot, in mutation order (cli-change items only). */
+  readonly persisted: PendingChange[][]
   readonly git: {
     isRepo: ReturnType<typeof vi.fn>
     diff: ReturnType<typeof vi.fn>
@@ -42,6 +44,7 @@ interface Harness {
 function makeHarness(opts: { isRepo?: boolean; root?: string | null } = {}): Harness {
   const audit: AuditEntry[] = []
   const notifications: number[] = []
+  const persisted: PendingChange[][] = []
   let diffValue = 'diff-v1'
   let rootValue = opts.root !== undefined ? opts.root : '/workspace'
   let tick = 0
@@ -58,12 +61,14 @@ function makeHarness(opts: { isRepo?: boolean; root?: string | null } = {}): Har
     audit: { log: (entry) => audit.push(entry) },
     getRoot: () => rootValue,
     notify: (pending) => notifications.push(pending),
+    persist: (items) => persisted.push([...items]),
     now: () => new Date(1751000000000 + tick++ * 1000).toISOString()
   })
   return {
     queue,
     audit,
     notifications,
+    persisted,
     git,
     setDiff: (next) => {
       diffValue = next
@@ -77,19 +82,54 @@ function makeHarness(opts: { isRepo?: boolean; root?: string | null } = {}): Har
   }
 }
 
+/** recordWrites returns null only on the captured-root coalesce refusal (v1.3.0). */
+function mustRecord(change: PendingChange | null): PendingChange {
+  if (change === null) throw new Error('recordWrites refused the batch')
+  return change
+}
+
 function recordTurn(h: Harness, turnId = 't1'): PendingChange {
-  return h.queue.recordWrites({
-    turnId,
-    threadId: 'th-1',
-    agentId: 'fixer',
-    paths: ['a.txt']
-  })
+  return mustRecord(
+    h.queue.recordWrites({
+      turnId,
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['a.txt']
+    })
+  )
 }
 
 const GATE_OPTS: HitlConfirmOpts = {
   tool: 'vault.write_file',
   path: 'notes/idea.md',
   description: 'Write 120 bytes'
+}
+
+const NO_FLAGS = {
+  highVelocity: false,
+  headMoved: false,
+  concurrentTurns: false,
+  degradedAttribution: false,
+  gateDegraded: false,
+  attributionSuspect: false,
+  forbidden: false
+} as const
+
+/** A persisted cli-change item as the disk mirror would hand it to rehydrate. */
+function persistedItem(overrides: Partial<PendingChange> = {}): PendingChange {
+  return {
+    id: 'pc_r1',
+    kind: 'cli-change',
+    threadId: 'th-1',
+    agentId: 'fixer',
+    paths: ['a.txt'],
+    diff: 'diff-v1',
+    capturedAt: '2026-07-14T00:00:00.000Z',
+    revertible: true,
+    flags: NO_FLAGS,
+    capturedRoot: '/workspace',
+    ...overrides
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -112,13 +152,15 @@ describe('ApprovalQueue add/recordWrites/list', () => {
   it('coalesces writes for the same turn: paths union, flags OR-merged, single item', () => {
     const h = makeHarness()
     recordTurn(h)
-    const merged = h.queue.recordWrites({
-      turnId: 't1',
-      threadId: 'th-1',
-      agentId: 'fixer',
-      paths: ['a.txt', 'b.txt'],
-      flags: { headMoved: true }
-    })
+    const merged = mustRecord(
+      h.queue.recordWrites({
+        turnId: 't1',
+        threadId: 'th-1',
+        agentId: 'fixer',
+        paths: ['a.txt', 'b.txt'],
+        flags: { headMoved: true }
+      })
+    )
 
     expect(h.queue.list()).toHaveLength(1)
     expect(merged.paths).toEqual(['a.txt', 'b.txt'])
@@ -137,13 +179,15 @@ describe('ApprovalQueue add/recordWrites/list', () => {
       paths: ['a.txt'],
       flags: { highVelocity: true }
     })
-    const merged = h.queue.recordWrites({
-      turnId: 't1',
-      threadId: 'th-1',
-      agentId: 'fixer',
-      paths: ['a.txt'],
-      flags: { highVelocity: false }
-    })
+    const merged = mustRecord(
+      h.queue.recordWrites({
+        turnId: 't1',
+        threadId: 'th-1',
+        agentId: 'fixer',
+        paths: ['a.txt'],
+        flags: { highVelocity: false }
+      })
+    )
     expect(merged.flags.highVelocity).toBe(true)
   })
 
@@ -158,12 +202,14 @@ describe('ApprovalQueue add/recordWrites/list', () => {
       paths: ['a.txt'],
       flags: { attributionSuspect: true }
     })
-    const merged = h.queue.recordWrites({
-      turnId: 't1',
-      threadId: 'th-1',
-      agentId: 'fixer',
-      paths: ['b.txt']
-    })
+    const merged = mustRecord(
+      h.queue.recordWrites({
+        turnId: 't1',
+        threadId: 'th-1',
+        agentId: 'fixer',
+        paths: ['b.txt']
+      })
+    )
     expect(merged.flags.attributionSuspect).toBe(true)
     expect(h.queue.list()[0]?.flags.attributionSuspect).toBe(true)
   })
@@ -556,6 +602,28 @@ describe('ApprovalQueue autoReject', () => {
       affectedPaths: ['secret.env']
     })
   })
+
+  it('discard failure after a mid-await workspace switch: the fallback item binds to the ENTRY root', async () => {
+    const h = makeHarness() // entry root: /workspace
+    // The switch completes while discard() is awaited, then discard fails:
+    // the visibility fallback must record old-root paths against the entry
+    // root, never the new active one (v1.3.0 root-binding race).
+    h.git.discard.mockImplementation(async (): Promise<GitOpResult> => {
+      h.setRoot('/new-workspace')
+      return { ok: false, reason: 'discard-failed' }
+    })
+
+    const result = await h.queue.autoReject(
+      { turnId: 't1', threadId: 'th-1', agentId: 'fixer', paths: ['secret.env'] },
+      '/workspace'
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'discard-failed' })
+    const item = h.queue.list()[0]
+    expect(item?.capturedRoot).toBe('/workspace')
+    expect(item?.flags.forbidden).toBe(true)
+    expect(h.git.diff).toHaveBeenLastCalledWith('/workspace', ['secret.env'])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -610,12 +678,14 @@ describe('ApprovalQueue approve with ignored-untracked paths', () => {
 describe('ApprovalQueue flagExisting', () => {
   it('OR-merges flags into an existing turn item without touching paths/diff', () => {
     const h = makeHarness()
-    const recorded = h.queue.recordWrites({
-      turnId: 't9',
-      threadId: 'th-1',
-      agentId: 'fixer',
-      paths: ['a.txt']
-    })
+    const recorded = mustRecord(
+      h.queue.recordWrites({
+        turnId: 't9',
+        threadId: 'th-1',
+        agentId: 'fixer',
+        paths: ['a.txt']
+      })
+    )
     const notifiesBefore = h.notifications.length
 
     const flagged = h.queue.flagExisting('t9', { headMoved: true })
@@ -639,23 +709,280 @@ describe('ApprovalQueue flagExisting', () => {
 })
 
 // ---------------------------------------------------------------------------
-// clear
+// capturedRoot payload + persist hook (v1.3.0)
 // ---------------------------------------------------------------------------
 
-describe('ApprovalQueue clear', () => {
-  it('denies pending gate confirms, empties the queue, and notifies 0', async () => {
+describe('ApprovalQueue capturedRoot payload + persist snapshots (v1.3.0)', () => {
+  it('cli-change items carry the root they were captured against', () => {
     const h = makeHarness()
-    recordTurn(h) // → notify 1
-    const decision = h.queue.enqueueGateConfirm(GATE_OPTS, 30_000) // → notify 2
+    const change = recordTurn(h)
+    expect(change.capturedRoot).toBe('/workspace')
+    expect(h.queue.list()[0]?.capturedRoot).toBe('/workspace')
+  })
 
-    h.queue.clear() // → notify 0
+  it('add() stamps capturedRoot from the active root', () => {
+    const h = makeHarness()
+    const change = recordTurn(h)
+    h.setRoot('/other-workspace')
+    h.queue.add({ ...change, id: 'pc_manual' })
+    const added = h.queue.list().find((i) => i.id === 'pc_manual')
+    expect(added?.capturedRoot).toBe('/other-workspace')
+  })
 
-    const denied = await decision
-    expect(denied.allowed).toBe(false)
-    expect(denied.reason).toMatch(/cleared/)
-    expect(denied.reason).toMatch(/workspace/)
+  it('persist fires on every mutation with cli-change items only', async () => {
+    const h = makeHarness()
+    recordTurn(h)
+    void h.queue.enqueueGateConfirm(GATE_OPTS, 30_000)
+    expect(h.queue.list()).toHaveLength(2)
+    // The gate-confirm mutation persisted, but its snapshot excludes the confirm.
+    expect(h.persisted.at(-1)?.map((i) => i.id)).toEqual(['pc_t1'])
+
+    await h.queue.resolve('pc_t1', true)
+    expect(h.persisted.at(-1)).toEqual([]) // resolved item left the mirror
+  })
+
+  it('gate-confirm items are NEVER serialized across their whole lifecycle', async () => {
+    const h = makeHarness()
+    const decision = h.queue.enqueueGateConfirm(GATE_OPTS, 30_000)
+    const id = h.queue.list()[0]?.id ?? ''
+    await h.queue.resolve(id, true)
+    await decision
+    expect(h.persisted.length).toBeGreaterThan(0)
+    for (const snapshot of h.persisted) {
+      expect(snapshot.every((i) => i.kind === 'cli-change')).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// recordWrites root binding (v1.3.0)
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue recordWrites root binding (v1.3.0)', () => {
+  it('binds to the caller-captured root when the active workspace flipped mid-flush', async () => {
+    // Workspace-switch race: the OLD root's watcher flushes a batch AFTER
+    // WorkspaceService flipped the active root. The item must bind to the
+    // watcher's root — the paths and diff belong to that tree.
+    const h = makeHarness()
+    h.setRoot('/new-workspace') // the switch already happened
+    const change = mustRecord(
+      h.queue.recordWrites({
+        turnId: 't1',
+        threadId: 'th-1',
+        agentId: 'fixer',
+        paths: ['a.txt'],
+        capturedRoot: '/workspace'
+      })
+    )
+
+    expect(change.capturedRoot).toBe('/workspace')
+    expect(h.git.diff).toHaveBeenCalledWith('/workspace', ['a.txt']) // never the new root
+    // Resolution stays root-bound: refused from the new workspace…
+    const refused = await h.queue.resolve('pc_t1', false)
+    expect(refused).toEqual({ ok: false, reason: 'workspace-changed' })
+    // …and honored back in the captured one.
+    h.setRoot('/workspace')
+    const resolved = await h.queue.resolve('pc_t1', false)
+    expect(resolved).toEqual({ ok: true })
+  })
+
+  it('a later same-id batch cannot flip an existing item to the new active root', () => {
+    const h = makeHarness()
+    recordTurn(h) // pc_t1 bound to /workspace
+    h.setRoot('/new-workspace')
+    const refused = h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-1',
+      agentId: 'fixer',
+      paths: ['b.txt'] // no capturedRoot: the getRoot() fallback path
+    })
+
+    expect(refused).toBeNull()
+    const item = h.queue.list()[0]
+    expect(item?.capturedRoot).toBe('/workspace') // unchanged
+    expect(item?.paths).toEqual(['a.txt']) // no cross-root path union
+    expect(h.audit.at(-1)).toMatchObject({
+      tool: 'approvals:record-refused',
+      decision: 'error',
+      error: 'captured-root-mismatch',
+      affectedPaths: ['b.txt']
+    })
+  })
+
+  it('an id collision with a rehydrated foreign-root item refuses the merge', () => {
+    // The cross-run hazard (defense in depth behind run-unique turn ids):
+    // run 1 persisted pc_t1 captured in /old-root; even if a colliding id
+    // reaches recordWrites, the queue must refuse rather than rebind the
+    // rehydrated item's capturedRoot and merge paths across trees.
+    const h = makeHarness()
+    h.queue.rehydrate([persistedItem({ id: 'pc_t1', capturedRoot: '/old-root' })])
+    expect(h.queue.list()).toHaveLength(1)
+
+    const refused = h.queue.recordWrites({
+      turnId: 't1',
+      threadId: 'th-9',
+      agentId: 'other-agent',
+      paths: ['README.md'],
+      capturedRoot: '/workspace'
+    })
+
+    expect(refused).toBeNull()
+    const item = h.queue.list()[0]
+    expect(item?.capturedRoot).toBe('/old-root')
+    expect(item?.threadId).toBe('th-1') // attribution never overwritten
+    expect(item?.paths).toEqual(['a.txt'])
+    expect(h.audit.at(-1)).toMatchObject({
+      tool: 'approvals:record-refused',
+      error: 'captured-root-mismatch'
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// gate-confirm root binding (v1.3.0)
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue gate-confirm root binding (v1.3.0)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('records the captured root on the gate-confirm item', () => {
+    const h = makeHarness()
+    void h.queue.enqueueGateConfirm(GATE_OPTS, 30_000)
+    expect(h.queue.list()[0]?.capturedRoot).toBe('/workspace')
+  })
+
+  it('cross-root resolution refuses workspace-changed, leaves the waiter pending, and resolves after switching back', async () => {
+    const h = makeHarness()
+    const decision = h.queue.enqueueGateConfirm(GATE_OPTS, 30_000)
+    let settled = false
+    void decision.then(() => {
+      settled = true
+    })
+    const id = h.queue.list()[0]?.id ?? ''
+
+    h.setRoot('/other-workspace')
+    const result = await h.queue.resolve(id, true)
+    expect(result).toEqual({ ok: false, reason: 'workspace-changed' })
+    expect(h.queue.list()).toHaveLength(1) // retained
+    await Promise.resolve()
+    expect(settled).toBe(false) // the decision was NOT answered cross-root
+    expect(h.audit[0]).toMatchObject({ decision: 'error', error: 'workspace-changed' })
+
+    h.setRoot('/workspace')
+    const ok = await h.queue.resolve(id, true)
+    expect(ok).toEqual({ ok: true })
+    await expect(decision).resolves.toMatchObject({ allowed: true })
+  })
+
+  it('the remove-on-timeout still bounds a cross-root confirm (no zombie row)', async () => {
+    vi.useFakeTimers()
+    const h = makeHarness()
+    const decision = h.queue.enqueueGateConfirm(GATE_OPTS, 30_000)
+    h.setRoot('/other-workspace')
+
+    vi.advanceTimersByTime(30_000)
+
+    await expect(decision).resolves.toMatchObject({ allowed: false })
     expect(h.queue.list()).toEqual([])
-    expect(h.notifications).toEqual([1, 2, 0])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// rehydrate (restart survival, v1.3.0)
+// ---------------------------------------------------------------------------
+
+describe('ApprovalQueue rehydrate (v1.3.0)', () => {
+  it('restores an item whose fresh diff matches, resolvable in its root', async () => {
+    const h = makeHarness() // diff stub returns 'diff-v1' — matches the fixture
+    h.queue.rehydrate([persistedItem()])
+
+    expect(h.queue.list().map((i) => i.id)).toEqual(['pc_r1'])
+    expect(h.audit).toHaveLength(0)
+    const result = await h.queue.resolve('pc_r1', true)
+    expect(result.ok).toBe(true)
+  })
+
+  it('re-validates against the item OWN capturedRoot, and resolution stays root-bound', async () => {
+    const h = makeHarness() // active root: /workspace
+    h.queue.rehydrate([persistedItem({ capturedRoot: '/elsewhere' })])
+
+    expect(h.git.diff).toHaveBeenCalledWith('/elsewhere', ['a.txt'])
+    expect(h.queue.list()).toHaveLength(1)
+    // Foreign-root item is visible but not resolvable from here.
+    const result = await h.queue.resolve('pc_r1', true)
+    expect(result).toEqual({ ok: false, reason: 'workspace-changed' })
+  })
+
+  it('drops + audits an item whose disk state drifted while the app was closed', () => {
+    const h = makeHarness()
+    h.setDiff('diff-v2') // disk changed since the persisted snapshot
+    h.queue.rehydrate([persistedItem()])
+
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit).toHaveLength(1)
+    expect(h.audit[0]).toMatchObject({
+      tool: 'approvals:rehydrate-drop',
+      decision: 'error',
+      error: 'stale-diff',
+      affectedPaths: ['a.txt']
+    })
+    // The pruned mirror is re-persisted without the dropped item.
+    expect(h.persisted.at(-1)).toEqual([])
+  })
+
+  it('drops + audits when the diff cannot be recomputed (conservative: drop, never keep)', () => {
+    const h = makeHarness()
+    h.git.diff.mockImplementation(() => {
+      throw new Error('git exploded')
+    })
+    h.queue.rehydrate([persistedItem()])
+
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit[0]).toMatchObject({ error: 'diff-failed' })
+  })
+
+  it('drops + audits when the fresh diff is the [diff unavailable] marker (unverifiable ≠ match)', () => {
+    // GitService.diff converts failures into a stable marker STRING rather
+    // than throwing; an item persisted with the same marker (its capture-time
+    // diff also failed) would compare equal and silently survive rehydrate.
+    const h = makeHarness()
+    h.setDiff('[diff unavailable: a.txt]\n')
+    h.queue.rehydrate([persistedItem({ diff: '[diff unavailable: a.txt]\n' })])
+
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit[0]).toMatchObject({
+      tool: 'approvals:rehydrate-drop',
+      decision: 'error',
+      error: 'diff-failed'
+    })
+  })
+
+  it('drops + audits an item with no captured root', () => {
+    const h = makeHarness()
+    h.queue.rehydrate([persistedItem({ capturedRoot: null })])
+
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit[0]).toMatchObject({ error: 'no-captured-root' })
+  })
+
+  it('never rehydrates a gate-confirm kind (tampered mirror)', () => {
+    const h = makeHarness()
+    h.queue.rehydrate([persistedItem({ id: 'gc_9', kind: 'gate-confirm' })])
+
+    expect(h.queue.list()).toEqual([])
+    expect(h.audit[0]).toMatchObject({ error: 'gate-confirm-never-rehydrated' })
+  })
+
+  it('never clobbers a live item with the same id', () => {
+    const h = makeHarness()
+    recordTurn(h, 'r1') // live pc_r1
+    const live = h.queue.list()[0]
+    h.queue.rehydrate([persistedItem({ diff: 'something-else' })])
+
+    expect(h.queue.list()).toEqual([live])
+    expect(h.audit).toHaveLength(0)
   })
 })
 
@@ -705,12 +1032,14 @@ describe('ApprovalQueue with real git-service', () => {
     const { queue } = makeRealQueue()
 
     writeFileSync(join(root, 'new.txt'), 'agent v1\n')
-    const change = queue.recordWrites({
-      turnId: 'turn-1',
-      threadId: 'th-00000001',
-      agentId: 'fixer',
-      paths: ['new.txt']
-    })
+    const change = mustRecord(
+      queue.recordWrites({
+        turnId: 'turn-1',
+        threadId: 'th-00000001',
+        agentId: 'fixer',
+        paths: ['new.txt']
+      })
+    )
     expect(change.diff).toContain('agent v1') // untracked file reviews non-blind
 
     // The file changes after review: resolve must refuse with stale-diff.

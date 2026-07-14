@@ -35,9 +35,29 @@ export function isWatcherUnhealthy(health: WatcherHealth | null): boolean {
   return health !== null && health.state !== 'watching' && health.state !== 'stopped'
 }
 
+/**
+ * Display-side mirror of resolve()'s root check (contracts §4 v1.3.0): a
+ * foreign-root item cannot be resolved from this workspace — main refuses
+ * with 'workspace-changed'. Mirrors the main-side predicate exactly
+ * (approval-queue.ts resolve()): an item with no recorded capturedRoot
+ * (pre-v1.3.0 shape) is treated as same-root — main remains the enforcement
+ * authority either way. Display data only, never the enforcement input.
+ */
+export function isForeignRoot(item: PendingChange, activeRoot: string | null): boolean {
+  return item.capturedRoot !== undefined && item.capturedRoot !== activeRoot
+}
+
 interface ApprovalsStore {
   readonly items: readonly PendingChange[]
   readonly pending: number
+  /**
+   * Active workspace root (main-side canonical value via workspace:current),
+   * refreshed with the item list so root labels and the foreign-root switch
+   * affordance always compare against the same snapshot. null = no workspace
+   * open OR not yet known — both degrade to the safe side (foreign, so the
+   * tray offers switch instead of a resolve main would refuse anyway).
+   */
+  readonly activeRoot: string | null
   readonly notice: string | null
   /** True while a resolve() round-trip is in flight (disables buttons). */
   readonly resolving: string | null
@@ -57,14 +77,21 @@ interface ApprovalsStore {
 export const useApprovalsStore = create<ApprovalsStore>((set, get) => ({
   items: [],
   pending: 0,
+  activeRoot: null,
   notice: null,
   resolving: null,
   watcherHealth: null,
   retrying: false,
 
   refresh: async () => {
-    const items = await window.api.approvals.list()
-    set({ items, pending: items.length })
+    // Fetched together so items and activeRoot land in one atomic set() —
+    // labels never render against a root snapshot from a different fetch.
+    // Root read degrades to null (= foreign display, main still enforces).
+    const [items, workspace] = await Promise.all([
+      window.api.approvals.list(),
+      window.api.workspace.current().catch(() => null)
+    ])
+    set({ items, pending: items.length, activeRoot: workspace?.root ?? null })
   },
 
   resolve: async (id, approve, message) => {

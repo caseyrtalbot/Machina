@@ -95,6 +95,49 @@ graph TD
 
 ## Step 1 — Global approval queue v2 core: multi-root scope + persistence + gate-confirm root-binding
 
+> **DONE** (2026-07-14, contracts v1.3.0). Landed as specced: clear-on-switch
+> removed with same-root restart semantics preserved; cli-change items persist to a
+> versioned userData mirror (`approval-queue-persistence.ts`, HarnessRunRegistry
+> pattern) and rehydrate once per app run with per-item fresh-diff re-validation
+> against the item's OWN capturedRoot (drift/missing-root/diff-failure ⇒ drop +
+> `approvals:rehydrate-drop` audit); gate-confirms record capturedRoot, refuse
+> cross-root resolution, and are never serialized (enforced in the queue snapshot
+> AND re-filtered at decode, both pinned); tray shows root labels + the OQ-A (a)
+> switch-to-resolve affordance with Approve/Reject withheld on foreign items; no
+> new IPC minted (the existing workspace-open path sufficed). **Recorded
+> deviations:** the orphaned `ApprovalQueue.clear()` method was deleted entirely
+> (zero production callers after the call removal; its copy contradicted the
+> multi-root contract); a pending gate-confirm now survives a workspace switch for
+> up to its 30s timeout (previously denied instantly by clear — cross-root refusal
+> + remove-on-timeout bound its life, tested); the contracts v1.2.1
+> "restart-preserves-queue" bullet still claimed clear-on-init was load-bearing
+> and was reconciled in the same commit. **Post-implementation review** (4 lenses:
+> spec compliance, adversarial persistence semantics, test quality, Codex cold
+> read) surfaced 13 findings; all 6 blocker/major CONFIRMED and fixed in the same
+> tree: wrong-root capture race (`recordWrites` now binds to the caller-supplied
+> capturing root, mirroring autoReject's expectedRoot); cross-run `pc_<turnId>`
+> collision (turn ids now run-unique `t<seq>-<runTag>`, plus coalesce-refusal on
+> capturedRoot mismatch as defense in depth); silent decode-level mirror drops
+> (load returns drop diagnostics, audited at `mirror-decode`); autoReject root
+> re-read race (binds to entry root); `[diff unavailable` marker treated as
+> comparable (now `diff-failed` ⇒ drop + audit; marker constant shared in
+> git-types so builder/detector cannot drift). **Recorded residual minors** (not
+> fixed this step, none safety-invariant): no barrier against a pre-rehydrate
+> queue mutation truncating the un-read mirror (safe under current wiring; step 6
+> arms the trigger — re-check there); mirror persist failures are swallowed
+> (restart durability degrades silently; candidate for step 2's notification
+> classes); no mirror flush on quit (a write captured in the last instant before
+> exit can miss the mirror; the write itself is on disk — convenience loss only);
+> transient stale-activeRoot window in the tray after a switch until refresh.
+> **Evidence (fresh runs on the final tree):** `npm run check` 314 files / 3810
+> tests green (+42 over the step-8 baseline); build green; full e2e 26 passed / 1
+> known skip INCLUDING the new `e2e/approvals-persistence.spec.ts` restart probe
+> (real claude turn → `pc_<turnId>` item → quit → relaunch → rehydrated +
+> resolvable → trailered commit); `npm audit --omit=dev` = the 1 known moderate
+> js-yaml advisory. **Casey-observed acceptance still pending:** switch workspaces
+> mid-review and watch queued items survive with root labels; a foreign-root item
+> offers the switch affordance instead of resolution.
+
 **Goal.** Make the queue genuinely global — items survive workspace switches and app
 restarts — **without weakening the workspace-root resolution invariant.** This is the
 one step that touches a load-bearing safety behavior (`initApprovalsForRoot` →
