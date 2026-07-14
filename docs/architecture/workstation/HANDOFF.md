@@ -101,11 +101,12 @@ running app.
 
 **Next work order for the incoming team(s):**
 
-- **Next = Phase 3 step 2** (notifications + propose-surface convergence, v1.3.1;
-  Session A) — and **step 3** (migration substrate + tick-counter + dock-store
-  extraction, v1.3.2; Session B) is parallel-safe with it per the spec's
-  two-session schedule (step 3 must land before step 4 starts — the
-  `thread-store.ts` collision).
+- **Next = Phase 3 steps 2 ∥ 3** (the first sanctioned parallel pair): step 2
+  (notifications + propose-surface convergence, v1.3.1; Session A) and step 3
+  (migration substrate + tick-counter + dock-store extraction, v1.3.2; Session B).
+  **The work order with ownership boundaries, rebase discipline, and Casey gates is
+  `HANDOFF-PHASE3-STEPS-2-3.md`** — it deletes itself when the second step lands.
+  Step 3 must land before step 4 starts (the `thread-store.ts` collision).
 - **Casey answers wanted (recommendations are the defaults if unanswered):** OQ8
   ratification at kickoff (blocker-class now — loops + canvas cards multiply
   cross-root PTYs; step 6 carries a root fence as the interim), plus OQ-A through
@@ -146,6 +147,41 @@ running app.
    investigation dossiers; both judges picked the risk design). Phase 2 is COMPLETE —
    new sessions start here. Carries its own stale-claim ledger, safety-invariant gate
    ledger, exit-bar coverage map, and open questions OQ8 + OQ-A–E.
+
+## What Phase 3 step 1 changed under you (`8f1323c`, contracts v1.3.0)
+
+1. **The approval queue is multi-root and durable.** `initApprovalsForRoot` no longer
+   clears it (the orphaned `ApprovalQueue.clear()` method was deleted entirely —
+   recorded deviation); items carry and display their `capturedRoot`; cli-change items
+   mirror to a versioned userData file (`approval-queue-persistence.ts`,
+   HarnessRunRegistry pattern) and rehydrate once per app run, each re-validated
+   against a fresh git diff of its OWN root — drift, missing root, or a failed diff
+   recompute drops the item with an `approvals:rehydrate-drop` audit entry.
+2. **Resolution never crosses roots.** `resolve()`'s `workspace-changed` refusal is
+   untouched; the tray withholds Approve/Reject on foreign-root items and offers
+   "Switch to <root> to resolve" through the one full-switch path (`te:open-vault` →
+   `workspace.open()`). Gate-confirms now record `capturedRoot`, refuse cross-root
+   resolution, and are NEVER serialized (queue-snapshot filter + decode-level refusal,
+   both pinned). A pending gate-confirm survives a workspace switch only until its 30s
+   timeout (recorded deviation from the old instant-deny-via-clear).
+3. **Turn ids are run-unique** (`t<seq>-<runTag>`, minted per `CliTurnRegistry`
+   instance) — the review-confirmed fix for cross-run `pc_<turnId>` collisions that
+   could silently rebind a rehydrated item. Every later step inherits this shape; do
+   not assume `t1`, `t2`… in tests. `recordWrites` also binds items to the
+   caller-supplied capturing root (watcher passes its own root) and refuses to
+   coalesce into an item whose `capturedRoot` differs (audited).
+4. **`[diff unavailable` is not a comparable snapshot.** The marker constant +
+   `isDiffUnavailable` live in `git-types.ts`; rehydration treats it as `diff-failed`
+   (drop + audit). Builder and detector share the constant — keep it that way.
+5. **Recorded residual minors** (step-1 DONE block in 06-phase-3-specs.md): no
+   barrier against a pre-rehydrate queue mutation truncating the un-read mirror
+   (re-check at step 6, which arms the trigger); mirror persist failures are swallowed
+   (candidate for step 2's notification classes); no mirror flush on quit; transient
+   stale-activeRoot tray window after a switch.
+6. **Evidence:** check 3810 green (+42), build green, full e2e 26 + 1 known skip incl.
+   the new `e2e/approvals-persistence.spec.ts` restart probe (real claude turn → item
+   → quit → relaunch → rehydrate → trailered commit). Casey-observed acceptance
+   pending: multi-root tray survival + foreign-root affordance on the running app.
 
 ## What step 8 changed (`2026-07-10`, contracts v1.2.8)
 
@@ -482,8 +518,11 @@ tests` is zero — do not reintroduce it; rollback is the approvals gate
    **Step 3 edits this file — respect the guard**: any new await-bearing path that
    rebuilds or rebinds the watcher must revalidate generation + root after each await,
    and stale watcher instances must not emit health. Same-root restarts NEVER call
-   `getApprovalQueue().clear()` (mutation-tested); the clear stays in
-   `initApprovalsForRoot` and is load-bearing for workspace switches.
+   `getApprovalQueue().clear()` (mutation-tested); the clear stayed in
+   `initApprovalsForRoot` and was load-bearing for workspace switches — **until Phase
+   3 step 1 (v1.3.0), which removed the clear AND the method entirely** (the queue is
+   multi-root now; resolution stays root-bound per item). Historical record kept;
+   trust the v1.3.0 contract.
 3. **Turn tagging did NOT widen `TurnStartedOpts`** (recorded deviation): the registry
    takes a late-bound `setGateHealthProbe` (same pattern as `setPtyAliveProbe`), and
    `CliTurn.gateDegradedAtStart` flows into `PendingChangeFlags.gateDegraded` → queue
