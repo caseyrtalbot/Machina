@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { McpLifecycle, MCP_TOOL_COUNT } from '../mcp-lifecycle'
+import { McpLifecycle, MCP_TOOL_COUNT, setMcpApprovalQueueProvider } from '../mcp-lifecycle'
 import { buildVaultDeps, applyFileToIndex } from '../vault-indexing'
 
 const HELLO_MD =
@@ -257,6 +257,60 @@ describe('McpLifecycle', () => {
 
       await client.close()
       await server.close()
+    })
+  })
+
+  // ── MCP gate convergence (Phase 3 step 2, contracts §4 v1.3.1) ───────────
+  // The write gate is QueueHitlGate over the approval queue, late-bound via
+  // setMcpApprovalQueueProvider (wired in registerGitIpc). Order matters
+  // inside this describe: the fail-closed test runs BEFORE any provider is
+  // set (module state starts unwired).
+  describe('MCP gate convergence (v1.3.1)', () => {
+    async function callWriteFile(): Promise<{ text: string; isError: boolean; target: string }> {
+      lifecycle.createForVault(vaultRoot, buildVaultDeps([]))
+      const server = lifecycle.buildServer()
+      const client = new Client({ name: 'test-client', version: '1.0.0' })
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+      await server.connect(serverTransport)
+      await client.connect(clientTransport)
+      // write_file requires an EXISTING file at an absolute path (pre-gate
+      // mtime capture stats it before the confirm).
+      const target = join(vaultRoot, 'notes', 'hello.md')
+      const result = await client.callTool({
+        name: 'vault.write_file',
+        arguments: { path: target, content: 'agent content' }
+      })
+      await client.close()
+      await server.close()
+      return {
+        text: (result.content as Array<{ type: string; text: string }>)[0].text,
+        isError: result.isError === true,
+        target
+      }
+    }
+
+    it('fail-closed: an unwired provider denies writes instead of falling back to a dialog', async () => {
+      const { text, isError } = await callWriteFile()
+      expect(isError).toBe(true)
+      expect(text).toBe('Denied: Approval queue not wired')
+    })
+
+    it('write confirms delegate to the queue backend (QueueHitlGate over enqueueGateConfirm)', async () => {
+      const seen: Array<{ tool: string; path: string }> = []
+      setMcpApprovalQueueProvider(() => ({
+        enqueueGateConfirm: async (opts, timeoutMs) => {
+          seen.push({ tool: opts.tool, path: opts.path })
+          // Production default flows through: the queue owns the timeout.
+          expect(timeoutMs).toBe(30_000)
+          return { allowed: false, reason: 'User denied via approvals queue' }
+        }
+      }))
+
+      const { text, isError, target } = await callWriteFile()
+
+      expect(seen).toEqual([{ tool: 'vault.write_file', path: target }])
+      expect(isError).toBe(true)
+      expect(text).toBe('Denied: User denied via approvals queue')
     })
   })
 })

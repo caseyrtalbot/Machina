@@ -21,7 +21,8 @@ import { createMcpServer } from './mcp-server'
 import { PathGuard } from './path-guard'
 import { AuditLogger } from './audit-logger'
 import { VaultQueryFacade, type VaultQueryDeps } from './vault-query-facade'
-import { ElectronHitlGate, WriteRateLimiter, TimeoutHitlGate } from './hitl-gate'
+import { WriteRateLimiter, type HitlGate } from './hitl-gate'
+import { QueueHitlGate, type QueueGateBackend } from './queue-hitl-gate'
 import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
@@ -66,6 +67,39 @@ function isLocalHost(hostHeader: string): boolean {
   return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '[::1]'
 }
 
+/**
+ * Late-bound approval-queue provider (Phase 3 step 2, contracts §4 v1.3.1;
+ * the setGateHealthProbe pattern). MCP write confirms resolve through the
+ * queue — QueueHitlGate over the ApprovalQueue, replacing the
+ * TimeoutHitlGate(ElectronHitlGate) dialog. ipc/git.ts owns the queue
+ * singleton and wires this at registerGitIpc(), before any workspace
+ * onReady can reach createForVault; a direct import from here would drag
+ * the whole approvals IPC graph into every lifecycle consumer and test.
+ * Fail-closed: with no provider wired the gate denies — a broken wiring
+ * must degrade to denial, never to a divergent confirm surface.
+ */
+let approvalQueueProvider: (() => QueueGateBackend) | null = null
+
+export function setMcpApprovalQueueProvider(provider: () => QueueGateBackend): void {
+  approvalQueueProvider = provider
+}
+
+function buildGate(): HitlGate {
+  const provider = approvalQueueProvider
+  if (provider === null) {
+    return {
+      confirm: async () => ({
+        allowed: false,
+        // Marker-free reason: mcp-server prefixes 'Denied: ' once.
+        reason: 'Approval queue not wired'
+      })
+    }
+  }
+  // QueueHitlGate owns its timeout (30s auto-deny + remove, OQ-B fail-closed
+  // posture) — no TimeoutHitlGate wrapper on this path.
+  return new QueueHitlGate(provider())
+}
+
 export class McpLifecycle {
   private serverFactory: (() => McpServer) | null = null
   private vaultRoot: string | null = null
@@ -106,7 +140,7 @@ export class McpLifecycle {
     const guard = new PathGuard(vaultRoot)
     const logger = new AuditLogger(join(app.getPath('userData'), 'audit'))
     const facade = new VaultQueryFacade(guard, logger, vaultRoot, deps)
-    const gate = new TimeoutHitlGate(new ElectronHitlGate())
+    const gate = buildGate()
     const rateLimiter = new WriteRateLimiter()
 
     const dispatchCanvasPlan = (plan: CanvasMutationPlan, canvasPath: string): void => {

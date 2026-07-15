@@ -4,7 +4,7 @@
  * Exposes workspace content via twelve tools: vault.read_file, search.query,
  * graph.get_neighbors, graph.get_ghosts, project.map_folder, canvas.get_snapshot
  * (reads); vault.write_file, vault.create_file, canvas.apply_plan (writes gated
- * by ElectronHitlGate + WriteRateLimiter). The three vault.* tools are also
+ * by QueueHitlGate over the approval queue + WriteRateLimiter). The three vault.* tools are also
  * registered under workspace.* aliases (workstation step 1) — same handlers,
  * with the invoked name flowing into Spotlighting envelopes and gate prompts.
  * Read tools wrap content in Spotlighting trust markers. Write tools

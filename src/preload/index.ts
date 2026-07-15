@@ -256,6 +256,13 @@ const api = {
   // Appended at the api end per the parallel-session rule.
   breaker: {
     status: () => typedInvoke('agent:breaker-status')
+  },
+  // OS-notification landing (workstation contracts §4/§6 v1.3.1, Phase 3
+  // step 2). Appended at the api end per the parallel-session rule: a
+  // notification click focuses the window, then this event opens the tray.
+  notifications: {
+    onOpenTray: (callback: (data: Record<string, never>) => void) =>
+      typedOn('approvals:open-tray', callback)
   }
 }
 

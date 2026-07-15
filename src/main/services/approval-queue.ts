@@ -28,6 +28,7 @@ import type {
   PendingChange,
   PendingChangeFlags
 } from '@shared/git-types'
+import type { ApprovalsAddedItem } from '@shared/ipc-channels'
 import type { HitlConfirmOpts, HitlDecision } from './hitl-gate'
 
 /** Gate-confirm items auto-deny (and are removed) after this long with no answer. */
@@ -72,8 +73,14 @@ export interface ApprovalQueueDeps {
   readonly audit: { log(entry: AuditEntry): void }
   /** Workspace root resolution (WorkspaceService.current() at the IPC layer). */
   readonly getRoot: () => string | null
-  /** Fires on EVERY queue mutation with the pending count (→ approvals:changed). */
-  readonly notify: (pending: number) => void
+  /**
+   * Fires on EVERY queue mutation with the pending count and the item delta
+   * (→ approvals:changed, v1.3.1): `added` lists the items genuinely NEW
+   * since the previous mutation — empty on resolves, flag merges, and
+   * coalesces into an existing turn item — so notification surfaces fire
+   * once per new item, never on resolves.
+   */
+  readonly notify: (pending: number, added: readonly ApprovalsAddedItem[]) => void
   /**
    * Fires after every mutation with the serializable snapshot — cli-change
    * items ONLY (gate-confirm items hold live Promise waiters and are never
@@ -117,7 +124,22 @@ function dedupe(paths: readonly string[]): readonly string[] {
 
 interface GateWaiter {
   readonly resolve: (decision: HitlDecision) => void
-  readonly timer: ReturnType<typeof setTimeout>
+  /** null for externally-owned holds (enqueueGateHold): no auto-deny timer. */
+  readonly timer: ReturnType<typeof setTimeout> | null
+}
+
+/**
+ * A gate-confirm row mirroring an EXTERNAL hold (the native agent's pending
+ * tool approval, v1.3.1). Unlike enqueueGateConfirm there is no auto-deny
+ * timer: the hold's own surface bounds its life (user decision or run
+ * abort), and the mirror must never outlive or outrace it.
+ */
+export interface GateHoldOpts {
+  readonly tool: string
+  readonly path: string
+  readonly description: string
+  readonly contentPreview?: string
+  readonly threadId: string
 }
 
 export class ApprovalQueue {
@@ -133,6 +155,8 @@ export class ApprovalQueue {
   private readonly capturedRoots = new Map<string, string | null>()
   private readonly gateWaiters = new Map<string, GateWaiter>()
   private gateSeq = 0
+  /** Item ids as of the last notify — the baseline for the added-items delta. */
+  private lastNotifiedIds: ReadonlySet<string> = new Set()
 
   constructor(private readonly deps: ApprovalQueueDeps) {}
 
@@ -497,7 +521,9 @@ export class ApprovalQueue {
         if (this.items.delete(id)) this.notifyChanged()
         resolveDecision({
           allowed: false,
-          reason: `Denied: approval queue timeout (${timeoutMs}ms)`
+          // No 'Denied: ' prefix: reasons are marker-free ('User denied via
+          // approvals queue' convention) — mcp-server prefixes 'Denied: ' once.
+          reason: `Approval queue timeout (${timeoutMs}ms)`
         })
       }, timeoutMs)
       this.gateWaiters.set(id, { resolve: resolveDecision, timer })
@@ -505,6 +531,63 @@ export class ApprovalQueue {
       this.capturedRoots.set(id, root)
       this.notifyChanged()
     })
+  }
+
+  /**
+   * Mirror an external hold as a 'gate-confirm' row (v1.3.1, native mirror).
+   * Resolving from the tray invokes `onDecision` exactly once (the same
+   * waiter path as enqueueGateConfirm); the owning surface settling first
+   * calls removeGateHold instead. No timer: the hold's surface owns the
+   * lifecycle. Never serialized (kind 'gate-confirm', pinned invariant).
+   * Returns the queue item id.
+   */
+  enqueueGateHold(opts: GateHoldOpts, onDecision: (decision: HitlDecision) => void): string {
+    this.gateSeq += 1
+    const id = `gh_${this.gateSeq}`
+    const root = this.deps.getRoot()
+    const change: PendingChange = {
+      id,
+      kind: 'gate-confirm',
+      threadId: opts.threadId,
+      agentId: opts.tool,
+      paths: [opts.path],
+      diff: opts.contentPreview ?? '',
+      capturedAt: this.nowIso(),
+      revertible: false,
+      flags: NO_FLAGS,
+      description: opts.description,
+      capturedRoot: root
+    }
+    this.gateWaiters.set(id, { resolve: onDecision, timer: null })
+    this.items.set(id, change)
+    this.capturedRoots.set(id, root)
+    this.notifyChanged()
+    return id
+  }
+
+  /**
+   * Remove a mirrored hold whose decision landed on its OWNING surface (the
+   * native diff card, or a run abort) — single resolution authority: the row
+   * disappears without invoking the waiter, and one audit entry records that
+   * the resolution happened elsewhere. Resolving from the tray first makes
+   * this a no-op (the item is already gone). Returns whether a row was
+   * removed.
+   */
+  removeGateHold(id: string, accepted: boolean): boolean {
+    const item = this.items.get(id)
+    if (item === undefined || item.kind !== 'gate-confirm') return false
+    this.gateWaiters.delete(id)
+    this.items.delete(id)
+    this.capturedRoots.delete(id)
+    this.notifyChanged()
+    this.deps.audit.log({
+      ts: this.nowIso(),
+      tool: 'approvals:hold-released',
+      args: { id, resolvedOn: 'native-surface' },
+      affectedPaths: [...item.paths],
+      decision: accepted ? 'allowed' : 'denied'
+    })
+    return true
   }
 
   // -- Internal --
@@ -521,7 +604,7 @@ export class ApprovalQueue {
     this.capturedRoots.delete(id)
     this.notifyChanged()
     if (waiter !== undefined) {
-      clearTimeout(waiter.timer)
+      if (waiter.timer !== null) clearTimeout(waiter.timer)
       waiter.resolve({
         allowed: approve,
         reason: approve ? 'User approved via approvals queue' : 'User denied via approvals queue'
@@ -578,7 +661,23 @@ export class ApprovalQueue {
   }
 
   private notifyChanged(): void {
-    this.deps.notify(this.items.size)
+    // Item delta (v1.3.1): computed HERE, the single mutation choke point,
+    // so downstream notification surfaces cannot double-fire — an id already
+    // notified (a coalesced batch, a flag merge, a resolve) never reappears.
+    const added: ApprovalsAddedItem[] = []
+    for (const item of this.items.values()) {
+      if (this.lastNotifiedIds.has(item.id)) continue
+      added.push({
+        id: item.id,
+        kind: item.kind,
+        agentId: item.agentId,
+        threadId: item.threadId,
+        capturedRoot: item.capturedRoot ?? null,
+        pathCount: item.paths.length
+      })
+    }
+    this.lastNotifiedIds = new Set(this.items.keys())
+    this.deps.notify(this.items.size, added)
     // Disk mirror: cli-change items only — gate-confirm items are NEVER
     // serialized (live Promise waiters; a rehydrated confirm would be an
     // unanswerable zombie row). The queue owns this invariant; the

@@ -517,7 +517,12 @@ export interface IpcEvents {
 
   // Approval queue mutation (main -> renderer): pending item count for the
   // approvals tray badge. Fired on every queue change (contracts §6).
-  'approvals:changed': { pending: number }
+  // v1.3.1 (Phase 3 step 2): the payload carries the item delta — the items
+  // genuinely NEW since the last mutation — so notification surfaces fire
+  // once per new item, never on resolves. `added` is empty on every
+  // non-adding mutation (resolve, flag merge, coalesce into an existing turn
+  // item). See ApprovalsAddedItem at the end of this file.
+  'approvals:changed': { pending: number; added: readonly ApprovalsAddedItem[] }
 
   // Agent-write-watcher health transition (main -> renderer): drives the
   // tray warning badge/banner and thread-surface degraded chip (contracts
@@ -535,6 +540,12 @@ export interface IpcEvents {
   // containment) or 'notice' (concurrentTurns ambiguity; kill left manual).
   // Drives the tray notice row and the thread-header kill-switch chip.
   'agent:breaker-tripped': import('./agent-breaker-types').BreakerTripEvent
+
+  // OS-notification click-to-focus landing (main -> renderer, Phase 3
+  // step 2, contracts §4 v1.3.1): main focuses the window then fires this so
+  // the approvals tray popover opens — the click lands IN the tray, not just
+  // on the app. Appended at the list end per the parallel-session rule.
+  'approvals:open-tray': Record<string, never>
 }
 
 export type IpcChannel = keyof IpcChannels
@@ -543,3 +554,30 @@ export type IpcResponse<C extends IpcChannel> = IpcChannels[C]['response']
 
 export type IpcEvent = keyof IpcEvents
 export type IpcEventData<E extends IpcEvent> = IpcEvents[E]
+
+// ---------------------------------------------------------------------------
+// Phase 3 step 2 (contracts §4/§6 v1.3.1) — appended per the parallel-session
+// rule.
+// ---------------------------------------------------------------------------
+
+/**
+ * One genuinely-new approval item, carried on `approvals:changed` (the delta
+ * the main-side notifier consumes: added ids + agent/root labels). Computed
+ * at the queue's single mutation choke point so it fires once per new item,
+ * never on resolves.
+ */
+export interface ApprovalsAddedItem {
+  readonly id: string
+  readonly kind: 'cli-change' | 'gate-confirm'
+  readonly agentId: string
+  readonly threadId: string
+  /** Workspace root the item was captured against; null = none open. */
+  readonly capturedRoot: string | null
+  readonly pathCount: number
+  /**
+   * Reserved for the step-6 loop scheduler: loop-context items ALWAYS
+   * notify regardless of window focus (attention policy, contracts §4
+   * v1.3.1). Never set before step 6.
+   */
+  readonly loopContext?: boolean
+}

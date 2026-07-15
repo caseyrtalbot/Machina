@@ -115,7 +115,28 @@ describe('QueueHitlGate', () => {
 
     await expect(decision).resolves.toEqual({
       allowed: false,
-      reason: 'Denied: approval queue timeout (50ms)'
+      reason: 'Approval queue timeout (50ms)'
+    })
+    expect(h.queue.list()).toEqual([])
+  })
+
+  // ── MCP gate swap (Phase 3 step 2, contracts §4 v1.3.1) ──────────────────
+  // The production MCP path is QueueHitlGate over the ApprovalQueue
+  // (mcp-lifecycle buildGate) — no TimeoutHitlGate wrapper: the queue's own
+  // remove-on-timeout is the 30s fail-closed posture (OQ-B, decided).
+
+  it('pins the OQ-B posture: the default timeout is 30s, fail-closed', async () => {
+    vi.useFakeTimers()
+    expect(GATE_CONFIRM_TIMEOUT_MS).toBe(30_000)
+    const h = makeHarness()
+    const gate = new QueueHitlGate(h.queue) // production shape: no override
+    const decision = gate.confirm(OPTS)
+
+    vi.advanceTimersByTime(30_000)
+
+    await expect(decision).resolves.toEqual({
+      allowed: false,
+      reason: 'Approval queue timeout (30000ms)'
     })
     expect(h.queue.list()).toEqual([])
   })

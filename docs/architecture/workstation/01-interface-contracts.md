@@ -478,6 +478,53 @@ stale-diff recompute, exactly as before.
   minted — the existing `workspace:open` invoke suffices. Copy stays inside the §4
   framing: the writes are already on disk; nothing is phrased as blocked.
 
+### Notifications + converged confirm surfaces (Phase 3 step 2, v1.3.1)
+
+The "with notifications" half of the queue line, plus convergence of both non-CLI
+approval surfaces onto the queue — ONE review surface.
+
+- **Notification honesty rule** — the `ApprovalsTray.tsx:4-7` header rule extends to
+  every OS surface: notification copy never phrases the queue as write-blocking.
+  Queued cli-changes are "already on disk, awaiting your review"; gate confirms are
+  "awaiting confirmation" — never "blocked"/"prevented". Pinned by a copy-lint test
+  over every notifier string (`approvals-notifier.test.ts`).
+- **Attention policy (recorded product decision — do not re-litigate):**
+
+  | class                            | notifies                                                                                                       |
+  | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+  | interactive-session queue item   | only while the window is unfocused                                                                               |
+  | loop-context queue item          | ALWAYS (class reserved now; the signal arrives with the step-6 scheduler via `ApprovalsAddedItem.loopContext`)   |
+  | breaker trip                     | ALWAYS                                                                                                           |
+  | watcher-health `down` transition | ALWAYS (transitions only, not every failed retry in a down window)                                               |
+  | maxSpendUsd / disarm             | ALWAYS (reserved; events arrive steps 6–7)                                                                       |
+  | mirror-persist failure           | ALWAYS, once per failure streak (the step-1 "swallowed persist failures" residual, closed)                       |
+
+  The dock badge always reflects the pending count regardless of focus. Clicking a
+  notification focuses the window and opens the tray (`approvals:open-tray`).
+  Delivery is best-effort: a notification failure never fails the queue mutation or
+  health transition that triggered it.
+- **Delta notify** — `ApprovalQueueDeps.notify` fires with `(pending, added)`; the
+  added-items delta is computed at the queue's single mutation choke point
+  (`notifyChanged`), so notifications fire once per genuinely-new item and NEVER on
+  resolves, flag merges, or coalesces into an existing turn item. Rehydrated items
+  count as new to the app run (deliberate: a relaunch re-surfaces pending reviews).
+- **Converged-surface rule** — MCP write confirms and native-agent tool holds both
+  resolve THROUGH the queue; neither owns a divergent modal surface:
+  - MCP: `mcp-lifecycle` builds `QueueHitlGate` over the queue via the late-bound
+    `setMcpApprovalQueueProvider` seam (wired in `registerGitIpc`, the
+    setGateHealthProbe pattern), replacing `TimeoutHitlGate(ElectronHitlGate)`. The
+    gate keeps the 30s fail-closed remove-on-timeout (OQ-B, decided) — the queue owns
+    the timeout, no wrapper. Fail-closed floor: an unwired provider DENIES (pinned
+    test) — broken wiring degrades to denial, never to a divergent dialog.
+  - Native: `tool_pending_approval` holds mirror to gate-confirm rows
+    (`enqueueGateHold` — NO auto-deny timer; the hold's own surface bounds its life,
+    run abort included). **Single resolution authority:** the context.ts approvals
+    map — the resolver is deleted before it is invoked, so resolving from either
+    surface (tray row or chat diff card) lands exactly once (double-resolve pinned
+    in both orders); a hold settled on the native surface releases its row with one
+    `approvals:hold-released` audit entry. Mirror rows are gate-confirm kind: never
+    serialized (pinned invariant unchanged).
+
 ### Watcher health (Phase 2 step 2, v1.2.1)
 
 "Containment + visibility" with zero visibility into its own death is a
@@ -995,7 +1042,7 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'approvals:watcher-retry':  { request: void; response: GitOpResult }  // v1.2.1 — manual restart; resets the backoff cap
 'harness:lint':          { request: { slug: string }; response: Diagnostic[] } // v1.2.4 — on-demand re-lint; no workspace ⇒ [] (list semantics). harness:list summaries carry the same diagnostics (+ adapter widened to HarnessAdapter | null)
 // IpcEvents
-'approvals:changed':     { pending: number }
+'approvals:changed':     { pending: number; added: ApprovalsAddedItem[] } // v1.3.1 — item delta (added ids + agent/root labels), computed at the queue's mutation choke point; empty on resolves so notifiers fire once per genuinely-new item
 'approvals:watcher-health': WatcherHealth // v1.2.1 — health transitions (tray badge/banner, thread chip)
 'cli-thread:get-session': { request: { threadId: string }; response: { sessionId: string; live: boolean } | null } // v1.2.3 — pull mirror of the spawner binding (invoke, not an event; appended per the parallel-session rule)
 // IpcEvents (v1.2.3)
@@ -1004,6 +1051,8 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'agent:breaker-status':  { request: void; response: AgentBreakerStatus } // v1.2.6 — pull mirror of tripped breakers + signalsDegraded (tray notice rows, kill-switch chip)
 // IpcEvents (v1.2.6)
 'agent:breaker-tripped': BreakerTripEvent // v1.2.6 — trip broadcast: action 'killed' (containment applied) or 'notice' (concurrentTurns ambiguity, kill left manual)
+// IpcEvents (v1.3.1)
+'approvals:open-tray':   Record<string, never> // v1.3.1 — OS-notification click-to-focus landing: main focuses the window then fires this so the tray popover opens
 ```
 
 Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
@@ -1033,6 +1082,25 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.3.1 (2026-07-14, Phase 3 step 2 landed)** —
+  notifications + propose-surface convergence. §4 gains the "Notifications +
+  converged confirm surfaces" subsection: the notification honesty rule (the
+  `ApprovalsTray.tsx:4-7` header rule extended to OS surfaces, pinned by a copy-lint
+  test), the recorded attention-policy table (interactive queue items notify only
+  unfocused; loop-context [reserved for step 6 via `ApprovalsAddedItem.loopContext`],
+  breaker trips, watcher-down transitions, spend/disarm [reserved], and
+  mirror-persist failures ALWAYS notify; dock badge always tracks the pending count;
+  click focuses + opens the tray), and the converged-surface rule — MCP confirms ride
+  `QueueHitlGate` over the queue (late-bound `setMcpApprovalQueueProvider` seam, 30s
+  fail-closed kept per OQ-B, unwired-provider denies) and native
+  `tool_pending_approval` holds mirror to gate-confirm rows (`enqueueGateHold`, no
+  auto-deny timer; single resolution authority = the context.ts approvals map;
+  double-resolve pinned in both orders; `approvals:hold-released` audit on
+  native-side settlement; never serialized, invariant unchanged). §6:
+  `approvals:changed` payload gains the `added` item delta (computed at the queue's
+  single mutation choke point — empty on resolves); new `approvals:open-tray` event
+  (appended). The step-1 swallowed-mirror-persist-failure residual is closed via the
+  persistence-degraded notification class.
 - **v1.3.0 (2026-07-14, Phase 3 step 1 landed)** —
   the structural bump: §4 queue scope contract rewritten (new subsection; the v1.2.1
   restart-preserves-queue bullet reconciled in place — its "clear-on-init stays

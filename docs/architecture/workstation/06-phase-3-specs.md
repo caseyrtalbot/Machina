@@ -206,6 +206,70 @@ dropping an item loses convenience, never data).
 
 ## Step 2 — Notifications + propose-surface convergence: OS notifier, attention policy, MCP + native gate-confirms
 
+> **DONE** (2026-07-14, contracts v1.3.1). Landed as specced: delta notify at the
+> queue's single choke point — `ApprovalQueueDeps.notify` is now
+> `(pending, added)` with the added-items delta computed in `notifyChanged`, so
+> notifications fire once per genuinely-new item and never on resolves
+> (rehydrated items count as new to the app run, deliberate); new
+> `services/approvals-notifier.ts` (small, deps-injected, Electron-free tests)
+> carries the recorded attention-policy table — interactive unfocused-only;
+> loop-context ALWAYS (class reserved via `ApprovalsAddedItem.loopContext`,
+> signal arrives step 6); breaker trips, watcher-down transitions, spend/disarm
+> (reserved), and mirror-persist failures ALWAYS; dock badge always tracks the
+> pending count; notification click focuses the window and opens the tray via
+> the new appended `approvals:open-tray` event. Breaker-trip and
+> watcher-down-transition notifications wired. MCP convergence landed: the
+> write gate is `QueueHitlGate` over the approval queue with the 30s
+> fail-closed remove-on-timeout kept (OQ-B, decided) and the `TimeoutHitlGate`
+> wrapper dropped on that path. **Native mirror: the true single-authority path
+> was achieved** — `tool_pending_approval` holds mirror to `gh_` gate-confirm
+> rows (`enqueueGateHold`/`removeGateHold`, NO auto-deny timer; run abort
+> bounds the hold), the context.ts approvals map is the single resolution
+> authority (resolver deleted before invocation), double-resolve pinned in BOTH
+> orders, and a native-side settlement writes one `approvals:hold-released`
+> audit entry — the step-7 Tier-E table was NOT amended; native coverage is
+> claimed and tested. The step-1 mirror-persist-failure residual was TAKEN: the
+> persistence-degraded class notifies once per failure streak (a successful
+> persist re-arms it). Copy gate pinned by copy-lint tests over every notifier
+> string and the gate-confirm tray row. **Recorded deviations:** (a) the MCP
+> swap is late-bound (`setMcpApprovalQueueProvider`, wired in `registerGitIpc`,
+> the setGateHealthProbe pattern) instead of a direct `getApprovalQueue()`
+> import at `mcp-lifecycle.ts:109` — the direct import would drag the approvals
+> IPC graph into every lifecycle consumer and test; fail-closed floor pinned:
+> an unwired provider DENIES. (b) The breaker-notify tap landed beside the
+> existing `typedSend` in `ipc/cli-thread.ts` (the spec-named site; one import
+> + one call — outside the parallel work order's ownership list, zero collision
+> risk with step 3's renderer dock surfaces; flagged for the landing rebase).
+> (c) The tray footer gains one conditional sentence when gate-confirm rows are
+> present (the "already on disk" framing is untrue for pre-write confirms —
+> copy-gate traceable). (d) `mcp-server.ts:7` and `queue-hitl-gate.ts:11-12`
+> header comments named ElectronHitlGate and claimed the gate was "deliberately
+> NOT wired over the MCP TimeoutHitlGate in production" — both false once this
+> step made that wiring production reality; neither file owned this step, so
+> both one-line headers were corrected here at landing (not left as doc drift).
+> **Review fix pass (2026-07-14, same worktree):**
+> `tests/main/approval-queue.test.ts` split at the 800-line ceiling into core
+> behaviors (584 lines) + `approval-queue-scope.test.ts` (644 — v1.3.0
+> scope/persistence, real-git integration, v1.3.1 delta/holds) + shared
+> `approval-queue-harness.ts` (134); the deny-reason stutter fixed from the
+> owned side — queue/lifecycle gate reasons are now marker-free (`Approval
+> queue timeout (30000ms)` / `Approval queue not wired`) so `mcp-server.ts`
+> (untouched) adds its `Denied: ` prefix exactly once, five pinned assertions
+> updated; the ApprovalsTray open-tray test now restores the `window.api`
+> stub it installs. **Evidence (post-fix-pass):** `npm run check` green — 317
+> test files, 3850 tests, 0 failures (+40 tests over step 1's 3810); `npm run
+> build` green (electron-vite, 6.7s renderer bundle); targeted e2e
+> `e2e/mcp-gate-confirm.spec.ts` green (31.0s — an external MCP client's
+> vault.write_file confirm appears as a tray gate-confirm ROW, fails closed at
+> the 30s queue timeout with `Denied: Approval queue timeout (30000ms)`, the
+> row is removed, the file is untouched); full e2e suite deferred to landing
+> per the work order. **Casey-observed acceptance PENDING (that day):** with
+> the app unfocused, an agent write fires an OS notification + dock badge and
+> clicking it lands in the tray; an MCP write confirm shows as a tray row and
+> fails closed at 30s if ignored. **OQ8 ratification pending** (as of kickoff
+> 2026-07-14): the cross-root tray note + per-thread manual kill are NOT
+> implemented this step.
+
 **Goal.** The "with notifications" half of PLAN's queue line, plus convergence of both
 non-CLI approval surfaces onto the queue so there is one review surface: MCP confirms
 (QueueHitlGate swap) and native-agent tool holds (the mirror — without it the step-7

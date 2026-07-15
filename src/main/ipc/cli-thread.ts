@@ -32,6 +32,7 @@ import {
 } from '../services/agent-circuit-breaker'
 import type { HarnessBudgets } from '@shared/harness-types'
 import { getCliAgentThreadBridge, getShellService } from './shell'
+import { getApprovalsNotifier } from '../services/approvals-notifier'
 
 let spawner: CliThreadSpawner | null = null
 
@@ -288,6 +289,9 @@ export function registerCliThreadIpc(): void {
   setBreakerEmit((event) => {
     const window = getMainWindow()
     if (window) typedSend(window, 'agent:breaker-tripped', event)
+    // Phase 3 step 2 (contracts §4 v1.3.1): breaker trips ALWAYS notify —
+    // safety attention class, never focus-suppressed.
+    getApprovalsNotifier().notifyBreakerTripped(event)
   })
 
   typedHandle('cli-thread:spawn', async ({ threadId, identity, cwd, agentId, model }) => {

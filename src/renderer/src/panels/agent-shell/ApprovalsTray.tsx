@@ -76,6 +76,16 @@ export function ApprovalsTray() {
     return () => window.removeEventListener(REVERT_AGENT_EVENT, onRevertRequest)
   }, [])
 
+  // OS-notification click-to-focus lands IN the tray (Phase 3 step 2,
+  // contracts §4 v1.3.1): main focuses the window then fires
+  // approvals:open-tray. Guarded like the store's module-level subscriptions
+  // so component tests without a preload bridge stay inert.
+  useEffect(() => {
+    const subscribe = window.api?.notifications?.onOpenTray
+    if (subscribe === undefined) return
+    return subscribe(() => setOpen(true))
+  }, [])
+
   // A stale request must not re-arm the confirm on the next manual open —
   // cleared render-side when the popover closes (CommandPalette's prevOpen
   // pattern; a setState-in-effect here is a cascading-render lint error).
@@ -318,6 +328,13 @@ export function ApprovalsTray() {
           >
             These changes are already on disk. Approve records them as a commit; Reject reverts
             files via git. Only writes inside the workspace root are tracked.
+            {items.some((item) => item.kind === 'gate-confirm') && (
+              <>
+                {' '}
+                Write confirms are the exception: the write waits for your decision — Approve allows
+                it, Reject denies it.
+              </>
+            )}
           </div>
         </div>
       )}
@@ -371,7 +388,12 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
         <span style={{ color: colors.text.primary }}>{item.agentId}</span>
         <span style={{ color: colors.text.muted }}>{item.threadId}</span>
         {item.kind === 'gate-confirm' && (
-          <span style={{ color: colors.text.muted }}>gate confirm</span>
+          // Converged surfaces (v1.3.1): MCP and native-agent write confirms
+          // ride this row — never a modal. Copy honesty: the write is
+          // awaiting confirmation, nothing is phrased as blocked.
+          <span data-testid="approval-gate-confirm" style={{ color: colors.text.muted }}>
+            write confirm
+          </span>
         )}
         {foreign && capturedRoot !== null && (
           <span
@@ -535,9 +557,11 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
             data-testid="approval-reject"
             disabled={rejectDisabled}
             title={
-              item.kind === 'cli-change' && !item.revertible
-                ? 'Not a git repository — nothing to revert from'
-                : 'Revert these files via git'
+              item.kind === 'gate-confirm'
+                ? 'Deny this write request'
+                : !item.revertible
+                  ? 'Not a git repository — nothing to revert from'
+                  : 'Revert these files via git'
             }
             onClick={() => onResolve(false)}
             style={actionButtonStyle(colors.claude.error, rejectDisabled)}
@@ -549,9 +573,11 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
             data-testid="approval-approve"
             disabled={busy}
             title={
-              item.revertible || item.kind === 'gate-confirm'
-                ? 'Record these changes as a commit'
-                : 'Acknowledge — non-repo workspace, no commit is possible'
+              item.kind === 'gate-confirm'
+                ? 'Allow this write to proceed'
+                : item.revertible
+                  ? 'Record these changes as a commit'
+                  : 'Acknowledge — non-repo workspace, no commit is possible'
             }
             onClick={() => onResolve(true)}
             style={actionButtonStyle(colors.claude.ready, busy)}

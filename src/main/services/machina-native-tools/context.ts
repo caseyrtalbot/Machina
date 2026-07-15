@@ -14,11 +14,29 @@ interface ApprovalDecision {
 
 const approvals = new Map<string, (decision: ApprovalDecision) => void>()
 
+/**
+ * Hold-settled seam (Phase 3 step 2, contracts §4 v1.3.1 native mirror).
+ * The approvals map above is the SINGLE resolution authority for native
+ * tool holds — a resolver exists exactly once and is deleted before it is
+ * invoked, so a decision lands exactly once no matter which surface (chat
+ * diff card, approvals tray, run abort) settles it. This listener fires
+ * AFTER a hold settles so the queue mirror can drop its gate-confirm row;
+ * it never resolves anything itself.
+ */
+let holdSettledListener: ((toolUseId: string, accepted: boolean) => void) | null = null
+
+export function setHoldSettledListener(
+  listener: ((toolUseId: string, accepted: boolean) => void) | null
+): void {
+  holdSettledListener = listener
+}
+
 export function decideApproval(toolUseId: string, accept: boolean, rejectReason?: string): void {
   const resolver = approvals.get(toolUseId)
   if (!resolver) return
   approvals.delete(toolUseId)
   resolver({ accept, rejectReason })
+  holdSettledListener?.(toolUseId, accept)
 }
 
 // Resolve any pending approval as rejected and drop it from the map. Call this
@@ -29,6 +47,7 @@ export function clearApproval(toolUseId: string, reason = 'run aborted'): void {
   if (!resolver) return
   approvals.delete(toolUseId)
   resolver({ accept: false, rejectReason: reason })
+  holdSettledListener?.(toolUseId, false)
 }
 
 export function awaitApproval(toolUseId: string): Promise<ApprovalDecision> {

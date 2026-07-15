@@ -38,7 +38,11 @@ import {
   status
 } from '../services/git-service'
 import { getDocumentManager } from './documents'
+import { getApprovalsNotifier } from '../services/approvals-notifier'
+import { setMcpApprovalQueueProvider } from '../services/mcp-lifecycle'
+import { setNativeHoldQueueProvider } from '../services/machina-native-agent'
 import type { GitOpResult, WatcherHealth, WatcherState } from '@shared/git-types'
+import type { ApprovalsAddedItem } from '@shared/ipc-channels'
 
 const NO_WORKSPACE: GitOpResult = { ok: false, reason: 'no-workspace' }
 /** A newer restart/switch owns the watcher; the caller's attempt is moot. */
@@ -48,9 +52,9 @@ function currentRoot(): string | null {
   return getWorkspaceService().current()?.root ?? null
 }
 
-function broadcastApprovalsChanged(pending: number): void {
+function broadcastApprovalsChanged(pending: number, added: readonly ApprovalsAddedItem[]): void {
   const window = getMainWindow()
-  if (window) typedSend(window, 'approvals:changed', { pending })
+  if (window) typedSend(window, 'approvals:changed', { pending, added })
 }
 
 let approvalQueue: ApprovalQueue | null = null
@@ -146,14 +150,23 @@ export function getApprovalQueue(): ApprovalQueue {
       },
       audit,
       getRoot: currentRoot,
-      notify: broadcastApprovalsChanged,
+      // v1.3.1: the delta notify tap sits BESIDE the persist wiring, never
+      // through it — renderer broadcast plus OS notifier (attention policy +
+      // dock badge), both fed from the queue's single choke point.
+      notify: (pending, added) => {
+        broadcastApprovalsChanged(pending, added)
+        getApprovalsNotifier().onQueueChanged(pending, added)
+      },
       // v1.3.0: mirror cli-change items to disk on every mutation so the
       // queue survives restarts. Fire-and-forget — a failed mirror write
       // must never fail a queue mutation; the next mutation retries.
+      // v1.3.1: failures are no longer swallowed silently (step-1 recorded
+      // residual) — the notifier surfaces one notice per failure streak.
       persist: (items) => {
         void getApprovalQueuePersistence()
           .persist(items)
-          .catch(() => undefined)
+          .then(() => getApprovalsNotifier().notePersistOk())
+          .catch(() => getApprovalsNotifier().notePersistFailure())
       }
     })
   }
@@ -275,7 +288,13 @@ function scheduleWatcherRetry(): void {
  * main/index.ts's init-failure catch.
  */
 export function markApprovalsWatcherDown(reason: string): void {
-  if (watcherDownSince === null) watcherDownSince = new Date().toISOString()
+  if (watcherDownSince === null) {
+    watcherDownSince = new Date().toISOString()
+    // v1.3.1 attention policy: the down TRANSITION always notifies — "gate
+    // went down" is exactly when the tray dot goes unseen. Repeated failed
+    // retries inside the same down window stay quiet.
+    getApprovalsNotifier().notifyWatcherDown(reason)
+  }
   setWatcherHealth('down', reason)
   scheduleWatcherRetry()
 }
@@ -505,4 +524,18 @@ export function registerGitIpc(): void {
   // pretending. Health is NEVER a trip input (a dead watcher must not kill
   // healthy agents). Same late-bound pattern as setGateHealthProbe.
   setBreakerSignalHealthProbe(() => watcherHealth.state === 'watching')
+
+  // MCP gate convergence (Phase 3 step 2, contracts §4 v1.3.1): MCP write
+  // confirms resolve through the queue (QueueHitlGate, 30s fail-closed —
+  // OQ-B). Late-bound provider, same pattern as the probes above: this
+  // module owns the ApprovalQueue singleton, and a direct import from
+  // mcp-lifecycle would drag the whole approvals IPC graph into every
+  // lifecycle consumer. Registration runs before any workspace onReady can
+  // reach createForVault.
+  setMcpApprovalQueueProvider(() => getApprovalQueue())
+
+  // Native-hold mirror (Phase 3 step 2, contracts §4 v1.3.1): the native
+  // agent's tool_pending_approval holds surface as queue gate-confirm rows.
+  // Same late-bound pattern; wired here because this module owns the queue.
+  setNativeHoldQueueProvider(() => getApprovalQueue())
 }

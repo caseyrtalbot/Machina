@@ -7,7 +7,13 @@ import { typedSend } from '../typed-ipc'
 import { getMainWindow } from '../window-registry'
 import { NATIVE_TOOLS } from '@shared/machina-native-tools'
 import { TE_DIR } from '@shared/constants'
-import { callTool, clearApproval } from './machina-native-tools'
+import { callTool, clearApproval, decideApproval } from './machina-native-tools'
+import { setHoldSettledListener } from './machina-native-tools/context'
+import {
+  mirrorNativeHold,
+  releaseNativeHold,
+  type HoldQueue
+} from './machina-native-tools/queue-mirror'
 import { getDocumentManager } from '../ipc/documents'
 import { AuditLogger } from './audit-logger'
 import { WriteRateLimiter } from './hitl-gate'
@@ -64,6 +70,26 @@ interface InflightRun {
 }
 
 const inflight = new Map<string, InflightRun>()
+
+/**
+ * Late-bound approval-queue provider (Phase 3 step 2, contracts §4 v1.3.1;
+ * the setGateHealthProbe pattern — ipc/git.ts owns the queue singleton and
+ * wires this at registerGitIpc(), before any run can start). Native
+ * tool_pending_approval holds mirror to queue gate-confirm rows so
+ * unattended/unfocused native ops reach the same tray + notification path;
+ * the hold-settled listener drops the row when the hold resolves on its own
+ * surface (chat diff card, run abort). Unwired (Electron-free unit tests):
+ * the chat diff card remains the only surface — never a lost decision.
+ */
+let holdQueueProvider: (() => HoldQueue) | null = null
+
+export function setNativeHoldQueueProvider(provider: () => HoldQueue): void {
+  holdQueueProvider = provider
+  setHoldSettledListener((toolUseId, accepted) => {
+    const current = holdQueueProvider
+    if (current !== null) releaseNativeHold(current(), toolUseId, accepted)
+  })
+}
 
 function emit(runId: string, threadId: string, body: AgentNativeEventBody): void {
   const window = getMainWindow()
@@ -215,8 +241,16 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
             vaultPath: opts.vaultPath,
             autoAccept: opts.autoAccept ?? false,
             toolUseId: tu.id,
-            emitPending: (toolUseId, preview) =>
-              emit(runId, opts.threadId, { kind: 'tool_pending_approval', toolUseId, ...preview }),
+            emitPending: (toolUseId, preview) => {
+              emit(runId, opts.threadId, { kind: 'tool_pending_approval', toolUseId, ...preview })
+              // v1.3.1 native mirror: the same hold, visible as a tray
+              // gate-confirm row. decideApproval is the single resolution
+              // authority for both surfaces (exactly-once by construction).
+              const provider = holdQueueProvider
+              if (provider !== null) {
+                mirrorNativeHold(provider(), toolUseId, opts.threadId, preview, decideApproval)
+              }
+            },
             dockTabsSnapshot: dockTabs,
             emitDockAction: (action) => {
               if (action.action === 'open') dockTabs = [...dockTabs, action.tab]

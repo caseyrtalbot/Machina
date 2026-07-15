@@ -324,6 +324,80 @@ describe('ApprovalsTray revert section (workstation step 5, contracts v1.2.5)', 
   })
 })
 
+describe('ApprovalsTray converged gate-confirm rows (Phase 3 step 2, v1.3.1)', () => {
+  it('renders a gate-confirm as a labeled row with honest confirm titles (never a modal)', () => {
+    seed([
+      makeItem({
+        id: 'gc_1',
+        kind: 'gate-confirm',
+        agentId: 'vault.write_file',
+        threadId: 'mcp-gate',
+        revertible: false,
+        description: 'Write to notes/idea.md'
+      })
+    ])
+    render(<ApprovalsTray />)
+    openTray()
+
+    expect(screen.getByTestId('approval-gate-confirm').textContent).toBe('write confirm')
+    expect(screen.getByTestId<HTMLButtonElement>('approval-approve').title).toBe(
+      'Allow this write to proceed'
+    )
+    expect(screen.getByTestId<HTMLButtonElement>('approval-reject').title).toBe(
+      'Deny this write request'
+    )
+  })
+
+  it('gate-confirm copy never claims the write is blocked or prevented', () => {
+    seed([
+      makeItem({
+        id: 'gc_1',
+        kind: 'gate-confirm',
+        agentId: 'write_note',
+        threadId: 'th-native',
+        revertible: false,
+        description: 'Native agent wants to create this note — awaiting your confirmation'
+      })
+    ])
+    render(<ApprovalsTray />)
+    openTray()
+
+    const row = screen.getByTestId('approval-item')
+    expect(row.textContent).not.toMatch(/\bblock(ed|ing|s)?\b|\bprevent(ed|ing|s)?\b/i)
+  })
+
+  it('approvals:open-tray (notification click) opens the popover', () => {
+    let openTrayCallback: ((data: Record<string, never>) => void) | null = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prevApi = (window as any).api
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api = {
+      notifications: {
+        onOpenTray: (callback: (data: Record<string, never>) => void) => {
+          openTrayCallback = callback
+          return () => {
+            openTrayCallback = null
+          }
+        }
+      }
+    }
+    try {
+      render(<ApprovalsTray />)
+      expect(screen.queryByTestId('approvals-popover')).toBeNull()
+
+      act(() => {
+        openTrayCallback?.({})
+      })
+
+      expect(screen.getByTestId('approvals-popover')).toBeTruthy()
+    } finally {
+      // Restore the bridge stub so it never leaks into later tests.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api = prevApi
+    }
+  })
+})
+
 describe('flagChips', () => {
   it('returns no chips for a revertible cli-change with no flags', () => {
     expect(flagChips(makeItem())).toEqual([])

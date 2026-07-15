@@ -148,6 +148,55 @@ running app.
    new sessions start here. Carries its own stale-claim ledger, safety-invariant gate
    ledger, exit-bar coverage map, and open questions OQ8 + OQ-A–E.
 
+## What Phase 3 step 2 changed under you (contracts v1.3.1)
+
+1. **The queue notify carries a delta.** `ApprovalQueueDeps.notify` is now
+   `(pending, added)` and the `approvals:changed` payload is
+   `{ pending, added }` — the added-items delta is computed at the queue's single
+   mutation choke point (`notifyChanged`), empty on resolves/flag-merges/coalesces.
+   Anything constructing an `ApprovalQueue` supplies the two-arg notify; renderer
+   listeners that only read `pending` are unaffected.
+2. **OS notifications + dock badge live in `services/approvals-notifier.ts`**, fed
+   from exactly four taps: the queue delta (beside the persist wiring in
+   `ipc/git.ts`, not through it), breaker trips (`ipc/cli-thread.ts`, beside the
+   existing `typedSend`), watcher-down TRANSITIONS (`markApprovalsWatcherDown`),
+   and mirror persist ok/failure (the step-1 swallowed-failure residual, closed —
+   one notice per failure streak). The attention policy is a recorded product
+   decision in contracts §4 — do not re-litigate; the loop-context class is
+   reserved (`ApprovalsAddedItem.loopContext`, never set before step 6). Delivery
+   is best-effort and access-safe: a notifier failure never fails the mutation.
+3. **MCP write confirms are tray rows, not dialogs.** `mcp-lifecycle` builds
+   `QueueHitlGate` over the queue via the late-bound `setMcpApprovalQueueProvider`
+   seam (wired in `registerGitIpc`; an unwired provider DENIES, pinned). 30s
+   fail-closed remove-on-timeout kept (OQ-B). `TimeoutHitlGate`/`ElectronHitlGate`
+   are production-orphaned on the MCP path (classes + tests remain).
+4. **Native holds mirror into the queue.** `tool_pending_approval` emits a `gh_`
+   gate-confirm row (`enqueueGateHold` — no auto-deny timer; `removeGateHold`
+   drops it when the hold settles native-side, one `approvals:hold-released`
+   audit). Single resolution authority is the context.ts approvals map
+   (`setHoldSettledListener` seam; `setNativeHoldQueueProvider` in
+   `machina-native-agent.ts`, wired from `registerGitIpc`). Double-resolve is
+   pinned in both orders; gate-confirms remain never-serialized.
+5. **Appended surfaces:** `approvals:open-tray` IpcEvent + `ApprovalsAddedItem`
+   (end of `ipc-channels.ts`), preload `notifications.onOpenTray`, and the tray's
+   open-on-notification-click subscription. Tray gate-confirm rows carry a
+   `write confirm` label, honest Approve/Reject titles, and a conditional footer
+   sentence (pre-write confirms are not "already on disk").
+6. **Pending:** Casey-observed acceptance (unfocused notification + badge → click
+   lands in tray; MCP confirm row failing closed at 30s) and OQ8 ratification
+   (cross-root tray note + per-thread manual kill NOT implemented). Evidence
+   (post review fix pass): check green — 317 files / 3850 tests (+40), build
+   green, targeted `e2e/mcp-gate-confirm.spec.ts` green (31.0s); full e2e runs
+   at landing.
+7. **Review fix pass (same day, before landing):** gate deny reasons are now
+   marker-free (`Approval queue timeout (30000ms)`, `Approval queue not wired`)
+   and `mcp-server.ts` (untouched) adds its `Denied: ` prefix exactly once, so
+   external MCP clients no longer see `Denied: Denied: …`; if you pin these
+   strings, pin the new form. `tests/main/approval-queue.test.ts` was split at
+   the 800-line ceiling into core + `approval-queue-scope.test.ts` (v1.3.0
+   scope/real-git + v1.3.1 delta/holds) with shared fakes in
+   `approval-queue-harness.ts`.
+
 ## What Phase 3 step 1 changed under you (`8f1323c`, contracts v1.3.0)
 
 1. **The approval queue is multi-root and durable.** `initApprovalsForRoot` no longer
