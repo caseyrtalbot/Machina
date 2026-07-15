@@ -134,9 +134,11 @@ graph TD
 > known skip INCLUDING the new `e2e/approvals-persistence.spec.ts` restart probe
 > (real claude turn → `pc_<turnId>` item → quit → relaunch → rehydrated +
 > resolvable → trailered commit); `npm audit --omit=dev` = the 1 known moderate
-> js-yaml advisory. **Casey-observed acceptance still pending:** switch workspaces
-> mid-review and watch queued items survive with root labels; a foreign-root item
-> offers the switch affordance instead of resolution.
+> js-yaml advisory. **Casey-observed acceptance PASSED (2026-07-15, live dev
+> app):** a cli-claude item captured in one workspace root survived the switch,
+> displayed its origin root, withheld Approve/Reject cross-root, and the
+> "Switch to <root> to resolve" affordance switched back and enabled resolution
+> (queue mirror + audit corroborate: `pc_t4-06d0ef18`, capturedRoot preserved).
 
 **Goal.** Make the queue genuinely global — items survive workspace switches and app
 restarts — **without weakening the workspace-root resolution invariant.** This is the
@@ -263,10 +265,12 @@ dropping an item loses convenience, never data).
 > vault.write_file confirm appears as a tray gate-confirm ROW, fails closed at
 > the 30s queue timeout with `Denied: Approval queue timeout (30000ms)`, the
 > row is removed, the file is untouched); full e2e suite deferred to landing
-> per the work order. **Casey-observed acceptance PENDING (that day):** with
-> the app unfocused, an agent write fires an OS notification + dock badge and
-> clicking it lands in the tray; an MCP write confirm shows as a tray row and
-> fails closed at 30s if ignored. **OQ8 ratification pending** (as of kickoff
+> per the work order. **Casey-observed acceptance PASSED (2026-07-14 evening,
+> live dev app):** with the app unfocused, an agent write fired the OS
+> notification + dock badge and the click landed in the tray; an external MCP
+> client's write confirm surfaced as a tray gate-confirm row (no modal) and
+> failed closed at the 30s timeout while observed (client-side deny at 30.01s
+> corroborates). **OQ8 ratification pending** (as of kickoff
 > 2026-07-14): the cross-root tray note + per-thread manual kill are NOT
 > implemented this step.
 
@@ -335,12 +339,11 @@ the attention policy is the mitigation; tune classes, never silence safety event
 
 ## Step 3 — Migration substrate hardening: tick-counter acceptance, dock-tab retirement, thread-store under 800
 
-> **LANDED — NOT DONE** (2026-07-14, contracts v1.3.2; Session B of the sanctioned
-> steps 2∥3 parallel pair — lands via rebase on the merged tree). Code-complete
-> and gate-green, but the DONE bar below is NOT met: it requires the
-> Casey-observed tick-counter run (that day), which is still PENDING — see the
-> end of this block. The step stays open, and exit bar 2's plain-terminal half
-> is NOT yet banked, until that observed run passes. Landed as specced: the
+> **DONE** (2026-07-14, contracts v1.3.2; Session B of the sanctioned
+> steps 2∥3 parallel pair — landed via rebase on the merged tree). The
+> Casey-observed tick-counter run PASSED live the same evening (see the end of
+> this block): the DONE bar is met, the OPEN Phase-1 step-4 acceptance is
+> CLOSED, and exit bar 2's plain-terminal half is banked. Landed as specced: the
 > `kind:'terminal'` DockTab variant + render case are deleted (dock-types union,
 > `DOCK_TAB_KINDS`, DockTabContent dispatch, DockTabBar label/tooltip cases, and
 > SurfaceDock's dock-tab agent-presence strip, which only terminal tabs could
@@ -391,11 +394,12 @@ the attention policy is the mitigation; tune classes, never silence safety event
 > ticks before the gap check because reconnect replay is at-least-once in
 > principle (duplication is impossible today with the inert queue). What the
 > automated check does NOT cover: pixels/visual layout, and the lived-usage
-> pacing of the run. **Casey-observed acceptance still PENDING** (closes the
-> OPEN Phase-1 step-4 acceptance): the tick-counter run watched live —
+> pacing of the run. **Casey-observed acceptance PASSED (2026-07-14 evening,
+> live dev app):** the tick-counter run watched live —
 > `while true; do echo tick $((i++)); sleep 0.2; done`, strip→canvas→strip,
-> consecutive ticks + live PTY — banks the plain-terminal half of exit bar 2
-> fresh, not inherited.
+> consecutive ticks + live PTY confirmed — the Phase-1 step-4 acceptance is
+> closed and the plain-terminal half of exit bar 2 is banked fresh, not
+> inherited.
 
 **Goal.** Retire the inherited hazards under exit bar 2 **before** agent-card work
 builds on them: (a) the Phase-1 step-4 tick-counter continuity acceptance — still OPEN

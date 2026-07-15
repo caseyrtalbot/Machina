@@ -96,17 +96,16 @@ read, findings fix, final full gate); all 6 blocker/major review findings fixed
 in-tree — including run-unique turn ids (`t<seq>-<runTag>`), a cross-cutting
 change every future step inherits. Full record: the step-1 DONE block in
 `06-phase-3-specs.md` (recorded deviations + 4 residual minors). Casey-observed
-acceptance pending: multi-root tray survival + foreign-root affordance on the
-running app.
+acceptance PASSED (2026-07-15, live dev app): multi-root tray survival + the
+foreign-root switch-to-resolve affordance confirmed on the running app.
 
 **Next work order for the incoming team(s):**
 
-- **Next = Phase 3 steps 2 ∥ 3** (the first sanctioned parallel pair): step 2
-  (notifications + propose-surface convergence, v1.3.1; Session A) and step 3
-  (migration substrate + tick-counter + dock-store extraction, v1.3.2; Session B).
-  **The work order with ownership boundaries, rebase discipline, and Casey gates is
-  `HANDOFF-PHASE3-STEPS-2-3.md`** — it deletes itself when the second step lands.
-  Step 3 must land before step 4 starts (the `thread-store.ts` collision).
+- **Steps 2 ∥ 3 LANDED (2026-07-14, `4f6213e` v1.3.1 + `d75a62c` v1.3.2), all
+  Casey gates PASSED (2026-07-14/15)**; the work order `HANDOFF-PHASE3-STEPS-2-3.md`
+  deleted itself at the second landing. **Next = step 4 (unattended turn
+  substrate)**, unblocked by step 3's landing; mind the queue-e2e overlap with
+  step 2's surfaces (spec parallel-session map).
 - **Casey answers wanted (recommendations are the defaults if unanswered):** OQ8
   ratification at kickoff (blocker-class now — loops + canvas cards multiply
   cross-root PTYs; step 6 carries a root fence as the interim), plus OQ-A through
@@ -114,6 +113,13 @@ running app.
 - Dependabot triage still open: `npm audit --omit=dev` reports 1 moderate production
   vuln (js-yaml via gray-matter); Phase 3 step 6 must take the scoped fix or record
   why not (spec cross-step rule).
+- Two live-app observations from the 2026-07-14/15 acceptance session (pre-existing,
+  deferred to the polish pass — verified NOT from the steps 2/3 diffs): (a) the
+  file-tree header's vault dropdown (`VaultSelector.tsx`) does not switch
+  workspaces; the working switch paths are the thread-sidebar button and the tray
+  affordance, both through `workspace.open()`; (b) with a coding repo open as the
+  workspace, the knowledge engine indexes `node_modules` (search surfaces dependency
+  READMEs) — needs an ignore-policy decision.
 - Untracked `.agents/skills/thought-engine-council/` at the repo root is Casey's —
   leave it alone, do not commit or delete it.
 
@@ -182,11 +188,10 @@ running app.
    (UI-driven strip→canvas→strip, gapless dedupe-checked ticks, exactly one webview
    per hop, same OS shell PID via lsof-by-cwd, live PTY after Ctrl+C). It shares the
    Electron user-data dir with the other e2e specs — run targeted or sequentially.
-5. **Casey-observed acceptance PENDING — step 3 is LANDED, not DONE:** the live
-   tick-counter run (strip→canvas→strip, consecutive ticks, same PTY) is the step's
-   binding DONE-bar item; until it passes, the step stays open, the OPEN Phase-1
-   step-4 acceptance stays open, and the plain-terminal half of exit bar 2 is not
-   banked.
+5. **Casey-observed acceptance PASSED (2026-07-14 evening) — step 3 is DONE:** the
+   live tick-counter run (strip→canvas→strip, consecutive ticks, same PTY) passed
+   watched live; the DONE bar is met, the OPEN Phase-1 step-4 acceptance is
+   closed, and the plain-terminal half of exit bar 2 is banked.
 6. **Out-of-ownership edits flagged for the landing rebase:** `dock-tools.ts`
    (forced deletion of the retired terminal case), `thread-md.test.ts` (fixture kind
    swap), `TerminalApp.tsx` + `terminal-app.test.ts` (the continuity fix). All
