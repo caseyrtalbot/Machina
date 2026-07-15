@@ -335,6 +335,68 @@ the attention policy is the mitigation; tune classes, never silence safety event
 
 ## Step 3 — Migration substrate hardening: tick-counter acceptance, dock-tab retirement, thread-store under 800
 
+> **LANDED — NOT DONE** (2026-07-14, contracts v1.3.2; Session B of the sanctioned
+> steps 2∥3 parallel pair — lands via rebase on the merged tree). Code-complete
+> and gate-green, but the DONE bar below is NOT met: it requires the
+> Casey-observed tick-counter run (that day), which is still PENDING — see the
+> end of this block. The step stays open, and exit bar 2's plain-terminal half
+> is NOT yet banked, until that observed run passes. Landed as specced: the
+> `kind:'terminal'` DockTab variant + render case are deleted (dock-types union,
+> `DOCK_TAB_KINDS`, DockTabContent dispatch, DockTabBar label/tooltip cases, and
+> SurfaceDock's dock-tab agent-presence strip, which only terminal tabs could
+> feed); recorded decision in contracts §3: strip = plain terminals, ThreadPanel's
+> agent surface = agent sessions. `store/dock-store.ts` extracted (tabs + active
+> index + dockCollapsed + toggleDock + the setActiveCanvas indirection +
+> validateThreadTabs + flushDockState): **`wc -l thread-store.ts` = 788** (< 800
+> hard gate, down from 1009, shrink-only), dock-store.ts = 303. Consumers
+> mechanically retargeted (SurfaceDock, DockTabBar, TitlebarBreadcrumb,
+> keybindings, palette-sources, SideDockRibbon, use-thread-streaming,
+> FilesDockAdapter, vault-persist, system-artifact-runtime, tool renderers, and
+> the graph/ghosts/health/sidebar/canvas one-liners); ApprovalsTray +
+> approvals-store untouched (Session A's files — zero retargets needed there).
+> **The risk clause fired: a real continuity regression was caught and fixed.**
+> The automated tick probe showed the canvas buffer starting at tick 7 with the
+> strip last showing tick 4 — TerminalApp's reconnect path erased the whole
+> viewport (ED2 + home) on the first live chunk, wiping every replayed
+> ring-buffer line still on screen. Fix: clear only the current line (CR + EL2)
+> so an idle shell's SIGWINCH prompt redraw cannot duplicate while all replayed
+> content survives (`TerminalApp.tsx` flushData; the source-pin test now FORBIDS
+> the viewport clear). pty-service deliberately untouched: the 8 MB
+> always-capturing ring buffer is the validated premise, and `connected` never
+> flips false so the reconnectQueue is inert (noted, not changed).
+> **Out-of-ownership collisions recorded for the landing rebase:**
+> `machina-native-tools/dock-tools.ts` (forced deletion of the retired terminal
+> case; runtime now rejects `kind:'terminal'` via the DOCK_TAB_KINDS check),
+> `thread-md.test.ts` + `tests/main/services/thread-md.test.ts` (fixture kind
+> swaps; thread-md decode stays transparent for legacy files — the dock-store
+> seed drops retired kinds instead, tested), `TerminalApp.tsx` +
+> `terminal-app.test.ts` (the continuity fix). **Tests:** variant retirement
+> pinned type-level (`@ts-expect-error` + DOCK_TAB_KINDS equality) and
+> render-dispatch level (all five remaining kinds mount their surface, never a
+> terminal adapter); thread-store dock tests migrated to dock-store
+> equivalent-or-stronger (identity dedupe, index shifting, multi-remove,
+> chat↔dock mirror both directions, focus-mode snapshot across the store
+> boundary, seed/drop/reset lifecycle, flush with strip fold-in, validation
+> under the workspace fence); detach-no-kill retained + a detach→attach
+> same-sessionId round-trip added; single-projection invariant unit-tested
+> (projection count never 0 mid-handover, destination attaches BEFORE source
+> detaches, exactly 1 after every op, stale re-migration mints nothing).
+> **Evidence (fresh runs on the final tree):** `npm run check` 316 files / 3839
+> tests green, 0 lint, 0 type errors; build green; targeted
+> `e2e/tick-continuity.spec.ts` 1 passed (4.4s): tick loop in a real strip PTY →
+> UI-driven strip→canvas→strip (context menu + card action) → unique tick
+> numbers gapless across both hops, reaching back past each boundary → exactly
+> one `<webview>` mounted per hop → identical OS shell PID throughout
+> (lsof-by-cwd) → Ctrl+C + echo answered by the same PTY. The probe dedupes
+> ticks before the gap check because reconnect replay is at-least-once in
+> principle (duplication is impossible today with the inert queue). What the
+> automated check does NOT cover: pixels/visual layout, and the lived-usage
+> pacing of the run. **Casey-observed acceptance still PENDING** (closes the
+> OPEN Phase-1 step-4 acceptance): the tick-counter run watched live —
+> `while true; do echo tick $((i++)); sleep 0.2; done`, strip→canvas→strip,
+> consecutive ticks + live PTY — banks the plain-terminal half of exit bar 2
+> fresh, not inherited.
+
 **Goal.** Retire the inherited hazards under exit bar 2 **before** agent-card work
 builds on them: (a) the Phase-1 step-4 tick-counter continuity acceptance — still OPEN
 and verbatim Phase 3's exit bar — is inherited unverified; (b) the wired-but-never-

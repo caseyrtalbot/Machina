@@ -19,6 +19,7 @@ import {
 import type { DockTab } from '@shared/dock-types'
 import { borderRadius, colors, transitions } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
 import { openStripTerminal } from './terminal-migration'
@@ -38,9 +39,9 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
   const activeThread = useThreadStore((s) =>
     s.activeThreadId ? (s.threadsById[s.activeThreadId] ?? null) : null
   )
-  const dockCollapsed = useThreadStore((s) => s.dockCollapsed)
-  const toggleDock = useThreadStore((s) => s.toggleDock)
-  const openOrFocusDockTab = useThreadStore((s) => s.openOrFocusDockTab)
+  const dockCollapsed = useDockStore((s) => s.dockCollapsed)
+  const toggleDock = useDockStore((s) => s.toggleDock)
+  const openOrFocusDockTab = useDockStore((s) => s.openOrFocusDockTab)
   const toggleAutoAccept = useThreadStore((s) => s.toggleAutoAccept)
   const cancelActive = useThreadStore((s) => s.cancelActive)
   const inFlight = useThreadStore((s) =>

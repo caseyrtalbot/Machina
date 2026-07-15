@@ -132,7 +132,15 @@ export function TerminalApp() {
         if (firstDataRef.current) {
           firstDataRef.current = false
           if (reconnectRef.current) {
-            term.write('\x1b[2J\x1b[H')
+            // Reconnect: the ring-buffer scrollback was already replayed into
+            // this terminal. The old whole-viewport erase (ED2 + cursor home)
+            // wiped every replayed line still on screen — the migration
+            // continuity regression caught by e2e/tick-continuity.spec.ts
+            // (Phase 3 step 3). Clear only the current line so an idle
+            // shell's SIGWINCH prompt redraw lands on the replayed prompt
+            // line instead of duplicating it; all content above survives the
+            // surface change.
+            term.write('\r\x1b[2K')
           } else {
             term.reset()
           }

@@ -146,6 +146,22 @@ describe('detach', () => {
   it('returns null for unknown tabIds', () => {
     expect(useTerminalStripStore.getState().detach(THREAD, 'nope')).toBeNull()
   })
+
+  it('detach→attach round-trip preserves the same sessionId with zero kills (migration seam, Phase 3 step 3)', () => {
+    const tabId = useTerminalStripStore.getState().spawn(THREAD, '/proj')
+    useTerminalStripStore.getState().bindSession(THREAD, tabId, 'live-rt')
+
+    const detached = useTerminalStripStore.getState().detach(THREAD, tabId)
+    expect(detached?.sessionId).toBe('live-rt')
+    const newTabId = useTerminalStripStore
+      .getState()
+      .attach(THREAD, { sessionId: detached!.sessionId, cwd: detached!.cwd })
+
+    expect(stripOf(THREAD)?.sessions).toEqual([
+      { tabId: newTabId, sessionId: 'live-rt', cwd: '/proj' }
+    ])
+    expect(killMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('attach', () => {

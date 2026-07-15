@@ -8,9 +8,6 @@ const LazyCanvasView = lazy(() =>
 const LazyEditorAdapter = lazy(() =>
   import('./dock-adapters/EditorDockAdapter').then((m) => ({ default: m.EditorDockAdapter }))
 )
-const LazyTerminalAdapter = lazy(() =>
-  import('./dock-adapters/TerminalDockAdapter').then((m) => ({ default: m.TerminalDockAdapter }))
-)
 const LazyGraph = lazy(() =>
   import('../graph/GraphViewShell').then((m) => ({ default: m.GraphViewShell }))
 )
@@ -50,8 +47,6 @@ function renderTab(tab: DockTab) {
       return <LazyCanvasView canvasId={tab.id} />
     case 'editor':
       return <LazyEditorAdapter initialPath={tab.path} />
-    case 'terminal':
-      return <LazyTerminalAdapter sessionId={tab.sessionId} />
     case 'graph':
       return <LazyGraph />
     case 'ghosts':

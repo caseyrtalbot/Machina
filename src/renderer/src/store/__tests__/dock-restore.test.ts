@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useThreadStore } from '../thread-store'
+import { useDockStore } from '../dock-store'
 import type { Thread } from '@shared/thread-types'
 
 const sampleThread = (id: string, tabs: Thread['dockState']['tabs']): Thread => ({
@@ -15,6 +16,7 @@ const sampleThread = (id: string, tabs: Thread['dockState']['tabs']): Thread => 
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(window as any).api = {
     thread: {
@@ -38,12 +40,10 @@ beforeEach(() => {
 describe('dock restore', () => {
   it('selectThread leaves dock tabs from the thread in place', async () => {
     useThreadStore.getState().setVaultPath('/v')
-    useThreadStore.setState({
-      threadsById: { a: sampleThread('a', [{ kind: 'graph' }]) },
-      dockTabsByThreadId: { a: [{ kind: 'graph' }] }
-    })
+    useThreadStore.setState({ threadsById: { a: sampleThread('a', [{ kind: 'graph' }]) } })
+    useDockStore.setState({ dockTabsByThreadId: { a: [{ kind: 'graph' }] } })
     await useThreadStore.getState().selectThread('a')
-    expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
+    expect(useDockStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
     expect(useThreadStore.getState().activeThreadId).toBe('a')
   })
 
@@ -53,22 +53,38 @@ describe('dock restore', () => {
       threadsById: {
         a: sampleThread('a', [{ kind: 'graph' }]),
         b: sampleThread('b', [{ kind: 'editor', path: '/v/note.md' }, { kind: 'health' }])
-      },
+      }
+    })
+    useDockStore.setState({
       dockTabsByThreadId: {
         a: [{ kind: 'graph' }],
         b: [{ kind: 'editor', path: '/v/note.md' }, { kind: 'health' }]
       }
     })
     await useThreadStore.getState().selectThread('b')
-    expect(useThreadStore.getState().dockTabsByThreadId['b']).toEqual([
+    expect(useDockStore.getState().dockTabsByThreadId['b']).toEqual([
       { kind: 'editor', path: '/v/note.md' },
       { kind: 'health' }
     ])
     await useThreadStore.getState().selectThread('a')
-    expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
-    expect(useThreadStore.getState().dockTabsByThreadId['b']).toEqual([
+    expect(useDockStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
+    expect(useDockStore.getState().dockTabsByThreadId['b']).toEqual([
       { kind: 'editor', path: '/v/note.md' },
       { kind: 'health' }
     ])
+  })
+
+  it('selectThread drops tabs whose backing resources are gone (validation path)', async () => {
+    useThreadStore.getState().setVaultPath('/v')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.fs.fileExists = vi.fn(async (p: string) => !p.includes('gone'))
+    useThreadStore.setState({ threadsById: { a: sampleThread('a', []) } })
+    useDockStore.setState({
+      dockTabsByThreadId: {
+        a: [{ kind: 'editor', path: '/v/gone.md' }, { kind: 'graph' }]
+      }
+    })
+    await useThreadStore.getState().selectThread('a')
+    expect(useDockStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
   })
 })

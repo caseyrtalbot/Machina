@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useEditorStore, createUntitledNote } from '../../store/editor-store'
 import { useUiStore } from '../../store/ui-store'
@@ -123,14 +124,14 @@ export function useAgentShellKeybindings(opts: AgentShellKeybindingOptions): voi
         }
       } else if (key === 'w') {
         e.preventDefault()
-        const state = useThreadStore.getState()
-        const tid = state.activeThreadId
+        const tid = useThreadStore.getState().activeThreadId
         if (!tid) return
-        const tabs = state.dockTabsByThreadId[tid] ?? []
+        const dock = useDockStore.getState()
+        const tabs = dock.dockTabsByThreadId[tid] ?? []
         if (tabs.length === 0) return
-        const stored = state.dockActiveIndexByThreadId[tid] ?? 0
+        const stored = dock.dockActiveIndexByThreadId[tid] ?? 0
         const target = Math.min(Math.max(0, stored), tabs.length - 1)
-        state.removeDockTab(target)
+        dock.removeDockTab(target)
       } else if (/^[1-9]$/.test(e.key)) {
         e.preventDefault()
         const n = Number(e.key)

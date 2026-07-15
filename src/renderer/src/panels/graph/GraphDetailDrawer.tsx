@@ -3,7 +3,7 @@ import { useVaultStore } from '@renderer/store/vault-store'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useEditorStore } from '@renderer/store/editor-store'
 import { useUiStore } from '@renderer/store/ui-store'
-import { useThreadStore } from '@renderer/store/thread-store'
+import { useDockStore } from '@renderer/store/dock-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import {
   borderRadius,
@@ -120,14 +120,14 @@ export function GraphDetailDrawer() {
   const handleOpenInEditor = () => {
     if (!artifact || !filePath) return
     useEditorStore.getState().setActiveNote(filePath)
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: filePath })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: filePath })
   }
 
   const handleNavigateBacklink = (id: string) => {
     const path = artifactPathById[id]
     if (path) {
       useEditorStore.getState().setActiveNote(path)
-      useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path })
+      useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path })
     }
   }
 

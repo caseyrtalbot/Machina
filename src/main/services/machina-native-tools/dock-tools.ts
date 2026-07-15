@@ -12,11 +12,6 @@ function buildDockTab(input: Record<string, unknown>): DockTab | { error: string
       return { kind: 'canvas', id: typeof input.canvasId === 'string' ? input.canvasId : 'default' }
     case 'editor':
       return { kind: 'editor', path: typeof input.path === 'string' ? input.path : '' }
-    case 'terminal':
-      return {
-        kind: 'terminal',
-        sessionId: typeof input.sessionId === 'string' ? input.sessionId : ''
-      }
     default:
       return { kind: kind as 'graph' | 'ghosts' | 'health' }
   }

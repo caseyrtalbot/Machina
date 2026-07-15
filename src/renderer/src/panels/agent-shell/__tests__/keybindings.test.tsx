@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useAgentShellKeybindings } from '../keybindings'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { useUiStore } from '../../../store/ui-store'
@@ -183,11 +184,11 @@ describe('useAgentShellKeybindings — panel toggles', () => {
       vaultPath: '/vault',
       sidebarCollapsed: false,
       chatCollapsed: false,
-      dockCollapsed: false,
       filesPanelOpen: false,
       focusMode: false,
       focusSnapshot: null
     })
+    useDockStore.setState({ dockCollapsed: false })
     // persistLayout fires on toggles; stub the config IPC it reads/writes.
     // @ts-expect-error test stub
     window.api.thread = {

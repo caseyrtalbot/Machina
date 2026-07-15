@@ -4,7 +4,8 @@ import { flushCanvasSave } from './canvas-autosave'
 import { useVaultStore } from './vault-store'
 import { flushPendingSave, useEditorStore } from './editor-store'
 import { rehydrateUiStore, useUiStore } from './ui-store'
-import { flushDockState, useThreadStore } from './thread-store'
+import { useThreadStore } from './thread-store'
+import { flushDockState } from './dock-store'
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 

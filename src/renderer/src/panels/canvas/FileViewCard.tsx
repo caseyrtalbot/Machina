@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view'
 import matter from 'gray-matter'
 import { useCanvasStore } from '../../store/canvas-store'
 import { useEditorStore } from '../../store/editor-store'
-import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { CardShell } from './CardShell'
 import { borderRadius, colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
@@ -256,7 +256,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   // Double-click: open in editor
   const handleDoubleClick = useCallback(() => {
     useEditorStore.getState().openTab(filePath, filename)
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: filePath })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: filePath })
   }, [filePath, filename])
 
   const openInEditor = useCallback(() => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { useThreadStreaming } from '../../hooks/use-thread-streaming'
 import { PanelLeft, MessageSquare } from 'lucide-react'
 import { ThreadSidebar } from './ThreadSidebar'
@@ -36,8 +37,8 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   const setVaultPath = useThreadStore((s) => s.setVaultPath)
   const loadThreads = useThreadStore((s) => s.loadThreads)
   const loadLayout = useThreadStore((s) => s.loadLayout)
-  const toggleDock = useThreadStore((s) => s.toggleDock)
-  const dockCollapsed = useThreadStore((s) => s.dockCollapsed)
+  const toggleDock = useDockStore((s) => s.toggleDock)
+  const dockCollapsed = useDockStore((s) => s.dockCollapsed)
   const sidebarWidth = useThreadStore((s) => s.sidebarWidth)
   const chatWidth = useThreadStore((s) => s.chatWidth)
   const sidebarCollapsed = useThreadStore((s) => s.sidebarCollapsed)

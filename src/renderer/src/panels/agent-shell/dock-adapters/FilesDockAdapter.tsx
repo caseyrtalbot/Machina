@@ -12,6 +12,7 @@ import { useSidebarFilterStore } from '../../../store/sidebar-filter-store'
 import { useSidebarSelectionStore } from '../../../store/sidebar-selection-store'
 import { filterSidebarFiles } from './sidebar-filtering'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { useUiStore } from '../../../store/ui-store'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from '../../../hooks/useCanvasAwareness'
 import { useAgentStates } from '../../../hooks/use-agent-states'
@@ -389,12 +390,12 @@ export function FilesDockAdapter({ onOpenSettings }: FilesDockAdapterProps = {})
           const current = useVaultStore.getState().files
           useVaultStore.getState().setFiles(current.filter((f) => f.path !== action.path))
           // Drop a stale Editor dock tab for this path on the active thread.
-          const thread = useThreadStore.getState()
-          const threadId = thread.activeThreadId
+          const threadId = useThreadStore.getState().activeThreadId
           if (threadId) {
-            const tabs = thread.dockTabsByThreadId[threadId] ?? []
+            const dock = useDockStore.getState()
+            const tabs = dock.dockTabsByThreadId[threadId] ?? []
             const idx = tabs.findIndex((t) => t.kind === 'editor' && t.path === action.path)
-            if (idx >= 0) thread.removeDockTab(idx)
+            if (idx >= 0) dock.removeDockTab(idx)
           }
           break
         }

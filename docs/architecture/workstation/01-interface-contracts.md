@@ -309,6 +309,33 @@ only after the first block and goes stale on respawn (the two-sources bug the st
 closes). The raw projection reattaches via the existing `terminal:reconnect` seam,
 reattach-ONLY: see the §4 dead-PTY no-respawn contract point.
 
+**Status 2026-07-14 (Phase 3 step 3, v1.3.2):** HARDENED — two decisions recorded:
+
+- **Dock-surface decision — the `kind:'terminal'` DockTab is RETIRED** (variant +
+  render case deleted; `DOCK_TAB_KINDS` no longer admits it, so the native
+  `open_dock_tab` tool rejects `kind:'terminal'` at runtime with its
+  kind-must-be-one-of error). The dock home for a plain terminal is the terminal
+  strip; for an agent session it is ThreadPanel's agent surface. A dock tab never
+  hosts a terminal webview again — the variant was wired but never user-openable,
+  and a dock terminal tab leaked its PTY on close.
+- **Single-projection invariant:** at most ONE mounted webview per `sessionId`.
+  Migration is atomic at React-commit granularity: the migration seam
+  (`terminal-migration.ts`) mutates destination-then-source in one synchronous
+  task (attach/addNode before detach/removeNode — the store-level projection
+  count never touches zero, so the PTY always has an owner to reconnect), and
+  `session-router.register` is last-writer-wins, so the single commit that
+  unmounts the old surface and mounts the new one leaves exactly one live input
+  path. A second steady-state projection would mean silent input contention — no
+  router multicast in Phase 3. Reconnect replay now genuinely preserves
+  scrollback: the terminal guest no longer erases the viewport on the first
+  post-reconnect chunk (it clears only the current line — the tick-continuity
+  fix; the guest source-pin test forbids reintroducing the viewport clear).
+- Renderer authority note: dock tab/layout state (tabs, active index,
+  dockCollapsed, the setActiveCanvas indirection, flushDockState) moved from
+  thread-store to `src/renderer/src/store/dock-store.ts` (thread-store back under
+  the 800-line cap; the two stores are import-cyclic with a no-top-level-reads
+  rule documented in the dock-store header).
+
 ## 4. Gate parity for CLI agents (the load-bearing contract) — v1.1, post adversarial pass
 
 CLI children write to disk directly (audit §3); in-process interception is impossible.
@@ -1082,6 +1109,19 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.3.2 (2026-07-14, Phase 3 step 3 landed; parallel pair with step 2's
+  v1.3.1)** — §3: the `kind:'terminal'` DockTab is retired with the dock-surface
+  decision recorded (strip = plain terminals, ThreadPanel's agent surface = agent
+  sessions; `DOCK_TAB_KINDS` rejects the kind at runtime for the native dock
+  tool), and the single-projection invariant is stated (at most one mounted
+  webview per sessionId; destination-before-source atomic handover in one
+  synchronous task; `session-router.register` last-writer-wins; no multicast in
+  Phase 3). Renderer dock tab/layout state extracted to
+  `src/renderer/src/store/dock-store.ts` (thread-store 788 lines, back under the
+  800 cap). Continuity fix in the terminal guest: reconnect no longer erases the
+  replayed ring-buffer viewport on first live data (current-line clear only) —
+  the tick-continuity e2e probe caught the old clear as real scrollback loss
+  during dock↔canvas migration. No new IPC (§6 unchanged).
 - **v1.3.1 (2026-07-14, Phase 3 step 2 landed)** —
   notifications + propose-surface convergence. §4 gains the "Notifications +
   converged confirm surfaces" subsection: the notification honesty rule (the

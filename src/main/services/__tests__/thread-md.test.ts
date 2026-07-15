@@ -209,7 +209,7 @@ describe('thread-md terminal strip persistence (workstation step 4)', () => {
 
   it('round-trips dockState.terminalStrip through encode -> decode', () => {
     const dockState = {
-      tabs: [{ kind: 'terminal' as const, sessionId: 'pty-abc' }, { kind: 'graph' as const }],
+      tabs: [{ kind: 'editor' as const, path: 'notes/a.md' }, { kind: 'graph' as const }],
       terminalStrip: strip
     }
     const decoded = decodeThread(encodeThread(baseThread({ dockState })))

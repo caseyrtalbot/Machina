@@ -3,7 +3,7 @@ import remarkGfm from 'remark-gfm'
 import type { ThreadMessage as TM } from '@shared/thread-types'
 import { resolveWikilinkTarget } from '@shared/engine/wikilink-resolver'
 import { useVaultStore } from '../../store/vault-store'
-import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
 import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { rehypeEmojiIcons } from '../../markdown/rehype-emoji-icons'
@@ -30,7 +30,7 @@ function openWikilink(target: string): void {
   const id = resolveWikilinkTarget(target, artifacts, artifactPathById)
   const path = id ? artifactPathById[id] : undefined
   if (path) {
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path })
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { colors, typography } from '../../../design/tokens'
-import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { ToolCardShell } from './ToolCardShell'
 
@@ -38,7 +38,7 @@ export function ListVaultCard({
   function openInEditor(rel: string) {
     const vault = useVaultStore.getState().vaultPath
     if (!vault) return
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: `${vault}/${rel}` })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: `${vault}/${rel}` })
   }
 
   return (

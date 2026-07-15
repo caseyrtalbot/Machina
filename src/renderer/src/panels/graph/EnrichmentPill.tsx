@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useThreadStore } from '@renderer/store/thread-store'
+import { useDockStore } from '@renderer/store/dock-store'
 import { useEnrichmentRunStore } from '@renderer/store/enrichment-run-store'
 import { floatingPanel, typography } from '@renderer/design/tokens'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
@@ -65,7 +66,7 @@ export function EnrichmentPill({ rawFileCount }: { readonly rawFileCount: number
         .createThread('machina-native', DEFAULT_NATIVE_MODEL, 'Enrich vault')
       // Keep the graph on screen in the new thread's dock so this pill keeps
       // reporting progress while write approvals land in the thread panel.
-      useThreadStore.getState().openOrFocusDockTab({ kind: 'graph' })
+      useDockStore.getState().openOrFocusDockTab({ kind: 'graph' })
       useEnrichmentRunStore.getState().bindThread(thread.id, targets.length)
       await useThreadStore.getState().appendUserMessage(buildEnrichmentPrompt(targets))
     } finally {

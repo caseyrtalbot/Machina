@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { SideDockRibbon } from '../SideDockRibbon'
 import type { Thread } from '@shared/thread-types'
 
@@ -17,12 +18,13 @@ const sampleThread = (id: string, agent: Thread['agent'] = 'machina-native'): Th
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
   useThreadStore.setState({
     vaultPath: '/v',
     activeThreadId: 'a',
-    threadsById: { a: sampleThread('a') },
-    dockTabsByThreadId: { a: [] }
+    threadsById: { a: sampleThread('a') }
   })
+  useDockStore.setState({ dockTabsByThreadId: { a: [] } })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(window as any).api = {
     thread: {
@@ -71,13 +73,13 @@ describe('SideDockRibbon', () => {
   })
 
   it('opens a surface tab and expands the dock if it was collapsed', () => {
-    useThreadStore.setState({ dockCollapsed: true })
+    useDockStore.setState({ dockCollapsed: true })
     render(<SideDockRibbon onOpenPalette={() => {}} />)
 
     fireEvent.click(screen.getByLabelText('Open graph'))
 
-    expect(useThreadStore.getState().dockCollapsed).toBe(false)
-    expect(useThreadStore.getState().dockTabsByThreadId.a).toEqual([{ kind: 'graph' }])
+    expect(useDockStore.getState().dockCollapsed).toBe(false)
+    expect(useDockStore.getState().dockTabsByThreadId.a).toEqual([{ kind: 'graph' }])
   })
 
   it('toggles auto-accept for native threads', async () => {

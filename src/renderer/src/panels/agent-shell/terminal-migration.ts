@@ -1,5 +1,6 @@
 import { createCanvasNode, type CanvasNode, type CanvasViewport } from '@shared/canvas-types'
 import { getActiveCanvasId, getCanvasStore } from '../../store/canvas-store'
+import { useDockStore } from '../../store/dock-store'
 import { useTerminalStripStore } from '../../store/terminal-strip-store'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -47,7 +48,7 @@ export function stripToCanvas(threadId: string, tabId: string): CanvasNode | nul
     metadata: { initialCwd: session.cwd }
   })
   store.getState().addNode(node)
-  useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
+  useDockStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
   strip.detach(threadId, tabId)
   return node
 }
@@ -74,11 +75,11 @@ export function canvasToStrip(node: CanvasNode): boolean {
  * expands a collapsed dock so the new session is visible.
  */
 export function openStripTerminal(cwd?: string): string | null {
-  const threads = useThreadStore.getState()
-  const threadId = threads.activeThreadId
+  const threadId = useThreadStore.getState().activeThreadId
   const root = cwd ?? useVaultStore.getState().vaultPath
   if (!threadId || !root) return null
-  if (threads.dockCollapsed) threads.toggleDock()
+  const dock = useDockStore.getState()
+  if (dock.dockCollapsed) dock.toggleDock()
   return useTerminalStripStore.getState().spawn(threadId, root)
 }
 
@@ -94,18 +95,18 @@ export async function openStripTerminalInFolder(): Promise<string | null> {
  * fully visible. No sessions → spawn one at the workspace root.
  */
 export function toggleTerminalStrip(): void {
-  const threads = useThreadStore.getState()
-  const threadId = threads.activeThreadId
+  const threadId = useThreadStore.getState().activeThreadId
   if (!threadId) return
   const strip = useTerminalStripStore.getState().byThreadId[threadId]
   if (!strip || strip.sessions.length === 0) {
     openStripTerminal()
     return
   }
-  if (threads.dockCollapsed) {
+  const dock = useDockStore.getState()
+  if (dock.dockCollapsed) {
     // Reveal intent: expand the dock, and only un-collapse the strip — never
     // flip an expanded strip to collapsed while bringing the dock back.
-    threads.toggleDock()
+    dock.toggleDock()
     if (strip.collapsed) useTerminalStripStore.getState().toggleCollapsed(threadId)
     return
   }

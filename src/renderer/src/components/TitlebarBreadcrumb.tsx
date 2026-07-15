@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useVaultStore } from '../store/vault-store'
 import { useThreadStore } from '../store/thread-store'
+import { useDockStore } from '../store/dock-store'
 import { formatModelLabel } from '@shared/format-model-label'
 import type { DockTab } from '@shared/dock-types'
 
@@ -35,12 +36,12 @@ export function TitlebarBreadcrumb() {
   const activeThread = useThreadStore((s) =>
     s.activeThreadId ? (s.threadsById[s.activeThreadId] ?? null) : null
   )
-  const activeDockTab = useThreadStore<DockTab | null>((s) => {
-    const id = s.activeThreadId
-    if (!id) return null
-    const tabs = s.dockTabsByThreadId[id] ?? []
+  const activeThreadId = useThreadStore((s) => s.activeThreadId)
+  const activeDockTab = useDockStore<DockTab | null>((s) => {
+    if (!activeThreadId) return null
+    const tabs = s.dockTabsByThreadId[activeThreadId] ?? []
     if (tabs.length === 0) return null
-    const idx = s.dockActiveIndexByThreadId[id] ?? 0
+    const idx = s.dockActiveIndexByThreadId[activeThreadId] ?? 0
     const safeIdx = idx < tabs.length ? idx : 0
     return tabs[safeIdx] ?? null
   })

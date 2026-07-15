@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, fireEvent, act, screen, within } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { SurfaceDock } from '../SurfaceDock'
 import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
@@ -25,12 +26,13 @@ const thread = (id: string): Thread => ({
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
   useThreadStore.setState({
     vaultPath: '/v',
     threadsById: { a: thread('a'), b: thread('b') },
-    dockTabsByThreadId: { a: tabsA, b: tabsB },
     activeThreadId: 'a'
   })
+  useDockStore.setState({ dockTabsByThreadId: { a: tabsA, b: tabsB } })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(window as any).api = {
     fs: { fileExists: () => Promise.resolve(true) },

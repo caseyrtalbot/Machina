@@ -148,6 +148,51 @@ running app.
    new sessions start here. Carries its own stale-claim ledger, safety-invariant gate
    ledger, exit-bar coverage map, and open questions OQ8 + OQ-A–E.
 
+## What Phase 3 step 3 changed under you (contracts v1.3.2)
+
+1. **Dock tab/layout state lives in `src/renderer/src/store/dock-store.ts` now.**
+   thread-store.ts is 788 lines (the < 800 hard gate) and stays SHRINK-ONLY per the
+   cross-step rule. `dockTabsByThreadId` / `dockActiveIndexByThreadId` /
+   `dockCollapsed`, every dock tab action, `toggleDock`, the setActiveCanvas
+   indirection, `validateThreadTabs`, and `flushDockState` moved; vault-persist
+   imports `flushDockState` from dock-store. The two stores import each other —
+   cycle-safe ONLY while no module top level reads the other's non-hoisted bindings
+   (rule documented in the dock-store header; `syncActiveCanvas` is a function
+   declaration on purpose). Read dock state from dock-store, thread identity from
+   thread-store; the chat↔dock never-both-collapsed mirror now spans the two.
+2. **The `kind:'terminal'` DockTab is gone** (union variant, `DOCK_TAB_KINDS`, render
+   dispatch, tab-bar labels). Plain terminals live in the strip; agent sessions in
+   ThreadPanel's agent surface (contracts §3 decision). The native `open_dock_tab`
+   tool rejects `kind:'terminal'` at runtime. SurfaceDock's dock-tab agent-presence
+   strip went with it — only terminal tabs could feed it.
+3. **Terminal reconnect keeps the replayed viewport.** TerminalApp's first-flush
+   whole-viewport erase wiped replayed ring-buffer lines still on screen — the
+   migration-continuity regression the automated tick probe caught. It now clears
+   only the current line; the guest source-pin test FORBIDS reintroducing a viewport
+   clear on the reconnect path. Known cosmetic edge (observation, not a regression):
+   if the ring-buffer replay ends mid-line and the FIRST live chunk is that same
+   line's continuation (a fast-emitting program, not an idle prompt redraw), the
+   current-line clear erases the replayed prefix and the continuation renders alone
+   at column 0. No scrollback above is lost, and any resulting tick gap would fail
+   the probe (it passed) — strictly better than the old full-viewport wipe.
+4. **The single-projection invariant is contract + test:** at most one mounted
+   webview per sessionId; the migration seam attaches the destination before
+   detaching the source in one synchronous task; `session-router.register` stays
+   last-writer-wins; no multicast in Phase 3. New probe: `e2e/tick-continuity.spec.ts`
+   (UI-driven strip→canvas→strip, gapless dedupe-checked ticks, exactly one webview
+   per hop, same OS shell PID via lsof-by-cwd, live PTY after Ctrl+C). It shares the
+   Electron user-data dir with the other e2e specs — run targeted or sequentially.
+5. **Casey-observed acceptance PENDING — step 3 is LANDED, not DONE:** the live
+   tick-counter run (strip→canvas→strip, consecutive ticks, same PTY) is the step's
+   binding DONE-bar item; until it passes, the step stays open, the OPEN Phase-1
+   step-4 acceptance stays open, and the plain-terminal half of exit bar 2 is not
+   banked.
+6. **Out-of-ownership edits flagged for the landing rebase:** `dock-tools.ts`
+   (forced deletion of the retired terminal case), `thread-md.test.ts` (fixture kind
+   swap), `TerminalApp.tsx` + `terminal-app.test.ts` (the continuity fix). All
+   minimal, type-forced or regression-forced; pty-service untouched (its
+   `reconnectQueue` is inert — `connected` never flips false — noted, not changed).
+
 ## What Phase 3 step 2 changed under you (contracts v1.3.1)
 
 1. **The queue notify carries a delta.** `ApprovalQueueDeps.notify` is now

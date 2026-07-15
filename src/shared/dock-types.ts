@@ -1,12 +1,15 @@
+// The `kind: 'terminal'` variant is RETIRED (workstation Phase 3 step 3,
+// contracts §3): the dock home for plain terminals is the terminal strip; for
+// agent sessions it is ThreadPanel's agent surface. It was wired but never
+// user-openable, and a dock terminal tab leaked its PTY on close.
 export type DockTab =
   | { kind: 'canvas'; id: string }
   | { kind: 'editor'; path: string }
-  | { kind: 'terminal'; sessionId: string }
   | { kind: 'graph' }
   | { kind: 'ghosts' }
   | { kind: 'health' }
 
-export const DOCK_TAB_KINDS = ['canvas', 'editor', 'terminal', 'graph', 'ghosts', 'health'] as const
+export const DOCK_TAB_KINDS = ['canvas', 'editor', 'graph', 'ghosts', 'health'] as const
 
 export type DockTabKind = (typeof DOCK_TAB_KINDS)[number]
 

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { ThreadMessage, ToolCall } from '@shared/thread-types'
 import { useThreadStore } from '../store/thread-store'
+import { useDockStore } from '../store/dock-store'
 import { AUTH_ERROR_BODY } from '../panels/agent-shell/ThreadMessage'
 
 export function useThreadStreaming(): void {
@@ -11,8 +12,8 @@ export function useThreadStreaming(): void {
   const finalize = useThreadStore((s) => s.finalizeAssistantMessage)
   const appendCliMessage = useThreadStore((s) => s.appendCliMessage)
   const setRunId = useThreadStore((s) => s.setRunId)
-  const addDockTab = useThreadStore((s) => s.addDockTab)
-  const removeDockTab = useThreadStore((s) => s.removeDockTab)
+  const addDockTab = useDockStore((s) => s.addDockTab)
+  const removeDockTab = useDockStore((s) => s.removeDockTab)
 
   useEffect(() => {
     const off = window.api.on.agentNativeEvent((evt) => {

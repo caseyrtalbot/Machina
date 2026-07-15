@@ -1,11 +1,10 @@
 import { useCallback, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { DockTabBar } from './DockTabBar'
 import { DockTabContent } from './DockTabContent'
 import { colors, typography } from '../../design/tokens'
 import { type DockTab } from '@shared/dock-types'
-import { useCliAgentPresence, type CLIAgentPresence } from '../../hooks/use-cli-agent-presence'
-import { CliAgentBadge } from '../../components/CliAgentBadge'
 import { TerminalStrip } from './TerminalStrip'
 
 const EMPTY_TABS: readonly DockTab[] = []
@@ -29,11 +28,10 @@ const DOCK_MIN_WIDTH = 240
 
 export function SurfaceDock() {
   const id = useThreadStore((s) => s.activeThreadId)
-  const tabs = useThreadStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
-  const collapsed = useThreadStore((s) => s.dockCollapsed)
-  const agentPresence = useCliAgentPresence()
-  const storedActiveIndex = useThreadStore((s) => (id ? (s.dockActiveIndexByThreadId[id] ?? 0) : 0))
-  const setStoreActive = useThreadStore((s) => s.setDockActiveIndex)
+  const tabs = useDockStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
+  const collapsed = useDockStore((s) => s.dockCollapsed)
+  const storedActiveIndex = useDockStore((s) => (id ? (s.dockActiveIndexByThreadId[id] ?? 0) : 0))
+  const setStoreActive = useDockStore((s) => s.setDockActiveIndex)
   // Track per-thread tab counts so a freshly-added tab (command palette,
   // ribbon, etc.) becomes active without a follow-up click. The user's last
   // active tab per thread lives in the store and survives thread switches.
@@ -79,16 +77,6 @@ export function SurfaceDock() {
     if (changed) setMountedIds(next)
   }
 
-  // Agent presence strip: terminal tabs whose sessions have a CLI agent
-  // (claude/codex/gemini) detected by CLIAgentSessionListener (item 3.12).
-  const terminalAgents: Array<{ tabIndex: number; sessionId: string; presence: CLIAgentPresence }> =
-    []
-  tabs.forEach((tab, tabIndex) => {
-    if (tab.kind !== 'terminal' || !tab.sessionId) return
-    const presence = agentPresence[tab.sessionId]
-    if (presence) terminalAgents.push({ tabIndex, sessionId: tab.sessionId, presence })
-  })
-
   if (collapsed) return <aside data-testid="dock-collapsed" style={{ width: 0 }} />
   return (
     <aside
@@ -103,38 +91,6 @@ export function SurfaceDock() {
       }}
     >
       <DockTabBar activeIndex={safeIndex} onActivate={onActivate} />
-      {terminalAgents.length > 0 ? (
-        <div
-          data-testid="dock-agent-presence"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            flexShrink: 0,
-            padding: '3px 8px',
-            overflowX: 'auto',
-            borderBottom: `1px solid ${colors.tab.border}`
-          }}
-        >
-          {terminalAgents.map(({ tabIndex, sessionId, presence }) => (
-            <button
-              key={sessionId}
-              type="button"
-              title={`Show terminal · ${sessionId.slice(0, 6)}`}
-              onClick={() => onActivate(tabIndex)}
-              style={{
-                display: 'inline-flex',
-                padding: 0,
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer'
-              }}
-            >
-              <CliAgentBadge presence={presence} />
-            </button>
-          ))}
-        </div>
-      ) : null}
       <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
         {active ? (
           tabs.map((tab) => {

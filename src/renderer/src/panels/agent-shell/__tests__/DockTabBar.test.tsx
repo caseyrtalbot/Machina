@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, screen, act } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { DockTabBar } from '../DockTabBar'
 import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
@@ -25,12 +26,13 @@ const thread = (id: string): Thread => ({
 beforeEach(() => {
   vi.useFakeTimers()
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
   useThreadStore.setState({
     vaultPath: '/v',
     threadsById: { a: thread('a') },
-    dockTabsByThreadId: { a: tabs.slice() },
     activeThreadId: 'a'
   })
+  useDockStore.setState({ dockTabsByThreadId: { a: tabs.slice() } })
 })
 
 afterEach(() => {
@@ -55,7 +57,7 @@ describe('DockTabBar context menu', () => {
     act(() => {
       vi.advanceTimersByTime(TAB_EXIT_FLUSH_MS)
     })
-    const remaining = useThreadStore.getState().dockTabsByThreadId['a']
+    const remaining = useDockStore.getState().dockTabsByThreadId['a']
     expect(remaining).toEqual([{ kind: 'ghosts' }])
   })
 
@@ -67,7 +69,7 @@ describe('DockTabBar context menu', () => {
     act(() => {
       vi.advanceTimersByTime(TAB_EXIT_FLUSH_MS)
     })
-    const remaining = useThreadStore.getState().dockTabsByThreadId['a']
+    const remaining = useDockStore.getState().dockTabsByThreadId['a']
     expect(remaining).toEqual([{ kind: 'graph' }])
   })
 })

@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useId } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useUiStore } from '../../store/ui-store'
-import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import type { GhostEntry } from '../../engine/ghost-index'
@@ -315,7 +315,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
   }, [ghost, emerge, isEmerging])
 
   const handleShowGraph = useCallback(() => {
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'graph' })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'graph' })
     useGraphViewStore.getState().setSelectedNode(ghost.id)
   }, [ghost.id])
 

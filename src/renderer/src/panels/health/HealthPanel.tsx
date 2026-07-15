@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useVaultStore } from '../../store/vault-store'
-import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { useEditorStore } from '../../store/editor-store'
 import { computeDerivedHealth } from '@shared/engine/vault-health'
 import type { HealthIssue } from '@shared/engine/vault-health'
@@ -202,7 +202,7 @@ function IssueRow({ issue }: { readonly issue: HealthIssue }) {
   const handleFileClick = useCallback(() => {
     if (!issue.filePath) return
     useEditorStore.getState().setActiveNote(issue.filePath)
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: issue.filePath })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: issue.filePath })
   }, [issue.filePath])
 
   const fileName = issue.filePath?.split('/').pop() ?? null

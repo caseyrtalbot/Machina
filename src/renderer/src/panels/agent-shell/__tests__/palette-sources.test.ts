@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { useEditorStore } from '../../../store/editor-store'
 import { buildPaletteItems, buildIndex, noteHitItems, searchPalette } from '../palette-sources'
@@ -29,6 +30,7 @@ const sampleThread = (id: string, title: string): Thread => ({
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
   useVaultStore.setState({
     files: [
       {
@@ -94,13 +96,14 @@ describe('palette-sources', () => {
   })
 
   it('selecting a file item adds an editor dock tab on the active thread', () => {
-    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    useThreadStore.setState({ activeThreadId: 'a' })
+    useDockStore.setState({ dockTabsByThreadId: { a: [] } })
     const close = vi.fn()
     const items = buildPaletteItems({ closePalette: close })
     const fileItem = items.find((i) => i.kind === 'file')
     expect(fileItem).toBeDefined()
     fileItem!.run()
-    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    const tabs = useDockStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/spark.md' })
   })
 
@@ -117,12 +120,13 @@ describe('palette-sources', () => {
 
   it('running a named canvas entry opens a per-id canvas dock tab', () => {
     useVaultStore.setState({ canvasIds: ['default', 'research'] })
-    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    useThreadStore.setState({ activeThreadId: 'a' })
+    useDockStore.setState({ dockTabsByThreadId: { a: [] } })
     const items = buildPaletteItems({ closePalette: () => {} })
     const named = items.find((i) => i.id === 'surface:canvas:research')
     expect(named).toBeDefined()
     named!.run()
-    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    const tabs = useDockStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'research' })
   })
 
@@ -156,7 +160,8 @@ describe('palette-sources', () => {
   })
 
   it('running a note item closes the palette and opens an editor dock tab', () => {
-    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    useThreadStore.setState({ activeThreadId: 'a' })
+    useDockStore.setState({ dockTabsByThreadId: { a: [] } })
     const close = vi.fn()
     const items = noteHitItems(
       [{ id: 'deep', title: 'Deep Note', path: '/v/notes/deep.md', snippet: 's', score: 1 }],
@@ -165,18 +170,19 @@ describe('palette-sources', () => {
     )
     items[0].run()
     expect(close).toHaveBeenCalled()
-    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    const tabs = useDockStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/deep.md' })
   })
 
   it('opening the canvas surface routes the dock tab to the default canvas', () => {
     useVaultStore.setState({ canvasIds: ['default', 'research'] })
-    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    useThreadStore.setState({ activeThreadId: 'a' })
+    useDockStore.setState({ dockTabsByThreadId: { a: [] } })
     const items = buildPaletteItems({ closePalette: () => {} })
     const canvas = items.find((i) => i.id === 'surface:canvas:default')
     expect(canvas).toBeDefined()
     canvas!.run()
-    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    const tabs = useDockStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'canvas', id: 'default' })
   })
 })
@@ -244,7 +250,8 @@ describe('palette-sources — step 4 terminal + editor actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useEditorStore.setState(useEditorStore.getInitialState())
-    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
+    useThreadStore.setState({ activeThreadId: 'a' })
+    useDockStore.setState({ dockTabsByThreadId: { a: [] } })
     // @ts-expect-error test stub
     window.api = { fs: { selectFile } }
   })
@@ -290,7 +297,7 @@ describe('palette-sources — step 4 terminal + editor actions', () => {
     expect(
       editor.openTabs.some((t) => t.path === '/v/notes/deep.md' && t.title === 'deep.md')
     ).toBe(true)
-    const tabs = useThreadStore.getState().dockTabsByThreadId['a']
+    const tabs = useDockStore.getState().dockTabsByThreadId['a']
     expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/deep.md' })
   })
 
@@ -301,7 +308,7 @@ describe('palette-sources — step 4 terminal + editor actions', () => {
     await item!.run()
     expect(useEditorStore.getState().activeNotePath).toBeNull()
     expect(useEditorStore.getState().openTabs).toEqual([])
-    expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
+    expect(useDockStore.getState().dockTabsByThreadId['a']).toEqual([])
   })
 })
 

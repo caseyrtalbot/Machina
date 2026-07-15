@@ -29,8 +29,8 @@ vi.mock('../../../store/vault-health-store', () => ({
   )
 }))
 
-vi.mock('../../../store/thread-store', () => ({
-  useThreadStore: Object.assign(
+vi.mock('../../../store/dock-store', () => ({
+  useDockStore: Object.assign(
     vi.fn((selector) =>
       selector({
         openOrFocusDockTab: mockOpenOrFocusDockTab,

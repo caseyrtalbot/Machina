@@ -6,6 +6,7 @@ import type { HarnessSummary } from '@shared/harness-types'
 import type { AgentCommits } from '@shared/git-types'
 import { TE_DIR } from '@shared/constants'
 import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeStatusStore } from '../../store/claude-status-store'
 import { useHarnessStore } from '../../store/harness-store'
@@ -85,7 +86,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: f.path,
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: f.path })
+        useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: f.path })
       }
     })
   }
@@ -100,7 +101,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: 'dock surface',
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
+        useDockStore.getState().openOrFocusDockTab({ kind: 'canvas', id: canvasId })
       }
     })
   }
@@ -118,7 +119,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: 'dock surface',
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().openOrFocusDockTab(s.tab)
+        useDockStore.getState().openOrFocusDockTab(s.tab)
       }
     })
   }
@@ -131,7 +132,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: 'cmd+/',
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().toggleDock()
+        useDockStore.getState().toggleDock()
       }
     },
     {
@@ -353,7 +354,7 @@ export function noteHitItems(
       subtitle: `${hit.semantic === true ? 'semantic · ' : ''}${hit.snippet || hit.path}`,
       run: () => {
         opts.closePalette()
-        useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: hit.path })
+        useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: hit.path })
       }
     }))
 }

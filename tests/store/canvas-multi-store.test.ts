@@ -11,6 +11,7 @@ import {
   flushCanvasSave
 } from '../../src/renderer/src/store/canvas-autosave'
 import { useThreadStore } from '../../src/renderer/src/store/thread-store'
+import { useDockStore } from '../../src/renderer/src/store/dock-store'
 import { createCanvasNode, type CanvasFile } from '../../src/shared/canvas-types'
 
 // Mock the IPC layer
@@ -107,15 +108,13 @@ describe('per-canvas store instances (3.8)', () => {
   })
 
   it('activating a canvas dock tab points the proxy at that canvas', () => {
-    useThreadStore.setState({
-      activeThreadId: 't1',
-      dockTabsByThreadId: { t1: [{ kind: 'canvas', id: 'dock-x' }] }
-    })
-    useThreadStore.getState().setDockActiveIndex('t1', 0)
+    useThreadStore.setState({ activeThreadId: 't1' })
+    useDockStore.setState({ dockTabsByThreadId: { t1: [{ kind: 'canvas', id: 'dock-x' }] } })
+    useDockStore.getState().setDockActiveIndex('t1', 0)
     expect(getActiveCanvasId()).toBe('dock-x')
 
     // A non-canvas tab keeps the last canvas active.
-    useThreadStore.getState().addDockTab({ kind: 'graph' })
+    useDockStore.getState().addDockTab({ kind: 'graph' })
     expect(getActiveCanvasId()).toBe('dock-x')
   })
 })

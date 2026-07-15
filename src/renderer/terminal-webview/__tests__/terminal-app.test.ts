@@ -151,8 +151,11 @@ describe('TerminalApp component', () => {
       expect(src).toContain('term.reset()')
     })
 
-    it('clears the viewport on first data for reconnect sessions', () => {
-      expect(src).toContain('\\x1b[2J\\x1b[H')
+    it('preserves replayed scrollback on reconnect: clears only the current line, never the viewport (Phase 3 step 3 continuity fix)', () => {
+      expect(src).toContain('\\r\\x1b[2K')
+      // The old whole-viewport clear erased every replayed line still on
+      // screen during dock↔canvas migration — must not come back.
+      expect(src).not.toContain('\\x1b[2J\\x1b[H')
     })
 
     it('does not force the viewport to the bottom after every write', () => {

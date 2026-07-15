@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useThreadStore, flushDockState } from '../thread-store'
+import { useThreadStore } from '../thread-store'
 import { threadRuntimeIsClosed, useAgentDispatchStore } from '../agent-dispatch-store'
 import { useTerminalStripStore } from '../terminal-strip-store'
 import type { Thread } from '@shared/thread-types'
@@ -88,13 +88,8 @@ describe('thread-store', () => {
     ).toBeUndefined()
   })
 
-  it('addDockTab and removeDockTab mutate the active thread tab list', () => {
-    useThreadStore.setState({ activeThreadId: 'a', dockTabsByThreadId: { a: [] } })
-    useThreadStore.getState().addDockTab({ kind: 'graph' })
-    expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
-    useThreadStore.getState().removeDockTab(0)
-    expect(useThreadStore.getState().dockTabsByThreadId['a']).toEqual([])
-  })
+  // The dock-tab slice tests (addDockTab/removeDockTab, flushDockState) migrated
+  // to dock-store.test.ts with the Phase 3 step 3 extraction — stronger, not fewer.
 
   it('cancelActive requests native abort and waits for main settlement before unlocking', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -933,19 +928,6 @@ describe('thread-store', () => {
     await useThreadStore.getState().deleteArchivedThread('a')
     expect(order).toEqual(['unarchive', 'delete'])
     expect(useThreadStore.getState().archivedThreads).toEqual([])
-  })
-
-  it('flushDockState persists the thread with its current dock tabs', async () => {
-    useThreadStore.setState({
-      vaultPath: '/v',
-      threadsById: { a: sampleThread('a') },
-      dockTabsByThreadId: { a: [{ kind: 'graph' }] }
-    })
-    await flushDockState('a')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const save = (window as any).api.thread.save as ReturnType<typeof vi.fn>
-    expect(save).toHaveBeenCalledTimes(1)
-    expect((save.mock.calls[0][1] as Thread).dockState.tabs).toEqual([{ kind: 'graph' }])
   })
 
   it('toggleAutoAccept flips the per-thread autoAcceptSession flag in memory only (no disk write)', () => {

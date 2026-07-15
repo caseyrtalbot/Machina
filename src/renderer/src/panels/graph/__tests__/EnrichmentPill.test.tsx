@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { useEnrichmentRunStore } from '../../../store/enrichment-run-store'
 import { EnrichmentPill } from '../EnrichmentPill'
@@ -91,7 +92,7 @@ describe('EnrichmentPill', () => {
     expect(runArgs.autoAccept).toBe(false)
 
     // The new thread keeps a graph dock tab so the pill stays visible.
-    const tabs = useThreadStore.getState().dockTabsByThreadId['enrich-1'] ?? []
+    const tabs = useDockStore.getState().dockTabsByThreadId['enrich-1'] ?? []
     expect(tabs.some((t) => t.kind === 'graph')).toBe(true)
   })
 

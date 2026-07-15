@@ -3,7 +3,7 @@ import { borderRadius, colors, transitions, typography } from '../../design/toke
 import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { logError } from '../../utils/error-logger'
 import { useVaultHealthStore } from '../../store/vault-health-store'
-import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 
 interface ContextMenuState {
   readonly x: number
@@ -48,7 +48,7 @@ function HealthDot() {
 
   const handleClick = () => {
     if (status !== 'green') {
-      useThreadStore.getState().openOrFocusDockTab({ kind: 'health' })
+      useDockStore.getState().openOrFocusDockTab({ kind: 'health' })
     }
   }
 

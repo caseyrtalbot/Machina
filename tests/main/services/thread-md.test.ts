@@ -72,13 +72,15 @@ describe('thread-md encode/decode', () => {
   })
 
   it('roundtrips dock_state covering all DockTab kinds', () => {
+    // kind:'terminal' retired at Phase 3 step 3; legacy files carrying it
+    // still decode transparently (byte-stable format) — the renderer's
+    // dock-store seed is what drops it.
     const t: Thread = {
       ...sample(),
       dockState: {
         tabs: [
           { kind: 'canvas', id: 'block-protocol' },
           { kind: 'editor', path: 'docs/x.md' },
-          { kind: 'terminal', sessionId: 'sess-7' },
           { kind: 'graph' },
           { kind: 'ghosts' },
           { kind: 'health' }

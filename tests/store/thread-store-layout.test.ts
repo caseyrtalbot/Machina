@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useThreadStore } from '../../src/renderer/src/store/thread-store'
+import { useDockStore } from '../../src/renderer/src/store/dock-store'
 
 interface MockApi {
   thread: {
@@ -21,11 +22,11 @@ function installApiMock(cfg: Record<string, unknown> = {}): MockApi {
 
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
   useThreadStore.setState({
     vaultPath: '/vault',
     sidebarCollapsed: false,
     chatCollapsed: false,
-    dockCollapsed: false,
     filesPanelOpen: false,
     focusMode: false,
     focusSnapshot: null
@@ -36,40 +37,38 @@ beforeEach(() => {
 
 describe('panel collapse invariants', () => {
   it('collapsing chat while the dock is collapsed re-expands the dock', () => {
-    useThreadStore.setState({ dockCollapsed: true })
+    useDockStore.setState({ dockCollapsed: true })
     useThreadStore.getState().toggleChatCollapsed()
-    const s = useThreadStore.getState()
-    expect(s.chatCollapsed).toBe(true)
-    expect(s.dockCollapsed).toBe(false)
+    expect(useThreadStore.getState().chatCollapsed).toBe(true)
+    expect(useDockStore.getState().dockCollapsed).toBe(false)
   })
 
   it('collapsing the dock while chat is collapsed re-expands chat', () => {
     useThreadStore.setState({ chatCollapsed: true })
-    useThreadStore.getState().toggleDock()
-    const s = useThreadStore.getState()
-    expect(s.dockCollapsed).toBe(true)
-    expect(s.chatCollapsed).toBe(false)
+    useDockStore.getState().toggleDock()
+    expect(useDockStore.getState().dockCollapsed).toBe(true)
+    expect(useThreadStore.getState().chatCollapsed).toBe(false)
   })
 
   it('loadLayout never restores both chat and dock collapsed', async () => {
     installApiMock({ chatCollapsed: true, dockCollapsed: true })
     await useThreadStore.getState().loadLayout()
-    const s = useThreadStore.getState()
-    expect(s.chatCollapsed).toBe(true)
-    expect(s.dockCollapsed).toBe(false)
+    expect(useThreadStore.getState().chatCollapsed).toBe(true)
+    expect(useDockStore.getState().dockCollapsed).toBe(false)
   })
 })
 
 describe('focus mode', () => {
   it('hides sidebar, chat, and files; forces the dock visible', () => {
-    useThreadStore.setState({ filesPanelOpen: true, dockCollapsed: true })
+    useThreadStore.setState({ filesPanelOpen: true })
+    useDockStore.setState({ dockCollapsed: true })
     useThreadStore.getState().toggleFocusMode()
     const s = useThreadStore.getState()
     expect(s.focusMode).toBe(true)
     expect(s.sidebarCollapsed).toBe(true)
     expect(s.chatCollapsed).toBe(true)
     expect(s.filesPanelOpen).toBe(false)
-    expect(s.dockCollapsed).toBe(false)
+    expect(useDockStore.getState().dockCollapsed).toBe(false)
   })
 
   it('restores the prior panel visibility on exit', () => {
@@ -84,13 +83,13 @@ describe('focus mode', () => {
   })
 
   it('restores a pre-focus collapsed dock on exit', () => {
-    useThreadStore.setState({ dockCollapsed: true, chatCollapsed: false })
+    useThreadStore.setState({ chatCollapsed: false })
+    useDockStore.setState({ dockCollapsed: true })
     useThreadStore.getState().toggleFocusMode()
-    expect(useThreadStore.getState().dockCollapsed).toBe(false)
+    expect(useDockStore.getState().dockCollapsed).toBe(false)
     useThreadStore.getState().toggleFocusMode()
-    const s = useThreadStore.getState()
-    expect(s.dockCollapsed).toBe(true)
-    expect(s.chatCollapsed).toBe(false)
+    expect(useDockStore.getState().dockCollapsed).toBe(true)
+    expect(useThreadStore.getState().chatCollapsed).toBe(false)
   })
 
   it('entering focus mode does not persist the files panel state', () => {

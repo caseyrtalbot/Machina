@@ -7,6 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 import { useThreadStore } from '../../store/thread-store'
+import { useDockStore } from '../../store/dock-store'
 import { type DockTab } from '@shared/dock-types'
 import { borderRadius, colors, spacing, transitions, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
@@ -44,8 +45,6 @@ function tabLabel(tab: DockTab): string {
       return tab.path ? basenameOf(tab.path) : 'untitled'
     case 'canvas':
       return tab.id === 'default' ? 'canvas' : tab.id
-    case 'terminal':
-      return tab.sessionId ? `terminal · ${tab.sessionId.slice(0, 6)}` : 'terminal'
     default:
       return tab.kind
   }
@@ -54,7 +53,6 @@ function tabLabel(tab: DockTab): string {
 function tabTooltip(tab: DockTab): string | undefined {
   if (tab.kind === 'editor' && tab.path) return tab.path
   if (tab.kind === 'canvas' && tab.id !== 'default') return `canvas · ${tab.id}`
-  if (tab.kind === 'terminal' && tab.sessionId) return `terminal · ${tab.sessionId}`
   return undefined
 }
 
@@ -66,8 +64,8 @@ export function DockTabBar({
   readonly onActivate: (i: number) => void
 }) {
   const id = useThreadStore((s) => s.activeThreadId)
-  const tabs = useThreadStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
-  const reorder = useThreadStore((s) => s.reorderDockTab)
+  const tabs = useDockStore((s) => (id ? (s.dockTabsByThreadId[id] ?? EMPTY_TABS) : EMPTY_TABS))
+  const reorder = useDockStore((s) => s.reorderDockTab)
   const [menu, setMenu] = useState<TabMenuTarget | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
@@ -101,8 +99,8 @@ export function DockTabBar({
         return next
       })
       const timer = window.setTimeout(() => {
-        const cur = useThreadStore.getState()
-        const threadId = cur.activeThreadId
+        const threadId = useThreadStore.getState().activeThreadId
+        const cur = useDockStore.getState()
         const list = threadId ? (cur.dockTabsByThreadId[threadId] ?? []) : []
         const targetIndices: number[] = []
         for (let i = 0; i < list.length; i += 1) {

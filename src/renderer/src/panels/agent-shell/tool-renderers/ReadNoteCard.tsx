@@ -3,7 +3,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { borderRadius, colors, floatingPanel, typography } from '../../../design/tokens'
-import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
 import { ToolCardShell } from './ToolCardShell'
@@ -52,7 +52,7 @@ export function ReadNoteCard({
     const vault = useVaultStore.getState().vaultPath
     if (!vault) return
     const fullPath = call.args.path.startsWith('/') ? call.args.path : `${vault}/${call.args.path}`
-    useThreadStore.getState().openOrFocusDockTab({ kind: 'editor', path: fullPath })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: fullPath })
   }
 
   const cardRef = useRef<HTMLDivElement | null>(null)

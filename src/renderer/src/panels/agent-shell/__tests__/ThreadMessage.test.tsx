@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ThreadMessage, AUTH_ERROR_BODY } from '../ThreadMessage'
 import { useVaultStore } from '../../../store/vault-store'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
 import type { ThreadMessage as TM } from '@shared/thread-types'
 
 const userMsg: TM = { role: 'user', body: 'hello', sentAt: '' }
@@ -127,7 +128,8 @@ describe('ThreadMessage — wikilinks', () => {
       artifactPathById: { career: '/vault/Career Decisions.md' }
     } as never)
     useThreadStore.setState(useThreadStore.getInitialState())
-    useThreadStore.setState({ activeThreadId: 't1', dockTabsByThreadId: { t1: [] } })
+    useThreadStore.setState({ activeThreadId: 't1' })
+    useDockStore.setState(useDockStore.getInitialState())
   })
 
   it('renders [[target|alias]] as a clickable link showing the alias', () => {
@@ -148,7 +150,7 @@ describe('ThreadMessage — wikilinks', () => {
       />
     )
     fireEvent.click(screen.getByText('Career Decisions'))
-    const tabs = useThreadStore.getState().dockTabsByThreadId['t1']
+    const tabs = useDockStore.getState().dockTabsByThreadId['t1']
     expect(tabs).toEqual([{ kind: 'editor', path: '/vault/Career Decisions.md' }])
   })
 

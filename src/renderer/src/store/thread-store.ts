@@ -6,11 +6,9 @@ import type {
   ToolCall,
   ToolResult
 } from '@shared/thread-types'
-import type { DockTab } from '@shared/dock-types'
 import type { AgentIdentity } from '@shared/agent-identity'
-import { TE_DIR } from '@shared/constants'
-import { setActiveCanvas } from './canvas-store'
 import { useTerminalStripStore } from './terminal-strip-store'
+import { flushDockState, syncActiveCanvas, useDockStore, validateThreadTabs } from './dock-store'
 import { useCliSessionStore } from './cli-session-store'
 import { transportFor, type DispatchStatus, type SendTurnResult } from './agent-transport'
 import {
@@ -37,9 +35,6 @@ interface ThreadState {
   pendingToolCallsByThreadId: Record<string, Array<{ call: ToolCall; result?: ToolResult }>>
   runIdByThreadId: Record<string, string>
   inFlightByThreadId: Record<string, boolean>
-  dockTabsByThreadId: Record<string, DockTab[]>
-  dockActiveIndexByThreadId: Record<string, number>
-  dockCollapsed: boolean
   sidebarWidth: number
   chatWidth: number
   sidebarCollapsed: boolean
@@ -88,29 +83,6 @@ interface ThreadState {
   setRunId: (threadId: string, runId: string | null) => void
   cancelActive: (threadId: string) => Promise<void>
   toggleAutoAccept: (threadId: string) => void
-
-  addDockTab: (tab: DockTab) => void
-  openOrFocusDockTab: (tab: DockTab) => void
-  removeDockTab: (index: number) => void
-  removeDockTabs: (indices: readonly number[]) => void
-  reorderDockTab: (from: number, to: number) => void
-  setDockActiveIndex: (threadId: string, index: number) => void
-  toggleDock: () => void
-}
-
-function dockTabIdentity(t: DockTab): string | null {
-  switch (t.kind) {
-    case 'editor':
-      return `editor:${t.path}`
-    case 'canvas':
-      return `canvas:${t.id}`
-    case 'terminal':
-      return null
-    case 'graph':
-    case 'ghosts':
-    case 'health':
-      return t.kind
-  }
 }
 
 const initial = {
@@ -123,9 +95,6 @@ const initial = {
   pendingToolCallsByThreadId: {} as Record<string, Array<{ call: ToolCall; result?: ToolResult }>>,
   runIdByThreadId: {} as Record<string, string>,
   inFlightByThreadId: {} as Record<string, boolean>,
-  dockTabsByThreadId: {} as Record<string, DockTab[]>,
-  dockActiveIndexByThreadId: {} as Record<string, number>,
-  dockCollapsed: false,
   sidebarWidth: 240,
   chatWidth: 420,
   sidebarCollapsed: false,
@@ -202,11 +171,10 @@ async function dispatchPersistedTurn(
 ): Promise<DispatchStatus> {
   const id = nextThread.id
   if (!workspaceDispatchIsCurrent(workspace) || threadRuntimeIsClosed(id)) return 'indeterminate'
-  const state = useThreadStore.getState()
   const result = await transportFor(nextThread.agent).sendTurn(nextThread, text, {
     vaultPath: workspace.workspacePath,
     historyMessages: buildNativeHistory(previousThread.messages),
-    dockTabsSnapshot: state.dockTabsByThreadId[id] ?? []
+    dockTabsSnapshot: useDockStore.getState().dockTabsByThreadId[id] ?? []
   })
 
   if (result.status === 'accepted') {
@@ -277,10 +245,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       pendingApprovalsByThreadId: {},
       pendingToolCallsByThreadId: {},
       runIdByThreadId: {},
-      inFlightByThreadId: {},
-      dockTabsByThreadId: {},
-      dockActiveIndexByThreadId: {}
+      inFlightByThreadId: {}
     })
+    useDockStore.getState().resetThreads()
   },
 
   loadThreads: async () => {
@@ -290,15 +257,14 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const list = await window.api.thread.list(v)
     if (!workspaceDispatchIsCurrent(workspace)) return
     const byId: Record<string, Thread> = {}
-    const dockByThread: Record<string, DockTab[]> = {}
     const dispatch = useAgentDispatchStore.getState()
     for (const t of list) {
       dispatch.setThreadStart(t.id, 'ready')
       byId[t.id] = t
-      dockByThread[t.id] = t.dockState.tabs.slice()
       useTerminalStripStore.getState().seed(t.id, t.dockState.terminalStrip)
     }
-    set({ threadsById: byId, dockTabsByThreadId: dockByThread })
+    useDockStore.getState().seedFromThreads(list)
+    set({ threadsById: byId })
   },
 
   loadLayout: async () => {
@@ -308,13 +274,12 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const cfg = await window.api.thread.readConfig(v)
     if (!workspaceDispatchIsCurrent(workspace)) return
     const chatCollapsed = cfg.chatCollapsed ?? false
-    const dockCollapsed = (cfg.dockCollapsed ?? false) && !chatCollapsed
+    useDockStore.getState().setDockCollapsed((cfg.dockCollapsed ?? false) && !chatCollapsed)
     set({
       sidebarWidth: clampPaneWidth(cfg.sidebarWidth ?? 240, SIDEBAR_MIN),
       chatWidth: clampPaneWidth(cfg.chatWidth ?? 420, CHAT_MIN),
       sidebarCollapsed: cfg.sidebarCollapsed ?? false,
-      chatCollapsed,
-      dockCollapsed
+      chatCollapsed
     })
   },
 
@@ -328,12 +293,10 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   },
 
   toggleChatCollapsed: () => {
-    set((s) => ({
-      chatCollapsed: !s.chatCollapsed,
-      dockCollapsed: !s.chatCollapsed ? false : s.dockCollapsed,
-      focusMode: false,
-      focusSnapshot: null
-    }))
+    const collapsing = !get().chatCollapsed
+    // Mirror of toggleDock: never leave both panes collapsed.
+    if (collapsing) useDockStore.getState().setDockCollapsed(false)
+    set({ chatCollapsed: collapsing, focusMode: false, focusSnapshot: null })
     void get().persistLayout()
   },
 
@@ -352,7 +315,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
   toggleFocusMode: () => {
     const s = get()
     if (s.focusMode && s.focusSnapshot) {
-      set({ ...s.focusSnapshot, focusMode: false, focusSnapshot: null })
+      const { dockCollapsed, ...paneSnapshot } = s.focusSnapshot
+      useDockStore.getState().setDockCollapsed(dockCollapsed)
+      set({ ...paneSnapshot, focusMode: false, focusSnapshot: null })
       return
     }
     set({
@@ -361,13 +326,13 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         sidebarCollapsed: s.sidebarCollapsed,
         chatCollapsed: s.chatCollapsed,
         filesPanelOpen: s.filesPanelOpen,
-        dockCollapsed: s.dockCollapsed
+        dockCollapsed: useDockStore.getState().dockCollapsed
       },
       sidebarCollapsed: true,
       chatCollapsed: true,
-      filesPanelOpen: false,
-      dockCollapsed: false
+      filesPanelOpen: false
     })
+    useDockStore.getState().setDockCollapsed(false)
   },
 
   persistLayout: async () => {
@@ -383,7 +348,7 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       chatWidth: layout.chatWidth,
       sidebarCollapsed: layout.sidebarCollapsed,
       chatCollapsed: layout.chatCollapsed,
-      dockCollapsed: layout.dockCollapsed
+      dockCollapsed: useDockStore.getState().dockCollapsed
     })
   },
 
@@ -393,15 +358,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     const workspace = v ? captureWorkspaceDispatch(v) : null
     if (prev && prev !== id) await flushDockState(prev)
     if (workspace && !workspaceDispatchIsCurrent(workspace)) return
-    const tabs = get().dockTabsByThreadId[id]
-    if (v && tabs && tabs.length > 0) {
-      const { valid, dropped } = await validateTabs(v, tabs)
-      if (workspace && !workspaceDispatchIsCurrent(workspace)) return
-      if (dropped > 0) {
-        set((s) => ({ dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: valid } }))
-        console.warn(`[thread-store] dropped ${dropped} dock tab(s) with missing resources`)
-      }
-    }
+    const stillCurrent = () => !workspace || workspaceDispatchIsCurrent(workspace)
+    if (v) await validateThreadTabs(v, id, stillCurrent)
+    if (!stillCurrent()) return
     const reveal = opts?.reveal ?? true
     set((s) =>
       reveal && s.chatCollapsed
@@ -430,9 +389,9 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       throw new Error('workspace changed while creating thread')
     }
     useAgentDispatchStore.getState().setThreadStart(t.id, 'starting')
+    useDockStore.getState().seedThreadTabs(t.id, t.dockState.tabs)
     set((s) => ({
       threadsById: { ...s.threadsById, [t.id]: t },
-      dockTabsByThreadId: { ...s.dockTabsByThreadId, [t.id]: t.dockState.tabs.slice() },
       activeThreadId: t.id,
       chatCollapsed: false,
       focusMode: false,
@@ -534,10 +493,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       delete stream[id]
       const tools = { ...s.pendingToolCallsByThreadId }
       delete tools[id]
-      const dock = { ...s.dockTabsByThreadId }
-      delete dock[id]
-      const dockIndex = { ...s.dockActiveIndexByThreadId }
-      delete dockIndex[id]
       const runs = { ...s.runIdByThreadId }
       delete runs[id]
       const flight = { ...s.inFlightByThreadId }
@@ -546,13 +501,12 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         threadsById: next,
         streamingByThreadId: stream,
         pendingToolCallsByThreadId: tools,
-        dockTabsByThreadId: dock,
-        dockActiveIndexByThreadId: dockIndex,
         runIdByThreadId: runs,
         inFlightByThreadId: flight,
         activeThreadId: s.activeThreadId === id ? null : s.activeThreadId
       }
     })
+    useDockStore.getState().dropThread(id)
     useTerminalStripStore.getState().drop(id)
   },
 
@@ -776,145 +730,13 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       const next: Thread = { ...t, autoAcceptSession: !(t.autoAcceptSession ?? false) }
       return { threadsById: { ...s.threadsById, [threadId]: next } }
     })
-  },
-
-  addDockTab: (tab) => {
-    const id = get().activeThreadId
-    if (!id) return
-    set((s) => {
-      const next = [...(s.dockTabsByThreadId[id] ?? []), tab]
-      return {
-        dockCollapsed: false,
-        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: next },
-        dockActiveIndexByThreadId: {
-          ...s.dockActiveIndexByThreadId,
-          [id]: next.length - 1
-        }
-      }
-    })
-  },
-
-  openOrFocusDockTab: (tab) => {
-    const id = get().activeThreadId
-    if (!id) return
-    set((s) => {
-      const tabs = s.dockTabsByThreadId[id] ?? []
-      const identity = dockTabIdentity(tab)
-      const existingIdx =
-        identity === null ? -1 : tabs.findIndex((t) => dockTabIdentity(t) === identity)
-      if (existingIdx >= 0) {
-        return {
-          dockCollapsed: false,
-          dockActiveIndexByThreadId: {
-            ...s.dockActiveIndexByThreadId,
-            [id]: existingIdx
-          }
-        }
-      }
-      const next = [...tabs, tab]
-      return {
-        dockCollapsed: false,
-        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: next },
-        dockActiveIndexByThreadId: {
-          ...s.dockActiveIndexByThreadId,
-          [id]: next.length - 1
-        }
-      }
-    })
-  },
-
-  removeDockTab: (index) => {
-    const id = get().activeThreadId
-    if (!id) return
-    set((s) => {
-      const tabs = (s.dockTabsByThreadId[id] ?? []).slice()
-      if (index < 0 || index >= tabs.length) return s
-      tabs.splice(index, 1)
-      const prevActive = s.dockActiveIndexByThreadId[id] ?? 0
-      // After splice: same index is now the next-right tab. Shift left if we
-      // removed at-or-before the active tab; clamp to the last tab.
-      const nextActive = Math.max(
-        0,
-        Math.min(prevActive >= index ? prevActive - 1 : prevActive, tabs.length - 1)
-      )
-      return {
-        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs },
-        dockActiveIndexByThreadId: {
-          ...s.dockActiveIndexByThreadId,
-          [id]: nextActive
-        }
-      }
-    })
-  },
-
-  removeDockTabs: (indices) => {
-    if (indices.length === 0) return
-    const id = get().activeThreadId
-    if (!id) return
-    set((s) => {
-      const drop = new Set(indices)
-      const before = s.dockTabsByThreadId[id] ?? []
-      const tabs = before.filter((_, i) => !drop.has(i))
-      const prevActive = s.dockActiveIndexByThreadId[id] ?? 0
-      const nextActive = Math.max(
-        0,
-        Math.min(
-          prevActive - indices.filter((i) => i <= prevActive).length,
-          Math.max(0, tabs.length - 1)
-        )
-      )
-      return {
-        dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs },
-        dockActiveIndexByThreadId: {
-          ...s.dockActiveIndexByThreadId,
-          [id]: nextActive
-        }
-      }
-    })
-  },
-
-  reorderDockTab: (from, to) => {
-    const id = get().activeThreadId
-    if (!id) return
-    set((s) => {
-      const tabs = (s.dockTabsByThreadId[id] ?? []).slice()
-      const [it] = tabs.splice(from, 1)
-      tabs.splice(to, 0, it)
-      return { dockTabsByThreadId: { ...s.dockTabsByThreadId, [id]: tabs } }
-    })
-  },
-
-  setDockActiveIndex: (threadId, index) =>
-    set((s) => {
-      if (s.dockActiveIndexByThreadId[threadId] === index) return s
-      return {
-        dockActiveIndexByThreadId: { ...s.dockActiveIndexByThreadId, [threadId]: index }
-      }
-    }),
-
-  toggleDock: () => {
-    set((s) => ({
-      dockCollapsed: !s.dockCollapsed,
-      // Mirror of toggleChatCollapsed: never leave both panes collapsed.
-      chatCollapsed: !s.dockCollapsed ? false : s.chatCollapsed,
-      focusMode: false,
-      focusSnapshot: null
-    }))
-    void get().persistLayout()
   }
 }))
 
-// Active-canvas indirection (3.8): whenever the active dock tab is a canvas,
-// point the global `useCanvasStore` proxy at that canvas's store instance.
-// Non-canvas tabs keep the last canvas active so palette/sidebar actions that
-// target "the canvas" keep meaning the one the user last looked at.
-useThreadStore.subscribe((s) => {
-  const threadId = s.activeThreadId
-  if (!threadId) return
-  const tabs = s.dockTabsByThreadId[threadId] ?? []
-  const tab = tabs[s.dockActiveIndexByThreadId[threadId] ?? 0]
-  if (tab?.kind === 'canvas') setActiveCanvas(tab.id)
-})
+// The active-canvas indirection also depends on activeThreadId, so the shared
+// sync (declared in dock-store, which owns the tab state) is registered on
+// this store too. Own-store subscribe only — cycle-safe, see dock-store header.
+useThreadStore.subscribe(syncActiveCanvas)
 
 /** Truncate a serialized payload so history summaries stay token-bounded. */
 function clip(s: string, max: number): string {
@@ -963,47 +785,4 @@ function buildNativeHistory(
     history.push({ role: m.role, content })
   }
   return history
-}
-
-async function validateTabs(
-  vault: string,
-  tabs: readonly DockTab[]
-): Promise<{ valid: DockTab[]; dropped: number }> {
-  // Run filesystem existence checks in parallel; preserve original tab order.
-  const checks = await Promise.all(
-    tabs.map(async (t) => {
-      if (t.kind === 'editor' && t.path !== '') {
-        return window.api.fs.fileExists(t.path)
-      }
-      if (t.kind === 'canvas' && t.id !== 'default') {
-        // Named canvases are real per-id stores (3.8); drop tabs whose file is gone.
-        return window.api.fs.fileExists(`${vault}/${TE_DIR}/canvas/${t.id}.json`)
-      }
-      // terminal and the static kinds (graph, ghosts, health) are always valid in v1
-      return true
-    })
-  )
-  const valid: DockTab[] = []
-  let dropped = 0
-  for (let i = 0; i < tabs.length; i += 1) {
-    if (checks[i]) valid.push(tabs[i])
-    else dropped += 1
-  }
-  return { valid, dropped }
-}
-
-/**
- * Persist a thread's current dock tabs into its thread file. Exported for the
- * coordinated-quit flush in vault-persist (the active thread's tabs would
- * otherwise be lost — flushing only happens on thread switch).
- */
-export async function flushDockState(id: string): Promise<void> {
-  const s = useThreadStore.getState()
-  const t = s.threadsById[id]
-  if (!s.vaultPath || !t) return
-  const tabs = s.dockTabsByThreadId[id] ?? []
-  const terminalStrip = useTerminalStripStore.getState().byThreadId[id]
-  const next: Thread = { ...t, dockState: { tabs, ...(terminalStrip ? { terminalStrip } : {}) } }
-  useThreadStore.setState({ threadsById: { ...s.threadsById, [id]: next } })
-  await window.api.thread.save(s.vaultPath, next)
 }

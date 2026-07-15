@@ -23,6 +23,7 @@ import { registerQuitHandler, subscribeVaultPersist, flushVaultState } from '../
 import { useEditorStore } from '../editor-store'
 import { useVaultStore } from '../vault-store'
 import { useThreadStore } from '../thread-store'
+import { useDockStore } from '../dock-store'
 import { useUiStore } from '../ui-store'
 
 const sampleThread = (id: string): Thread => ({
@@ -108,9 +109,9 @@ describe('registerQuitHandler', () => {
     useThreadStore.setState({
       vaultPath: '/vault',
       activeThreadId: 'a',
-      threadsById: { a: sampleThread('a') },
-      dockTabsByThreadId: { a: [{ kind: 'graph' }] }
+      threadsById: { a: sampleThread('a') }
     })
+    useDockStore.setState({ dockTabsByThreadId: { a: [{ kind: 'graph' }] } })
 
     registerQuitHandler()
 
@@ -140,7 +141,9 @@ describe('registerQuitHandler', () => {
     useThreadStore.setState({
       vaultPath: '/vault',
       activeThreadId: 'a',
-      threadsById: { a: sampleThread('a') },
+      threadsById: { a: sampleThread('a') }
+    })
+    useDockStore.setState({
       dockTabsByThreadId: { a: [{ kind: 'graph' }, { kind: 'editor', path: '/vault/n.md' }] }
     })
 

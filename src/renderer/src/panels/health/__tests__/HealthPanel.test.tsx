@@ -50,8 +50,8 @@ vi.mock('../../../store/vault-store', () => ({
   )
 }))
 
-vi.mock('../../../store/thread-store', () => ({
-  useThreadStore: Object.assign(
+vi.mock('../../../store/dock-store', () => ({
+  useDockStore: Object.assign(
     vi.fn((selector) =>
       selector({
         openOrFocusDockTab: vi.fn()
@@ -216,8 +216,8 @@ describe('HealthPanel', () => {
     const mockOpenOrFocus = vi.fn()
     const mockSetActiveNote = vi.fn()
 
-    const { useThreadStore } = await import('../../../store/thread-store')
-    ;(useThreadStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+    const { useDockStore } = await import('../../../store/dock-store')
+    ;(useDockStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
       openOrFocusDockTab: mockOpenOrFocus
     })
 
