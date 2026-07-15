@@ -210,8 +210,10 @@ headMoved banner + audit entry**.
 > tab leaves no orphan shell, relaunch restores strip at persisted cwd, .ts renders
 > CodeMirror, autosave lands on disk). Post-review hardening beyond this spec is
 > recorded in HANDOFF.md "What step 4 changed under you". **Manual migration
-> acceptance (tick-counter continuity, Casey observing) is still OPEN** — the one
-> unticked exit item.
+> acceptance (tick-counter continuity, Casey observing): CLOSED 2026-07-14 at
+> workstation Phase 3 step 3** — the run passed live (consecutive ticks
+> strip→canvas→strip, same PTY); evidence in that step's DONE block in
+> `06-phase-3-specs.md`. No unticked exit items remain.
 
 Editor center and agent panel already exist (EditorPanel routes non-.md to
 CodeFileEditor/CodeMirror 6; ThreadPanel is the agent panel) — the build is the terminal
