@@ -15,6 +15,9 @@ import { BlockWatcher } from '../services/block-watcher'
 import { CLIAgentSessionListener } from '../services/cli-agent-session-listener'
 import { CliAgentThreadBridge } from '../services/cli-agent-thread-bridge'
 import { getCliTurnRegistry } from '../services/cli-turn-registry'
+import { markBlockSeen, clearSession } from '../services/shell-readiness'
+import { ThreadStorage } from '../services/thread-storage'
+import { AuditLogger } from '../services/audit-logger'
 import { checkHeadMovedAtTurnEnd } from './git'
 import { getMainWindow } from '../window-registry'
 import type { SessionId } from '@shared/types'
@@ -29,6 +32,34 @@ function sendToMainWindow<T>(channel: string, payload: T): void {
   }
 }
 
+/**
+ * Lazy audit singleton for failed transcript appends (P3 step 4 review
+ * hardening): main is the SOLE message writer, so a dropped assistant final
+ * is a lost transcript line — console output alone is not a durable surface.
+ * Same userData/audit location as the cli-thread logger (AuditLogger appends,
+ * so parallel instances on one dir are safe); defined here because importing
+ * ipc/cli-thread's logger would create a module cycle.
+ */
+let appendAudit: AuditLogger | null = null
+
+function getAppendAudit(): AuditLogger {
+  if (appendAudit === null) {
+    appendAudit = new AuditLogger(join(app.getPath('userData'), 'audit'))
+  }
+  return appendAudit
+}
+
+function auditAppendFailure(threadId: string, root: string, error: string): void {
+  getAppendAudit().log({
+    ts: new Date().toISOString(),
+    tool: 'thread:append-failed',
+    args: { threadId, root },
+    affectedPaths: [],
+    decision: 'error',
+    error
+  })
+}
+
 const cliAgentListener = new CLIAgentSessionListener({
   onStatus: (status) => sendToMainWindow('cli-agent:session-status-changed', status),
   onContext: (status) => sendToMainWindow('cli-agent:context-updated', status)
@@ -40,14 +71,36 @@ const cliAgentThreadBridge = new CliAgentThreadBridge({
   // once per completed block, which is once per CLI turn. When a turn
   // actually closes, run the end-of-turn headMoved check — a final
   // self-commit produces no watched fs event, so this is its only tripwire.
-  onTurnComplete: (threadId) => {
+  // P3 step 4 (contracts §4 v1.3.3): main is the persistence authority for
+  // the final assistant message — append it here, then push thread:changed.
+  onTurnComplete: (threadId, message, bindCwd) => {
     const closed = getCliTurnRegistry().turnEnded(threadId)
     if (closed !== undefined) checkHeadMovedAtTurnEnd(closed)
+    // Root: the turn window's cwd when one closed; otherwise the bridge's
+    // bind-time cwd — still alive on the mid-turn-kill path where close()
+    // already wiped the spawner maps and the turn window.
+    const root = closed?.cwd ?? bindCwd
+    void (async () => {
+      try {
+        const appended = await new ThreadStorage(root).appendMessage(threadId, message)
+        if (appended) sendToMainWindow('thread:changed', { root, threadId })
+        else console.error(`thread append skipped (file missing): ${threadId} in ${root}`)
+      } catch (err) {
+        // Main is the sole message writer now: a failed append is a lost
+        // transcript line — say so loudly (console + durable audit entry),
+        // never reject unhandled.
+        console.error(`thread append failed: ${threadId} in ${root}`, err)
+        auditAppendFailure(threadId, root, String(err))
+      }
+    })()
   }
 })
 
 const blockWatcher = new BlockWatcher({
   onUpdate: ({ sessionId, block }) => {
+    // Feed the main-side readiness tracker (P3 step 4): the first block on a
+    // fresh session is its shell prompt — the send-safe signal.
+    markBlockSeen(sessionId)
     // block:update is consumed by the renderer's block-store + BlockCard,
     // not by the terminal webview. Route to the main BrowserWindow.
     sendToMainWindow('block:update', { sessionId: sessionId as SessionId, block })
@@ -84,6 +137,7 @@ export function registerShellIpc(): void {
     },
     (sessionId, code) => {
       blockWatcher.closeSession(sessionId)
+      clearSession(sessionId)
       cliAgentListener.closeSession(sessionId)
       cliAgentThreadBridge.closeSession(sessionId)
       const wc = getWebContents(sessionId)

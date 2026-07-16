@@ -47,6 +47,17 @@ vi.mock('../../../src/main/ipc/shell', () => ({
   getCliAgentThreadBridge: () => ({})
 }))
 
+// P3 step 4: dispatchAgentTurn appends the user message main-side before the
+// validation chain under test here. Resolve true so every wiring fixture
+// reaches the spawner (a real ThreadStorage would fail closed on ENOENT).
+vi.mock('../../../src/main/services/thread-storage', () => ({
+  ThreadStorage: class {
+    appendMessage(): Promise<boolean> {
+      return Promise.resolve(true)
+    }
+  }
+}))
+
 // The handlers construct the spawner; only its call surface matters here —
 // the resolved attribution must arrive in the spawn/input positional args.
 vi.mock('../../../src/main/services/cli-thread-spawner', async (importOriginal) => {

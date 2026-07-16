@@ -451,6 +451,119 @@ of step 8; the fix lands here before anything builds on the premise.
 
 ## Step 4 — Unattended turn substrate: exported main dispatch + main-side transcript persistence
 
+> **DONE** (2026-07-15, contracts v1.3.3; review-hardened in the same landing —
+> steps 4→5 stay strictly sequential per the Risks clause). Landed as specced:
+> `dispatchAgentTurn` exported from `ipc/cli-thread.ts` (`:297`; the
+> `cli-thread:input` handler is a one-expression delegate at `:451`; the spawner
+> singleton stays module-private), carrying the identical validation chain —
+> audit entries carry the caller's `DispatchOrigin`, so the attribution/model
+> trust boundary is unbypassable by construction. Main-side readiness wait: new
+> Electron-free `services/shell-readiness.ts` (65 lines; `markBlockSeen`/
+> `clearSession` taps in `ipc/shell.ts`), awaited before EVERY send (never
+> rejects; send-anyway on the 10s timeout; the post-await `closedThreads`
+> re-check fences close-during-wait). **Main is now the sole writer of
+> CLI-thread messages:** the user message appends FIRST (fail-closed on a
+> missing file, never recreated), the assistant final persists at
+> `onTurnComplete` under turn-root-else-bind-cwd (the mid-turn-kill synthetic
+> final persists), every write serializes through a per-`(vaultPath, threadId)`
+> queue drained at quit, and `thread:changed` fires only on successful appends —
+> all seven renderer whole-save paths cut at one choke point (`thread:save`
+> meta-merges for CLI threads). New typed channels per the 4-step pattern:
+> `thread:read`, `thread:changed`, `thread:append-system`, and the dev-gated
+> `cli-thread:test-dispatch` (double-locked: `!app.isPackaged` AND
+> `MACHINA_E2E === '1'`; type-only in production, invoke rejects). The renderer
+> refresh lives in new `store/thread-sync.ts` (36 lines; root filter +
+> workspace-switch guard): **`wc -l thread-store.ts` = 786** (zero growth,
+> < 800 hard gate). **Recorded deviations:** (a) the persistence cutover landed
+> at the main `thread:save` boundary, not by editing the two
+> `use-thread-streaming.ts:95-131` call sites — one choke point reroutes every
+> renderer whole-save path at once, making double-append and stale-snapshot
+> clobber structurally impossible; the hook's only edit is the thread-sync
+> side-effect import, display behavior kept exactly. (b) `thread-write-queue.ts`
+> is not a byte-for-byte canvas-write-queue clone: the map stores a SETTLED
+> shadow of the chained promise — the clone's shape turned every rejecting task
+> into a second, unhandled rejection (caught live by vitest on the EISDIR test);
+> commented in the file as a delta. (c) the design's `saveThreadMeta` was folded
+> into `saveThreadFromRenderer` (a queued method calling another queued method
+> would deadlock the per-thread queue; keeping both duplicates the merge), and
+> `maxIso` inlined as a plain `>` ternary (single use, ISO lexical ordering
+> commented) per the minimum-code rule. (d)
+> `tests/main/ipc/cli-thread-attribution.test.ts` (outside the design's file
+> list) gained a ThreadStorage mock resolving `appendMessage` true — a required
+> consequence of append-before-validation; without it every handler-wiring
+> fixture failed closed on ENOENT. (e) probe B pins the canonical `cli_command`
+> toolCall fence on disk instead of the design's `metadata` fields — disk
+> contradicts the design: `thread-md`'s `encodeMessage` never writes `metadata`
+> (or the block's `startedAt`) to the wire format, so neither is assertable from
+> the file; both halves are pinned unit-side by the bridge T8 identical-object
+> assertion, recorded in the spec header. (f) both probes share one Electron
+> app/workspace (serial mode + `afterAll` cleanup) — the design's "same
+> workspace/app" wording made explicit; a probe-A failure skips B while the app
+> still closes. (g) the onTurnComplete/tap wiring coverage lives in new
+> colocated `shell-turn-persistence.test.ts`, not in
+> `tests/main/shell-ipc.test.ts` — that suite runs real BlockWatcher/bridge
+> instances and retrofitting constructor-capturing module mocks risked its six
+> existing tests. (h) **d2 reversed at review, not deferred:** the design left
+> status-message persistence display-only pending ratification, but the review
+> confirmed the lost-transcript regression as major, so the design's own specced
+> reversal shipped now via main-owned `thread:append-system` (main mints the
+> record); recorded in the v1.3.3 changelog + a post-hoc ratification item in
+> HANDOFF; cosmetic residue: the renderer's optimistic `sentAt` differs from the
+> disk copy until the `thread:changed` refresh reconciles. (i) per-thread FIFO
+> serialization was taken over the immutable per-turn-context option — it
+> removes the overlap that made the shared maps hazardous; an explicit renderer
+> `cli-thread:spawn` can still race a dispatch (narrower than the confirmed
+> scenario; noted for step 5). (j) `drainThreadWrites` runs as a separate quit
+> step AFTER the shutdown `Promise.allSettled`, so shutdown-killed PTYs'
+> synthetic finals are enqueued before the drain snapshot. **Adversarial review
+> (2026-07-15, four lenses including a Codex cold read): 10 confirmed findings,
+> all fixed pre-commit** — the two readiness-wait bypasses (explicit spawn,
+> concurrent dispatch) closed by awaiting before every send; concurrent-dispatch
+> reordering/attribution corruption closed by the per-thread FIFO; `thread:save`
+> authority now derived from the ON-DISK agent (relabel bypass closed, agent
+> immutable after mint); lost status messages persist via
+> `thread:append-system`; the unpinned onTurnComplete closure, bindCwd
+> mid-turn-kill fallback, and readiness/tap wiring seams pinned by dedicated
+> suites; probe A de-vacuoused (thread loaded + activated in the renderer before
+> the blurred dispatch); detached persistence drained at quit with a durable
+> `thread:append-failed` audit on failure; and the absent v1.3.3 docs delta
+> written (changelog + §4 subsection + §6 rows + this block + HANDOFF).
+> **Evidence (fresh runs on the final tree):** `npm run check` green — 324 test
+> files, 3954 tests, 0 failures, typecheck (node + web) clean; build green
+> (vite, 6.75s); full e2e suite 30 passed / 1 fixme-skip (the known
+> `app.spec.ts:238` "tab bar remains draggable" fixme) in 2.3m, including both
+> `e2e/unattended-dispatch.spec.ts` probes against the real authed `claude`
+> binary — probe A: IPC-created thread loaded + activated in the renderer, the
+> window blurred (`isFocused() === false`), turn dispatched via
+> `window.api.test.dispatch` → user sentinel durable on disk before the send,
+> assistant final on disk with zero renderer participation, `pc_`-prefixed
+> cli-change queue item with matching threadId, exactly one user + one assistant
+> sentinel at settle; probe B: a normal renderer-sent turn → exactly one
+> assistant sentinel, the canonical `cli_command` d4 fence, the SAME persisted
+> reply visible in the thread panel, a second `pc_` item, and probe A's
+> transcript still exactly-once after a second full turn (late-clobber guard).
+> What the automated checks do NOT cover: pixels/visual layout, real-`claude`
+> latency variance, multi-window renderers, and the step-5 scheduler origin.
+> **Residual minors (recorded, not fixed):** the tracked e2e fixture
+> `e2e/fixtures/test-vault/.machina/state.json` was rewritten by a live app run
+> (machine-specific absolute path) — unrelated working-tree drift, reverted via
+> `git restore` before the landing commit (the app writing back into tracked
+> fixtures remains an open hygiene hazard); two test suites grew past the
+> 800-line cap this step (`cli-agent-thread-bridge.test.ts` 858,
+> `cli-thread-spawner.test.ts` 943) — accepted per existing main precedent
+> (tests at 1763/946/934 already on main; the cap is enforced on production
+> source, whose max here is 786) rather than splitting reviewed suites
+> post-review; the review re-flagged probe A's spec-header "while a
+> renderer IS subscribed" framing as stronger than what the probe pins; the
+> readiness wait consumes up to 10s of the renderer's 15s CLI IPC timeout
+> (degraded raw turns now brush it); `appendMessage` unconditionally overwrites
+> `lastMessage` (no later-wins merge like the meta path), so an assistant final
+> can move it backward under overlapping turns; `thread-sync`'s module-level
+> `thread:changed` registration is unexercised by its unit suite (the stub lacks
+> an `on` namespace) — the e2e probes are its only guard. No Casey visual gate
+> per the DONE bar; the evidence is transcript-on-disk + queue-item-present with
+> no renderer participation.
+
 **Goal.** Retire the load-bearing gap for exit bar 1: today no function in main can
 run "prompt → bound thread" (`getSpawner()` is module-private, `ipc/cli-thread.ts:38`)
 and assistant replies only reach disk via the renderer subscriber

@@ -7,9 +7,10 @@
  * the adapter's roster AND passes the charset check is forwarded; anything
  * else forwards undefined, with an audit note for explicit-but-rejected picks.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import type { AuditEntry } from '@shared/agent-types'
+import type { IpcRequest } from '@shared/ipc-channels'
 
 const state = vi.hoisted(() => ({
   handlers: new Map<string, (args: never) => unknown>(),
@@ -26,13 +27,43 @@ const state = vi.hoisted(() => ({
     ensureRootReady: vi.fn(async () => {}),
     get: vi.fn(() => undefined)
   },
-  auditEntries: [] as unknown[]
+  auditEntries: [] as unknown[],
+  // P3 step 4: main-side user-message persistence. appendMessage resolves
+  // true by default — every dispatch appends before validation, so a
+  // fail-closed default would break every fixture in this file.
+  appendMessage: vi.fn(async (_root: string, _id: string, _message: unknown) => true),
+  sends: [] as Array<{ event: string; data: unknown }>,
+  mainWindow: {} as unknown,
+  // P3 step 4: the test-dispatch channel is double-locked on
+  // !app.isPackaged && MACHINA_E2E=1 — the gating suite flips this.
+  isPackaged: false,
+  // P3 step 4 wiring seams: getSpawner's constructor options (captured so the
+  // waitForSessionReady wiring is pinned, not just the injected mock) and the
+  // shell-readiness delegation target.
+  spawnerCtorOpts: [] as Array<Record<string, unknown>>,
+  waitForFirstBlock: vi.fn(async (_sessionId: string) => true)
 }))
 
 vi.mock('../../typed-ipc', () => ({
   typedHandle: vi.fn((channel: string, handler: (args: never) => unknown) => {
     state.handlers.set(channel, handler)
+  }),
+  typedSend: vi.fn((_window: unknown, event: string, data: unknown) => {
+    state.sends.push({ event, data })
   })
+}))
+
+vi.mock('../../window-registry', () => ({
+  getMainWindow: vi.fn(() => state.mainWindow)
+}))
+
+vi.mock('../../services/thread-storage', () => ({
+  ThreadStorage: class {
+    constructor(private readonly root: string) {}
+    appendMessage(id: string, message: unknown): Promise<boolean> {
+      return state.appendMessage(this.root, id, message)
+    }
+  }
 }))
 
 vi.mock('../../services/cli-thread-spawner', async (importOriginal) => {
@@ -40,6 +71,9 @@ vi.mock('../../services/cli-thread-spawner', async (importOriginal) => {
   return {
     ...actual,
     CliThreadSpawner: class {
+      constructor(opts: Record<string, unknown>) {
+        state.spawnerCtorOpts.push(opts)
+      }
       spawn = state.spawner.spawn
       input = state.spawner.input
       close = state.spawner.close
@@ -49,6 +83,10 @@ vi.mock('../../services/cli-thread-spawner', async (importOriginal) => {
     }
   }
 })
+
+vi.mock('../../services/shell-readiness', () => ({
+  waitForFirstBlock: (sessionId: string) => state.waitForFirstBlock(sessionId)
+}))
 
 vi.mock('../../services/audit-logger', () => ({
   AuditLogger: class {
@@ -64,7 +102,12 @@ vi.mock('../../services/harness-run-registry', async (importOriginal) => {
 })
 
 vi.mock('electron', () => ({
-  app: { getPath: vi.fn(() => '/nonexistent-test-userdata') }
+  app: {
+    getPath: vi.fn(() => '/nonexistent-test-userdata'),
+    get isPackaged() {
+      return state.isPackaged
+    }
+  }
 }))
 
 vi.mock('../shell', () => ({
@@ -76,7 +119,7 @@ vi.mock('../config', () => ({
   readAppConfigValue: state.readAppConfigValue
 }))
 
-import { checkMaxTurnsOnTurnStarted, registerCliThreadIpc } from '../cli-thread'
+import { checkMaxTurnsOnTurnStarted, dispatchAgentTurn, registerCliThreadIpc } from '../cli-thread'
 
 function invoke<T>(channel: string, args: unknown): Promise<T> {
   const handler = state.handlers.get(channel)
@@ -336,5 +379,410 @@ describe('checkMaxTurnsOnTurnStarted', () => {
     checkMaxTurnsOnTurnStarted({ ...info, invocationCount: 999 }, () => undefined, breaker)
     expect(breaker.noteTurnStarted).toHaveBeenCalledTimes(1)
     expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+  })
+})
+
+// ── Phase 3 step 4 (contracts §4 v1.3.3): dispatchAgentTurn factoring ──
+
+type InputArgs = IpcRequest<'cli-thread:input'>
+
+interface ParityCapture {
+  inputCalls: unknown[][]
+  audits: Array<Omit<AuditEntry, 'ts'>>
+  result: unknown
+}
+
+/** Run one dispatch and snapshot its observable effects (ts stripped from audits). */
+async function captureDispatch(run: () => Promise<unknown>): Promise<ParityCapture> {
+  state.spawner.input.mockClear()
+  state.auditEntries.length = 0
+  const result = await run()
+  return {
+    inputCalls: state.spawner.input.mock.calls.map((call) => [...call]),
+    audits: (state.auditEntries as AuditEntry[]).map(({ ts: _ts, ...rest }) => rest),
+    result
+  }
+}
+
+const RAW_BINDING = {
+  slug: 'raw-runner',
+  workspaceRoot: '/v',
+  adapter: 'raw',
+  invocationTemplate: "trusted '--ask' {prompt}"
+} as const
+
+const PARITY_MATRIX: ReadonlyArray<{
+  name: string
+  binding: Record<string, unknown> | undefined
+  args: InputArgs
+  expectedInputCalls: unknown[][]
+  expectedResult: { ok: boolean }
+  expectedAudit?: { tool: string; channel?: string }
+}> = [
+  {
+    name: 'structured ok (unbound ad-hoc turn)',
+    binding: undefined,
+    args: { threadId: 'th_p1', identity: 'cli-claude', text: 'go', cwd: '/v' },
+    expectedInputCalls: [['th_p1', 'cli-claude', 'go', '/v', undefined, undefined, false]],
+    expectedResult: { ok: true }
+  },
+  {
+    name: 'raw ok (bound snapshot template forwarded, 8-arg branch)',
+    binding: RAW_BINDING,
+    args: { threadId: 'th_p2', identity: 'cli-raw', text: 'go', cwd: '/v', agentId: 'raw-runner' },
+    expectedInputCalls: [
+      ['th_p2', 'cli-raw', 'go', '/v', 'raw-runner', undefined, false, "trusted '--ask' {prompt}"]
+    ],
+    expectedResult: { ok: true }
+  },
+  {
+    name: 'adapter mismatch blocks before the spawner',
+    binding: { slug: 'bound-runner', workspaceRoot: '/v', adapter: 'claude' },
+    args: {
+      threadId: 'th_p3',
+      identity: 'cli-raw',
+      text: 'go',
+      cwd: '/v',
+      agentId: 'bound-runner'
+    },
+    expectedInputCalls: [],
+    expectedResult: { ok: false },
+    expectedAudit: { tool: 'cli-agent:attribution-mismatch', channel: 'cli-thread:input' }
+  },
+  {
+    name: 'invalid model pick audited, adapter default forwarded',
+    binding: undefined,
+    args: { threadId: 'th_p4', identity: 'cli-codex', text: 'go', cwd: '/v', model: 'sonnet' },
+    expectedInputCalls: [['th_p4', 'cli-codex', 'go', '/v', undefined, undefined, false]],
+    expectedResult: { ok: true },
+    expectedAudit: { tool: 'cli-thread:input' }
+  },
+  {
+    name: 'malformed agentId degrades + audits',
+    binding: undefined,
+    args: { threadId: 'th_p5', identity: 'cli-claude', text: 'go', cwd: '/v', agentId: 'bad id!' },
+    expectedInputCalls: [['th_p5', 'cli-claude', 'go', '/v', undefined, undefined, true]],
+    expectedResult: { ok: true },
+    expectedAudit: { tool: 'cli-agent:attribution-mismatch', channel: 'cli-thread:input' }
+  }
+]
+
+describe('dispatchAgentTurn ↔ cli-thread:input parity (Phase 3 step 4)', () => {
+  beforeEach(() => {
+    state.handlers.clear()
+    state.auditEntries.length = 0
+    vi.clearAllMocks()
+    registerCliThreadIpc()
+  })
+
+  afterEach(() => {
+    state.registry.get.mockImplementation(() => undefined)
+  })
+
+  it.each(PARITY_MATRIX)(
+    '$name: identical spawner call, audits, and result on both entry points',
+    async ({ binding, args, expectedInputCalls, expectedResult, expectedAudit }) => {
+      state.registry.get.mockImplementation(() => binding as never)
+      const viaHandler = await captureDispatch(() => invoke('cli-thread:input', args))
+      const viaExport = await captureDispatch(() => dispatchAgentTurn(args))
+
+      // Parity: the handler is a thin caller — one dispatch body, two doors.
+      expect(viaExport.result).toEqual(viaHandler.result)
+      expect(viaExport.inputCalls).toEqual(viaHandler.inputCalls)
+      expect(viaExport.audits).toEqual(viaHandler.audits)
+
+      // Non-vacuous: both match the concrete expected validation outcome.
+      expect(viaExport.result).toEqual(expectedResult)
+      expect(viaExport.inputCalls).toEqual(expectedInputCalls)
+      if (expectedAudit === undefined) {
+        expect(viaExport.audits).toEqual([])
+      } else {
+        expect(viaExport.audits).toHaveLength(1)
+        expect(viaExport.audits[0].tool).toBe(expectedAudit.tool)
+        if (expectedAudit.channel !== undefined) {
+          expect(viaExport.audits[0].args).toMatchObject({ channel: expectedAudit.channel })
+        }
+      }
+    }
+  )
+
+  it('a non-default origin relabels audit entries without changing dispatch behavior', async () => {
+    state.registry.get.mockImplementation(() => undefined)
+    const args: InputArgs = {
+      threadId: 'th_o1',
+      identity: 'cli-codex',
+      text: 'go',
+      cwd: '/v',
+      model: 'sonnet',
+      agentId: 'bad id!'
+    }
+    const viaDefault = await captureDispatch(() => dispatchAgentTurn(args))
+    const viaTestChannel = await captureDispatch(() =>
+      dispatchAgentTurn(args, 'cli-thread:test-dispatch')
+    )
+
+    // Same validation outcome and spawner call — origin is a label, not a fork.
+    expect(viaTestChannel.result).toEqual(viaDefault.result)
+    expect(viaTestChannel.inputCalls).toEqual(viaDefault.inputCalls)
+
+    // Both the degrade audit (args.channel) and the model-denial audit (tool)
+    // carry the origin: unattended dispatches never masquerade as renderer turns.
+    const degrade = viaTestChannel.audits.find((e) => e.tool === 'cli-agent:attribution-mismatch')
+    expect(degrade?.args).toMatchObject({ channel: 'cli-thread:test-dispatch' })
+    expect(viaTestChannel.audits.some((e) => e.tool === 'cli-thread:test-dispatch')).toBe(true)
+    const defaultDegrade = viaDefault.audits.find(
+      (e) => e.tool === 'cli-agent:attribution-mismatch'
+    )
+    expect(defaultDegrade?.args).toMatchObject({ channel: 'cli-thread:input' })
+  })
+})
+
+// ── Phase 3 step 4 (contracts §4 v1.3.3): main-side user-message persistence ──
+
+describe('dispatchAgentTurn main-side user-message persistence (Phase 3 step 4)', () => {
+  const args: InputArgs = {
+    threadId: 'th_u1',
+    identity: 'cli-claude',
+    text: 'fix the tests',
+    cwd: '/repos/project'
+  }
+
+  beforeEach(() => {
+    state.handlers.clear()
+    state.auditEntries.length = 0
+    state.sends.length = 0
+    state.mainWindow = {}
+    vi.clearAllMocks()
+    registerCliThreadIpc()
+  })
+
+  it('appends the user message to the turn root BEFORE the spawner input', async () => {
+    const result = await invoke<{ ok: boolean }>('cli-thread:input', args)
+    expect(result).toEqual({ ok: true })
+    expect(state.appendMessage).toHaveBeenCalledExactlyOnceWith('/repos/project', 'th_u1', {
+      role: 'user',
+      body: 'fix the tests',
+      sentAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
+    })
+    // Ordering: durable user message before the send (and before turnStarted,
+    // which fires inside the spawner's sendUserMessage downstream of input).
+    expect(state.appendMessage.mock.invocationCallOrder[0]).toBeLessThan(
+      state.spawner.input.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('a false append (missing thread file) fails closed: no spawner call, no thread:changed', async () => {
+    state.appendMessage.mockResolvedValueOnce(false)
+    const result = await dispatchAgentTurn(args)
+    expect(result).toEqual({ ok: false })
+    expect(state.spawner.input).not.toHaveBeenCalled()
+    expect(state.sends).toEqual([])
+  })
+
+  it('emits thread:changed { root, threadId } only after a successful append', async () => {
+    await dispatchAgentTurn(args)
+    expect(state.sends).toEqual([
+      { event: 'thread:changed', data: { root: '/repos/project', threadId: 'th_u1' } }
+    ])
+  })
+
+  it('skips the thread:changed emit when no main window exists (headless safety)', async () => {
+    state.mainWindow = null
+    const result = await dispatchAgentTurn(args)
+    expect(result).toEqual({ ok: true })
+    expect(state.sends).toEqual([])
+    expect(state.spawner.input).toHaveBeenCalledTimes(1)
+  })
+
+  it('appends the user message even for a turn blocked by adapter mismatch (refusal on disk)', async () => {
+    state.registry.get.mockImplementation(
+      () => ({ slug: 'bound-runner', workspaceRoot: '/v', adapter: 'claude' }) as never
+    )
+    const result = await dispatchAgentTurn({
+      ...args,
+      identity: 'cli-raw',
+      agentId: 'bound-runner'
+    })
+    state.registry.get.mockImplementation(() => undefined)
+    expect(result).toEqual({ ok: false })
+    expect(state.appendMessage).toHaveBeenCalledTimes(1)
+    expect(state.spawner.input).not.toHaveBeenCalled()
+  })
+})
+
+// ── Phase 3 step 4 (contracts §4/§6 v1.3.3): dev-only test-dispatch channel ──
+
+describe('cli-thread:test-dispatch gating (Phase 3 step 4)', () => {
+  const args: InputArgs = {
+    threadId: 'th_g1',
+    identity: 'cli-claude',
+    text: 'go',
+    cwd: '/v'
+  }
+
+  beforeEach(() => {
+    state.handlers.clear()
+    state.auditEntries.length = 0
+    state.sends.length = 0
+    state.mainWindow = {}
+    state.isPackaged = false
+    delete process.env['MACHINA_E2E']
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    delete process.env['MACHINA_E2E']
+    state.isPackaged = false
+  })
+
+  it('is NOT registered when MACHINA_E2E is unset', () => {
+    registerCliThreadIpc()
+    expect(state.handlers.has('cli-thread:test-dispatch')).toBe(false)
+    // The production channels are unaffected by the gate.
+    expect(state.handlers.has('cli-thread:input')).toBe(true)
+  })
+
+  it('is NOT registered under a truthy-but-wrong env value', () => {
+    process.env['MACHINA_E2E'] = 'true'
+    registerCliThreadIpc()
+    expect(state.handlers.has('cli-thread:test-dispatch')).toBe(false)
+  })
+
+  it('is NOT registered in a packaged build even with MACHINA_E2E=1 (double lock)', () => {
+    state.isPackaged = true
+    process.env['MACHINA_E2E'] = '1'
+    registerCliThreadIpc()
+    expect(state.handlers.has('cli-thread:test-dispatch')).toBe(false)
+  })
+
+  it('registers under MACHINA_E2E=1 non-packaged and delegates to dispatchAgentTurn', async () => {
+    process.env['MACHINA_E2E'] = '1'
+    registerCliThreadIpc()
+    const result = await invoke<{ ok: boolean }>('cli-thread:test-dispatch', args)
+    expect(result).toEqual({ ok: true })
+    // Full dispatch body, not a fork: user-message append + spawner input.
+    expect(state.appendMessage).toHaveBeenCalledExactlyOnceWith('/v', 'th_g1', {
+      role: 'user',
+      body: 'go',
+      sentAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
+    })
+    expect(state.spawner.input).toHaveBeenCalledExactlyOnceWith(
+      'th_g1',
+      'cli-claude',
+      'go',
+      '/v',
+      undefined,
+      undefined,
+      false
+    )
+  })
+
+  it('labels channel-invoked audit entries with the test-dispatch origin', async () => {
+    process.env['MACHINA_E2E'] = '1'
+    registerCliThreadIpc()
+    await invoke('cli-thread:test-dispatch', {
+      ...args,
+      identity: 'cli-codex',
+      model: 'sonnet',
+      agentId: 'bad id!'
+    })
+    const audits = state.auditEntries as AuditEntry[]
+    const degrade = audits.find((e) => e.tool === 'cli-agent:attribution-mismatch')
+    expect(degrade?.args).toMatchObject({ channel: 'cli-thread:test-dispatch' })
+    expect(audits.some((e) => e.tool === 'cli-thread:test-dispatch')).toBe(true)
+    expect(audits.some((e) => e.tool === 'cli-thread:input')).toBe(false)
+  })
+})
+
+// ── Phase 3 step 4 review hardening: the getSpawner readiness wiring seam ──
+
+describe('getSpawner readiness wiring (Phase 3 step 4)', () => {
+  beforeEach(() => {
+    state.handlers.clear()
+    vi.clearAllMocks()
+    registerCliThreadIpc()
+  })
+
+  it('constructs the spawner with waitForSessionReady delegating to shell-readiness', async () => {
+    // The spawner singleton is minted on the first dispatch of the module's
+    // lifetime; ensure at least one ran, then inspect the captured options.
+    await invoke('cli-thread:input', {
+      threadId: 'th_w1',
+      identity: 'cli-claude',
+      text: 'go',
+      cwd: '/v'
+    })
+    expect(state.spawnerCtorOpts.length).toBeGreaterThan(0)
+    const wait = state.spawnerCtorOpts[0]['waitForSessionReady'] as
+      | ((sessionId: string) => Promise<boolean>)
+      | undefined
+    // Deleting the getSpawner wiring line would resurrect the Phase-1 step-6
+    // lost-reply race while every mock-injected suite stayed green — pin the
+    // real seam: the option exists and delegates to waitForFirstBlock.
+    if (wait === undefined) throw new Error('waitForSessionReady not wired in getSpawner')
+    state.waitForFirstBlock.mockClear()
+    await expect(wait('sess-w1')).resolves.toBe(true)
+    expect(state.waitForFirstBlock).toHaveBeenCalledExactlyOnceWith('sess-w1')
+  })
+})
+
+// ── Phase 3 step 4 review hardening: per-thread dispatch serialization ──
+
+describe('dispatchAgentTurn per-thread serialization (Phase 3 step 4)', () => {
+  const argsA: InputArgs = { threadId: 'th_s1', identity: 'cli-claude', text: 'first', cwd: '/v' }
+
+  beforeEach(() => {
+    state.handlers.clear()
+    state.auditEntries.length = 0
+    state.sends.length = 0
+    state.mainWindow = {}
+    vi.clearAllMocks()
+    registerCliThreadIpc()
+  })
+
+  it('overlapping dispatches for ONE thread run strictly FIFO — the second never starts early', async () => {
+    let release: ((result: { ok: boolean }) => void) | undefined
+    state.spawner.input.mockImplementationOnce(
+      () =>
+        new Promise<{ ok: boolean }>((resolve) => {
+          release = resolve
+        })
+    )
+    const first = dispatchAgentTurn(argsA)
+    await vi.waitFor(() => expect(state.spawner.input).toHaveBeenCalledTimes(1))
+    const second = dispatchAgentTurn({ ...argsA, text: 'second' })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    // While turn 1 is in flight, turn 2 must not have appended or sent: its
+    // send would land in turn 1's not-yet-ready PTY and its per-thread
+    // spawner-map/turn-window writes would corrupt turn 1's attribution.
+    expect(state.appendMessage).toHaveBeenCalledTimes(1)
+    expect(state.spawner.input).toHaveBeenCalledTimes(1)
+    release?.({ ok: true })
+    await expect(first).resolves.toEqual({ ok: true })
+    await expect(second).resolves.toEqual({ ok: true })
+    expect(state.appendMessage).toHaveBeenCalledTimes(2)
+    expect(state.spawner.input).toHaveBeenCalledTimes(2)
+    expect(state.spawner.input.mock.calls.map((call) => call[2])).toEqual(['first', 'second'])
+  })
+
+  it('a rejected dispatch surfaces to its own caller and never wedges the thread queue', async () => {
+    state.appendMessage.mockRejectedValueOnce(new Error('disk on fire'))
+    await expect(dispatchAgentTurn(argsA)).rejects.toThrow('disk on fire')
+    await expect(dispatchAgentTurn({ ...argsA, text: 'after' })).resolves.toEqual({ ok: true })
+  })
+
+  it('dispatches for DIFFERENT threads stay concurrent', async () => {
+    let release: ((result: { ok: boolean }) => void) | undefined
+    state.spawner.input.mockImplementationOnce(
+      () =>
+        new Promise<{ ok: boolean }>((resolve) => {
+          release = resolve
+        })
+    )
+    const blocked = dispatchAgentTurn(argsA)
+    await vi.waitFor(() => expect(state.spawner.input).toHaveBeenCalledTimes(1))
+    await expect(dispatchAgentTurn({ ...argsA, threadId: 'th_s2' })).resolves.toEqual({ ok: true })
+    release?.({ ok: true })
+    await expect(blocked).resolves.toEqual({ ok: true })
   })
 })

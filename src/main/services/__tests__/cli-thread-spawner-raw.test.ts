@@ -58,7 +58,7 @@ describe('CliThreadSpawner bound raw dispatch', () => {
 
     const command = "\\mytool '--ask' 'don'\\''t $(touch /tmp/pwn); `id`'"
     expect(result).toEqual({ ok: true })
-    expect(bridge.bind).toHaveBeenCalledWith('sess-raw', 'thread-R', 'raw')
+    expect(bridge.bind).toHaveBeenCalledWith('sess-raw', 'thread-R', '/v', 'raw')
     expect(expectRawInvocation).toHaveBeenCalledWith('sess-raw', command)
     expect(registry.turnStarted).toHaveBeenCalledWith({
       threadId: 'thread-R',

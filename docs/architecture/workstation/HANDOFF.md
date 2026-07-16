@@ -99,17 +99,48 @@ change every future step inherits. Full record: the step-1 DONE block in
 acceptance PASSED (2026-07-15, live dev app): multi-root tray survival + the
 foreign-root switch-to-resolve affordance confirmed on the running app.
 
+**Phase 3 step 4 is SHIPPED 2026-07-15** (contracts v1.3.3): a full turn is now
+main-originable and main-persisted — `dispatchAgentTurn` exported (spawner still
+module-private, validation chain identical, serialized per threadId), a main-side
+BlockWatcher readiness wait before every send, the exactly-once transcript
+cutover (main is the persistence authority for cli threads; renderer
+display-only with a `thread:changed` refresh), and the dev-gated
+`cli-thread:test-dispatch` channel for the unattended e2e probes. Built by a
+4-implementer workflow + adversarial review; all 10 confirmed major findings
+fixed in-tree. Full gate on the final tree: `npm run check` 324 files / 3954
+tests green, build green, full e2e 30 passed / 1 known fixme-skip (2.3m)
+including both new `e2e/unattended-dispatch.spec.ts` probes (also executed
+targeted against the real authed `claude`: 2/2, 35.1s). Full record: the step-4
+DONE block in `06-phase-3-specs.md` + the v1.3.3 contracts changelog (deviations
+d1–d4, residuals r1–r6; r5 closed at review). No Casey-observed gate on this
+DONE bar — the evidence is transcript-on-disk + queue-item-present with no
+renderer participation; the one Casey item is the d2 ratification bullet below.
+
 **Next work order for the incoming team(s):**
 
-- **Steps 2 ∥ 3 LANDED (2026-07-14, `4f6213e` v1.3.1 + `d75a62c` v1.3.2), all
-  Casey gates PASSED (2026-07-14/15)**; the work order `HANDOFF-PHASE3-STEPS-2-3.md`
-  deleted itself at the second landing. **Next = step 4 (unattended turn
-  substrate)**, unblocked by step 3's landing; mind the queue-e2e overlap with
-  step 2's surfaces (spec parallel-session map).
+- **Next = step 5 (containment aggregation + durable budgets + cost
+  observable)**, strictly sequential AFTER step 4 per the spec's parallel map
+  (both own `ipc/cli-thread.ts`: step 5's scheduler calls the exported
+  `dispatchAgentTurn` and extends the `DispatchOrigin` union with its own audit
+  literal, residual r6), and step 5 must land strictly BEFORE step 6 (step 6
+  consumes step 5's rollups and budget headroom). OQ8 + OQ-A–E still want Casey
+  answers — recommendations are the defaults (next bullet). Steps 2 ∥ 3 landed
+  2026-07-14 (`4f6213e` v1.3.1 + `d75a62c` v1.3.2, all Casey gates PASSED); the
+  step-4 landing is the SHIPPED paragraph above. New e2e
+  `e2e/unattended-dispatch.spec.ts` is a serial suite sharing the Electron
+  user-data dir — run it targeted/sequential, never parallel with the other
+  queue e2e specs.
 - **Casey answers wanted (recommendations are the defaults if unanswered):** OQ8
   ratification at kickoff (blocker-class now — loops + canvas cards multiply
   cross-root PTYs; step 6 carries a root fence as the interim), plus OQ-A through
   OQ-E in the spec's open-questions section.
+- **Casey ratification, step 4 (d2 — decided at review, ratify or re-open):** the
+  design deferred CLI status messages (dispatch-refusal / start-status) to
+  session-display-only pending your call; the adversarial review flagged the
+  transcript regression and the specced reversal was implemented instead — they now
+  persist via the main-owned `thread:append-system` append (contracts v1.3.3
+  changelog). If you prefer display-only, the reversal is one channel + two
+  renderer call sites to unwind.
 - Dependabot triage still open: `npm audit --omit=dev` reports 1 moderate production
   vuln (js-yaml via gray-matter); Phase 3 step 6 must take the scoped fix or record
   why not (spec cross-step rule).
@@ -153,6 +184,59 @@ foreign-root switch-to-resolve affordance confirmed on the running app.
    investigation dossiers; both judges picked the risk design). Phase 2 is COMPLETE —
    new sessions start here. Carries its own stale-claim ledger, safety-invariant gate
    ledger, exit-bar coverage map, and open questions OQ8 + OQ-A–E.
+
+## What Phase 3 step 4 changed under you (contracts v1.3.3)
+
+1. **Main is the persistence authority for CLI-thread messages now.** `thread:save`
+   is a metadata-only merge for cli threads, branched on the ON-DISK agent inside
+   the per-thread write queue (`ThreadStorage.saveThreadFromRenderer`; `agent` is
+   immutable after mint — a relabeled payload buys nothing). Your renderer code can
+   still call `thread.save` freely, but its `messages` array is ignored for cli
+   threads: main appends the user message (top of `dispatchAgentTurn`), the
+   assistant final (`onTurnComplete` in `ipc/shell.ts`, root = turn cwd else
+   bind-time cwd — mid-turn kills persist their synthetic final), and status system
+   messages via the new `thread:append-system` invoke. The renderer's
+   `thread:cli-message` subscriber is display-only — persistence MOVED, it did not
+   duplicate: exactly-once is the recorded §4 rule, double-append is the failure
+   mode, and probe A gates it with the thread loaded in a subscribed renderer.
+   Never hand-write a cli thread file.
+2. **`dispatchAgentTurn(args, origin)` is exported from `ipc/cli-thread.ts`** — the
+   one dispatch body behind `'cli-thread:input'`, the dev-gated
+   `'cli-thread:test-dispatch'` (`!app.isPackaged && MACHINA_E2E=1` only), and your
+   step-5 scheduler. It appends the user message first (missing file ⇒ `ok:false`,
+   fail closed), runs the full validation chain (`resolveRequestedAgentId` →
+   `resolveRequestedModel` — identical for every caller, audit entries carry the
+   caller's origin), and is **serialized per threadId** — do not add your own
+   per-thread locking on top, and do not call the spawner directly (`getSpawner`
+   stays module-private; the export is the one sanctioned door). Extend
+   `DispatchOrigin` with your scheduler's literal (r6).
+3. **Fresh-PTY sends wait for the shell prompt in main** (`shell-readiness.ts`,
+   BlockWatcher-fed, awaited before EVERY send; 10s bounded, send-anyway). The
+   renderer harness poll still works and is now a harmless double wait.
+4. **Open renderers refresh via `thread:changed`** (`store/thread-sync.ts`:
+   root-filtered, replaces `messages`/`lastMessage` only). `thread:created` does
+   NOT exist — unattended turns must target existing thread files (r1).
+5. **Coordinated quit drains thread writes** (`drainThreadWrites`, after shell
+   shutdown in `src/main/index.ts`). Failed appends surface as
+   `thread:append-failed` audit entries under `userData/audit`.
+6. **New e2e: `e2e/unattended-dispatch.spec.ts`** (probe A blurred unattended
+   dispatch with the thread loaded in the renderer — the exactly-once gate; probe B
+   attended regression guard with a settle-point recheck). Serial suite, shared
+   Electron user-data dir, needs a real authed `claude` — run targeted/sequential.
+7. **Residuals a later step will trip on** (full list: the v1.3.3 changelog + §4
+   step-4 subsection in contracts): r4 — degraded/hookless `cli-raw` sessions emit
+   no blocks, so a fresh raw turn eats the full 10s readiness timeout INSIDE the
+   renderer's 15s `CLI_IPC_TIMEOUT_MS` window (a scheduler calling
+   `dispatchAgentTurn` directly has no such ceiling); an explicit renderer
+   `cli-thread:spawn` still runs OUTSIDE the per-thread dispatch queue and can
+   race a dispatch's shared attribution maps (narrower than the fixed overlap —
+   fence it when the step-5 scheduler lands); `appendMessage` stamps
+   `lastMessage` unconditionally, so an overlapping turn's assistant final can
+   move it backward (cosmetic sidebar ordering); the `thread-sync` subscription
+   registration is NOT exercised by the unit suite (recorded minor) — deleting
+   its side-effect import in `use-thread-streaming.ts` keeps `npm run check`
+   green while killing unattended refresh, so verify that seam by hand if you
+   touch it.
 
 ## What Phase 3 step 3 changed under you (contracts v1.3.2)
 

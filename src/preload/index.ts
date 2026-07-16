@@ -140,9 +140,13 @@ const api = {
     unarchive: (vaultPath: string, id: string) =>
       typedInvoke('thread:unarchive', { vaultPath, id }),
     delete: (vaultPath: string, id: string) => typedInvoke('thread:delete', { vaultPath, id }),
+    read: (vaultPath: string, id: string) => typedInvoke('thread:read', { vaultPath, id }),
     readConfig: (vaultPath: string) => typedInvoke('thread:read-config', { vaultPath }),
     writeConfig: (vaultPath: string, config: VaultMachinaConfig) =>
-      typedInvoke('thread:write-config', { vaultPath, config })
+      typedInvoke('thread:write-config', { vaultPath, config }),
+    // Main-owned system-status append (P3 step 4): main mints the record.
+    appendSystem: (vaultPath: string, threadId: string, body: string) =>
+      typedInvoke('thread:append-system', { vaultPath, threadId, body })
   },
   cliThread: {
     spawn: (req: {
@@ -217,7 +221,10 @@ const api = {
       callback: (data: IpcEventData<'cli-thread:session-changed'>) => void
     ) => typedOn('cli-thread:session-changed', callback),
     agentBreakerTripped: (callback: (data: IpcEventData<'agent:breaker-tripped'>) => void) =>
-      typedOn('agent:breaker-tripped', callback)
+      typedOn('agent:breaker-tripped', callback),
+    // Appended at the namespace end per the parallel-session rule (P3 step 4).
+    threadChanged: (callback: (data: IpcEventData<'thread:changed'>) => void) =>
+      typedOn('thread:changed', callback)
   },
   app: {
     pathExists: (path: string) => typedInvoke('app:path-exists', { path }),
@@ -263,7 +270,24 @@ const api = {
   notifications: {
     onOpenTray: (callback: (data: Record<string, never>) => void) =>
       typedOn('approvals:open-tray', callback)
-  }
+  },
+  // Dev-only unattended-dispatch passthrough (P3 step 4). Main's dev-gated
+  // registration is the authority — this gate only avoids advertising a dead
+  // method (sandbox is false, so preload reads process.env). Appended at the
+  // api end per the parallel-session rule.
+  test:
+    process.env['MACHINA_E2E'] === '1'
+      ? {
+          dispatch: (req: {
+            threadId: string
+            identity: AgentIdentity
+            text: string
+            cwd: string
+            agentId?: string
+            model?: string
+          }) => typedInvoke('cli-thread:test-dispatch', req)
+        }
+      : undefined
 }
 
 export type ElectronApi = typeof api

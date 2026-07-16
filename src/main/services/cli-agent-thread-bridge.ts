@@ -57,9 +57,12 @@ interface CliAgentThreadBridgeOptions {
   /**
    * Fired exactly once per completed (or cancelled) block on a bound
    * session — the turn-window close signal for the CliTurnRegistry
-   * (workstation step 3). Optional so existing tests stay valid.
+   * (workstation step 3). Since P3 step 4 (contracts §4 v1.3.3) it also
+   * carries the final assistant message and the binding's bind-time cwd so
+   * main can persist the transcript line under the turn's root. Optional so
+   * existing tests stay valid; narrower callbacks keep compiling.
    */
-  readonly onTurnComplete?: (threadId: string) => void
+  readonly onTurnComplete?: (threadId: string, message: AssistantMessage, cwd: string) => void
 }
 
 /** Incremental parse state for one block's structured (JSONL) output. */
@@ -94,6 +97,12 @@ function newStreamState(): StreamState {
 
 interface BindingState {
   readonly threadId: string
+  /** Root authority for main-side transcript persistence (P3 step 4): the
+   *  workspace root captured at bind time. Must outlive spawner.close(),
+   *  which wipes cwdByThread and the turn window BEFORE the PTY exit callback
+   *  runs settleRunningBlock — this copy is what keeps the mid-turn-kill
+   *  synthetic final persistable. */
+  readonly cwd: string
   /** Optional adapter declared by the spawner. Only `raw` changes command
    *  recognition; known-agent detection remains command-based. */
   readonly adapterId?: AdapterId
@@ -121,10 +130,12 @@ export class CliAgentThreadBridge {
   constructor(private readonly opts: CliAgentThreadBridgeOptions) {}
 
   /** Associate `sessionId` with `threadId`. Subsequent block updates on this
-   *  session emit thread messages addressed to `threadId`. */
-  bind(sessionId: string, threadId: string, adapterId?: AdapterId): void {
+   *  session emit thread messages addressed to `threadId`. `cwd` is the
+   *  workspace root the PTY was spawned in (see BindingState.cwd). */
+  bind(sessionId: string, threadId: string, cwd: string, adapterId?: AdapterId): void {
     this.bindings.set(sessionId, {
       threadId,
+      cwd,
       ...(adapterId !== undefined ? { adapterId } : {}),
       emittedBlockIds: new Set(),
       admittedRawBlockIds: new Set(),
@@ -208,7 +219,7 @@ export class CliAgentThreadBridge {
     this.opts.onMessage({ threadId: binding.threadId, message })
     // After the final message: the write-linger window opens from the block's
     // completion, and emittedBlockIds already guarantees once-per-block.
-    this.opts.onTurnComplete?.(binding.threadId)
+    this.opts.onTurnComplete?.(binding.threadId, message, binding.cwd)
   }
 
   closeSession(sessionId: string): void {
@@ -236,11 +247,9 @@ export class CliAgentThreadBridge {
     // left behind (the trailing line is only consumed on a final pass).
     if (parseEvent) drainStructuredOutput(state, block, parseEvent, true)
     binding.emittedBlockIds.add(blockId)
-    this.opts.onMessage({
-      threadId: binding.threadId,
-      message: buildFinalMessage(block, agent, state)
-    })
-    this.opts.onTurnComplete?.(binding.threadId)
+    const message = buildFinalMessage(block, agent, state)
+    this.opts.onMessage({ threadId: binding.threadId, message })
+    this.opts.onTurnComplete?.(binding.threadId, message, binding.cwd)
   }
 }
 

@@ -238,6 +238,12 @@ export interface IpcChannels {
     }
     response: void
   }
+  // Single-thread disk read for the thread:changed refresh (P3 step 4,
+  // contracts §4/§6 v1.3.3). Null when the file is missing or unreadable.
+  'thread:read': {
+    request: { vaultPath: string; id: string }
+    response: import('./thread-types').Thread | null
+  }
 
   // --- Machina Native (Anthropic SDK) ---
   'agent-native:has-key': { request: void; response: boolean }
@@ -431,6 +437,27 @@ export interface IpcChannels {
     request: void
     response: import('./agent-breaker-types').AgentBreakerStatus
   }
+
+  // --- Dev-only unattended-dispatch test channel (P3 step 4, contracts §4/§6
+  // v1.3.3) --- Shape-locked to 'cli-thread:input'; registered ONLY when
+  // !app.isPackaged && MACHINA_E2E=1 (types are erased, so this declaration
+  // has zero production runtime surface — invoking the unregistered channel
+  // rejects). Its audit entries carry this channel name as the dispatch
+  // origin. Appended at the interface end per the parallel-session rule.
+  'cli-thread:test-dispatch': IpcChannels['cli-thread:input']
+
+  // --- Main-owned status-message append (P3 step 4, contracts §4 v1.3.3) ---
+  // Persists a renderer-minted dispatch-refusal / start-status SYSTEM message
+  // through the same serialized main-side append the transcript cutover made
+  // authoritative (thread:save's cli meta-merge drops messages by design).
+  // Main mints the record — role 'system' by construction, so the
+  // assistant/user exactly-once authority is untouched. ok:false = thread
+  // file missing (deleted/archived — never recreated). Appended at the
+  // interface end per the parallel-session rule.
+  'thread:append-system': {
+    request: { vaultPath: string; threadId: string; body: string }
+    response: { ok: boolean }
+  }
 }
 
 export type AgentNativeApprovalPreview =
@@ -546,6 +573,16 @@ export interface IpcEvents {
   // the approvals tray popover opens — the click lands IN the tray, not just
   // on the app. Appended at the list end per the parallel-session rule.
   'approvals:open-tray': Record<string, never>
+
+  // Main-side transcript append landed (main -> renderer, P3 step 4,
+  // contracts §4/§6 v1.3.3): fired once per SUCCESSFUL main-persisted message
+  // (user append in dispatchAgentTurn, assistant final at onTurnComplete,
+  // status append via thread:append-system) — never on meta-merges or failed
+  // appends. `root` is the TURN's workspace
+  // root; the renderer MUST filter against its current vaultPath before
+  // merging (foreign-root pushes never enter the active workspace's
+  // threadsById). Appended at the list end per the parallel-session rule.
+  'thread:changed': { root: string; threadId: string }
 }
 
 export type IpcChannel = keyof IpcChannels

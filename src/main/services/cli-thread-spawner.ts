@@ -69,6 +69,18 @@ interface CliThreadSpawnerOptions {
    * event covers only the rebinding the renderer would otherwise never see.
    */
   readonly onSessionChanged?: (threadId: string, sessionId: string) => void
+  /**
+   * Main-side shell-readiness wait (workstation Phase 3 step 4): resolves true
+   * once the fresh PTY's first block appears (its shell prompt has been
+   * drawn), false on timeout or session exit. Awaited before EVERY send —
+   * the live PTY may have been minted by an explicit `spawn()` or by a
+   * concurrent dispatch whose wait is still pending, so gating only the
+   * spawn-on-demand branch would type into a not-yet-ready shell. Already-
+   * ready sessions resolve immediately. Optional so existing tests and
+   * callers stay valid; wired in ipc/cli-thread.ts to
+   * shell-readiness.waitForFirstBlock.
+   */
+  readonly waitForSessionReady?: (sessionId: string) => Promise<boolean>
 }
 
 export class CliThreadSpawner {
@@ -192,7 +204,7 @@ export class CliThreadSpawner {
     }
 
     const sessionId = this.opts.shellService.create(cwd, undefined, undefined, undefined, identity)
-    this.opts.bridge.bind(sessionId, threadId, adapterForIdentity(identity).id)
+    this.opts.bridge.bind(sessionId, threadId, cwd, adapterForIdentity(identity).id)
     this.sessionByThread.set(threadId, sessionId)
     this.identityByThread.set(threadId, identity)
     this.cwdByThread.set(threadId, cwd)
@@ -270,6 +282,17 @@ export class CliThreadSpawner {
       if (!spawned.ok) return { ok: false }
       if (this.closedThreads.has(threadId)) return { ok: false }
       this.opts.onSessionChanged?.(threadId, spawned.sessionId)
+    }
+    // Phase-1 step-6 lost-reply guard, now main-side (P3 step 4): never type
+    // into a fresh shell before its prompt block appears — on EVERY send, not
+    // just the spawn-on-demand branch: a `hasLiveSession` short-circuit here
+    // would let a concurrent dispatch (or the first input after an explicit
+    // spawn) write into a PTY whose prompt has not drawn. Already-seen
+    // sessions resolve immediately; a timeout still sends (bounded
+    // best-effort, mirroring the renderer poll).
+    const sessionId = this.sessionByThread.get(threadId)
+    if (sessionId !== undefined && this.opts.waitForSessionReady !== undefined) {
+      await this.opts.waitForSessionReady(sessionId)
     }
     if (this.closedThreads.has(threadId)) return { ok: false }
     return { ok: this.sendUserMessage(threadId, identity, text) }

@@ -88,7 +88,8 @@ describe('CliThreadSpawner', () => {
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.sessionId).toBe('sess-xyz')
     expect(shell.create).toHaveBeenCalledWith('/v', undefined, undefined, undefined, 'cli-claude')
-    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A', 'claude')
+    // The bind-time cwd is the persistence root authority (P3 step 4).
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A', '/v', 'claude')
     expect(spawner.getSessionId('thread-A')).toBe('sess-xyz')
   })
 
@@ -133,7 +134,7 @@ describe('CliThreadSpawner', () => {
     const res = await spawner.input('thread-A', 'cli-claude', 'list files', '/v')
     expect(res.ok).toBe(true)
     expect(shell.create).toHaveBeenCalledTimes(1)
-    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A', 'claude')
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-A', '/v', 'claude')
     expect(pty.writeAgentInput).toHaveBeenCalledWith(
       'sess-xyz',
       `${CLAUDE_BASE} 'list files'\r`,
@@ -641,7 +642,7 @@ describe('CliThreadSpawner raw adapter (workstation Phase 2 step 1)', () => {
     expect(result.ok).toBe(true)
     expect(detect).not.toHaveBeenCalled()
     expect(shell.create).toHaveBeenCalledWith('/v', undefined, undefined, undefined, 'cli-raw')
-    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-R', 'raw')
+    expect(bindSpy).toHaveBeenCalledWith('sess-xyz', 'thread-R', '/v', 'raw')
   })
 
   it('sendUserMessage refuses on cli-raw: no template source exists in step 1', async () => {
@@ -685,6 +686,161 @@ describe('CliThreadSpawner raw adapter (workstation Phase 2 step 1)', () => {
     expect(res.ok).toBe(false)
     expect(shell.create).toHaveBeenCalledTimes(1)
     expect(pty.writeAgentInput).not.toHaveBeenCalled()
+  })
+})
+
+describe('CliThreadSpawner readiness wait (workstation Phase 3 step 4)', () => {
+  function waitBridge(): CliAgentThreadBridge {
+    return {
+      bind: vi.fn(),
+      getAgentSessionId: () => undefined
+    } as unknown as CliAgentThreadBridge
+  }
+
+  it('input on a dead thread awaits waitForSessionReady between the spawn and the PTY write', async () => {
+    const { shell, pty } = fakeServices()
+    const calls: string[] = []
+    shell.create.mockImplementation(() => {
+      calls.push('create')
+      return 'sess-xyz'
+    })
+    pty.writeAgentInput.mockImplementation(() => {
+      calls.push('write')
+      return true
+    })
+    const waitForSessionReady = vi.fn(async (sessionId: string) => {
+      calls.push(`wait:${sessionId}`)
+      return true
+    })
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: waitBridge(),
+      detect: async () => [installed('claude')],
+      waitForSessionReady
+    })
+    const res = await spawner.input('thread-A', 'cli-claude', 'go', '/v')
+    expect(res.ok).toBe(true)
+    // No send before the fresh session's first block: the wait sits strictly
+    // between PTY creation and the agent-input write, keyed by the new id.
+    expect(calls).toEqual(['create', 'wait:sess-xyz', 'write'])
+  })
+
+  it('waits on the stale-PTY respawn path too, with the NEW sessionId', async () => {
+    const { shell, pty } = fakeServices()
+    const waitForSessionReady = vi.fn(async () => true)
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: waitBridge(),
+      detect: async () => [installed('claude')],
+      waitForSessionReady
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    pty.getActiveSessions.mockReturnValue([])
+    shell.create.mockReturnValue('sess-new')
+    const res = await spawner.input('thread-A', 'cli-claude', 'retry', '/v')
+    expect(res.ok).toBe(true)
+    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
+    expect(waitForSessionReady).toHaveBeenCalledWith('sess-new')
+  })
+
+  it('EVERY send is gated on the wait — including the first input after an explicit spawn()', async () => {
+    // spawn() creates the PTY without sending, so the first input sees a live
+    // session; a hasLiveSession short-circuit here skipped the wait and typed
+    // into the pre-prompt shell (the Phase-1 step-6 hazard). The real
+    // waitForFirstBlock resolves synchronously for already-seen sessions, so
+    // established sessions pay zero cost for the unconditional gate.
+    const { shell, pty } = fakeServices()
+    const calls: string[] = []
+    pty.writeAgentInput.mockImplementation(() => {
+      calls.push('write')
+      return true
+    })
+    const waitForSessionReady = vi.fn(async (sessionId: string) => {
+      calls.push(`wait:${sessionId}`)
+      return true
+    })
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: waitBridge(),
+      detect: async () => [installed('claude')],
+      waitForSessionReady
+    })
+    await spawner.spawn('thread-A', 'cli-claude', '/v')
+    const res = await spawner.input('thread-A', 'cli-claude', 'hi', '/v')
+    expect(res.ok).toBe(true)
+    // One PTY (no respawn), and the wait resolved BEFORE the write.
+    expect(shell.create).toHaveBeenCalledTimes(1)
+    expect(calls).toEqual(['wait:sess-xyz', 'write'])
+  })
+
+  it('a concurrent input during a pending fresh-spawn wait is gated too (no pre-prompt send)', async () => {
+    // Turn 1 spawns and parks on the wait; turn 2 arrives while the PTY is
+    // live but unready. Pre-fix, turn 2's hasLiveSession short-circuit sent
+    // immediately — into the unready shell, and AHEAD of turn 1.
+    const { shell, pty } = fakeServices()
+    const releases: Array<(ready: boolean) => void> = []
+    const waitForSessionReady = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          releases.push(resolve)
+        })
+    )
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: waitBridge(),
+      detect: async () => [installed('claude')],
+      waitForSessionReady
+    })
+    const first = spawner.input('thread-A', 'cli-claude', 'first', '/v')
+    await vi.waitFor(() => expect(waitForSessionReady).toHaveBeenCalledTimes(1))
+    const second = spawner.input('thread-A', 'cli-claude', 'second', '/v')
+    await vi.waitFor(() => expect(waitForSessionReady).toHaveBeenCalledTimes(2))
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
+    releases.forEach((release) => release(true))
+    await Promise.all([first, second])
+    expect(pty.writeAgentInput).toHaveBeenCalledTimes(2)
+  })
+
+  it('a wait resolving false (timeout/exit) still sends — bounded best-effort semantics', async () => {
+    const { shell, pty } = fakeServices()
+    const waitForSessionReady = vi.fn(async () => false)
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: waitBridge(),
+      detect: async () => [installed('claude')],
+      waitForSessionReady
+    })
+    const res = await spawner.input('thread-A', 'cli-claude', 'go anyway', '/v')
+    expect(res.ok).toBe(true)
+    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
+    expect(pty.writeAgentInput).toHaveBeenCalledTimes(1)
+  })
+
+  it('close() during the wait fences the send: ok=false and nothing reaches the PTY', async () => {
+    const { shell, pty } = fakeServices()
+    let release: ((ready: boolean) => void) | undefined
+    const waitForSessionReady = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve
+        })
+    )
+    const registry = { turnStarted: vi.fn(), threadClosed: vi.fn() }
+    const spawner = new CliThreadSpawner({
+      shellService: shell as never,
+      bridge: waitBridge(),
+      detect: async () => [installed('claude')],
+      registry,
+      waitForSessionReady
+    })
+    const pending = spawner.input('thread-A', 'cli-claude', 'must not run', '/v')
+    await vi.waitFor(() => expect(waitForSessionReady).toHaveBeenCalledTimes(1))
+    spawner.close('thread-A')
+    release?.(true)
+    await expect(pending).resolves.toEqual({ ok: false })
+    expect(pty.writeAgentInput).not.toHaveBeenCalled()
+    expect(registry.turnStarted).not.toHaveBeenCalled()
+    expect(shell.kill).toHaveBeenCalledWith('sess-xyz')
   })
 })
 

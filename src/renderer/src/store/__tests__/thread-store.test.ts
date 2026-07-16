@@ -26,6 +26,7 @@ beforeEach(() => {
   ;(window as any).api = {
     thread: {
       save: vi.fn().mockResolvedValue(undefined),
+      appendSystem: vi.fn().mockResolvedValue({ ok: true }),
       list: vi.fn().mockResolvedValue([]),
       listArchived: vi.fn().mockResolvedValue([]),
       read: vi.fn(),
@@ -193,13 +194,13 @@ describe('thread-store', () => {
         ),
         abort
       }
-      // First save persists the user turn. The diagnostic save after the run
-      // timeout never settles.
+      // The save persists the user turn; the diagnostic status APPEND after
+      // the run timeout never settles (status messages ride
+      // thread:append-system since the P3 step 4 cutover).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(window as any).api.thread.save = vi
-        .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockReturnValueOnce(new Promise(() => {}))
+      ;(window as any).api.thread.save = vi.fn().mockResolvedValueOnce(undefined)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).api.thread.appendSystem = vi.fn().mockReturnValueOnce(new Promise(() => {}))
       useThreadStore.setState({
         vaultPath: '/v',
         activeThreadId: 'a',

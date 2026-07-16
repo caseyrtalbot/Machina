@@ -552,6 +552,83 @@ approval surfaces onto the queue — ONE review surface.
     `approvals:hold-released` audit entry. Mirror rows are gate-confirm kind: never
     serialized (pinned invariant unchanged).
 
+### Transcript persistence authority + unattended dispatch (Phase 3 step 4, v1.3.3)
+
+Message-persistence authority for CLI threads is MAIN's, at one choke point — the
+substrate for exit bar 1's unattended turns.
+
+- **Exactly-once rule** — the renderer structurally cannot write MESSAGES for a cli
+  thread: `thread:save` derives its branch from the **on-disk** thread's agent inside
+  the per-thread write queue (`ThreadStorage.saveThreadFromRenderer`) — a disk-cli
+  thread gets a metadata-only merge (`messages` always from disk, `lastMessage` =
+  later ISO stamp), a disk-native thread keeps the whole-save, and the payload's
+  `agent` field is IGNORED for authority and immutable after mint (relabeling a cli
+  thread `machina-native` neither restores the whole-save clobber nor changes the
+  identity on disk). Main appends each message exactly once: the user message at the
+  top of `dispatchAgentTurn` (before validation — refused turns keep their prompt on
+  disk; a missing thread file refuses the turn, `ok:false`, never a ghost turn),
+  the assistant final at the bridge's `onTurnComplete`, and renderer-minted
+  dispatch-refusal / start-status system messages via `thread:append-system` (main
+  mints the record; role `'system'` by construction, so status persistence reopens no
+  assistant/user write path). Every mutation for one `(vaultPath, threadId)` rides the
+  serialized `thread-write-queue`; append-vs-archive/delete can never resurrect a file
+  (ENOENT append → `false`, deletion wins). Coordinated quit drains the queue
+  (`drainThreadWrites`, after shell shutdown so shutdown-killed PTYs' synthetic finals
+  land) — a turn completing at quit time keeps its transcript line.
+- **Root resolution** — the assistant append lands under the TURN's root: the closed
+  turn window's cwd when one closed, else the bridge binding's **bind-time cwd**,
+  which outlives `spawner.close()` by construction — the breaker/kill-switch mid-turn
+  synthetic 'session terminated' final therefore persists (the spawner maps and turn
+  window are already wiped on that path). Never an "active root". A failed append is a
+  lost transcript line and main is the sole writer, so it is surfaced loudly:
+  console + a durable `thread:append-failed` audit entry; `thread:changed` is emitted
+  only on a successful append.
+- **Unattended dispatch** — `dispatchAgentTurn(args, origin)` is exported from
+  `ipc/cli-thread.ts`: the single dispatch body behind `'cli-thread:input'`, the
+  dev-gated `'cli-thread:test-dispatch'`, and the step-5+ scheduler. It carries the
+  identical validation chain the IPC boundary always ran (`resolveRequestedAgentId` →
+  `resolveRequestedModel` → spawner input; turn windows / budgets / breaker /
+  approvals engage via `turnStarted` inside the spawner — unbypassable by
+  construction; this supersedes the v1.2.2 "wired into BOTH spawn and input" claim's
+  enumeration: the chain now lives in one body behind all dispatch doors).
+  `origin: DispatchOrigin` labels the audit trail so unattended dispatches never
+  masquerade as renderer turns; step 5's scheduler extends the union (residual r6).
+  Dispatch is **serialized per threadId** in main (FIFO; distinct threads concurrent):
+  the renderer's inFlight guard is renderer-side only, and an unserialized overlap
+  would send turn 2 into turn 1's not-yet-ready PTY and corrupt the shared per-thread
+  cwd/agent/model attribution maps mid-flight.
+- **Main-side readiness wait** — `shell-readiness.waitForFirstBlock` (fed by two taps
+  in `ipc/shell.ts`: `markBlockSeen` on every BlockWatcher update, `clearSession` on
+  PTY exit) is awaited by the spawner before EVERY send, not only the spawn-on-demand
+  branch — the live PTY may have been minted by an explicit `spawn()` or by a
+  concurrent dispatch whose wait is still pending. Already-seen sessions resolve
+  synchronously (zero cost on established sessions); timeout/exit still sends
+  (bounded best-effort, 10s, the renderer poll's semantics). **Supersedes** v1.2.2
+  deviation (1)'s rationale that "moving the send into main would re-open the Phase-1
+  step-6 lost-reply failure": main now owns a BlockWatcher-fed readiness wait, so the
+  lost-reply lesson is preserved main-side; the v1.2.8 renderer harness send-timing
+  path is UNCHANGED (its poll is now a harmless double wait).
+- **Renderer refresh** — `thread:changed` → `store/thread-sync.ts` re-reads the one
+  thread via `thread:read` and replaces only `messages`/`lastMessage`, filtered by
+  root against the current vaultPath (foreign-root pushes never enter the active
+  workspace's state). `thread:created` is NOT minted (r1): unattended callers must
+  target existing thread files.
+- **Recorded deviations/residuals** — (file-list deviation) `use-thread-streaming.ts`
+  keeps its cli branches as display/state updaters; persistence authority was removed
+  at the main `thread:save` boundary instead (the stronger form — all seven renderer
+  whole-save paths cut at once, thread-store.ts zero growth). (d1) a turn against a
+  missing thread file is refused instead of running reply-less. (d2 — RESOLVED at
+  review, see changelog) status messages persist main-side via `thread:append-system`
+  rather than becoming session-display-only. (d3) user msg + dispatch are atomic in
+  one IPC — no orphan-prompt crash window. (d4) streamed attended turns persist the
+  bridge-final shape (block-startedAt `sentAt`, canonical `cli_command` toolCall)
+  rather than the renderer-finalize shape — richer, consistent with non-streamed
+  turns. Residuals: r1 above; r3 write-queue keys are literal paths (no realpath
+  canonicalization — both writers originate from the same vaultPath string);
+  r4 degraded/hookless `cli-raw` sessions emit no blocks → +10s on fresh raw turns in
+  degraded mode (bounded); r6 above. r5 (quit-drain gap) was CLOSED at review by
+  `drainThreadWrites`.
+
 ### Watcher health (Phase 2 step 2, v1.2.1)
 
 "Containment + visibility" with zero visibility into its own death is a
@@ -677,6 +754,14 @@ binding authority:
   No code change was needed: `git-service.ts` already enumerates trailers; a test pins
   it. Post-binding, forged slugs can no longer _enter_ trailers via Machina's own path;
   forged-by-shell trailers remain the accepted §4 forgery residual.
+
+**Status 2026-07-15 (Phase 3 step 4, v1.3.3):** the degrade-not-fail bullet's "wired
+into BOTH `cli-thread:spawn` and `cli-thread:input`" enumeration is superseded — the
+input-side chain now lives in the exported `dispatchAgentTurn` body behind every
+dispatch door (the IPC handler, the dev-gated `cli-thread:test-dispatch`, step 5+
+scheduler), each labeled by `DispatchOrigin` in the audit trail; `cli-thread:spawn`
+keeps its own direct wiring. Semantics unchanged — the chain itself is identical.
+See the transcript-persistence subsection above.
 
 ### Two-projection agent view (Phase 2 step 4, v1.2.3)
 
@@ -1080,6 +1165,11 @@ New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcE
 'agent:breaker-tripped': BreakerTripEvent // v1.2.6 — trip broadcast: action 'killed' (containment applied) or 'notice' (concurrentTurns ambiguity, kill left manual)
 // IpcEvents (v1.3.1)
 'approvals:open-tray':   Record<string, never> // v1.3.1 — OS-notification click-to-focus landing: main focuses the window then fires this so the tray popover opens
+'thread:read':           { request: { vaultPath: string; id: string }; response: Thread | null } // v1.3.3 — single-thread disk read for the thread:changed refresh; null on missing/unreadable
+'thread:append-system':  { request: { vaultPath: string; threadId: string; body: string }; response: { ok: boolean } } // v1.3.3 — main-owned status-message append (main mints the record, role 'system' by construction); ok:false = file missing, never recreated
+'cli-thread:test-dispatch': /* shape of 'cli-thread:input' */ // v1.3.3 — NON-PRODUCTION surface: registered only when !app.isPackaged && MACHINA_E2E=1; thin caller of dispatchAgentTurn carrying its own audit origin label
+// IpcEvents (v1.3.3)
+'thread:changed':        { root: string; threadId: string } // v1.3.3 — fired once per SUCCESSFUL main-persisted message (user append, assistant final, status append); never on meta-merges or failed appends; the renderer MUST filter root against its current vaultPath before merging
 ```
 
 Git/harness channels take no `root` — main resolves it from `WorkspaceService.current()`
@@ -1109,6 +1199,42 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.3.3 (2026-07-15, Phase 3 step 4 landed)** — unattended turn substrate. §4
+  gains the "Transcript persistence authority + unattended dispatch" subsection:
+  message-persistence authority for cli threads moves MAIN-side with the
+  exactly-once rule (the renderer never writes cli-thread messages; `thread:save`
+  is a metadata merge for cli threads, branched on the ON-DISK agent inside the
+  per-thread write queue with `agent` immutable after mint; main appends the user
+  message in `dispatchAgentTurn` + the assistant final at turn end + status system
+  messages via the new `thread:append-system`), keyed by the turn's root with the
+  bridge bind-time cwd as the guaranteed fallback — the mid-turn-kill synthetic
+  final persists. `dispatchAgentTurn(args, origin)` exported (identical validation
+  chain as the IPC boundary; `DispatchOrigin` audit labels; serialized per
+  threadId in main; supersedes the v1.2.2 attribution subsection's "wired into
+  BOTH spawn and input" enumeration — dated status line added there); main-side
+  readiness wait awaited before EVERY send (shell-readiness fed by BlockWatcher
+  taps) — **supersedes** v1.2.2 deviation
+  (1)'s "send stays renderer-side / moving the send into main would re-open the
+  lost-reply failure" rationale (main now owns a BlockWatcher-fed first-block
+  wait; the v1.2.8 renderer harness send-timing path is UNCHANGED — cross-reference,
+  old entries not edited). §6: new `thread:changed` event, `thread:read` and
+  `thread:append-system` invokes, and the dev-gated `cli-thread:test-dispatch`
+  (non-production surface, distinct audit origin). Recorded deviations: file-list
+  deviation (renderer streaming call sites kept as display updaters; authority cut
+  at the main `thread:save` boundary — thread-store.ts zero growth), d1
+  (missing-file turn refused, `ok:false`), d3 (user msg + dispatch atomic in one
+  IPC), d4 (streamed turns persist the bridge-final shape). **d2 — the design's
+  status-messages-become-display-only behavior change — was REVERSED at review
+  time via its specced reversal** (`thread:append-system`, main-owned serialized
+  append): dispatch-refusal / start-status system messages persist to disk, so no
+  unratified transcript regression lands; Casey ratifies the direction post-hoc
+  (HANDOFF open item). Review hardening in the same landing: per-thread dispatch
+  serialization, unconditional readiness wait (explicit-spawn and
+  concurrent-dispatch paths gated too), disk-derived `thread:save` authority,
+  quit-time `drainThreadWrites` (closes residual r5), durable
+  `thread:append-failed` audit on failed appends. Residuals r1 (no
+  `thread:created`), r3 (literal-path queue keys), r4 (degraded raw +10s), r6
+  (DispatchOrigin extended by step 5) stand.
 - **v1.3.2 (2026-07-14, Phase 3 step 3 landed; parallel pair with step 2's
   v1.3.1)** — §3: the `kind:'terminal'` DockTab is retired with the dock-surface
   decision recorded (strip = plain terminals, ThreadPanel's agent surface = agent

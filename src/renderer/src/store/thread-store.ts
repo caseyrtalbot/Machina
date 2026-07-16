@@ -196,15 +196,13 @@ async function dispatchPersistedTurn(
     useThreadStore.setState((latest) => ({
       threadsById: { ...latest.threadsById, [id]: withStatus }
     }))
-    const statusPersistence = window.api.thread.save(workspace.workspacePath, withStatus)
+    // Main-owned append: thread:save's cli meta-merge drops messages, so the
+    // status message must ride the serialized main-side entry point to disk.
+    const persist = window.api.thread.appendSystem(workspace.workspacePath, id, result.message)
     try {
-      await withTimeout(
-        statusPersistence,
-        THREAD_IPC_TIMEOUT_MS,
-        `thread:save dispatch status ${id}`
-      )
+      await withTimeout(persist, THREAD_IPC_TIMEOUT_MS, `thread:append-system ${id}`)
     } catch {
-      void statusPersistence.catch(() => {})
+      void persist.catch(() => {})
       return 'indeterminate'
     }
   }
@@ -419,8 +417,8 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         const next = addSystemMessage(cur, started.message)
         return { threadsById: { ...s.threadsById, [t.id]: next } }
       })
-      const cur = get().threadsById[t.id]
-      if (cur) await saveThread(v, cur, `thread:save start status ${t.id}`)
+      const persist = window.api.thread.appendSystem(v, t.id, started.message)
+      await withTimeout(persist, THREAD_IPC_TIMEOUT_MS, `thread:append-system ${t.id}`)
     }
     return t
   },

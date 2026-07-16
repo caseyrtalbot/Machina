@@ -309,7 +309,7 @@ describe('blockToMessage (gemini/raw passthrough — no parseEvent on the adapte
   it('gemini blocks emit no interim deltas while running', () => {
     const emitted: CliAgentThreadMessageEvent[] = []
     const bridge = new CliAgentThreadBridge({ onMessage: (e) => emitted.push(e) })
-    bridge.bind('s1', 'thread-G')
+    bridge.bind('s1', 'thread-G', '/v')
     let block = startedBlock('s1', `gemini -p 'hi'`)
     block = appendOutput(block, claudeText('partial') + '\n')
     bridge.observe('s1', block)
@@ -325,7 +325,7 @@ describe('blockToMessage (gemini/raw passthrough — no parseEvent on the adapte
     // matches no CLIAgentSpec, so the bridge is pure passthrough for it.
     const emitted: CliAgentThreadMessageEvent[] = []
     const bridge = new CliAgentThreadBridge({ onMessage: (e) => emitted.push(e) })
-    bridge.bind('s1', 'thread-R')
+    bridge.bind('s1', 'thread-R', '/v')
     let block = startedBlock('s1', `mytool --json 'hi'`)
     block = appendOutput(block, claudeText('nope') + '\n')
     block = completed(block, 0)
@@ -346,7 +346,7 @@ describe('CliAgentThreadBridge interim streaming', () => {
 
   it('streams text deltas while running; the final body extends their concatenation', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
 
     // Init line complete, text line still partial: nothing to stream yet.
@@ -380,7 +380,7 @@ describe('CliAgentThreadBridge interim streaming', () => {
 
   it('captures the agent session id for thread continuity, surviving closeSession', () => {
     const { bridge } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
     block = appendOutput(block, claudeInit + '\n')
     bridge.observe('s1', block)
@@ -391,7 +391,7 @@ describe('CliAgentThreadBridge interim streaming', () => {
 
   it('captures the codex thread id from thread.started', () => {
     const { bridge } = recording()
-    bridge.bind('s1', 'thread-B')
+    bridge.bind('s1', 'thread-B', '/v')
     let block = startedBlock('s1', `codex exec --json 'hi'`)
     block = appendOutput(block, codexLines.slice(0, 2).join('\n') + '\n')
     bridge.observe('s1', block)
@@ -400,7 +400,7 @@ describe('CliAgentThreadBridge interim streaming', () => {
 
   it('stops interim parsing when the output is truncated, keeping earlier text', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
     block = appendOutput(block, claudeText('First') + '\n')
     bridge.observe('s1', block)
@@ -419,7 +419,7 @@ describe('CliAgentThreadBridge interim streaming', () => {
 
   it('keeps extracted text on a cancelled block alongside the error result', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
     block = appendOutput(block, claudeText('Partial answer') + '\n')
     bridge.observe('s1', block)
@@ -453,7 +453,7 @@ describe('CliAgentThreadBridge', () => {
 
   it('does not emit when the command is not a known CLI agent', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', 'npm test')
     block = completed(block, 0)
     bridge.observe('s1', block)
@@ -462,7 +462,7 @@ describe('CliAgentThreadBridge', () => {
 
   it('does not emit while the block is still running', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     const block = startedBlock('s1', 'claude --print "x"')
     bridge.observe('s1', block)
     expect(emitted).toEqual([])
@@ -470,7 +470,7 @@ describe('CliAgentThreadBridge', () => {
 
   it('emits one message when a mapped session block reaches completed', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', 'claude --print "hi"')
     bridge.observe('s1', block)
     block = completed(block, 0)
@@ -482,7 +482,7 @@ describe('CliAgentThreadBridge', () => {
 
   it('does not re-emit for the same block id seen multiple times', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', 'claude --print "x"')
     block = completed(block, 0)
     bridge.observe('s1', block)
@@ -493,7 +493,7 @@ describe('CliAgentThreadBridge', () => {
 
   it('emits separately for each new block in the same session', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     const a = completed(startedBlock('s1', 'claude --print "a"'), 0)
     bridge.observe('s1', a)
     // Second block: same session, new id (pendingBlock uses different id input)
@@ -507,7 +507,7 @@ describe('CliAgentThreadBridge', () => {
 
   it('drops the binding when the session is closed', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     bridge.closeSession('s1')
     let block = startedBlock('s1', 'claude --print "x"')
     block = completed(block, 0)
@@ -517,8 +517,8 @@ describe('CliAgentThreadBridge', () => {
 
   it('routes by sessionId so two threads in flight do not cross', () => {
     const { bridge, emitted } = recording()
-    bridge.bind('s1', 'thread-A')
-    bridge.bind('s2', 'thread-B')
+    bridge.bind('s1', 'thread-A', '/v')
+    bridge.bind('s2', 'thread-B', '/v')
     const a = completed(startedBlock('s1', 'claude --print "a"'), 0)
     const b = completed(startedBlock('s2', 'codex chat'), 0)
     bridge.observe('s1', a)
@@ -544,7 +544,7 @@ describe('CliAgentThreadBridge closeSession with a mid-flight block (PTY death)'
 
   it('emits a synthetic terminated final so the turn settles', () => {
     const { bridge, messages, turns } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
     block = appendOutput(block, claudeText('Partial answer') + '\n')
     bridge.observe('s1', block)
@@ -568,7 +568,7 @@ describe('CliAgentThreadBridge closeSession with a mid-flight block (PTY death)'
 
   it('drains trailing complete lines the interim passes left behind', () => {
     const { bridge, messages } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
     // No trailing newline: the interim pass leaves the last line unconsumed.
     block = appendOutput(block, claudeText('Tail text'))
@@ -583,7 +583,7 @@ describe('CliAgentThreadBridge closeSession with a mid-flight block (PTY death)'
 
   it('emits nothing when the last observed block already completed', () => {
     const { bridge, messages, turns } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', 'claude --print "x"')
     bridge.observe('s1', block)
     block = completed(block, 0)
@@ -599,7 +599,7 @@ describe('CliAgentThreadBridge closeSession with a mid-flight block (PTY death)'
 
   it('emits nothing when no block was ever observed on the session', () => {
     const { bridge, messages, turns } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     bridge.closeSession('s1')
     expect(messages).toEqual([])
     expect(turns).toEqual([])
@@ -621,7 +621,7 @@ describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
 
   it('fires exactly once per completed block; running observes do not fire', () => {
     const { bridge, log } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     let block = startedBlock('s1', 'claude --print "x"')
     bridge.observe('s1', block)
     expect(log.filter((e) => e.kind === 'turn-complete')).toEqual([])
@@ -637,7 +637,7 @@ describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
 
   it('fires for cancelled blocks too', () => {
     const { bridge, log } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     const block = startedBlock('s1', 'claude --print "x"')
     const r = cancelBlock(block, 5000)
     if (!r.ok) throw new Error(r.error)
@@ -656,7 +656,7 @@ describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
 
   it('does not fire for non-CLI-agent commands on a bound session', () => {
     const { bridge, log } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     const block = completed(startedBlock('s1', 'npm test'), 0)
     bridge.observe('s1', block)
     expect(log).toEqual([])
@@ -664,7 +664,7 @@ describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
 
   it("fires AFTER the block's final onMessage", () => {
     const { bridge, log } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     const block = completed(startedBlock('s1', 'claude --print "x"'), 0)
     bridge.observe('s1', block)
     expect(log).toEqual([
@@ -675,7 +675,7 @@ describe('CliAgentThreadBridge onTurnComplete (workstation step 3)', () => {
 
   it('fires once per block for separate blocks in the same session', () => {
     const { bridge, log } = recordingWithLog()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
     const a = completed(startedBlock('s1', 'claude --print "a"'), 0)
     bridge.observe('s1', a)
     const p = pendingBlock('b-s1-2', meta('s1'))
@@ -708,7 +708,7 @@ describe('block-protocol integrity with interleaved human input (workstation Pha
 
   it('echoed keystrokes interleaved into the running agent block do not corrupt extraction; the turn still completes and the reply mirrors', () => {
     const { bridge, messages, turnCompletes } = recordingBridge()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
 
     let block = startedBlock('s1', 'claude --print --verbose --output-format stream-json "fix"')
     // First structured lines arrive.
@@ -739,7 +739,7 @@ describe('block-protocol integrity with interleaved human input (workstation Pha
 
   it('a user-run non-agent command block mid-turn neither mirrors nor closes the turn window', () => {
     const { bridge, messages, turnCompletes } = recordingBridge()
-    bridge.bind('s1', 'thread-A')
+    bridge.bind('s1', 'thread-A', '/v')
 
     // Agent turn opens and is still running.
     const agentStart = startedBlock(
@@ -766,5 +766,93 @@ describe('block-protocol integrity with interleaved human input (workstation Pha
     const finals = messages.filter((m) => m.message.metadata?.endedAt !== undefined)
     expect(finals).toHaveLength(1)
     expect(finals[0].message.body).toBe('fixed')
+  })
+})
+
+describe('CliAgentThreadBridge onTurnComplete final-message + root surface (Phase 3 step 4)', () => {
+  // The shell.ts persistence closure's ONLY inputs are these three arguments
+  // (threadId, final message, bind-time cwd) — asserting them here pins that
+  // the main-side append has everything it needs on every completion path.
+  // The bind cwd ('/repo/root') deliberately differs from the block metadata
+  // cwd ('/Users/c/proj'): the root must be the bind-time capture, never
+  // block metadata (which drifts when the session cd's).
+  function recordingTurns(): {
+    bridge: CliAgentThreadBridge
+    messages: CliAgentThreadMessageEvent[]
+    turns: Array<{
+      threadId: string
+      message: import('@shared/thread-types').AssistantMessage
+      cwd: string
+    }>
+  } {
+    const messages: CliAgentThreadMessageEvent[] = []
+    const turns: Array<{
+      threadId: string
+      message: import('@shared/thread-types').AssistantMessage
+      cwd: string
+    }> = []
+    const bridge = new CliAgentThreadBridge({
+      onMessage: (e) => messages.push(e),
+      onTurnComplete: (threadId, message, cwd) => turns.push({ threadId, message, cwd })
+    })
+    return { bridge, messages, turns }
+  }
+
+  it('normal completed block: carries the identical final message and the bind-time cwd', () => {
+    const { bridge, messages, turns } = recordingTurns()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeText('Done.') + '\n')
+    block = completed(block, 0)
+    bridge.observe('s1', block)
+
+    expect(turns).toHaveLength(1)
+    expect(turns[0].threadId).toBe('thread-A')
+    expect(turns[0].cwd).toBe('/repo/root')
+    // Same object as the final onMessage emission: one buildFinalMessage
+    // call feeds both surfaces, so disk and display can never diverge.
+    expect(turns[0].message).toBe(messages[messages.length - 1].message)
+    expect(turns[0].message.body).toBe('Done.')
+    expect(turns[0].message.toolCalls?.[0].call.kind).toBe('cli_command')
+  })
+
+  it('mid-turn kill: closeSession settles the running block with the synthetic final AND the bind cwd', () => {
+    // The regression the rev-2 design exists for: breaker trip / kill switch
+    // runs spawner.close() — cwdByThread wiped, turn window dropped — BEFORE
+    // the PTY exit callback reaches the bridge. The bind-time cwd is the only
+    // surviving root, and it must arrive here by construction.
+    const { bridge, messages, turns } = recordingTurns()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeText('Partial answer') + '\n')
+    bridge.observe('s1', block)
+    expect(turns).toEqual([])
+
+    bridge.closeSession('s1')
+
+    expect(turns).toHaveLength(1)
+    expect(turns[0].threadId).toBe('thread-A')
+    expect(turns[0].cwd).toBe('/repo/root')
+    expect(turns[0].message).toBe(messages[messages.length - 1].message)
+    expect(turns[0].message.body).toBe('Partial answer')
+    const result = turns[0].message.toolCalls?.[0].result
+    expect(result?.ok).toBe(false)
+    if (result && !result.ok) {
+      expect(result.error.message).toBe('session terminated')
+    }
+  })
+
+  it('cancelled block: the final message + cwd still surface exactly once', () => {
+    const { bridge, turns } = recordingTurns()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    const block = startedBlock('s1', 'claude --print "x"')
+    const r = cancelBlock(block, 5000)
+    if (!r.ok) throw new Error(r.error)
+    bridge.observe('s1', r.value)
+    bridge.observe('s1', r.value)
+
+    expect(turns).toHaveLength(1)
+    expect(turns[0].cwd).toBe('/repo/root')
+    expect(turns[0].message.toolCalls?.[0].result?.ok).toBe(false)
   })
 })

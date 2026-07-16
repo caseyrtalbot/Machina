@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { ThreadMessage, ToolCall } from '@shared/thread-types'
+// Loads the thread:changed subscription app-wide (P3 step 4): main-persisted
+// appends reconcile the open thread from disk; this hook itself is
+// display-only (its thread:save calls are metadata merges for cli threads).
+import '../store/thread-sync'
 import { useThreadStore } from '../store/thread-store'
 import { useDockStore } from '../store/dock-store'
 import { AUTH_ERROR_BODY } from '../panels/agent-shell/ThreadMessage'

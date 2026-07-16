@@ -1,4 +1,5 @@
-import { typedHandle } from '../typed-ipc'
+import { typedHandle, typedSend } from '../typed-ipc'
+import { getMainWindow } from '../window-registry'
 import { ThreadStorage } from '../services/thread-storage'
 import type { Thread } from '../../shared/thread-types'
 
@@ -24,7 +25,39 @@ export function registerThreadIpc(): void {
   })
 
   typedHandle('thread:save', async ({ vaultPath, thread }) => {
-    await new ThreadStorage(vaultPath).saveThread(thread)
+    // Persistence-authority cutover (P3 step 4, contracts §4 v1.3.3): the
+    // renderer never writes MESSAGES for cli threads — main appends them, so
+    // a renderer save is a metadata merge and a stale in-memory messages
+    // array can neither double-append nor clobber a main-appended reply.
+    // The cli-vs-native branch keys off the ON-DISK agent inside the write
+    // queue (never the payload — see saveThreadFromRenderer).
+    await new ThreadStorage(vaultPath).saveThreadFromRenderer(thread)
+  })
+
+  // Main-owned status-message persistence (P3 step 4, contracts §4 v1.3.3):
+  // renderer-minted dispatch-refusal / start-status system messages ride this
+  // serialized append instead of thread:save (whose cli meta-merge drops
+  // messages by design). Main mints the record — role is 'system' by
+  // construction, so the assistant/user exactly-once authority stays intact.
+  typedHandle('thread:append-system', async ({ vaultPath, threadId, body }) => {
+    const appended = await new ThreadStorage(vaultPath).appendMessage(threadId, {
+      role: 'system',
+      body,
+      sentAt: new Date().toISOString()
+    })
+    if (appended) {
+      const window = getMainWindow()
+      if (window) typedSend(window, 'thread:changed', { root: vaultPath, threadId })
+    }
+    return { ok: appended }
+  })
+
+  typedHandle('thread:read', async ({ vaultPath, id }) => {
+    try {
+      return await new ThreadStorage(vaultPath).readThread(id)
+    } catch {
+      return null
+    }
   })
 
   typedHandle('thread:create', async ({ vaultPath, agent, model, title }) => {

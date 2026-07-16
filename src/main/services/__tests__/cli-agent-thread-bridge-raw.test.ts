@@ -38,7 +38,7 @@ function recordingRaw(): {
     onMessage: (event) => messages.push(event),
     onTurnComplete: (threadId) => turns.push(threadId)
   })
-  bridge.bind('s1', 'thread-R', 'raw')
+  bridge.bind('s1', 'thread-R', '/v', 'raw')
   return { bridge, messages, turns }
 }
 
@@ -50,7 +50,7 @@ describe('CliAgentThreadBridge marked raw invocations', () => {
       onMessage: (event) => messages.push(event),
       onTurnComplete: (threadId) => turns.push(threadId)
     })
-    bridge.bind('s1', 'thread-A', 'claude')
+    bridge.bind('s1', 'thread-A', '/v', 'claude')
 
     expect(bridge.expectRawInvocation('s1', 'mytool run')).toBe(false)
     bridge.observe('s1', completed(rawBlock('known-human', 'npm test')))

@@ -39,6 +39,7 @@ import { FsErrorLog } from './services/fs-error-log'
 import { ClaudeStatusService } from './services/claude-status-service'
 import { getMainWindow, setMainWindow } from './window-registry'
 import { QuitCoordinator } from './services/quit-coordinator'
+import { drainThreadWrites } from './services/thread-write-queue'
 import {
   installMainLogger,
   logRendererConsole,
@@ -522,6 +523,16 @@ app.on('before-quit', (event) => {
     logCleanupResult('mcp stop', cleanupResults[0])
     logCleanupResult('shell shutdown', cleanupResults[1])
     logCleanupResult('vault watcher stop', cleanupResults[2])
+
+    // Step 4: drain pending thread-file writes AFTER the shell shutdown —
+    // PTYs killed above settle their running blocks and enqueue synthetic
+    // assistant finals, and those detached appends (P3 step 4: main is the
+    // sole transcript writer) must reach disk before the process exits.
+    try {
+      await drainThreadWrites()
+    } catch (err) {
+      console.error('[quit] thread write drain failed', err)
+    }
   })()
     .catch((err) => {
       console.error('[quit] cleanup failed', err)
