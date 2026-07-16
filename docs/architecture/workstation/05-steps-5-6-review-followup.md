@@ -9,9 +9,9 @@ a symlink-aliased workspace root disengaged the whole containment gate — turn
 attribution is PATH identity now (realpath-canonicalized both sides). The
 durable statements of the fixes live in the §8 v1.2.7 changelog entry in
 `01-interface-contracts.md` and the step 5/6 DONE blocks (+ v1.2.7 amendment)
-in `04-phase-2-specs.md`; the HANDOFF.md "What Phase 2 step 5/6 changed under
-you" sections carry the cross-session facts. Everything below is kept as the
-historical record of what the review caught.
+in `04-phase-2-specs.md`; the cross-session facts live in the §8 v1.2.5–v1.2.7
+changelog entries. Everything below is kept as the historical record of what
+the review caught.
 
 Steps 5 (`5b1589d`, per-agent revert UI, contracts v1.2.5) and 6 (`24d53e1`, budget
 stack + circuit breakers + kill switch, contracts v1.2.6) LANDED on main and each

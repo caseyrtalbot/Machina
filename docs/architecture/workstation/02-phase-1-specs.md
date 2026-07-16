@@ -23,7 +23,7 @@ Cross-step rules:
 
 Replace the vault singleton with `WorkspaceService`; open any folder; per-turn cwd from
 the renderer; MCP aliases. No dependency on later steps. Shipped as specced with two
-additions recorded in HANDOFF.md: the stale e2e suite was repaired to the current UI
+additions recorded here: the stale e2e suite was repaired to the current UI
 (one `test.fixme` against the known-open titlebar drag issue), and no
 `getActiveVaultRoot()` bridge exists — later steps resolve root via
 `getWorkspaceService().current()`.
@@ -208,12 +208,20 @@ headMoved banner + audit entry**.
 > ~110 new step-4 tests), build green, e2e 17 passed / 1 fixme-skipped, Playwright
 > smoke probe 7/7 (ctrl+backquote spawn, PTY cwd == workspace root via lsof, closed
 > tab leaves no orphan shell, relaunch restores strip at persisted cwd, .ts renders
-> CodeMirror, autosave lands on disk). Post-review hardening beyond this spec is
-> recorded in HANDOFF.md "What step 4 changed under you". **Manual migration
-> acceptance (tick-counter continuity, Casey observing): CLOSED 2026-07-14 at
-> workstation Phase 3 step 3** — the run passed live (consecutive ticks
-> strip→canvas→strip, same PTY); evidence in that step's DONE block in
-> `06-phase-3-specs.md`. No unticked exit items remain.
+> CodeMirror, autosave lands on disk). **Manual migration acceptance (tick-counter
+> continuity, Casey observing): CLOSED 2026-07-14 at workstation Phase 3 step 3** —
+> the run passed live (consecutive ticks strip→canvas→strip, same PTY); evidence in
+> that step's DONE block in `06-phase-3-specs.md`. No unticked exit items remain.
+>
+> Post-review hardening residuals (permanent record). Open engineering residual:
+> pendingKill parking handles the close-before-bind race, but a
+> spawn-then-instant-thread-switch (or thread delete) before the webview reports
+> `session-created` still leaks one PTY — the reporting webview unmounts; the real
+> fix is host-side sessionId pre-allocation (extend `terminal:create` to accept a
+> caller-supplied id), left for later terminal work. Deliberately-not-done cosmetic
+> residuals: strip webviews have no render-process-gone recovery; ctrl+backquote
+> does not reach the host while a terminal webview has focus (webview isolation); a
+> PTY that exits while its strip webview is unmounted respawns fresh on revisit.
 
 Editor center and agent panel already exist (EditorPanel routes non-.md to
 CodeFileEditor/CodeMirror 6; ThreadPanel is the agent panel) — the build is the terminal
@@ -312,7 +320,13 @@ commit carries the `Machina-Agent: test-fixer` trailer. Deviations (harness:crea
 root semantics, persisted thread agentId) are in contracts §8 (v1.1.3). Two smoke
 findings worth knowing: harness-run waits for the fresh PTY's first prompt (via
 block-store) before sending the first turn — typing into a half-initialized shell
-loses the reply (see HANDOFF step-6 §6/§7); and the smoke exposed a STALE INSTALLED
+loses the reply (the te preexec hook is not live before rc init finishes, so the
+block's command is mis-derived from the prompt echo at command-end,
+`detectAgentFromCommand` fails, and the reply is silently never mirrored; humans
+never hit it — they type seconds after spawn; write attribution is unaffected either
+way. Since contracts v1.3.3, main's BlockWatcher-fed readiness wait before EVERY
+send is the primary defense — the renderer poll is a harmless double wait); and the
+smoke exposed a STALE INSTALLED
 `~/.te.zsh` on this machine (predating the `cmd=` command-start key), which silently
 broke agent-reply detection for ALL cli threads — fixed by re-installing the bundled
 hook (the app's "Set up shell hooks" flow).
@@ -358,13 +372,24 @@ whose first message contains the composed harness prompt and receives a reply th
 the stock `claude --print` invocation; a harness-run write lands in the approvals tray
 attributed `test-fixer` and its approved commit carries the slug trailer.
 
-## Tracer-bullet exit bar (Phase 1 done) — **MET** (2026-07-06, Casey-confirmed on the running app; run record in HANDOFF.md "Definition of done")
+## Tracer-bullet exit bar (Phase 1 done) — **MET** (2026-07-06, Casey-confirmed on the running app; run record below)
 
 On a real repo (e.g. `strength-engine`), in one sitting: open the repo (step 1) → spawn
 a terminal in it (step 4) → create the test-fixer harness (step 6) → run it, watch the
 turn (steps 3/6) → approve the diff from the tray (steps 2/3) → see the
 `Machina-Agent: test-fixer` commit and `revertAgent` cleanly undo it (step 2) — with
 `npm run check` green and every safety invariant (PLAN.md) intact.
+
+**Run record:** Casey ran the full path manually on the running dev app (2026-07-06),
+on a real repo with a deliberately broken test: palette create (six entries, verify.sh
+0555, duplicate-create refused), palette run (cli-claude thread fixed the failing
+test), tray approve, `Machina-Agent: test-fixer` + `Machina-Session` trailers on the
+approved commit, then `window.api.git.revertAgent('test-fixer')` from the DevTools
+console returned `ok: true` and produced a `Machina-Reverts` commit restoring the
+pre-agent tree. All checks reported good. This confirmation followed the earlier
+automated transcripts (step-6 smoke 11/11; step-5 P1/P2 in
+`03-snapshot-retirement-evidence.md`). Phase 2 step 5 later shipped the tray revert UI
+(revertAgent was console/IPC-only at this run).
 
 ## Deferred / accepted residuals (do not silently re-litigate)
 

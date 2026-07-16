@@ -516,8 +516,9 @@ Parallel-safe with step 7.
 
 Retire the last Phase-1 residual: `revertAgent` is backend-complete (channel
 `ipc-channels.ts:322-325`, handler `ipc/git.ts:190-194`, preload `index.ts:220`) with
-ZERO renderer callers and no enumeration IPC — the exact gap named in HANDOFF's
-definition-of-done record. Extract a read-only `listAgentCommits` from the existing
+ZERO renderer callers and no enumeration IPC — the exact gap named in the Phase-1
+tracer-bullet run record (`02-phase-1-specs.md`). Extract a read-only
+`listAgentCommits` from the existing
 trailer log-walk (`git-service.ts:384-402` — same single git-log invocation, group
 instead of filter), and surface revert in the ApprovalsTray popover (the established
 git-consequences surface — OQ5) plus palette entries, behind a confirm dialog with honest
