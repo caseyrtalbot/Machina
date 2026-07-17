@@ -7,8 +7,17 @@
  * disk and stay owned by the approvals queue.
  */
 
-/** What escalated: the breaker's four trip inputs (contracts §5 v1.2.6). */
-export type BreakerReason = 'velocity' | 'forbidden-writes' | 'head-moved' | 'max-turns'
+/**
+ * What escalated: the breaker's trip inputs (contracts §5 v1.2.6;
+ * 'max-spend' added in Phase 3 step 5 — notice-class ONLY, structurally
+ * kill-incapable until step 6 calibrates the loop-level disarm).
+ */
+export type BreakerReason =
+  | 'velocity'
+  | 'forbidden-writes'
+  | 'head-moved'
+  | 'max-turns'
+  | 'max-spend'
 
 /**
  * What the trip did. 'killed' = the thread's PTY was closed (the containment

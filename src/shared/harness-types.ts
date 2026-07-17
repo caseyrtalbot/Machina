@@ -189,8 +189,9 @@ export function validateHarnessScope(
  * Harness budgets (contracts §5, ENFORCED since Phase 2 step 6):
  * `maxWritesPerMinute` is the write-rate-limiter threshold, PER THREAD
  * (per-thread-per-slug semantics — N concurrent threads bound to one slug
- * each get the full threshold; per-slug aggregation is Phase 3's loop
- * scheduler); `maxTurns` is CLI invocations per thread, counted at
+ * each get the full threshold; per-slug aggregation is the opt-in
+ * `maxWritesPerMinutePerSlug` / `maxTurnsPerSlug` pair since Phase 3
+ * step 5); `maxTurns` is CLI invocations per thread, counted at
  * `CliTurnRegistry.turnStarted` (OQ2 — agent-internal iterations are
  * invisible in the --print model). Budgets SNAPSHOT into the thread's
  * binding at harness:run time; post-bind SKILL.md edits affect the next
@@ -199,12 +200,33 @@ export function validateHarnessScope(
 export interface HarnessBudgets {
   readonly maxTurns: number
   readonly maxWritesPerMinute: number
+  /**
+   * Aggregate CLI-invocation ceiling across ALL threads of this (root, slug),
+   * per app run (Phase 3 step 5). Absent = no aggregate enforcement — the
+   * opt-in second ceiling beside the per-thread `maxTurns`.
+   */
+  readonly maxTurnsPerSlug?: number
+  /**
+   * Aggregate write-rate ceiling (writes/min) across all threads of the slug
+   * in one root (Phase 3 step 5). Absent = per-thread limiter only.
+   */
+  readonly maxWritesPerMinutePerSlug?: number
 }
 
-/** Hard builder bounds: finite positive integers, generous enough for an attended run. */
+const REQUIRED_BUDGET_KEYS = ['maxTurns', 'maxWritesPerMinute'] as const
+const OPTIONAL_BUDGET_KEYS = ['maxTurnsPerSlug', 'maxWritesPerMinutePerSlug'] as const
+
+/**
+ * Hard builder bounds: finite positive integers, generous enough for an
+ * attended run. The aggregate ceilings are deliberately wider than their
+ * per-thread siblings: an aggregate over N threads legitimately exceeds the
+ * per-thread maxima.
+ */
 export const HARNESS_BUDGET_BOUNDS = {
   maxTurns: { min: 1, max: 100 },
-  maxWritesPerMinute: { min: 1, max: 120 }
+  maxWritesPerMinute: { min: 1, max: 120 },
+  maxTurnsPerSlug: { min: 1, max: 1000 },
+  maxWritesPerMinutePerSlug: { min: 1, max: 600 }
 } as const
 
 export function validateHarnessBudgets(
@@ -214,14 +236,18 @@ export function validateHarnessBudgets(
     return { ok: false, error: 'budgets must be an object' }
   }
   const candidate = value as Record<string, unknown>
-  const unknown = Object.keys(candidate).filter(
-    (key) => key !== 'maxTurns' && key !== 'maxWritesPerMinute'
-  )
+  const known: readonly string[] = [...REQUIRED_BUDGET_KEYS, ...OPTIONAL_BUDGET_KEYS]
+  const unknown = Object.keys(candidate).filter((key) => !known.includes(key))
   if (unknown.length > 0) {
     return { ok: false, error: `budgets has unknown field(s): ${unknown.join(', ')}` }
   }
-  for (const key of ['maxTurns', 'maxWritesPerMinute'] as const) {
+  for (const key of [...REQUIRED_BUDGET_KEYS, ...OPTIONAL_BUDGET_KEYS] as const) {
     const budget = candidate[key]
+    // Aggregate ceilings (step 5) validate only when present; absent = no
+    // aggregate enforcement.
+    if (budget === undefined && (OPTIONAL_BUDGET_KEYS as readonly string[]).includes(key)) {
+      continue
+    }
     const bounds = HARNESS_BUDGET_BOUNDS[key]
     if (
       !Number.isInteger(budget) ||
@@ -401,6 +427,25 @@ export function stripFrontmatter(md: string): string {
   return md.replace(FRONTMATTER_RE, '')
 }
 
+/**
+ * Fixed-order budgets flow mapping — the exact round-trip pair of the parser
+ * regex below: required fields first, then each optional aggregate (step 5)
+ * only when present, always in this order.
+ */
+function serializeBudgets(budgets: HarnessBudgets): string {
+  const parts = [
+    `maxTurns: ${budgets.maxTurns}`,
+    `maxWritesPerMinute: ${budgets.maxWritesPerMinute}`,
+    ...(budgets.maxTurnsPerSlug !== undefined
+      ? [`maxTurnsPerSlug: ${budgets.maxTurnsPerSlug}`]
+      : []),
+    ...(budgets.maxWritesPerMinutePerSlug !== undefined
+      ? [`maxWritesPerMinutePerSlug: ${budgets.maxWritesPerMinutePerSlug}`]
+      : [])
+  ]
+  return `{ ${parts.join(', ')} }`
+}
+
 /** Serialize exactly the hand-rolled subset parsed below. */
 export function serializeHarnessFrontmatter(frontmatter: HarnessFrontmatter): string {
   return [
@@ -409,7 +454,7 @@ export function serializeHarnessFrontmatter(frontmatter: HarnessFrontmatter): st
     `description: ${frontmatter.description}`,
     `adapter: ${frontmatter.adapter}`,
     `permissionMode: ${frontmatter.permissionMode} # immutable default (Q9)`,
-    `budgets: { maxTurns: ${frontmatter.budgets.maxTurns}, maxWritesPerMinute: ${frontmatter.budgets.maxWritesPerMinute} }`,
+    `budgets: ${serializeBudgets(frontmatter.budgets)}`,
     ...(frontmatter.invocationTemplate !== undefined
       ? [`invocationTemplate: ${frontmatter.invocationTemplate}`]
       : []),
@@ -460,14 +505,20 @@ export function parseHarnessFrontmatter(
   if (permissionMode !== 'queue-all-writes') {
     return { ok: false, error: `unsupported permissionMode: ${permissionMode}` }
   }
-  const budgetsMatch = /^\{\s*maxTurns:\s*(\d+)\s*,\s*maxWritesPerMinute:\s*(\d+)\s*\}$/.exec(
-    budgetsRaw ?? ''
-  )
+  // Still one literal shape, order-fixed (not YAML): the two aggregate
+  // ceilings (step 5) are independently optional trailing groups; bounds are
+  // re-validated through validateHarnessBudgets after the match.
+  const budgetsMatch =
+    /^\{\s*maxTurns:\s*(\d+)\s*,\s*maxWritesPerMinute:\s*(\d+)\s*(?:,\s*maxTurnsPerSlug:\s*(\d+)\s*)?(?:,\s*maxWritesPerMinutePerSlug:\s*(\d+)\s*)?\}$/.exec(
+      budgetsRaw ?? ''
+    )
   if (!budgetsMatch) return { ok: false, error: `unparseable budgets: ${budgetsRaw}` }
 
-  const budgets = {
+  const budgets: HarnessBudgets = {
     maxTurns: Number(budgetsMatch[1]),
-    maxWritesPerMinute: Number(budgetsMatch[2])
+    maxWritesPerMinute: Number(budgetsMatch[2]),
+    ...(budgetsMatch[3] !== undefined ? { maxTurnsPerSlug: Number(budgetsMatch[3]) } : {}),
+    ...(budgetsMatch[4] !== undefined ? { maxWritesPerMinutePerSlug: Number(budgetsMatch[4]) } : {})
   }
   const budgetCheck = validateHarnessBudgets(budgets)
   if (!budgetCheck.ok) return budgetCheck

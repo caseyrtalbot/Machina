@@ -11,6 +11,7 @@ import {
   appendOutput,
   completeBlock,
   cancelBlock,
+  TRUNCATION_MARKER,
   type Block,
   type BlockMetadata
 } from '@shared/engine/block-model'
@@ -766,6 +767,135 @@ describe('block-protocol integrity with interleaved human input (workstation Pha
     const finals = messages.filter((m) => m.message.metadata?.endedAt !== undefined)
     expect(finals).toHaveLength(1)
     expect(finals[0].message.body).toBe('fixed')
+  })
+})
+
+describe('CliAgentThreadBridge cost accumulation (Phase 3 step 5)', () => {
+  // Spike-shaped result record (claude 2.1.205, 2026-07-17): total_cost_usd
+  // rides the terminal result line — the block's single cost observation.
+  const claudeResultWithCost = (result: string, cost: number) =>
+    JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      result,
+      session_id: CLAUDE_SESSION,
+      total_cost_usd: cost
+    })
+
+  function recordingCosts(): {
+    bridge: CliAgentThreadBridge
+    turns: Array<{ threadId: string; costUsd: number | null }>
+  } {
+    const turns: Array<{ threadId: string; costUsd: number | null }> = []
+    const bridge = new CliAgentThreadBridge({
+      onMessage: () => {},
+      onTurnComplete: (threadId, _message, _cwd, costUsd) => turns.push({ threadId, costUsd })
+    })
+    return { bridge, turns }
+  }
+
+  function completedClaudeBlock(blockId: string, sessionId: string, output: string): Block {
+    const p = pendingBlock(blockId, meta(sessionId))
+    const r = startBlock(p, `claude --print --verbose --output-format stream-json 'hi'`, 1000)
+    if (!r.ok) throw new Error(r.error)
+    return completed(appendOutput(r.value, output), 0)
+  }
+
+  it('sums observed costs across completed blocks; the 4th arg carries each delta', () => {
+    const { bridge, turns } = recordingCosts()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    bridge.observe(
+      's1',
+      completedClaudeBlock('b1', 's1', claudeResultWithCost('first', 0.49012999999999995) + '\n')
+    )
+    bridge.observe(
+      's1',
+      completedClaudeBlock('b2', 's1', claudeResultWithCost('second', 0.01) + '\n')
+    )
+
+    expect(turns.map((t) => t.costUsd)).toEqual([0.49012999999999995, 0.01])
+    expect(bridge.getThreadCostUsd('thread-A')).toBeCloseTo(0.50013, 10)
+  })
+
+  it('closeSession does NOT reset the thread total (kill does not refill observed spend)', () => {
+    const { bridge } = recordingCosts()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    bridge.observe(
+      's1',
+      completedClaudeBlock('b1', 's1', claudeResultWithCost('done', 0.49) + '\n')
+    )
+    expect(bridge.getThreadCostUsd('thread-A')).toBe(0.49)
+
+    bridge.closeSession('s1')
+    expect(bridge.getThreadCostUsd('thread-A')).toBe(0.49)
+  })
+
+  it('mid-turn kill without a result record: the synthetic final passes costUsd null and mints no entry', () => {
+    const { bridge, turns } = recordingCosts()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    block = appendOutput(block, claudeText('partial answer') + '\n')
+    bridge.observe('s1', block)
+
+    bridge.closeSession('s1')
+
+    expect(turns).toEqual([{ threadId: 'thread-A', costUsd: null }])
+    // Unobserved is undefined — NEVER 0 (flagged-not-zeroed at the bridge).
+    expect(bridge.getThreadCostUsd('thread-A')).toBeUndefined()
+  })
+
+  it('a truncated block still yields the tail result record cost (v1.3.4 review fix)', () => {
+    // Enough stream-json lines to blow past the block model's 64KB head +
+    // 256KB tail cap, so the truncation marker lands in outputText and the
+    // bridge's incremental text parsing degrades. The terminal result record
+    // (with the cost) arrives LAST and survives intact in the retained tail
+    // — the degraded gate must not drop the money observation with the text
+    // (large tool-heavy turns are exactly the expensive ones).
+    const { bridge, turns } = recordingCosts()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    const filler = claudeText('x'.repeat(2000)) + '\n'
+    for (let i = 0; i < 180; i++) block = appendOutput(block, filler)
+    block = appendOutput(block, claudeResultWithCost('done', 1.23) + '\n')
+    block = completed(block, 0)
+    // Sanity: the cap actually engaged AND the result record survived.
+    expect(block.outputText).toContain(TRUNCATION_MARKER)
+    expect(block.outputText).toContain('"total_cost_usd":1.23')
+
+    bridge.observe('s1', block)
+    expect(turns).toEqual([{ threadId: 'thread-A', costUsd: 1.23 }])
+    expect(bridge.getThreadCostUsd('thread-A')).toBe(1.23)
+  })
+
+  it('a truncated block whose result record never arrived stays null — recovery never invents cost', () => {
+    const { bridge, turns } = recordingCosts()
+    bridge.bind('s1', 'thread-A', '/repo/root')
+    let block = startedBlock('s1', `claude --print --verbose --output-format stream-json 'hi'`)
+    const filler = claudeText('x'.repeat(2000)) + '\n'
+    for (let i = 0; i < 180; i++) block = appendOutput(block, filler)
+    block = completed(block, 1)
+    expect(block.outputText).toContain(TRUNCATION_MARKER)
+
+    bridge.observe('s1', block)
+    expect(turns).toEqual([{ threadId: 'thread-A', costUsd: null }])
+    expect(bridge.getThreadCostUsd('thread-A')).toBeUndefined()
+  })
+
+  it('cost-unobservable streams (codex/gemini) mint no entry — undefined, never 0', () => {
+    const { bridge, turns } = recordingCosts()
+    bridge.bind('s-codex', 'thread-C', '/repo/root')
+    let codexBlock = startedBlock('s-codex', `codex exec --json --skip-git-repo-check 'hi'`)
+    codexBlock = appendOutput(codexBlock, codexLines.join('\n') + '\n')
+    bridge.observe('s-codex', completed(codexBlock, 0))
+    expect(turns).toEqual([{ threadId: 'thread-C', costUsd: null }])
+    expect(bridge.getThreadCostUsd('thread-C')).toBeUndefined()
+
+    bridge.bind('s-gem', 'thread-G', '/repo/root')
+    let gemBlock = startedBlock('s-gem', `gemini -p 'hi'`)
+    gemBlock = appendOutput(gemBlock, claudeResultWithCost('looks like cost', 9.99) + '\n')
+    bridge.observe('s-gem', completed(gemBlock, 0))
+    // gemini has no parseEvent: even cost-shaped output is never extracted.
+    expect(bridge.getThreadCostUsd('thread-G')).toBeUndefined()
   })
 })
 

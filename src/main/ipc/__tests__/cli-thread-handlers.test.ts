@@ -347,11 +347,21 @@ describe('checkMaxTurnsOnTurnStarted', () => {
   function makeBreaker() {
     return { noteTurnStarted: vi.fn(), noteMaxTurns: vi.fn() }
   }
-  const info = { threadId: 'th1', agentId: 'test-fixer', cwd: '/repo', invocationCount: 11 }
+  const info = {
+    threadId: 'th1',
+    agentId: 'test-fixer',
+    cwd: '/repo',
+    invocationCount: 11,
+    slugInvocationCount: 11
+  }
 
   it('resets the breaker episode on EVERY turn, then trips when the count exceeds the budget', () => {
     const breaker = makeBreaker()
-    checkMaxTurnsOnTurnStarted(info, () => ({ maxTurns: 10, maxWritesPerMinute: 10 }), breaker)
+    checkMaxTurnsOnTurnStarted(
+      info,
+      () => ({ slug: 'test-fixer', budgets: { maxTurns: 10, maxWritesPerMinute: 10 } }),
+      breaker
+    )
     expect(breaker.noteTurnStarted).toHaveBeenCalledExactlyOnceWith({
       threadId: 'th1',
       agentId: 'test-fixer'
@@ -368,7 +378,7 @@ describe('checkMaxTurnsOnTurnStarted', () => {
     const breaker = makeBreaker()
     checkMaxTurnsOnTurnStarted(
       { ...info, invocationCount: 10 },
-      () => ({ maxTurns: 10, maxWritesPerMinute: 10 }),
+      () => ({ slug: 'test-fixer', budgets: { maxTurns: 10, maxWritesPerMinute: 10 } }),
       breaker
     )
     expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
@@ -379,6 +389,135 @@ describe('checkMaxTurnsOnTurnStarted', () => {
     checkMaxTurnsOnTurnStarted({ ...info, invocationCount: 999 }, () => undefined, breaker)
     expect(breaker.noteTurnStarted).toHaveBeenCalledTimes(1)
     expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+    // A binding WITHOUT a budgets snapshot (backfill, pre-step-6) is the
+    // same non-enforcing shape.
+    checkMaxTurnsOnTurnStarted(
+      { ...info, invocationCount: 999 },
+      () => ({ slug: 'test-fixer' }),
+      breaker
+    )
+    expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+  })
+})
+
+// ── Phase 3 step 5: per-(root, slug) aggregate ceiling (maxTurnsPerSlug) ──
+
+describe('checkMaxTurnsOnTurnStarted slug aggregate (step 5)', () => {
+  function makeBreaker() {
+    return { noteTurnStarted: vi.fn(), noteMaxTurns: vi.fn() }
+  }
+  const base = { agentId: 'test-fixer', cwd: '/repo' }
+  const budgets = { maxTurns: 10, maxWritesPerMinute: 10, maxTurnsPerSlug: 5 }
+  const binding = { slug: 'test-fixer', budgets }
+
+  it('an absent maxTurnsPerSlug never trips on the aggregate (attended parity)', () => {
+    const breaker = makeBreaker()
+    checkMaxTurnsOnTurnStarted(
+      { ...base, threadId: 'thA', invocationCount: 1, slugInvocationCount: 999 },
+      () => ({ slug: 'test-fixer', budgets: { maxTurns: 10, maxWritesPerMinute: 10 } }),
+      breaker
+    )
+    expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+  })
+
+  it('aggregate budget N allows exactly N invocations; the N+1th trips on the breaching thread', () => {
+    const breaker = makeBreaker()
+    // Thread A sends 3, thread B sends 2 — aggregate exactly 5, no trip.
+    const sends = [
+      { threadId: 'thA', invocationCount: 1, slugInvocationCount: 1 },
+      { threadId: 'thA', invocationCount: 2, slugInvocationCount: 2 },
+      { threadId: 'thB', invocationCount: 1, slugInvocationCount: 3 },
+      { threadId: 'thA', invocationCount: 3, slugInvocationCount: 4 },
+      { threadId: 'thB', invocationCount: 2, slugInvocationCount: 5 }
+    ]
+    for (const send of sends) {
+      checkMaxTurnsOnTurnStarted({ ...base, ...send }, () => binding, breaker)
+    }
+    expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+    // B's next send breaches the aggregate while both per-thread counts sit
+    // far under maxTurns — the trip lands on the thread that fired it.
+    checkMaxTurnsOnTurnStarted(
+      { ...base, threadId: 'thB', invocationCount: 3, slugInvocationCount: 6 },
+      () => binding,
+      breaker
+    )
+    expect(breaker.noteMaxTurns).toHaveBeenCalledExactlyOnceWith({
+      threadId: 'thB',
+      agentId: 'test-fixer',
+      scope: 'slug',
+      invocationCount: 6,
+      maxTurns: 5
+    })
+  })
+
+  it('a per-thread breach still trips independently, without the slug scope', () => {
+    const breaker = makeBreaker()
+    checkMaxTurnsOnTurnStarted(
+      { ...base, threadId: 'thA', invocationCount: 11, slugInvocationCount: 3 },
+      () => binding,
+      breaker
+    )
+    expect(breaker.noteMaxTurns).toHaveBeenCalledExactlyOnceWith({
+      threadId: 'thA',
+      agentId: 'test-fixer',
+      invocationCount: 11,
+      maxTurns: 10
+    })
+  })
+
+  it('both ceilings breached ⇒ a single noteMaxTurns call (per-thread first, early return)', () => {
+    const breaker = makeBreaker()
+    checkMaxTurnsOnTurnStarted(
+      { ...base, threadId: 'thA', invocationCount: 11, slugInvocationCount: 6 },
+      () => binding,
+      breaker
+    )
+    expect(breaker.noteMaxTurns).toHaveBeenCalledTimes(1)
+    expect(breaker.noteMaxTurns.mock.calls[0][0]).toMatchObject({ maxTurns: 10 })
+  })
+
+  it('a turn counted under a foreign pool is never judged against the slug ceiling (v1.3.4 review fix)', () => {
+    // Degraded attribution (registry-error / adapter-unknown): the turn's
+    // agentId fell back to the adapter identity, so slugInvocationCount is
+    // the SHARED cli-claude pool — here inflated to 61 by unrelated ad-hoc
+    // traffic. Judging it against this binding's maxTurnsPerSlug (50) would
+    // kill-class a thread whose real slug aggregate is untouched.
+    const breaker = makeBreaker()
+    const degradedBinding = {
+      slug: 'test-fixer',
+      budgets: { maxTurns: 100, maxWritesPerMinute: 10, maxTurnsPerSlug: 50 }
+    }
+    checkMaxTurnsOnTurnStarted(
+      {
+        threadId: 'thA',
+        agentId: 'cli-claude',
+        cwd: '/repo',
+        invocationCount: 1,
+        slugInvocationCount: 61
+      },
+      () => degradedBinding,
+      breaker
+    )
+    expect(breaker.noteMaxTurns).not.toHaveBeenCalled()
+    // The per-thread ceiling is pool-independent and still binds the
+    // degraded turn.
+    checkMaxTurnsOnTurnStarted(
+      {
+        threadId: 'thA',
+        agentId: 'cli-claude',
+        cwd: '/repo',
+        invocationCount: 101,
+        slugInvocationCount: 62
+      },
+      () => degradedBinding,
+      breaker
+    )
+    expect(breaker.noteMaxTurns).toHaveBeenCalledExactlyOnceWith({
+      threadId: 'thA',
+      agentId: 'cli-claude',
+      invocationCount: 101,
+      maxTurns: 100
+    })
   })
 })
 

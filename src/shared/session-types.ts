@@ -81,6 +81,14 @@ export interface AgentStreamEvent {
    * it only when no assistant event produced text (defensive fallback).
    */
   readonly resultText: string | null
+  /**
+   * USD cost carried by this event, or null. Only claude's terminal
+   * `type:'result'` record carries one (`total_cost_usd`, spike-verified
+   * 2026-07-17, claude 2.1.205). codex `--json` emits token counts only, no
+   * USD field (codex-cli 0.144.5 spike); gemini/raw have no parseEvent.
+   * null = "no cost observation on this event", never "cost was zero".
+   */
+  readonly costUsd: number | null
 }
 
 export interface AgentAdapter {

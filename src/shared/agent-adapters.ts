@@ -498,6 +498,7 @@ function parseClaudeEvent(line: string): AgentStreamEvent | null {
   const texts: string[] = []
   const tools: ToolCall[] = []
   let resultText: string | null = null
+  let costUsd: number | null = null
   if (obj.type === 'assistant' && isRecord(obj.message) && Array.isArray(obj.message.content)) {
     for (const part of obj.message.content) {
       if (!isRecord(part)) continue
@@ -507,17 +508,28 @@ function parseClaudeEvent(line: string): AgentStreamEvent | null {
         tools.push({ name: part.name, inputPreview: previewOf(part.input) })
       }
     }
-  } else if (obj.type === 'result' && typeof obj.result === 'string') {
-    resultText = obj.result
+  } else if (obj.type === 'result') {
+    if (typeof obj.result === 'string') resultText = obj.result
+    // Spike-verified 2026-07-17 (claude 2.1.205): the terminal result record
+    // carries `total_cost_usd` on success AND error subtypes —
+    // error_during_execution / error_max_turns records carry cost but no
+    // string `result` field, so the cost read must not gate on the text
+    // field (a consistently-erroring loop burns real spend every firing).
+    // `modelUsage.<id>.costUSD` repeats the same value under an
+    // environment-specific key — deliberately not parsed.
+    if (typeof obj.total_cost_usd === 'number' && Number.isFinite(obj.total_cost_usd)) {
+      costUsd = obj.total_cost_usd
+    }
   }
-  return { agentSessionId, texts, tools, resultText }
+  return { agentSessionId, texts, tools, resultText, costUsd }
 }
 
 const EMPTY_EVENT: AgentStreamEvent = {
   agentSessionId: null,
   texts: [],
   tools: [],
-  resultText: null
+  resultText: null,
+  costUsd: null
 }
 
 /** One line of `codex exec --json` (experimental JSONL event stream). */
@@ -525,7 +537,7 @@ function parseCodexEvent(line: string): AgentStreamEvent | null {
   const obj = parseJsonRecordLine(line)
   if (obj === null) return null
   if (obj.type === 'thread.started' && typeof obj.thread_id === 'string') {
-    return { agentSessionId: obj.thread_id, texts: [], tools: [], resultText: null }
+    return { agentSessionId: obj.thread_id, texts: [], tools: [], resultText: null, costUsd: null }
   }
   if (obj.type === 'item.completed' && isRecord(obj.item)) {
     const item = obj.item
@@ -536,14 +548,21 @@ function parseCodexEvent(line: string): AgentStreamEvent | null {
           ? item.item_type
           : null
     if (itemType === 'agent_message' && typeof item.text === 'string') {
-      return { agentSessionId: null, texts: [item.text], tools: [], resultText: null }
+      return {
+        agentSessionId: null,
+        texts: [item.text],
+        tools: [],
+        resultText: null,
+        costUsd: null
+      }
     }
     if (itemType !== null && itemType !== 'agent_message' && itemType !== 'reasoning') {
       return {
         agentSessionId: null,
         texts: [],
         tools: [{ name: itemType, inputPreview: previewOf(item) }],
-        resultText: null
+        resultText: null,
+        costUsd: null
       }
     }
   }

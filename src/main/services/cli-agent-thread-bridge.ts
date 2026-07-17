@@ -59,10 +59,18 @@ interface CliAgentThreadBridgeOptions {
    * session — the turn-window close signal for the CliTurnRegistry
    * (workstation step 3). Since P3 step 4 (contracts §4 v1.3.3) it also
    * carries the final assistant message and the binding's bind-time cwd so
-   * main can persist the transcript line under the turn's root. Optional so
-   * existing tests stay valid; narrower callbacks keep compiling.
+   * main can persist the transcript line under the turn's root. Since P3
+   * step 5 (contracts v1.3.4) the 4th argument is the turn's observed USD
+   * cost DELTA (claude's terminal result record), or null when this turn
+   * carried no cost observation — never 0 as a stand-in for "unknown".
+   * Optional so existing tests stay valid; narrower callbacks keep compiling.
    */
-  readonly onTurnComplete?: (threadId: string, message: AssistantMessage, cwd: string) => void
+  readonly onTurnComplete?: (
+    threadId: string,
+    message: AssistantMessage,
+    cwd: string,
+    costUsd: number | null
+  ) => void
 }
 
 /** Incremental parse state for one block's structured (JSONL) output. */
@@ -81,6 +89,9 @@ interface StreamState {
   tools: ParsedToolCall[]
   /** Agent-native session id (claude session_id / codex thread_id). */
   agentSessionId: string | null
+  /** Observed USD cost for this block (claude's terminal result record);
+   *  null = no cost observation, never "cost was zero" (step 5). */
+  costUsd: number | null
 }
 
 function newStreamState(): StreamState {
@@ -91,7 +102,8 @@ function newStreamState(): StreamState {
     sawAssistantText: false,
     degraded: false,
     tools: [],
-    agentSessionId: null
+    agentSessionId: null,
+    costUsd: null
   }
 }
 
@@ -126,6 +138,11 @@ export class CliAgentThreadBridge {
   /** threadId → agent-native session id. Outlives PTY sessions on purpose:
    *  the spawner resumes the conversation across respawns within this app run. */
   private readonly agentSessionIdByThread = new Map<string, string>()
+  /** threadId → cumulative observed USD across completed blocks this app run
+   *  (step 5). Entries are minted ONLY on an observed cost (no entry ≠ $0)
+   *  and survive closeSession: a kill must not erase observed spend — the
+   *  invocationCounts / agentSessionIdByThread precedent. */
+  private readonly costUsdByThread = new Map<string, number>()
 
   constructor(private readonly opts: CliAgentThreadBridgeOptions) {}
 
@@ -177,6 +194,12 @@ export class CliAgentThreadBridge {
     return this.agentSessionIdByThread.get(threadId)
   }
 
+  /** Cumulative observed USD for the thread this app run, or undefined when
+   *  no cost was ever observed — never coerced to 0 (flagged-not-zeroed). */
+  getThreadCostUsd(threadId: string): number | undefined {
+    return this.costUsdByThread.get(threadId)
+  }
+
   observe(sessionId: string, block: Block): void {
     const binding = this.bindings.get(sessionId)
     if (!binding) return
@@ -217,9 +240,10 @@ export class CliAgentThreadBridge {
     }
     const message = buildFinalMessage(block, agent, state)
     this.opts.onMessage({ threadId: binding.threadId, message })
+    this.accumulateCost(binding.threadId, state.costUsd)
     // After the final message: the write-linger window opens from the block's
     // completion, and emittedBlockIds already guarantees once-per-block.
-    this.opts.onTurnComplete?.(binding.threadId, message, binding.cwd)
+    this.opts.onTurnComplete?.(binding.threadId, message, binding.cwd, state.costUsd)
   }
 
   closeSession(sessionId: string): void {
@@ -249,7 +273,16 @@ export class CliAgentThreadBridge {
     binding.emittedBlockIds.add(blockId)
     const message = buildFinalMessage(block, agent, state)
     this.opts.onMessage({ threadId: binding.threadId, message })
-    this.opts.onTurnComplete?.(binding.threadId, message, binding.cwd)
+    // A mid-turn kill whose result record never arrived observes nothing:
+    // state.costUsd stays null — honest, not zeroed. The final drain above
+    // can still surface a cost when the result line landed before PTY death.
+    this.accumulateCost(binding.threadId, state.costUsd)
+    this.opts.onTurnComplete?.(binding.threadId, message, binding.cwd, state.costUsd)
+  }
+
+  private accumulateCost(threadId: string, costUsd: number | null): void {
+    if (costUsd === null) return
+    this.costUsdByThread.set(threadId, (this.costUsdByThread.get(threadId) ?? 0) + costUsd)
   }
 }
 
@@ -285,11 +318,16 @@ function drainStructuredOutput(
   parseEvent: (line: string) => AgentStreamEvent | null,
   final: boolean
 ): string {
-  if (state.degraded) return ''
-  if (block.outputText.includes(TRUNCATION_MARKER)) {
+  if (state.degraded || block.outputText.includes(TRUNCATION_MARKER)) {
     // The block model capped the output (head + marker + tail): line indices
-    // are no longer stable, so stop incremental parsing and keep what we have.
+    // are no longer stable, so stop incremental parsing and keep what we
+    // have. But claude's terminal `result` record — the block's single cost
+    // observation — arrives LAST, so it survives intact in the retained
+    // tail: on the final pass, rescan for the cost alone. Dropping it with
+    // the text would make exactly the biggest (most expensive) turns
+    // invisible to the spend floor (v1.3.4 review fix).
     state.degraded = true
+    if (final) recoverDegradedCost(state, block, parseEvent)
     return ''
   }
   const cleaned = stripTerminalControls(block.outputText)
@@ -297,8 +335,10 @@ function drainStructuredOutput(
   const completeCount = final ? lines.length : lines.length - 1
   if (completeCount < state.consumedLines) {
     // Output rewrote itself under us (late-completing escape sequence across
-    // a newline). Bail out of incremental mode rather than re-emit text.
+    // a newline). Bail out of incremental mode rather than re-emit text —
+    // but on a final pass still rescan for the cost record (see above).
     state.degraded = true
+    if (final) recoverDegradedCost(state, block, parseEvent)
     return ''
   }
   const before = state.extracted
@@ -310,6 +350,9 @@ function drainStructuredOutput(
     if (event === null) continue
     state.sawStructured = true
     if (event.agentSessionId !== null) state.agentSessionId = event.agentSessionId
+    // claude emits one cost per turn on the terminal result record;
+    // last-write-wins within a block.
+    if (event.costUsd !== null) state.costUsd = event.costUsd
     for (const text of event.texts) appendText(state, text)
     // claude's terminal `result` line repeats the final text — use it only
     // when no assistant event produced text (defensive fallback).
@@ -320,6 +363,27 @@ function drainStructuredOutput(
   }
   state.consumedLines = completeCount
   return state.extracted.slice(before.length)
+}
+
+/**
+ * Degraded-mode cost rescue (Phase 3 step 5 review fix): truncation or a
+ * mid-stream rewrite stops incremental TEXT extraction (line indices are
+ * unstable), but the terminal result record is still parseable wherever it
+ * survived, so the money observation is recovered by a full reparse for
+ * costUsd ONLY. Spliced partial lines around the truncation marker fail the
+ * JSON-record gate and are skipped; last observed cost wins (the genuine
+ * terminal record is last). Text/tools/session ids stay degraded — this
+ * never resurrects content, only the spend observation.
+ */
+function recoverDegradedCost(
+  state: StreamState,
+  block: Block,
+  parseEvent: (line: string) => AgentStreamEvent | null
+): void {
+  for (const raw of stripTerminalControls(block.outputText).split(/\r?\n/)) {
+    const event = parseEvent(raw)
+    if (event !== null && event.costUsd !== null) state.costUsd = event.costUsd
+  }
 }
 
 function appendText(state: StreamState, text: string): void {

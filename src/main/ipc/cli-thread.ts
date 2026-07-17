@@ -33,7 +33,6 @@ import {
   setBreakerKillCallback,
   type AgentCircuitBreaker
 } from '../services/agent-circuit-breaker'
-import type { HarnessBudgets } from '@shared/harness-types'
 import { getCliAgentThreadBridge, getShellService } from './shell'
 import { getApprovalsNotifier } from '../services/approvals-notifier'
 
@@ -74,7 +73,8 @@ function getSpawner(): CliThreadSpawner {
 /**
  * Audit label for a dispatch's entry point (Phase 3 step 4, contracts §4
  * v1.3.3): unattended dispatches must not masquerade as renderer turns in the
- * audit trail. Step 5's scheduler extends this union with its own literal.
+ * audit trail. Step 6's scheduler extends this union with its own literal
+ * (r6 corrected at step 5: the scheduler is step 6's work, contracts v1.3.4).
  */
 export type DispatchOrigin = 'cli-thread:input' | 'cli-thread:test-dispatch'
 
@@ -132,10 +132,14 @@ export function resolveRequestedModel(
  * contracts §4 v1.2.2). Every spawn/input checks the thread's main binding,
  * even when renderer agentId is absent: truly unbound threads remain clean
  * ad-hoc turns, while a modern binding recovers its authoritative slug and
- * adapter. A malformed, stale, legacy-adapter-less, unbound-forwarded, or
- * registry-unresolvable value degrades to adapter attribution and tags the
- * turn suspect. A known binding adapter that does not map exactly to the
- * requested CLI identity fails closed.
+ * adapter. A malformed or stale forwarded value on a MODERN binding (adapter
+ * known and identity-verified) also recovers the binding slug — the binding
+ * is the attribution authority, and degrading budgeted traffic to the shared
+ * adapter-identity pool would let it leak out of the slug aggregate (v1.3.4
+ * review fix) — while still tagging the turn suspect. Legacy-adapter-less,
+ * unbound-forwarded, or registry-unresolvable values degrade to adapter
+ * attribution and tag the turn suspect. A known binding adapter that does
+ * not map exactly to the requested CLI identity fails closed.
  * `ensureRootReady` runs the one-time trust-on-upgrade backfill first, so the
  * first post-relaunch turn of a legacy thread never degrades falsely.
  * Exported for handler-level tests.
@@ -175,6 +179,27 @@ export async function resolveRequestedAgentId(
       error: `agentId failed binding validation (${reason}); adapter identity used`
     })
     return { agentId: undefined, attributionSuspect: true }
+  }
+  /**
+   * Degrade variant for a MODERN binding (adapter known + identity-verified
+   * above): the untrusted forwarded value is discarded, but attribution
+   * recovers the authoritative binding slug instead of the adapter identity,
+   * so the turn stays inside its (root, slug) aggregate — turn rollup, slug
+   * write limiter, and commit trailers all key on it (v1.3.4 review fix).
+   */
+  const degradeToBoundSlug = (
+    reason: 'malformed' | 'binding-mismatch',
+    boundSlug: string
+  ): { agentId: string; attributionSuspect: true } => {
+    audit.log({
+      ts: new Date().toISOString(),
+      tool: 'cli-agent:attribution-mismatch',
+      args: { channel, threadId, requested, reason, boundSlug },
+      affectedPaths: [],
+      decision: 'denied',
+      error: `agentId failed binding validation (${reason}); binding slug recovered`
+    })
+    return { agentId: boundSlug, attributionSuspect: true }
   }
   let binding: HarnessBinding | undefined
   try {
@@ -226,9 +251,19 @@ export async function resolveRequestedAgentId(
       ...(rawTemplate.ok ? { invocationTemplate: rawTemplate.value } : {})
     }
   }
-  if (!SAFE_ID_RE.test(requested)) return degrade('malformed')
+  if (!SAFE_ID_RE.test(requested)) {
+    if (binding !== undefined && binding.adapter !== undefined) {
+      return degradeToBoundSlug('malformed', binding.slug)
+    }
+    return degrade('malformed')
+  }
   if (binding === undefined) return degrade('unbound-thread')
-  if (binding.slug !== requested) return degrade('binding-mismatch', { boundSlug: binding.slug })
+  if (binding.slug !== requested) {
+    if (binding.adapter !== undefined) {
+      return degradeToBoundSlug('binding-mismatch', binding.slug)
+    }
+    return degrade('binding-mismatch', { boundSlug: binding.slug })
+  }
   if (binding.adapter === undefined) {
     // Trust-on-upgrade and pre-step-8 bindings have no durable adapter fact.
     // Keep the ad-hoc turn usable, but never attribute it to the harness slug.
@@ -252,21 +287,54 @@ export async function resolveRequestedAgentId(
  * per-thread total INCLUDING this send, so budget N allows exactly N
  * invocations and the N+1th trips. Threads with no bound budgets snapshot
  * (ad-hoc, pre-step-6 bindings, backfills) are never budget-tripped.
- * Exported for handler-level tests.
+ *
+ * Phase 3 step 5: the same check enforces the opt-in per-(root, slug)
+ * aggregate — `maxTurnsPerSlug` against the registry's slugInvocationCount.
+ * Aggregate budget N allows exactly N invocations across all threads of the
+ * slug this app run; the N+1th trips on whichever thread fired it, reading
+ * the breaching thread's own bind-time snapshot. Absent field = no aggregate
+ * enforcement (attended parity). The lookup returns the BINDING (slug +
+ * budgets), because the slug ceiling judges ONLY the slug's own pool: a
+ * degraded-attribution turn (registry-error / adapter-unknown) counts under
+ * the shared adapter-identity key, and comparing that foreign pool's count
+ * against this binding's maxTurnsPerSlug would kill-class a thread whose
+ * real slug aggregate is untouched (v1.3.4 review fix). Exported for
+ * handler-level tests.
  */
 export function checkMaxTurnsOnTurnStarted(
   info: TurnStartedInfo,
-  budgetFor: (cwd: string, threadId: string) => HarnessBudgets | undefined,
+  bindingFor: (
+    cwd: string,
+    threadId: string
+  ) => Pick<HarnessBinding, 'slug' | 'budgets'> | undefined,
   breaker: Pick<AgentCircuitBreaker, 'noteTurnStarted' | 'noteMaxTurns'>
 ): void {
   breaker.noteTurnStarted({ threadId: info.threadId, agentId: info.agentId })
-  const budgets = budgetFor(info.cwd, info.threadId)
-  if (budgets !== undefined && info.invocationCount > budgets.maxTurns) {
+  const binding = bindingFor(info.cwd, info.threadId)
+  if (binding?.budgets === undefined) return
+  const budgets = binding.budgets
+  if (info.invocationCount > budgets.maxTurns) {
     breaker.noteMaxTurns({
       threadId: info.threadId,
       agentId: info.agentId,
       invocationCount: info.invocationCount,
       maxTurns: budgets.maxTurns
+    })
+    // Single kill per check — the breaker's killed-guard would make a second
+    // call inert anyway.
+    return
+  }
+  if (
+    budgets.maxTurnsPerSlug !== undefined &&
+    info.agentId === binding.slug &&
+    info.slugInvocationCount > budgets.maxTurnsPerSlug
+  ) {
+    breaker.noteMaxTurns({
+      threadId: info.threadId,
+      agentId: info.agentId,
+      scope: 'slug',
+      invocationCount: info.slugInvocationCount,
+      maxTurns: budgets.maxTurnsPerSlug
     })
   }
 }
@@ -396,7 +464,7 @@ export function registerCliThreadIpc(): void {
       }
       checkMaxTurnsOnTurnStarted(
         info,
-        (cwd, threadId) => getHarnessRunRegistry().get(cwd, threadId)?.budgets,
+        (cwd, threadId) => getHarnessRunRegistry().get(cwd, threadId),
         getAgentCircuitBreaker()
       )
     })()

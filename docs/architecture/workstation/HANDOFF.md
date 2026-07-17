@@ -4,7 +4,7 @@ You are picking up the Machina → agentic-development-workstation track. This f
 cold-start: read it, then the docs it points at (the doc map below), and you can start
 building without asking questions.
 
-## Where things stand (2026-07-15 — Phases 0–2 COMPLETE; Phase 3 steps 1–4 shipped)
+## Where things stand (2026-07-17 — Phases 0–2 COMPLETE; Phase 3 steps 1–5 shipped)
 
 **Phase 0 (seam audit + interface contracts) is COMPLETE.** The Phase 0 docs were
 adversarially re-verified by an 11-agent workflow (4 verification lenses over 52 claims,
@@ -78,17 +78,33 @@ d1–d4, residuals r1–r6; r5 closed at review). No Casey-observed gate on this
 DONE bar — the evidence is transcript-on-disk + queue-item-present with no
 renderer participation; the one Casey item is the d2 ratification bullet below.
 
+**Phase 3 step 5 is SHIPPED 2026-07-17** (contracts v1.3.4): the containment
+floor the scheduler requires, one commit before it — the opt-in per-(root, slug)
+aggregate ceilings (`maxTurnsPerSlug` / `maxWritesPerMinutePerSlug`), the slug
+turn rollup (kill never refills; per app run by design), the claude cost
+observable (`total_cost_usd`, every result subtype) feeding a notice-class
+`noteCost` breaker input and a durable monotone `AgentCostLedger` (no reset
+API), the codex spike (VERIFIED-ABSENT — token counts only), and the
+loop-traffic breaker calibration suite (numbers in the step-5 DONE block +
+`tests/main/services/agent-breaker-loop-traffic.test.ts` header). Built by a
+29-agent workflow (spikes, 2 designers + judge, 3 tracks, 5 review lenses incl.
+Codex cold read); 7 confirmed blocker/major findings fixed in-tree, 1 refuted.
+Resume-cumulativity spike RAN at landing: per-invocation, sum fold correct.
+Full record: the step-5 DONE block in `06-phase-3-specs.md` + the v1.3.4
+contracts changelog.
+
 **Next work order for the incoming team(s):**
 
-- **Next = step 5 (containment aggregation + durable budgets + cost
-  observable)**, strictly sequential AFTER step 4 per the spec's parallel map
-  (both own `ipc/cli-thread.ts`: step 5's scheduler calls the exported
-  `dispatchAgentTurn` and extends the `DispatchOrigin` union with its own audit
-  literal, residual r6), and step 5 must land strictly BEFORE step 6 (step 6
-  consumes step 5's rollups and budget headroom). OQ8 + OQ-A–E still want Casey
-  answers — recommendations are the defaults (next bullet). Steps 2 ∥ 3 landed
-  2026-07-14 (`4f6213e` v1.3.1 + `d75a62c` v1.3.2, all Casey gates PASSED); the
-  step-4 landing is the SHIPPED paragraph above. New e2e
+- **Next = step 6 (loop scheduler v1: queue-and-wait only — exit-bar-1 run)**,
+  strictly sequential after step 5 (it consumes the slug rollups, budget
+  headroom, and `spendFor`/`getThreadCostUsd` read surfaces). Named step-6
+  preconditions from step 5: fence explicit `cli-thread:spawn` into the
+  per-thread dispatch queue BEFORE the scheduler's first dispatch (upgraded
+  step-4 residual i); extend `DispatchOrigin` with the scheduler's audit
+  literal (r6 — corrected: step 6's work, not step 5's); take the js-yaml
+  scoped fix or record why not (cross-step rule); OQ8 ratification is
+  blocker-class at step 6 and OQ-D/OQ-E want answers before its commit
+  (recommendations are the defaults). New e2e
   `e2e/unattended-dispatch.spec.ts` is a serial suite sharing the Electron
   user-data dir — run it targeted/sequential, never parallel with the other
   queue e2e specs.
@@ -103,9 +119,12 @@ renderer participation; the one Casey item is the d2 ratification bullet below.
   persist via the main-owned `thread:append-system` append (contracts v1.3.3
   changelog). If you prefer display-only, the reversal is one channel + two
   renderer call sites to unwind.
-- Dependabot triage still open: `npm audit --omit=dev` reports 1 moderate production
-  vuln (js-yaml via gray-matter); Phase 3 step 6 must take the scoped fix or record
-  why not (spec cross-step rule).
+- Dependabot triage still open, and it GREW at the step-5 landing: `npm audit
+  --omit=dev` now reports the known js-yaml moderate (step 6 must take the scoped
+  fix or record why not — spec cross-step rule) PLUS a new high-severity chain,
+  adm-zip <0.6.0 via onnxruntime-node via @huggingface/transformers
+  (GHSA-xcpc-8h2w-3j85; the only fix is a breaking transformers upgrade —
+  needs a Casey call, not a step commit).
 - Two live-app observations from the 2026-07-14/15 acceptance session (pre-existing,
   deferred to the polish pass — verified NOT from the steps 2/3 diffs): (a) the
   file-tree header's vault dropdown (`VaultSelector.tsx`) does not switch
@@ -122,7 +141,7 @@ renderer participation; the one Casey item is the d2 ratification bullet below.
    invariants. Do not re-litigate the decision table.
 2. **00-seam-audit.md** — file:line evidence for every seam Phase 1 built on, plus the
    two original work orders. Has a corrections log.
-3. **01-interface-contracts.md** — the typed contracts (v1.3.3). Section 4 is the
+3. **01-interface-contracts.md** — the typed contracts (v1.3.4). Section 4 is the
    load-bearing one: read its framing before touching anything agent-related. §8 is
    the reverse-chronological changelog — new entries go at the TOP; the per-version
    entries are the durable statements of every landed deviation.
@@ -148,6 +167,34 @@ renderer participation; the one Casey item is the d2 ratification bullet below.
    investigation dossiers; both judges picked the risk design). Phase 2 is COMPLETE —
    new sessions start here. Carries its own stale-claim ledger, safety-invariant gate
    ledger, exit-bar coverage map, and open questions OQ8 + OQ-A–E.
+
+## What Phase 3 step 5 changed under you (contracts v1.3.4)
+
+1. **`checkMaxTurnsOnTurnStarted` takes a BINDING lookup now** (`Pick<HarnessBinding,
+   'slug' | 'budgets'>`), not a budgets lookup — the slug ceiling judges only the
+   slug's own pool (`info.agentId === binding.slug` guard). Per-thread maxTurns
+   trips first, single kill per check. `TurnStartedInfo` gains required
+   `slugInvocationCount`; any test building it by hand must add the field.
+2. **`resolveRequestedAgentId` recovers the binding slug on degraded MODERN
+   bindings** (malformed / binding-mismatch with adapter known): attribution stays
+   suspect but budgeted traffic can no longer leak into the shared adapter-identity
+   pool. Legacy-adapter-less / unbound / registry-error still degrade to adapter
+   identity (and are therefore outside every slug aggregate — recorded, deliberate).
+3. **Cost flows main-side only:** the bridge accumulates per-thread USD
+   (`getThreadCostUsd`, survives `closeSession`), `onTurnComplete` carries a 4th
+   cost-delta arg, `ipc/shell.ts` feeds `noteCost` (notice-class, structurally
+   kill-incapable, `'max-spend'` reason) and the durable `AgentCostLedger`
+   (`userData/agent-cost-ledger.json`, monotone, NO reset API, corrupt-load
+   audited, quit-time `flush()` in `main/index.ts`). null = unobserved, never $0.
+   Step-6 read surface: `slugInvocationCount` + `spendFor` + `getThreadCostUsd`.
+4. **`AgentWriteWatcher` gains the optional `getSlugWriteBudget` dep** (wired in
+   `ipc/git.ts` from the binding — slug + threshold); absent = byte-identical
+   routing. The slug limiter keys by the BINDING slug, never the turn's agentId.
+5. **Residuals a later step will trip on:** literal-path rollup keys (a
+   symlink-alias root splits a slug aggregate); a quit racing the cost block's
+   `ensureRootReady` await loses that increment (undercount; flush covers only the
+   load-parked half); `tests/**` is outside both tsconfigs — lint is the only
+   static gate on test files.
 
 ## What Phase 3 step 4 changed under you (contracts v1.3.3)
 

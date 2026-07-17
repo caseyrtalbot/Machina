@@ -542,7 +542,8 @@ describe('parseEvent parity with the bridge extractors', () => {
       agentSessionId: CLAUDE_SESSION,
       texts: [],
       tools: [],
-      resultText: null
+      resultText: null,
+      costUsd: null
     })
   })
 
@@ -600,7 +601,8 @@ describe('parseEvent parity with the bridge extractors', () => {
       agentSessionId: CODEX_THREAD,
       texts: [],
       tools: [],
-      resultText: null
+      resultText: null,
+      costUsd: null
     })
   })
 
@@ -627,7 +629,8 @@ describe('parseEvent parity with the bridge extractors', () => {
       agentSessionId: null,
       texts: [],
       tools: [],
-      resultText: null
+      resultText: null,
+      costUsd: null
     })
   })
 
@@ -645,7 +648,8 @@ describe('parseEvent parity with the bridge extractors', () => {
       agentSessionId: null,
       texts: [],
       tools: [],
-      resultText: null
+      resultText: null,
+      costUsd: null
     })
     expect(
       parseCodex('2026-06-10T14:08:01.334563Z ERROR codex_memories_write::phase2: no changes')
@@ -654,6 +658,110 @@ describe('parseEvent parity with the bridge extractors', () => {
 
   it('gemini has no parseEvent (raw PTY projection — the bridge contract)', () => {
     expect(ADAPTERS.gemini.parseEvent).toBeUndefined()
+  })
+})
+
+describe('costUsd observability (Phase 3 step 5, contracts v1.3.4)', () => {
+  const parseClaude = ADAPTERS.claude.parseEvent!
+  const parseCodex = ADAPTERS.codex.parseEvent!
+
+  // VERBATIM spike fixture (claude 2.1.205, spiked 2026-07-17): the terminal
+  // result line of a real `claude --print --verbose --output-format
+  // stream-json` run — `total_cost_usd` on the result record is the ONLY
+  // parsed cost source; `modelUsage.<id>.costUSD` repeats the same value
+  // under an environment-specific model-id key and is deliberately unparsed.
+  const SPIKE_CLAUDE_RESULT =
+    '{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"duration_ms":1457,"duration_api_ms":1282,"ttft_ms":1356,"ttft_stream_ms":1331,"time_to_request_ms":110,"num_turns":1,"result":"ok","stop_reason":"end_turn","session_id":"a9c19c25-8293-45e5-bf7f-bbaac3443a11","total_cost_usd":0.49012999999999995,"usage":{"input_tokens":5263,"cache_creation_input_tokens":21865,"cache_read_input_tokens":0,"output_tokens":4,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":21865,"ephemeral_5m_input_tokens":0},"inference_geo":"not_available","iterations":[{"input_tokens":5263,"output_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":21865,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":21865},"type":"message"}],"speed":"standard"},"modelUsage":{"claude-fable-5":{"inputTokens":5263,"outputTokens":4,"cacheReadInputTokens":0,"cacheCreationInputTokens":21865,"webSearchRequests":0,"costUSD":0.49012999999999995,"contextWindow":1000000,"maxOutputTokens":64000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"fa84ef09-e779-4b26-ac7b-7c5b765ef5ff"}'
+
+  // VERBATIM spike fixture (codex-cli 0.144.5, spiked 2026-07-17): the only
+  // usage-bearing record `codex exec --json` emits — token counts, NO USD
+  // field anywhere. Codex is cost-UNOBSERVABLE (verified-absent).
+  const SPIKE_CODEX_TURN_COMPLETED =
+    '{"type":"turn.completed","usage":{"input_tokens":21809,"cached_input_tokens":10496,"output_tokens":5,"reasoning_output_tokens":0}}'
+
+  const SESSION = 'a9c19c25-8293-45e5-bf7f-bbaac3443a11'
+
+  it('claude: the verbatim spike result record yields total_cost_usd', () => {
+    const event = parseClaude(SPIKE_CLAUDE_RESULT)
+    expect(event?.costUsd).toBe(0.49012999999999995)
+    expect(event?.resultText).toBe('ok')
+    expect(event?.agentSessionId).toBe(SESSION)
+    expect(event?.texts).toEqual([])
+  })
+
+  it('claude: a result record without total_cost_usd is null — modelUsage.costUSD is not a source', () => {
+    const line = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      result: 'ok',
+      session_id: SESSION,
+      modelUsage: { 'claude-fable-5': { costUSD: 0.49012999999999995 } }
+    })
+    expect(parseClaude(line)?.costUsd).toBeNull()
+  })
+
+  it('claude: error-subtype result records (no string `result`) still yield total_cost_usd (v1.3.4 review fix)', () => {
+    // Shape verified against a real error_max_turns turn (claude 2.1.205,
+    // 2026-07-17): failed turns carry cost but NO string `result` field —
+    // the cost read must not gate on the text field, or a consistently
+    // erroring loop burns real spend invisibly to the durable floor.
+    for (const subtype of ['error_max_turns', 'error_during_execution']) {
+      const line = JSON.stringify({
+        type: 'result',
+        subtype,
+        is_error: true,
+        num_turns: 1,
+        session_id: SESSION,
+        total_cost_usd: 0.0230836,
+        usage: { input_tokens: 3, output_tokens: 1 }
+      })
+      const event = parseClaude(line)
+      expect(event?.costUsd, subtype).toBe(0.0230836)
+      expect(event?.resultText, subtype).toBeNull()
+    }
+  })
+
+  it('claude: non-number and non-finite total_cost_usd values are null, never coerced', () => {
+    for (const raw of ['"0.49"', 'null', 'true', '1e999', '-1e999']) {
+      const line = `{"type":"result","result":"ok","session_id":"${SESSION}","total_cost_usd":${raw}}`
+      expect(parseClaude(line)?.costUsd, raw).toBeNull()
+    }
+  })
+
+  it('claude: system and assistant events carry costUsd null', () => {
+    const init = JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION })
+    const assistant = JSON.stringify({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+      session_id: SESSION
+    })
+    expect(parseClaude(init)?.costUsd).toBeNull()
+    expect(parseClaude(assistant)?.costUsd).toBeNull()
+  })
+
+  it('codex: the verbatim turn.completed usage record has NO cost semantics (verified-absent)', () => {
+    // Asserting the ABSENCE of cost semantics, not their presence: the event
+    // is structured (non-null) but carries no USD observation.
+    const event = parseCodex(SPIKE_CODEX_TURN_COMPLETED)
+    expect(event).not.toBeNull()
+    expect(event?.costUsd).toBeNull()
+  })
+
+  it('codex: every event shape carries costUsd null', () => {
+    const lines = [
+      JSON.stringify({ type: 'thread.started', thread_id: '019eb1da-decb-7052-a145-1ac71e4bc80b' }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { id: 'item_0', type: 'agent_message', text: 'ok' }
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { id: 'item_1', type: 'command_execution', command: 'ls' }
+      })
+    ]
+    for (const line of lines) {
+      expect(parseCodex(line)?.costUsd, line).toBeNull()
+    }
   })
 })
 

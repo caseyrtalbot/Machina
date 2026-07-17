@@ -187,6 +187,20 @@ export interface AgentWriteWatcherDeps {
    * each get the full threshold (per-thread-per-slug semantics).
    */
   readonly getWriteBudget?: (threadId: string) => number | undefined
+  /**
+   * Aggregate (root, slug) write-rate ceiling from the bound harness's
+   * bind-time budgets snapshot (`maxWritesPerMinutePerSlug`, Phase 3 step 5).
+   * Returns the BINDING slug alongside the threshold so the aggregate is
+   * keyed by the attribution authority, not the turn's possibly-degraded
+   * agentId — a degraded-attribution turn (adapter-identity fallback) must
+   * neither shard the slug's pool nor pollute the shared adapter key (v1.3.4
+   * review fix). Undefined (field absent, unbound thread, provider unwired)
+   * ⇒ the slug limiter is neither created, recorded into, nor evaluated —
+   * attended behavior is unchanged (opt-in second ceiling).
+   */
+  readonly getSlugWriteBudget?: (
+    threadId: string
+  ) => { readonly slug: string; readonly maxWritesPerMinute: number } | undefined
   /** Circuit-breaker signal port (step 6); absent = signals unwired. */
   readonly breaker?: AgentBreakerPort
 }
@@ -198,6 +212,13 @@ export class AgentWriteWatcher {
   private stopped = false
   /** Per-thread write velocity → the highVelocity flag. */
   private readonly limiters = new Map<string, WriteRateLimiter>()
+  /**
+   * Aggregate write velocity per slug (Phase 3 step 5), keyed by the BINDING
+   * slug from getSlugWriteBudget — the watcher is already per-root, so the
+   * pair is (root, slug) by construction. Instances share the per-thread
+   * limiters' process-lifetime orphaning (never evicted; accepted cost).
+   */
+  private readonly slugLimiters = new Map<string, WriteRateLimiter>()
   /** relPath → suppression expiry (ms epoch) for the gate's own git/trash ops. */
   private readonly suppressed = new Map<string, number>()
   /** Turns whose headMoved tripwire already produced its one audit entry. */
@@ -386,7 +407,17 @@ export class AgentWriteWatcher {
     if (parts.attributed.length > 0 && match !== null) {
       const paths = this.relPaths(parts.attributed)
       const limiter = this.limiterFor(match.turn.threadId)
-      for (const _ of paths) limiter.record()
+      // Aggregate (root, slug) limiter (step 5): opt-in via the budgets
+      // snapshot. When the field is absent the slug limiter is neither
+      // created, recorded into, nor evaluated — routing is byte-identical.
+      // Keyed by the BINDING slug (attribution authority), never the turn's
+      // possibly-degraded agentId (v1.3.4 review fix).
+      const slugBudget = this.deps.getSlugWriteBudget?.(match.turn.threadId)
+      const slugLimiter = slugBudget !== undefined ? this.slugLimiterFor(slugBudget.slug) : null
+      for (const _ of paths) {
+        limiter.record()
+        slugLimiter?.record()
+      }
       const headMoved = isAgentHeadMove(
         match.turn,
         this.deps.headSha(this.deps.root),
@@ -407,8 +438,14 @@ export class AgentWriteWatcher {
       // snapshot; DEFAULT for unbound/ad-hoc threads (step 6).
       const threshold =
         this.deps.getWriteBudget?.(match.turn.threadId) ?? DEFAULT_MAX_WRITES_PER_MINUTE
+      const slugExceeded =
+        slugLimiter !== null &&
+        slugBudget !== undefined &&
+        slugLimiter.isExceeded(slugBudget.maxWritesPerMinute)
       const flags: Partial<PendingChangeFlags> = {
-        highVelocity: limiter.isExceeded(threshold),
+        // "Write rate exceeded a configured ceiling" — the per-thread
+        // threshold or (opt-in, step 5) the slug aggregate.
+        highVelocity: limiter.isExceeded(threshold) || slugExceeded,
         headMoved,
         concurrentTurns: match.concurrent,
         degradedAttribution: match.degraded,
@@ -478,6 +515,14 @@ export class AgentWriteWatcher {
     if (existing !== undefined) return existing
     const limiter = new WriteRateLimiter()
     this.limiters.set(threadId, limiter)
+    return limiter
+  }
+
+  private slugLimiterFor(slug: string): WriteRateLimiter {
+    const existing = this.slugLimiters.get(slug)
+    if (existing !== undefined) return existing
+    const limiter = new WriteRateLimiter()
+    this.slugLimiters.set(slug, limiter)
     return limiter
   }
 

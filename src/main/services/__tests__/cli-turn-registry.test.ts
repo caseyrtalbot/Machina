@@ -469,6 +469,7 @@ describe('invocation counting + onTurnStarted callback (step 6)', () => {
       agentId: string
       cwd: string
       invocationCount: number
+      slugInvocationCount: number
     }> = []
     const registry = new CliTurnRegistry({
       headSha: () => null,
@@ -479,9 +480,21 @@ describe('invocation counting + onTurnStarted callback (step 6)', () => {
     registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
     registry.turnStarted({ threadId: 'th2', agentId: 'claude', cwd: ROOT })
     expect(infos).toEqual([
-      { threadId: 'th1', agentId: 'test-fixer', cwd: ROOT, invocationCount: 1 },
-      { threadId: 'th1', agentId: 'test-fixer', cwd: ROOT, invocationCount: 2 },
-      { threadId: 'th2', agentId: 'claude', cwd: ROOT, invocationCount: 1 }
+      {
+        threadId: 'th1',
+        agentId: 'test-fixer',
+        cwd: ROOT,
+        invocationCount: 1,
+        slugInvocationCount: 1
+      },
+      {
+        threadId: 'th1',
+        agentId: 'test-fixer',
+        cwd: ROOT,
+        invocationCount: 2,
+        slugInvocationCount: 2
+      },
+      { threadId: 'th2', agentId: 'claude', cwd: ROOT, invocationCount: 1, slugInvocationCount: 1 }
     ])
   })
 
@@ -503,5 +516,72 @@ describe('invocation counting + onTurnStarted callback (step 6)', () => {
     expect(() =>
       registry.turnStarted({ threadId: 'th1', agentId: 'claude', cwd: ROOT })
     ).not.toThrow()
+  })
+})
+
+// ── Phase 3 step 5: per-(root, slug) invocation rollup for maxTurnsPerSlug ──
+
+describe('per-(root, slug) rollup (step 5)', () => {
+  function collect() {
+    const infos: Array<{ threadId: string; agentId: string; slugInvocationCount: number }> = []
+    const registry = new CliTurnRegistry({
+      headSha: () => null,
+      isPtyAlive: () => true,
+      onTurnStarted: (info) =>
+        infos.push({
+          threadId: info.threadId,
+          agentId: info.agentId,
+          slugInvocationCount: info.slugInvocationCount
+        })
+    })
+    return { registry, infos }
+  }
+
+  it('N threads on one (root, slug) share a running aggregate count', () => {
+    const { registry, infos } = collect()
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th2', agentId: 'test-fixer', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    expect(infos.map((i) => i.slugInvocationCount)).toEqual([1, 2, 3])
+  })
+
+  it('threadClosed does NOT reset the aggregate — a breaker kill must not refill the slug budget', () => {
+    const { registry, infos } = collect()
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.threadClosed('th1')
+    // A loop that kills-then-refires a fresh thread on the same slug resumes
+    // at the accumulated aggregate within the app run.
+    registry.turnStarted({ threadId: 'th2', agentId: 'test-fixer', cwd: ROOT })
+    expect(infos.map((i) => i.slugInvocationCount)).toEqual([1, 2])
+  })
+
+  it('distinct roots and distinct slugs isolate their aggregates', () => {
+    const { registry, infos } = collect()
+    registry.turnStarted({ threadId: 'th1', agentId: 'test-fixer', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th2', agentId: 'test-fixer', cwd: '/tmp/ws-b' })
+    registry.turnStarted({ threadId: 'th3', agentId: 'other-slug', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th4', agentId: 'test-fixer', cwd: ROOT })
+    expect(infos.map((i) => i.slugInvocationCount)).toEqual([1, 1, 1, 2])
+  })
+
+  it('the NUL delimiter keeps concat-ambiguous (root, slug) pairs disjoint', () => {
+    // ('/tmp/ws-a', 'bc') and ('/tmp/ws-ab', 'c') concatenate identically
+    // without a delimiter; the NUL-keyed rollup must never merge them.
+    const { registry, infos } = collect()
+    registry.turnStarted({ threadId: 'th1', agentId: 'bc', cwd: '/tmp/ws-a' })
+    registry.turnStarted({ threadId: 'th2', agentId: 'c', cwd: '/tmp/ws-ab' })
+    expect(infos.map((i) => i.slugInvocationCount)).toEqual([1, 1])
+  })
+
+  it('unbound (adapter-identity) threads key separately and cannot drain a slug aggregate', () => {
+    const { registry, infos } = collect()
+    registry.turnStarted({ threadId: 'th1', agentId: 'cli-claude', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th2', agentId: 'cli-claude', cwd: ROOT })
+    registry.turnStarted({ threadId: 'th3', agentId: 'test-fixer', cwd: ROOT })
+    expect(infos).toEqual([
+      { threadId: 'th1', agentId: 'cli-claude', slugInvocationCount: 1 },
+      { threadId: 'th2', agentId: 'cli-claude', slugInvocationCount: 2 },
+      { threadId: 'th3', agentId: 'test-fixer', slugInvocationCount: 1 }
+    ])
   })
 })

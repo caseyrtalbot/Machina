@@ -17,7 +17,8 @@ const REASON_LABEL: Record<BreakerTripEvent['reason'], string> = {
   velocity: 'sustained write velocity',
   'forbidden-writes': 'repeated protected-path writes',
   'head-moved': 'git history moved',
-  'max-turns': 'turn budget exhausted'
+  'max-turns': 'turn budget exhausted',
+  'max-spend': 'spend threshold crossed'
 }
 
 export function AgentBreakerNotices() {

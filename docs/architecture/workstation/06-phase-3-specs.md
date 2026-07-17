@@ -622,6 +622,90 @@ surface: steps 4 and 5 are strictly sequential.
 
 ## Step 5 — Containment aggregation + durable budgets + cost observable (BEFORE any trigger exists)
 
+> **DONE** (2026-07-17, contracts v1.3.4). Landed as specced: the opt-in
+> aggregate pair `HarnessBudgets.maxTurnsPerSlug` (1..1000) /
+> `maxWritesPerMinutePerSlug` (1..600) — absent = no aggregate enforcement,
+> attended behavior unchanged (golden per-thread fences verified unedited);
+> `slugInvocationCounts` rollup in `CliTurnRegistry` keyed `root\0slug` (per
+> app run, never reset by `threadClosed` — kill never refills; relaunch resets
+> BY DESIGN, cross-relaunch caps are step 6's durable loop counters); the slug
+> branch in `checkMaxTurnsOnTurnStarted` (per-thread trips first, single kill
+> per check, `noteMaxTurns` gains `scope`, reason stays `'max-turns'`); the
+> per-slug write limiter keyed by the BINDING slug via the new
+> `getSlugWriteBudget` dep. Cost observable: `AgentStreamEvent.costUsd`
+> (null = unobserved, never zeroed, end to end); `parseClaudeEvent` reads
+> `total_cost_usd` on every result subtype (error records carry cost — review
+> fix); bridge accumulation survives `closeSession`; `noteCost` is
+> notice-class and structurally kill-incapable (`'max-spend'` reason); new
+> durable `AgentCostLedger` (monotone (root, slug) USD at
+> `userData/agent-cost-ledger.json`, HarnessRunRegistry pattern, NO reset
+> API, corrupt-load audited — money is the one unrecoverable resource, so
+> spend is durable NOW while the turn rollup stays per-app-run: the recorded
+> decision). Cost matrix: claude VERIFIED (spike 2026-07-17, claude 2.1.205);
+> **codex VERIFIED-ABSENT** (codex-cli 0.144.5 spike: token counts only, no
+> USD field — no coverage claimed, no price table faked); gemini/raw
+> UNOBSERVABLE-flagged. **Resume-cumulativity micro-spike RUN at landing:
+> verdict PER-INVOCATION** (turn 1 `total_cost_usd` 0.202772, resumed turn
+> 0.127774 < turn 1 — impossible under cumulative semantics), so the bridge's
+> sum fold is the correct accounting. The stale 04-phase-2-specs.md max-$
+> line corrected in this commit (stale-claim ledger discharged). **Recorded
+> deviations:** wiring seams beyond the spec's file list (`ipc/shell.ts` cost
+> block, `ipc/git.ts` slug-budget dep, new `agent-cost-ledger.ts`,
+> `main/index.ts` quit flush, `agent-breaker-types.ts` + the renderer
+> `REASON_LABEL` line — both compile-forced by `'max-spend'`);
+> `onTurnComplete` widened with a 4th cost-delta arg; no harness-level
+> `maxSpendUsd` (it is the step-6 loop-file budget); **r6 corrected —
+> `DispatchOrigin` extends at step 6 with the scheduler, not step 5**; the
+> step-4 spawn-race residual (i) carried and UPGRADED to a named step-6
+> precondition (fence explicit `cli-thread:spawn` into the per-thread
+> dispatch queue before the scheduler's first dispatch). **Adversarial review
+> (5 lenses: spec compliance, containment semantics, test quality, Codex cold
+> read, cross-track spotcheck — the spotcheck agent died without output; 4
+> returned findings): 15 findings, 8 blocker/major adversarially verified →
+> 7 CONFIRMED, all fixed in-tree:** slug ceiling judged only against the
+> slug's own pool (binding-guarded — a degraded turn in the shared
+> adapter-identity pool can no longer false-trip a bound thread); degraded
+> modern-binding turns recover the authoritative binding slug (still
+> `attributionSuspect`) so budgeted traffic cannot leak out of its aggregate,
+> turn-side and write-side; claude cost read on error-subtype results;
+> degraded/truncated-output cost rescue (the terminal result record is
+> reparsed for cost alone — the most expensive turns must not be the
+> invisible ones); the shell.ts cost wiring pinned by tests (a neutering
+> mutation now fails 3); ledger corrupt-load audit widened (non-ENOENT read
+> failures + malformed spend shape); contracts honesty fixes. 1 REFUTED:
+> "concurrent firings overshoot the aggregate" describes the designed
+> detect-and-kill-after-send semantics (per-thread parity), not a bypass.
+> **Residual minors (recorded, not fixed):** literal-path rollup keys — a
+> symlink-alias root splits a slug aggregate (r3-style); a quit racing the
+> cost block's `ensureRootReady` await loses that increment (undercount
+> direction, same family as the accepted SIGKILL residual; flush covers the
+> load-parked half); `tests/**` sits outside both tsconfig includes so the
+> gate's typecheck does not cover test files (pre-existing, observed).
+> **Loop-traffic calibration (numbers, not vibes — canonical asserted record:
+> the header table of `tests/main/services/agent-breaker-loop-traffic.test.ts`):**
+> episode reset masks cross-firing sustain — 20 firings × 2 exceeded velocity
+> batches = **0 trips over 40 exceeded batches**, vs a trip at batch 3 within
+> one firing (`VELOCITY_TRIP_CONSECUTIVE = 3`, unchanged); headMoved once per
+> firing × 20 = 20 notices, 0 kills; maxTurns=3 with kill-then-refire = kills
+> on firings 4..10 (kill never refills); `maxTurnsPerSlug=5` with a fresh
+> thread per firing trips at **exactly firing 6 with every per-thread count
+> at 1** (the N-firings ≈ N× budget hole, closed); fresh registry resets the
+> slug aggregate 5→1 (per app run by design) while a fresh ledger on the same
+> file **resumes at $0.50** (relaunch never refills money); noteCost breached
+> 3× in one episode = exactly 1 notice, 0 kills — even $1000/turn against a
+> $5 threshold; `WriteRateLimiter` 10/min: exceeded from write 10, fully
+> drained 60s after the last write. **Evidence (fresh runs on the final
+> tree):** `npm run check` green — 326 test files, 4031 tests, 0 failures,
+> typecheck clean; build green (7.47s); targeted
+> `e2e/unattended-dispatch.spec.ts` 2/2 passed (19.3s) against the real
+> authed `claude` (dispatch-path regression guard); `npm audit --omit=dev` =
+> the known js-yaml moderate (step 6's cross-step rule) **plus a NEW
+> high-severity chain since the step-4 landing** — adm-zip <0.6.0 via
+> onnxruntime-node via @huggingface/transformers (GHSA-xcpc-8h2w-3j85; fix is
+> a breaking transformers upgrade) — recorded for the open dependabot triage,
+> out of this step's surgical scope. No Casey-observed gate per the DONE bar;
+> the evidence is the calibration numbers above + green gates.
+
 **Goal.** Land the containment floor the scheduler requires, one commit before the
 scheduler: per-slug aggregation (without it, a loop minting a fresh thread per firing
 gives every firing the FULL per-thread allowance — N firings ≈ N× budget), a durable

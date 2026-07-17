@@ -165,6 +165,103 @@ describe('maxTurns enforcement through the REAL registration path', () => {
   })
 })
 
+// ── Phase 3 step 5: per-(root, slug) aggregate ceiling through the real path ──
+
+const TH_A = 'th-aggregate-a'
+const TH_B = 'th-aggregate-b'
+
+/** Two same-slug bindings sharing an aggregate budget (maxTurnsPerSlug: 3). */
+function seedMirrorSlugAggregate(wsRoot: string) {
+  mkdirSync(dirs.userData, { recursive: true })
+  const budgets = { maxTurns: 10, maxWritesPerMinute: 5, maxTurnsPerSlug: 3 }
+  writeFileSync(
+    join(dirs.userData, 'harness-bindings.json'),
+    JSON.stringify({
+      version: 1,
+      backfilledRoots: [wsRoot],
+      bindings: {
+        [`${wsRoot}\0${TH_A}`]: { slug: SLUG, workspaceRoot: wsRoot, budgets },
+        [`${wsRoot}\0${TH_B}`]: { slug: SLUG, workspaceRoot: wsRoot, budgets }
+      }
+    })
+  )
+}
+
+describe('maxTurnsPerSlug enforcement through the REAL registration path (step 5)', () => {
+  it('same-slug threads consume the aggregate; the N+1th turn trips on the breaching thread', async () => {
+    seedMirrorSlugAggregate(wsRoot!)
+    const { registry, breaker, kills } = await wire()
+
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    registry.turnStarted({ threadId: TH_B, agentId: SLUG, cwd: wsRoot! })
+    await settle()
+    // Aggregate exactly 3 (= budget), every per-thread count far under
+    // maxTurns (10): no trip — budget N allows exactly N.
+    expect(kills).toEqual([])
+
+    registry.turnStarted({ threadId: TH_B, agentId: SLUG, cwd: wsRoot! })
+    await vi.waitFor(() => expect(kills).toEqual([TH_B]))
+    const status = breaker.getAgentCircuitBreaker().status()
+    const trip = status.trips.find((t) => t.threadId === TH_B)
+    expect(trip).toMatchObject({ agentId: SLUG, reason: 'max-turns', action: 'killed' })
+    // The slug-aggregate numbers survive whichever detail wording the
+    // breaker renders (the scope-aware wording lands with the noteMaxTurns
+    // widening in this same step's cost track).
+    expect(trip?.detail).toContain('4')
+    expect(trip?.detail).toContain('(3)')
+  })
+
+  it('degraded attribution (adapter-identity fallback) is neither judged against nor drains the slug ceiling (v1.3.4 review fix)', async () => {
+    seedMirrorSlugAggregate(wsRoot!) // maxTurnsPerSlug: 3
+    const { registry, kills } = await wire()
+    // Unrelated ad-hoc unbound threads inflate the SHARED cli-claude pool
+    // far past the bound budget — they carry no budgets and never trip.
+    for (let i = 0; i < 5; i++) {
+      registry.turnStarted({ threadId: `th-adhoc-${i}`, agentId: 'cli-claude', cwd: wsRoot! })
+    }
+    await settle()
+    expect(kills).toEqual([])
+    // A degraded send on the BOUND thread (registry-error/adapter-unknown
+    // shape: adapter-identity attribution + suspect tag) counts as
+    // cli-claude #6 > 3. Its binding's budgets ARE found by threadId — the
+    // old code compared the foreign pool count against maxTurnsPerSlug and
+    // kill-classed a slug whose real aggregate was 0.
+    registry.turnStarted({
+      threadId: TH_A,
+      agentId: 'cli-claude',
+      cwd: wsRoot!,
+      attributionSuspect: true
+    })
+    await settle()
+    expect(kills).toEqual([])
+    // The slug pool itself was untouched: three healthy sends still fit…
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    registry.turnStarted({ threadId: TH_B, agentId: SLUG, cwd: wsRoot! })
+    await settle()
+    expect(kills).toEqual([])
+    // …and the 4th slug-pool send trips as before.
+    registry.turnStarted({ threadId: TH_B, agentId: SLUG, cwd: wsRoot! })
+    await vi.waitFor(() => expect(kills).toEqual([TH_B]))
+  })
+
+  it('a kill (threadClosed) between sends does not refill the slug aggregate', async () => {
+    seedMirrorSlugAggregate(wsRoot!)
+    const { registry, kills } = await wire()
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    registry.turnStarted({ threadId: TH_A, agentId: SLUG, cwd: wsRoot! })
+    await settle()
+    expect(kills).toEqual([])
+    // The kill path drops the window with zero linger…
+    registry.threadClosed(TH_A)
+    // …and the sibling thread resumes at the accumulated aggregate: 4 > 3.
+    registry.turnStarted({ threadId: TH_B, agentId: SLUG, cwd: wsRoot! })
+    await vi.waitFor(() => expect(kills).toEqual([TH_B]))
+  })
+})
+
 describe('turn attribution across a symlink alias of the workspace root (v1.2.7)', () => {
   // THE velocity-breaker e2e root cause: WorkspaceService canonicalizes the
   // root (realpath), so the agent-write watcher runs on `/private/var/...`,

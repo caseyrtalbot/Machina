@@ -5,7 +5,9 @@ import {
   identityForAdapter,
   isValidHarnessSlug,
   parseHarnessFrontmatter,
+  serializeHarnessFrontmatter,
   stripFrontmatter,
+  validateHarnessBudgets,
   validateHarnessTaskBrief,
   validateHarnessScope,
   type HarnessScope
@@ -140,6 +142,100 @@ describe('parseHarnessFrontmatter', () => {
     )
     expect(control.ok).toBe(false)
     if (!control.ok) expect(control.error).toContain('Ctrl-U')
+  })
+})
+
+// ── Phase 3 step 5: optional aggregate budget fields ──
+
+describe('aggregate budget fields (step 5)', () => {
+  const fm = (budgets: string) =>
+    [
+      '---',
+      'name: x',
+      'description: d',
+      'adapter: claude',
+      'permissionMode: queue-all-writes',
+      `budgets: ${budgets}`,
+      '---'
+    ].join('\n')
+
+  it('the existing two-field literal parses byte-unchanged, optional fields absent', () => {
+    const parsed = parseHarnessFrontmatter(fm('{ maxTurns: 10, maxWritesPerMinute: 10 }'))
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(parsed.value.budgets).toEqual({ maxTurns: 10, maxWritesPerMinute: 10 })
+      expect(parsed.value.budgets.maxTurnsPerSlug).toBeUndefined()
+      expect(parsed.value.budgets.maxWritesPerMinutePerSlug).toBeUndefined()
+    }
+  })
+
+  it.each([
+    { maxTurns: 10, maxWritesPerMinute: 10 },
+    { maxTurns: 10, maxWritesPerMinute: 10, maxTurnsPerSlug: 50 },
+    { maxTurns: 10, maxWritesPerMinute: 10, maxWritesPerMinutePerSlug: 30 },
+    { maxTurns: 10, maxWritesPerMinute: 10, maxTurnsPerSlug: 50, maxWritesPerMinutePerSlug: 30 }
+  ])('every optional-field combination round-trips serialize ↔ parse: %j', (budgets) => {
+    const md = serializeHarnessFrontmatter({
+      name: 'x',
+      description: 'd',
+      adapter: 'claude',
+      permissionMode: 'queue-all-writes',
+      budgets
+    })
+    const parsed = parseHarnessFrontmatter(md)
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.value.budgets).toEqual(budgets)
+  })
+
+  it('rejects out-of-order fields (one literal shape, order-fixed — not YAML)', () => {
+    const swapped = fm(
+      '{ maxTurns: 10, maxWritesPerMinute: 10, maxWritesPerMinutePerSlug: 30, maxTurnsPerSlug: 50 }'
+    )
+    const result = parseHarnessFrontmatter(swapped)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('unparseable budgets')
+    expect(
+      parseHarnessFrontmatter(fm('{ maxTurnsPerSlug: 50, maxTurns: 10, maxWritesPerMinute: 10 }'))
+        .ok
+    ).toBe(false)
+  })
+
+  it('re-validates bounds after a regex match (out-of-bounds still fails)', () => {
+    expect(
+      parseHarnessFrontmatter(fm('{ maxTurns: 10, maxWritesPerMinute: 10, maxTurnsPerSlug: 0 }')).ok
+    ).toBe(false)
+    expect(
+      parseHarnessFrontmatter(fm('{ maxTurns: 10, maxWritesPerMinute: 10, maxTurnsPerSlug: 1001 }'))
+        .ok
+    ).toBe(false)
+    expect(
+      parseHarnessFrontmatter(
+        fm('{ maxTurns: 10, maxWritesPerMinute: 10, maxWritesPerMinutePerSlug: 601 }')
+      ).ok
+    ).toBe(false)
+  })
+
+  it('validateHarnessBudgets accepts snapshots with or without the optional fields (the decodeBudgets path)', () => {
+    expect(validateHarnessBudgets({ maxTurns: 10, maxWritesPerMinute: 10 })).toEqual({ ok: true })
+    expect(
+      validateHarnessBudgets({
+        maxTurns: 10,
+        maxWritesPerMinute: 10,
+        maxTurnsPerSlug: 1000,
+        maxWritesPerMinutePerSlug: 600
+      })
+    ).toEqual({ ok: true })
+    // Present-but-invalid aggregates still refuse: non-integer, zero, unknown key.
+    expect(
+      validateHarnessBudgets({ maxTurns: 10, maxWritesPerMinute: 10, maxTurnsPerSlug: 1.5 }).ok
+    ).toBe(false)
+    expect(
+      validateHarnessBudgets({ maxTurns: 10, maxWritesPerMinute: 10, maxWritesPerMinutePerSlug: 0 })
+        .ok
+    ).toBe(false)
+    expect(validateHarnessBudgets({ maxTurns: 10, maxWritesPerMinute: 10, surprise: 1 }).ok).toBe(
+      false
+    )
   })
 })
 

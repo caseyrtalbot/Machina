@@ -340,6 +340,17 @@ function buildWatcher(root: string): AgentWriteWatcher {
     // the watcher applies the default.
     getWriteBudget: (threadId) =>
       getHarnessRunRegistry().get(root, threadId)?.budgets?.maxWritesPerMinute,
+    // Step 5: aggregate (root, slug) write-rate ceiling — same registry read,
+    // opt-in via the new budgets field; absent = per-thread limiter only.
+    // Carries the BINDING slug so the watcher keys the aggregate by the
+    // attribution authority, immune to degraded turn attribution (v1.3.4).
+    getSlugWriteBudget: (threadId) => {
+      const binding = getHarnessRunRegistry().get(root, threadId)
+      const maxWritesPerMinute = binding?.budgets?.maxWritesPerMinutePerSlug
+      return binding !== undefined && maxWritesPerMinute !== undefined
+        ? { slug: binding.slug, maxWritesPerMinute }
+        : undefined
+    },
     // Step 6: escalation port — velocity / forbidden / headMoved signals
     // flow to the circuit breaker (kill + audit + event on trip).
     breaker: getAgentCircuitBreaker(),

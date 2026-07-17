@@ -15,6 +15,9 @@ import { BlockWatcher } from '../services/block-watcher'
 import { CLIAgentSessionListener } from '../services/cli-agent-session-listener'
 import { CliAgentThreadBridge } from '../services/cli-agent-thread-bridge'
 import { getCliTurnRegistry } from '../services/cli-turn-registry'
+import { getAgentCircuitBreaker } from '../services/agent-circuit-breaker'
+import { getAgentCostLedger } from '../services/agent-cost-ledger'
+import { getHarnessRunRegistry } from '../services/harness-run-registry'
 import { markBlockSeen, clearSession } from '../services/shell-readiness'
 import { ThreadStorage } from '../services/thread-storage'
 import { AuditLogger } from '../services/audit-logger'
@@ -73,7 +76,7 @@ const cliAgentThreadBridge = new CliAgentThreadBridge({
   // self-commit produces no watched fs event, so this is its only tripwire.
   // P3 step 4 (contracts §4 v1.3.3): main is the persistence authority for
   // the final assistant message — append it here, then push thread:changed.
-  onTurnComplete: (threadId, message, bindCwd) => {
+  onTurnComplete: (threadId, message, bindCwd, costUsd) => {
     const closed = getCliTurnRegistry().turnEnded(threadId)
     if (closed !== undefined) checkHeadMovedAtTurnEnd(closed)
     // Root: the turn window's cwd when one closed; otherwise the bridge's
@@ -93,6 +96,35 @@ const cliAgentThreadBridge = new CliAgentThreadBridge({
         auditAppendFailure(threadId, root, String(err))
       }
     })()
+    // Cost vertical (P3 step 5, contracts v1.3.4): a null delta means "no
+    // cost observation this turn" — nothing fires (never zeroed). Unbound
+    // threads still get per-thread accumulation + noteCost (observability);
+    // the durable ledger is slug-keyed, so no slug means no ledger entry.
+    if (costUsd !== null) {
+      const cumulative = getCliAgentThreadBridge().getThreadCostUsd(threadId) ?? costUsd
+      getAgentCircuitBreaker().noteCost({
+        threadId,
+        agentId: closed?.agentId ?? threadId,
+        turnCostUsd: costUsd,
+        cumulativeUsd: cumulative
+      })
+      void (async () => {
+        try {
+          await getHarnessRunRegistry().ensureRootReady(root)
+        } catch {
+          return
+        }
+        const slug = getHarnessRunRegistry().get(root, threadId)?.slug
+        if (slug === undefined) return
+        try {
+          await getAgentCostLedger().recordSpend(root, slug, costUsd)
+        } catch (err) {
+          // A failed persist loses at most this increment from the durable
+          // floor — undercount direction, surfaced, never rethrown here.
+          console.error(`cost ledger record failed: ${threadId} in ${root}`, err)
+        }
+      })()
+    }
   }
 })
 

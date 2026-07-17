@@ -1100,6 +1100,13 @@ the default if unanswered)
 - Max-$ cost budget (PLAN's third budget knob) deferred: no cost observable exists in
   the `--print` CLI model; natural home is Phase 3's loop scheduler alongside per-slug
   aggregation. Recorded so the PLAN-named budget is not dropped silently.
+  **Corrected 2026-07-17 (Phase 3 step 5, v1.3.4):** the "no cost observable" claim
+  was stale — claude's `--print` stream DOES carry `total_cost_usd` on its terminal
+  result record (spike-verified, claude 2.1.205); codex `--json` is verified-absent
+  (token counts only, codex-cli 0.144.5); gemini/raw are unobservable. The observable
+  + per-slug aggregation landed in Phase 3 step 5, one commit before the scheduler
+  (cost observability matrix in 01-interface-contracts.md §5); the enforcement knob
+  (`maxSpendUsd`) remains a step-6 loop-file budget.
 - Phase-1 residuals that remain: TOCTOU narrowed-not-closed (stale-diff + v1.1.5);
   TE_DIR app-state watcher blind spot by design; concurrent same-root agents flagged
   not isolated (worktrees remain the PLAN-Q11 answer if usage demands); legacy DockTab

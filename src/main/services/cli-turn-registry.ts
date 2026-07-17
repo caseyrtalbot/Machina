@@ -123,6 +123,13 @@ export interface TurnStartedInfo {
    * threadClosed: a breaker kill must not refill the budget.
    */
   readonly invocationCount: number
+  /**
+   * CLI invocations sent across ALL threads of this (root, slug) so far this
+   * app run, INCLUDING this one (Phase 3 step 5: the maxTurnsPerSlug unit).
+   * Same lifetime semantics as invocationCount — never reset by threadClosed,
+   * reset by relaunch.
+   */
+  readonly slugInvocationCount: number
 }
 
 export interface CliTurnRegistryDeps {
@@ -171,6 +178,18 @@ export class CliTurnRegistry {
    * death must not refill the thread's budget.
    */
   private readonly invocationCounts = new Map<string, number>()
+  /**
+   * Total invocations per (root, slug) this app run, keyed `${cwd}\0${agentId}`
+   * (NUL delimiter, mirroring HarnessRunRegistry's bindingKey). Counts EVERY
+   * turnStarted under the key, budgeted or not. Never reset by threadClosed:
+   * a breaker kill must not refill the slug aggregate any more than the
+   * per-thread count. In-memory per app run — a relaunch resets it BY DESIGN
+   * (per-app-run parity with maxTurns; cross-relaunch caps are step 6's
+   * durable loop counters). Keys are literal paths (recorded residual): a
+   * same-slug thread spawned via a symlink alias of the root splits the
+   * aggregate — containment via activeTurnFor realpaths, counting does not.
+   */
+  private readonly slugInvocationCounts = new Map<string, number>()
   private seq = 0
   /** Per-registry (= per-app-run) tag making turnIds run-unique — see CliTurn.turnId. */
   private readonly runTag = randomUUID().slice(0, 8)
@@ -198,11 +217,17 @@ export class CliTurnRegistry {
     this.openInvocations.set(opts.threadId, (this.openInvocations.get(opts.threadId) ?? 0) + 1)
     const invocationCount = (this.invocationCounts.get(opts.threadId) ?? 0) + 1
     this.invocationCounts.set(opts.threadId, invocationCount)
+    // Unbound/ad-hoc threads carry the adapter identity here — a different
+    // key from any harness slug, so they can never drain a slug's aggregate.
+    const slugKey = `${opts.cwd}\0${opts.agentId}`
+    const slugInvocationCount = (this.slugInvocationCounts.get(slugKey) ?? 0) + 1
+    this.slugInvocationCounts.set(slugKey, slugInvocationCount)
     this.deps.onTurnStarted?.({
       threadId: opts.threadId,
       agentId: opts.agentId,
       cwd: opts.cwd,
-      invocationCount
+      invocationCount,
+      slugInvocationCount
     })
     return turn
   }

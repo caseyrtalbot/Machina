@@ -1050,7 +1050,12 @@ before this step):
   (`AgentWriteWatcherDeps.getWriteBudget`, wired in ipc/git.ts from the binding
   snapshot); unbound/ad-hoc threads get the default 10
   (`DEFAULT_MAX_WRITES_PER_MINUTE` — a fallback constant, not a value read from
-  any harness).
+  any harness). **Status 2026-07-17 (Phase 3 step 5, v1.3.4):** a second, OPT-IN
+  aggregate ceiling now exists — the optional `maxTurnsPerSlug` /
+  `maxWritesPerMinutePerSlug` pair; "Phase 3's loop scheduler" was the projected
+  home, but aggregation landed in step 5, one commit before the scheduler.
+  Per-thread semantics above are UNCHANGED (parity direction only); see the
+  step-5 subsection below.
 - **`maxTurns` = CLI invocations per thread**, counted at
   `CliTurnRegistry.turnStarted` (OQ2 — agent-internal iterations are invisible
   in the `--print` model and gemini/raw have no structured stream; Phase-3
@@ -1130,6 +1135,164 @@ the window with zero linger — they become audited-unattributed writes
 inside the §4 framing: breakers contain accidents faster; they never claim
 prevention — the tripping writes are already on disk and stay in the queue.
 
+### Containment aggregation + cost observable (Phase 3 step 5, v1.3.4)
+
+**Aggregation semantics — a second, opt-in ceiling; parity direction only.**
+Budgets now express per-thread AND per-(root, slug) ceilings: `HarnessBudgets`
+gains optional `maxTurnsPerSlug` (1..1000) and `maxWritesPerMinutePerSlug`
+(1..600) — bounds deliberately wider than the per-thread maxima (100/120)
+because an aggregate over N threads legitimately exceeds them. Absent fields =
+no aggregate enforcement (the budgets-absent pattern): every existing harness
+behaves byte-identically, pinned by the unedited golden fences (the per-thread
+turn-registry describes; the write-watcher same-slug full-threshold test). The
+slug turn rollup (`CliTurnRegistry.slugInvocationCounts`, keyed
+`${cwd}\0${agentId}`, surfaced as required `TurnStartedInfo.slugInvocationCount`)
+counts EVERY `turnStarted` under the key, per app run, and survives
+`threadClosed` — a kill never refills the aggregate; a relaunch resets it BY
+DESIGN (per-app-run parity with `maxTurns`; cross-relaunch caps are step 6's
+durable loop counters — recorded so the asymmetry reads as a decision, not an
+omission). Enforcement is a slug branch inside `checkMaxTurnsOnTurnStarted`
+(same listener, same deferred-past-send microtask): the per-thread breach trips
+first with an early return (single kill per check); an aggregate budget N allows
+exactly N invocations across all threads of the (root, slug), and the N+1th
+trips on whichever thread fired it, reading the breaching thread's own bind-time
+snapshot. `noteMaxTurns` gains optional `scope?: 'thread' | 'slug'`; the reason
+stays `'max-turns'` — the detail string disambiguates ("slug aggregate
+invocation N exceeded the harness maxTurnsPerSlug budget (M)"). Unbound/ad-hoc
+threads key under adapter identity — a different key from any slug — and cannot
+drain a slug's aggregate. The REVERSE leak is closed too (review fix, same
+commit): degraded attribution on a MODERN binding (malformed or mismatched
+forwarded slug, adapter known + identity-verified) now recovers the BINDING
+slug — still audited, still `attributionSuspect` — instead of falling back to
+the shared adapter-identity pool, so budgeted traffic cannot leak out of its
+slug aggregate; and `checkMaxTurnsOnTurnStarted` takes the binding (slug +
+budgets), evaluating the slug ceiling ONLY when the turn's counted agentId
+equals the binding slug — a turn counted under a foreign pool (registry-error /
+adapter-unknown degrade, where slug recovery is impossible or refused) is never
+judged against it, closing the false kill-class trip from unrelated ad-hoc
+traffic inflating the shared adapter key. Write side: optional
+`AgentWriteWatcherDeps.getSlugWriteBudget` (wired in ipc/git.ts from the same
+binding snapshot as `getWriteBudget`) returns `{ slug, maxWritesPerMinute }`
+and the watcher lazily mints the per-slug `WriteRateLimiter` KEYED BY THAT
+BINDING SLUG — the attribution authority, immune to degraded turn attribution
+— beside the per-thread one (the watcher is per-root, so the pair is (root,
+slug) by construction); `highVelocity` semantics WIDEN to "write rate exceeded a
+configured ceiling (per-thread or per-slug)" — still exactly ONE `noteVelocity`
+per attributed batch, `exceeded` carrying the OR, so the aggregate inherits the
+calibrated 3-consecutive kill discipline. Parser subset: the budgets regex
+extends with two independently-optional, FIXED-ORDER trailing groups,
+re-validated through `validateHarnessBudgets` post-match; `serializeBudgets`
+emits present fields in the same fixed order — parse/serialize stays an exact
+round-trip pair. Residual (r3-style): slug-rollup keys are literal paths — a
+same-slug thread spawned via a symlink alias of the root splits the aggregate
+(containment realpaths; counting does not).
+
+**Cost observability matrix (per adapter). Null/undefined = unobserved, NEVER
+zeroed, anywhere in the chain.**
+
+- **cli-claude — VERIFIED**: `total_cost_usd` on the terminal `type:'result'`
+  record (spike 2026-07-17, claude 2.1.205; the verbatim record is the pinned
+  fixture in tests/shared/agent-adapters.test.ts) — read on EVERY result
+  subtype: error records (`error_during_execution` / `error_max_turns`) carry
+  cost but no string `result` field, so the read does not gate on the text
+  field (review fix — a consistently erroring loop still burns real spend).
+  `modelUsage.<id>.costUSD`
+  repeats the same value under an environment-specific model-id key — observed
+  but deliberately UNCONSUMED, recorded so a later per-model breakdown is a
+  known extension, not a rediscovery.
+- **cli-codex — VERIFIED-ABSENT**: codex-cli 0.144.5 spike — the only
+  usage-bearing record is `turn.completed` with token counts; no USD field
+  anywhere. No token→dollar price table (a maintained price table is a new
+  drift-prone truth source — the faked coverage the spec forbids). Spike-only
+  operational note: `codex exec --json` outside a trusted git dir requires
+  `--skip-git-repo-check`.
+- **cli-gemini / cli-raw — UNOBSERVABLE**: no `parseEvent`, no structured
+  stream at all.
+- **Resume-cumulativity micro-spike: RUN, verdict PER-INVOCATION (2026-07-17,
+  claude 2.1.205).** A live two-turn `--resume` run: turn 1 `total_cost_usd`
+  0.202772; the resumed turn reported 0.127774 — LESS than turn 1's total,
+  impossible under cumulative semantics. `total_cost_usd` covers the invocation
+  only, so the bridge's SUM fold across blocks is the correct accounting (the
+  `max()` fallback recorded at design time is not needed).
+
+**Cost accounting shape.** `AgentStreamEvent` gains required
+`costUsd: number | null` (null = "no cost observation on this event", never
+"cost was zero"); `parseClaudeEvent` reads finite `total_cost_usd` on every
+`type:'result'` record regardless of subtype (see the matrix above); every
+codex return literal and `EMPTY_EVENT` carry null. The
+bridge accumulates per thread (`costUsdByThread` — entries minted ONLY on an
+observed cost, surviving `closeSession`: a kill must not erase observed spend;
+accessor `getThreadCostUsd`, undefined = never observed). Degraded-mode cost
+rescue (review fix): when truncation (the block model's head+tail cap) or a
+mid-stream rewrite stops incremental text extraction, the final drain still
+reparses the retained output for the cost record — the terminal result line
+arrives last, so it survives in the tail; text/tools stay degraded, only the
+money observation is recovered (large tool-heavy turns are exactly the
+expensive ones the spend floor must see). `onTurnComplete`
+widens with a 4th arg — the turn's cost DELTA (`number | null`) — on both
+emission paths; the mid-turn-kill synthetic final passes the block's DRAINED
+cost (null when the result record never arrived; a cost observed before PTY
+death is delivered, not dropped). Wiring (ipc/shell.ts, the sole step-5 shell
+edit): a non-null delta feeds breaker `noteCost` with the bridge cumulative,
+then a detached `ensureRootReady` → slug lookup →
+`AgentCostLedger.recordSpend`; unbound threads keep per-thread accumulation +
+`noteCost` (observability) but skip the ledger — no slug means no loop can read
+that key. `noteCost` is NOTICE-CLASS ONLY, structurally kill-incapable
+(`noticeOnly: true` unconditional at its single trip site — no code path to
+`action: 'killed'`, test-pinned); no step-5 production caller supplies
+`maxSpendUsd` — step 6's loop wiring does (present + breached ⇒ one
+`'max-spend'` notice per episode, audit decision `'error'`, existing
+notice-latch dedup + later-kill-class escalation apply). `BreakerReason` gains
+`'max-spend'` (one compile-forced `REASON_LABEL` line in the renderer notice).
+`noteCost` always records `lastCost` (read via the narrow `lastCostFor`
+accessor; wiped by `noteTurnStarted` — snapshot, not counter). The disarm
+ACTION lives in step 6's LoopRegistry (loop-level disarm at loop-file
+`maxSpendUsd`) — never kill-class until calibrated; NO harness-level
+`maxSpendUsd` field exists (it is the step-6 loop-file budget). Durable floor:
+`AgentCostLedger` (`src/main/services/agent-cost-ledger.ts`, singleton) —
+monotone lifetime (root, slug) USD spend at `userData/agent-cost-ledger.json`,
+`${root}\0${slug}` keys, HarnessRunRegistry persistence pattern (memoized load;
+degrade-not-fail decode with per-entry tolerance — non-finite/negative entries
+dropped, and `recordSpend` drops non-finite/negative DELTAS too, the
+monotone-money guard; serialized persist chain, atomicWrite, a failed write
+rejects its caller but never poisons later persists), and NO reset API — step 6
+consumes baseline-and-delta (arm-time `spendFor` snapshot vs current).
+`spendFor` returns undefined for a never-seen key — the observed-spend FLOOR,
+never $0. A corrupt-mirror load gets ONE audit entry — stricter than
+HarnessRunRegistry's silent degrade, because a corrupt money mirror is a silent
+budget-refill channel (recorded deviation). The audit covers unparseable JSON,
+a non-object file, a NON-ENOENT read failure (EACCES/EISDIR/I/O — a mirror
+that exists but cannot be read is not a first run, and the next persist would
+durably overwrite it), and a current-version file whose `spend` field is not
+an object (review fix); only ENOENT (true first run) and an unknown FUTURE
+version (forward-compat, deliberate) load silently. Quit: `getAgentCostLedger().flush()`
+appended in the coordinated-quit tail (`main/index.ts`, beside the step-4
+`drainThreadWrites` precedent); `flush()` awaits the memoized load first, so a
+detached `recordSpend` still parked on the shared load has chained its persist
+before flush returns (test-surfaced race, closed). Accepted residuals, both
+undercount-direction: a hard SIGKILL can lose at-most-in-flight increments;
+and a shell.ts cost block still awaiting `ensureRootReady`/the registry lookup
+at quit has not yet called `recordSpend`, so its increment is outside the
+flush's coverage — the flush closes only the load-parked half of the detached
+path (review-recorded; same family as the SIGKILL residual, flagged, not
+claimed away).
+
+**maxTurns stays coarse (OQ2 restated).** Adapter streams are NOT parsed to
+count agent-internal iterations — invisible in the `--print` model, and
+gemini/raw have no structured stream. And **loop iteration ≠ thread maxTurns**:
+a loop firing is one `turnStarted` on a FRESH thread — per-thread budgets never
+bound a loop (that is the N-firings ≈ N× budget hole the aggregate closes); the
+firing count itself is capped by the loop's own durable counters (step 6). The
+read surface step 6 consumes: `TurnStartedInfo.slugInvocationCount` (per-firing
+headroom at dispatch), `getAgentCostLedger().spendFor(root, slug)` (durable
+observed-spend floor), `getThreadCostUsd(threadId)` (per-thread, app-run).
+Loop-traffic calibration numbers (episode-reset masking, re-trip cadence, the
+aggregate trip at exactly firing N+1) are asserted — and summarized as the
+step-6 calibration table — in the header of
+tests/main/services/agent-breaker-loop-traffic.test.ts, the canonical record
+until the 06-phase-3-specs.md step-5 DONE block lands in the close-out pass
+and copies that table.
+
 ## 6. IPC channels (names reserved; registration follows the 4-step pattern)
 
 New namespaces `workspace`, `git`, `approvals`, `harness` in `IpcChannels`/`IpcEvents`:
@@ -1199,6 +1362,87 @@ Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
+- **v1.3.4 (2026-07-17, Phase 3 step 5 landed)** — containment aggregation + cost
+  observable, one commit before the scheduler. §5 gains the "Containment aggregation +
+  cost observable" subsection (the file's H2 numbering still skips a literal §5 —
+  mismatch preserved and flagged, not silently renumbered), with a dated status line
+  added to the v1.2.6 per-thread-per-slug bullet. (1) Aggregation: per-thread AND
+  per-(root, slug) ceilings via new optional `HarnessBudgets.maxTurnsPerSlug`
+  (1..1000) / `maxWritesPerMinutePerSlug` (1..600) — absent = no aggregate
+  enforcement, attended behavior byte-identical (golden fences unedited); slug
+  rollup `slugInvocationCounts` + required `TurnStartedInfo.slugInvocationCount` in
+  CliTurnRegistry (keyed `root\0slug`, per app run, survives `threadClosed` — kill
+  never refills; relaunch resets BY DESIGN, cross-relaunch caps are step 6's durable
+  loop counters); slug branch in `checkMaxTurnsOnTurnStarted` (per-thread trips
+  first, single kill per check; `noteMaxTurns` gains optional `scope`, reason stays
+  `'max-turns'`, detail disambiguates); write side `getSlugWriteBudget` dep + lazy
+  per-slug limiter, `highVelocity` widened to "exceeded a configured ceiling", still
+  one `noteVelocity` per batch with `exceeded` carrying the OR; fixed-order
+  parser-subset extension + `serializeBudgets` (exact round-trip preserved).
+  Review fixes folded in before landing: degraded attribution on a modern
+  binding (malformed/mismatched forwarded slug, adapter verified) recovers the
+  BINDING slug in `resolveRequestedAgentId` (audited, suspect-tagged) so
+  budgeted traffic cannot leak into the shared adapter pool;
+  `checkMaxTurnsOnTurnStarted` takes the binding and evaluates the slug ceiling
+  only when the counted agentId IS the binding slug (a foreign-pool count is
+  never judged against it — no false kill-class trips from ad-hoc traffic);
+  `getSlugWriteBudget` returns `{ slug, maxWritesPerMinute }` and the slug
+  limiter keys by that binding slug, not the turn's agentId. (2)
+  Cost observability matrix: claude VERIFIED (`total_cost_usd` on the terminal
+  result record — every subtype, error records carry cost without a string
+  `result` (review fix); spike 2026-07-17, claude 2.1.205; `modelUsage.*.costUSD`
+  observed-but-unconsumed), codex VERIFIED-ABSENT (codex-cli 0.144.5 spike: token
+  counts only, no USD field; no token→price table), gemini/raw UNOBSERVABLE (no
+  `parseEvent`); the claude resume-cumulativity micro-spike RAN at landing —
+  verdict PER-INVOCATION (resumed turn reported less than turn 1's total), so
+  the sum fold is the correct accounting. (3)
+  Cost accounting: `AgentStreamEvent.costUsd: number | null` (null = unobserved,
+  never zeroed, end to end); bridge `costUsdByThread` (survives `closeSession`) +
+  `getThreadCostUsd`; `onTurnComplete` widened with a 4th cost-delta arg rather
+  than a parallel callback (recorded deviation); the synthetic mid-turn-kill final
+  delivers the block's drained cost, null only when no result record arrived;
+  degraded-mode cost rescue in the bridge (review fix): a truncated/rewritten
+  block's final drain still reparses for the tail result record's cost — text
+  stays degraded, money is not dropped;
+  shell.ts wiring → `noteCost` (notice-class ONLY, structurally kill-incapable;
+  `'max-spend'` reason + compile-forced renderer `REASON_LABEL` line; narrow
+  `lastCostFor` accessor added) + new durable `AgentCostLedger`
+  (agent-cost-ledger.ts: monotone (root, slug) USD at
+  `userData/agent-cost-ledger.json`, HarnessRunRegistry persistence pattern, NO
+  reset API — step 6 reads baseline-and-delta; corrupt-load AUDITED, the recorded
+  stricter-than-registry deviation, covering unparseable/non-object files,
+  non-ENOENT read failures, and a non-object `spend` field (review fix) — only
+  ENOENT and unknown future versions load silently;
+  `recordSpend` drops non-finite/negative deltas;
+  quit-time flush appended in main/index.ts, and `flush()` awaits the memoized load
+  — the load-parked half of the detached race, closed; a cost block still awaiting
+  `ensureRootReady` at quit and hard-SIGKILL in-flight increments remain — both
+  undercount direction, accepted residuals). Recorded decision: money is durable NOW,
+  the turn rollup is per-app-run — money is the one unrecoverable resource and a
+  relaunch that zeroes spend is the silent-refill hazard, while a relaunch-durable
+  turn cap would be a lifetime-exhaustion latch on attended use. No harness-level
+  `maxSpendUsd` — it is the step-6 loop-file budget. (4) maxTurns stays coarse (OQ2
+  restated — adapter streams are not parsed to count internal turns); loop
+  iteration ≠ thread maxTurns (one firing = one `turnStarted` on a fresh thread,
+  capped by the loop's own durable counters; step-6 read surface =
+  `slugInvocationCount` + `spendFor` + `getThreadCostUsd`). Files beyond the spec's
+  list (wiring seams, recorded): ipc/git.ts, ipc/shell.ts, agent-cost-ledger.ts,
+  main/index.ts (flush, append-only), agent-breaker-types.ts +
+  agent-breaker-notice.tsx (compile-forced by `'max-spend'`). Residual
+  corrections: **r6 corrected — `DispatchOrigin` extends at step 6 with the
+  scheduler, not step 5**; the step-4 spawn-race residual (i) is carried and
+  UPGRADED to a named step-6 precondition (fence explicit `cli-thread:spawn` into
+  the per-thread dispatch queue before the scheduler's first dispatch). New
+  residual: literal-path slug-rollup keys (r3-style). Loop-traffic calibration
+  numbers (episode-reset masking: 0 velocity trips across 40 exceeded batches
+  spread over 20 fresh-thread firings vs a trip at batch 3 within one firing;
+  aggregate trip at exactly firing N+1 with every per-thread count at 1) are
+  asserted and tabled in the header of
+  tests/main/services/agent-breaker-loop-traffic.test.ts — the canonical record
+  until the 06-phase-3-specs.md step-5 DONE block lands in the close-out pass
+  and copies that table. The stale 04-phase-2-specs.md
+  max-$ line corrected in this commit (stale-claim ledger discharged). §6: no new
+  IPC.
 - **v1.3.3 (2026-07-15, Phase 3 step 4 landed)** — unattended turn substrate. §4
   gains the "Transcript persistence authority + unattended dispatch" subsection:
   message-persistence authority for cli threads moves MAIN-side with the

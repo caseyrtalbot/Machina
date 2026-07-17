@@ -329,6 +329,20 @@ describe('budgets snapshot at bind (step 6)', () => {
     expect(reloaded.registry.get(ROOT, 'th1')?.budgets).toEqual(BUDGETS)
   })
 
+  it('a snapshot carrying the step-5 aggregate fields survives persist/reload intact', async () => {
+    const AGGREGATE = {
+      maxTurns: 5,
+      maxWritesPerMinute: 7,
+      maxTurnsPerSlug: 50,
+      maxWritesPerMinutePerSlug: 30
+    }
+    const h = makeRegistry()
+    expect(await h.registry.record(ROOT, 'th-agg', 'test-fixer', AGGREGATE)).toEqual({ ok: true })
+    const reloaded = makeRegistry()
+    await reloaded.registry.ensureRootReady(ROOT)
+    expect(reloaded.registry.get(ROOT, 'th-agg')?.budgets).toEqual(AGGREGATE)
+  })
+
   it('a same-slug re-record NEVER refreshes the snapshot (snapshot-at-BIND, write-once)', async () => {
     const h = makeRegistry()
     await h.registry.record(ROOT, 'th1', 'test-fixer', BUDGETS)

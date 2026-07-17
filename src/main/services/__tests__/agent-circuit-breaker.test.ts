@@ -234,6 +234,153 @@ describe('headMoved notice-latch (post-merge review hardening, contracts §8 v1.
   })
 })
 
+describe('noteCost — notice-class, structurally kill-incapable (Phase 3 step 5)', () => {
+  it('NEVER kills, at any magnitude/threshold combination', () => {
+    const h = makeBreaker()
+    const combos = [
+      { turnCostUsd: 0.49, cumulativeUsd: 0.49 },
+      { turnCostUsd: 10_000, cumulativeUsd: 1_000_000 },
+      { turnCostUsd: 10_000, cumulativeUsd: 1_000_000, maxSpendUsd: 0.01 },
+      { turnCostUsd: 0.01, cumulativeUsd: 0.02, maxSpendUsd: 0.01 }
+    ]
+    for (const combo of combos) {
+      h.breaker.noteTurnStarted({ threadId: 'th1', agentId: 'test-fixer' })
+      h.breaker.noteCost({ threadId: 'th1', agentId: 'test-fixer', ...combo })
+    }
+    expect(h.kills).toEqual([])
+    expect(h.events.every((e) => e.action === 'notice')).toBe(true)
+  })
+
+  it('no threshold ⇒ no trip, lastCost recorded (observability only)', () => {
+    const h = makeBreaker()
+    h.breaker.noteCost({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      turnCostUsd: 0.49,
+      cumulativeUsd: 1.2
+    })
+    expect(h.events).toEqual([])
+    expect(h.auditEntries).toEqual([])
+    expect(h.breaker.status().trips).toEqual([])
+    expect(h.breaker.lastCostFor('th1')).toEqual({ turnCostUsd: 0.49, cumulativeUsd: 1.2 })
+  })
+
+  it('threshold breached ⇒ exactly one max-spend notice per episode (audit decision error)', () => {
+    const h = makeBreaker()
+    h.breaker.noteCost({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      turnCostUsd: 1,
+      cumulativeUsd: 5,
+      maxSpendUsd: 4
+    })
+    expect(h.kills).toEqual([])
+    expect(h.events).toHaveLength(1)
+    expect(h.events[0]).toMatchObject({ reason: 'max-spend', action: 'notice' })
+    expect(h.events[0].detail).toContain('5')
+    expect(h.events[0].detail).toContain('4')
+    expect(h.auditEntries[0].decision).toBe('error')
+
+    // Notice-latch dedup within the episode: further breaches stay quiet.
+    h.breaker.noteCost({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      turnCostUsd: 1,
+      cumulativeUsd: 6,
+      maxSpendUsd: 4
+    })
+    expect(h.events).toHaveLength(1)
+    expect(h.auditEntries).toHaveLength(1)
+    // lastCost still tracks the newest observation after the latch.
+    expect(h.breaker.lastCostFor('th1')).toEqual({ turnCostUsd: 1, cumulativeUsd: 6 })
+  })
+
+  it('a cumulative exactly AT the threshold does not trip (strict >)', () => {
+    const h = makeBreaker()
+    h.breaker.noteCost({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      turnCostUsd: 2,
+      cumulativeUsd: 4,
+      maxSpendUsd: 4
+    })
+    expect(h.events).toEqual([])
+  })
+
+  it('a max-spend notice escalates to the ONE kill on a later kill-class signal', () => {
+    const h = makeBreaker()
+    h.breaker.noteCost({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      turnCostUsd: 1,
+      cumulativeUsd: 5,
+      maxSpendUsd: 4
+    })
+    expect(h.kills).toEqual([])
+    for (let i = 0; i < VELOCITY_TRIP_CONSECUTIVE; i++) {
+      h.breaker.noteVelocity({ ...SIG, exceeded: true })
+    }
+    expect(h.kills).toEqual(['th1'])
+    expect(h.events).toHaveLength(2)
+    expect(h.events[1]).toMatchObject({ reason: 'velocity', action: 'killed' })
+  })
+
+  it('noteTurnStarted wipes lastCost (snapshot, not a counter)', () => {
+    const h = makeBreaker()
+    h.breaker.noteCost({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      turnCostUsd: 0.49,
+      cumulativeUsd: 0.49
+    })
+    expect(h.breaker.lastCostFor('th1')).toBeDefined()
+    h.breaker.noteTurnStarted({ threadId: 'th1', agentId: 'test-fixer' })
+    expect(h.breaker.lastCostFor('th1')).toBeUndefined()
+  })
+})
+
+describe('noteMaxTurns scope (Phase 3 step 5 slug aggregate)', () => {
+  it("scope 'slug' is kill-class max-turns with the slug-aggregate detail, exactly once per episode", () => {
+    const h = makeBreaker()
+    h.breaker.noteMaxTurns({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      invocationCount: 6,
+      maxTurns: 5,
+      scope: 'slug'
+    })
+    expect(h.kills).toEqual(['th1'])
+    expect(h.events[0]).toMatchObject({ reason: 'max-turns', action: 'killed' })
+    expect(h.events[0].detail).toContain('slug aggregate')
+    expect(h.events[0].detail).toContain('maxTurnsPerSlug')
+    expect(h.events[0].detail).toContain('6')
+    expect(h.events[0].detail).toContain('5')
+
+    // Same-episode repeat is inert (kill exactly once).
+    h.breaker.noteMaxTurns({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      invocationCount: 7,
+      maxTurns: 5,
+      scope: 'slug'
+    })
+    expect(h.kills).toEqual(['th1'])
+    expect(h.events).toHaveLength(1)
+  })
+
+  it('absent scope behaves byte-identically to the per-thread detail', () => {
+    const h = makeBreaker()
+    h.breaker.noteMaxTurns({
+      threadId: 'th1',
+      agentId: 'test-fixer',
+      invocationCount: 11,
+      maxTurns: 10
+    })
+    expect(h.events[0].detail).toBe('invocation 11 exceeded the harness maxTurns budget (10)')
+    expect(h.events[0].detail).not.toContain('slug')
+  })
+})
+
 describe('negative rules (contracts §5 v1.2.6)', () => {
   it('NEVER trips on watcher-degraded state alone — health is status honesty, not a trip input', () => {
     const h = makeBreaker({ isSignalSourceHealthy: () => false })

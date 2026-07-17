@@ -327,7 +327,11 @@ describe('resolveRequestedAgentId', () => {
     expect(result).toEqual({ agentId: undefined, attributionSuspect: true, blocked: true })
   })
 
-  it('a binding mismatch degrades, audits the bound slug, and flags the turn', async () => {
+  it('a binding mismatch on a MODERN binding recovers the bound slug, audits, and flags the turn', async () => {
+    // v1.3.4 review fix: the write-once binding is the attribution authority.
+    // Degrading to the adapter identity would count this budgeted turn under
+    // the shared adapter pool — leaking it out of the slug aggregate (turn
+    // rollup + slug write limiter) and polluting a foreign pool.
     const registry = fakeRegistry({ slug: 'agent-x', workspaceRoot: ROOT, adapter: 'claude' })
     const audit = collectAudit()
     const result = await resolveRequestedAgentId(
@@ -339,13 +343,48 @@ describe('resolveRequestedAgentId', () => {
       audit,
       'cli-claude'
     )
-    expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
+    expect(result).toEqual({ agentId: 'agent-x', attributionSuspect: true })
     expect(audit.entries).toHaveLength(1)
     expect(audit.entries[0].args).toMatchObject({
       reason: 'binding-mismatch',
       requested: 'agent-y',
       boundSlug: 'agent-x'
     })
+  })
+
+  it('a malformed agentId on a MODERN binding also recovers the bound slug (+audit, +flag)', async () => {
+    const registry = fakeRegistry({ slug: 'agent-x', workspaceRoot: ROOT, adapter: 'claude' })
+    const audit = collectAudit()
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      'bad id!',
+      registry,
+      audit,
+      'cli-claude'
+    )
+    expect(result).toEqual({ agentId: 'agent-x', attributionSuspect: true })
+    expect(audit.entries).toHaveLength(1)
+    expect(audit.entries[0].args).toMatchObject({ reason: 'malformed', boundSlug: 'agent-x' })
+  })
+
+  it('a binding mismatch on an adapter-less legacy binding still refuses slug attribution', async () => {
+    // Without a durable adapter fact the identity match cannot be verified —
+    // slug recovery stays off (the adapter-unknown posture).
+    const registry = fakeRegistry({ slug: 'agent-x', workspaceRoot: ROOT })
+    const audit = collectAudit()
+    const result = await resolveRequestedAgentId(
+      'cli-thread:input',
+      'th1',
+      ROOT,
+      'agent-y',
+      registry,
+      audit,
+      'cli-claude'
+    )
+    expect(result).toEqual({ agentId: undefined, attributionSuspect: true })
+    expect(audit.entries[0].args).toMatchObject({ reason: 'binding-mismatch' })
   })
 
   it('a forwarded agentId on an unbound thread degrades + flags (post-backfill rule)', async () => {
@@ -410,7 +449,7 @@ describe('handler wiring (spawn + input forward the RESOLVED attribution)', () =
     expect(spawnerCtl.spawns).toEqual([['th1', 'cli-claude', ROOT, 'test-fixer', undefined, false]])
   })
 
-  it('cli-thread:input degrades a mismatched slug to undefined + suspect=true', async () => {
+  it('cli-thread:input forwards the RECOVERED bound slug + suspect=true on a mismatch (v1.3.4)', async () => {
     registryCtl.current = {
       ensureRootReady: async () => {},
       get: () => ({ slug: 'agent-x', workspaceRoot: ROOT, adapter: 'claude' })
@@ -425,7 +464,7 @@ describe('handler wiring (spawn + input forward the RESOLVED attribution)', () =
       agentId: 'agent-y'
     })
     expect(spawnerCtl.inputs).toEqual([
-      ['th1', 'cli-claude', 'go', ROOT, undefined, undefined, true]
+      ['th1', 'cli-claude', 'go', ROOT, 'agent-x', undefined, true]
     ])
   })
 
@@ -532,7 +571,7 @@ describe('frontmatter tamper repro (real registry, persisted mirror across relau
     await fs.rm(dir, { recursive: true, force: true })
   })
 
-  it('a tampered agent_id resolves to identity fallback + suspect + audit; the binding holds', async () => {
+  it('a tampered agent_id resolves to the BOUND slug + suspect + audit; the binding holds', async () => {
     // Session 1: main binds the thread to agent-x via its own validation.
     const first = new HarnessRunRegistry({
       filePath,
@@ -564,7 +603,9 @@ describe('frontmatter tamper repro (real registry, persisted mirror across relau
       audit,
       'cli-claude'
     )
-    expect(resolved).toEqual({ agentId: undefined, attributionSuspect: true })
+    // v1.3.4: the tamper cannot even deflect attribution out of the slug
+    // pool — the authoritative binding slug is recovered (still suspect).
+    expect(resolved).toEqual({ agentId: 'agent-x', attributionSuspect: true })
     expect(audit.entries).toHaveLength(1)
     expect(audit.entries[0].tool).toBe('cli-agent:attribution-mismatch')
     expect(audit.entries[0].args).toMatchObject({

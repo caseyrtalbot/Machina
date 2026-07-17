@@ -91,6 +91,13 @@ interface ThreadBreakerState {
   /** Forbidden autoRejects seen for the current turn. */
   forbiddenTurnId: string | null
   forbiddenCount: number
+  /**
+   * Latest cost observation only — observability, not accounting (the
+   * durable accumulators are the bridge map and the AgentCostLedger).
+   * Wiped by noteTurnStarted's freshState like everything else; correct
+   * because it is a snapshot, not a counter (step 5, contracts v1.3.4).
+   */
+  lastCost?: { readonly turnCostUsd: number; readonly cumulativeUsd: number }
   /** Latched trip for the current episode; null until tripped. */
   trip: BreakerTripEvent | null
 }
@@ -162,12 +169,18 @@ export class AgentCircuitBreaker {
     })
   }
 
-  /** The thread's invocation count exceeded its bound harness budget. */
+  /**
+   * The thread's invocation count exceeded its bound harness budget.
+   * `scope` (step 5): absent = 'thread' (per-thread maxTurns, unchanged);
+   * 'slug' = the per-(root, slug) aggregate ceiling (maxTurnsPerSlug). The
+   * reason stays 'max-turns' either way — the detail string disambiguates.
+   */
   noteMaxTurns(info: {
     threadId: string
     agentId: string
     invocationCount: number
     maxTurns: number
+    scope?: 'thread' | 'slug'
   }): void {
     const state = this.stateFor(info.threadId, info.agentId)
     if (state.trip?.action === 'killed') return
@@ -177,8 +190,50 @@ export class AgentCircuitBreaker {
       // unambiguous — never concurrent-flagged.
       { threadId: info.threadId, agentId: info.agentId, turnId: '', concurrentTurns: false },
       'max-turns',
-      `invocation ${info.invocationCount} exceeded the harness maxTurns budget (${info.maxTurns})`
+      info.scope === 'slug'
+        ? `slug aggregate invocation ${info.invocationCount} exceeded the harness maxTurnsPerSlug budget (${info.maxTurns})`
+        : `invocation ${info.invocationCount} exceeded the harness maxTurns budget (${info.maxTurns})`
     )
+  }
+
+  /**
+   * One observed cost delta for a completed turn (step 5, contracts v1.3.4).
+   * NOTICE-CLASS ONLY, structurally kill-incapable: the single trip site
+   * below passes `noticeOnly: true` unconditionally — there is no code path
+   * from noteCost to `action: 'killed'`. No step-5 production caller supplies
+   * `maxSpendUsd`; step 6's loop wiring does (present + breached ⇒ notice
+   * trip — kept so the notice class is testable now). Never called for
+   * cost-unobservable adapters (codex/gemini/raw): unobserved is flagged by
+   * the contracts matrix, never zeroed into a spend of $0.
+   */
+  noteCost(info: {
+    threadId: string
+    agentId: string
+    turnCostUsd: number
+    cumulativeUsd: number
+    maxSpendUsd?: number
+  }): void {
+    const state = this.stateFor(info.threadId, info.agentId)
+    state.lastCost = { turnCostUsd: info.turnCostUsd, cumulativeUsd: info.cumulativeUsd }
+    if (state.trip?.action === 'killed') return
+    if (info.maxSpendUsd === undefined || info.cumulativeUsd <= info.maxSpendUsd) return
+    this.trip(
+      state,
+      { threadId: info.threadId, agentId: info.agentId, turnId: '', concurrentTurns: false },
+      'max-spend',
+      `cumulative observed spend $${info.cumulativeUsd} crossed the maxSpendUsd threshold ($${info.maxSpendUsd})`,
+      // The forced-notice pattern (noteHeadMoved): a spend threshold is a
+      // visibility line, not a containment action — the disarm ACTION lives
+      // in step 6's LoopRegistry, never a kill until calibrated.
+      { noticeOnly: true }
+    )
+  }
+
+  /** Latest cost observation for a thread — observability read, never $0 for unseen. */
+  lastCostFor(
+    threadId: string
+  ): { readonly turnCostUsd: number; readonly cumulativeUsd: number } | undefined {
+    return this.byThread.get(threadId)?.lastCost
   }
 
   /** Pull mirror for the tray/chip (`agent:breaker-status`). */

@@ -40,6 +40,7 @@ import { ClaudeStatusService } from './services/claude-status-service'
 import { getMainWindow, setMainWindow } from './window-registry'
 import { QuitCoordinator } from './services/quit-coordinator'
 import { drainThreadWrites } from './services/thread-write-queue'
+import { getAgentCostLedger } from './services/agent-cost-ledger'
 import {
   installMainLogger,
   logRendererConsole,
@@ -532,6 +533,15 @@ app.on('before-quit', (event) => {
       await drainThreadWrites()
     } catch (err) {
       console.error('[quit] thread write drain failed', err)
+    }
+
+    // Step 5 (P3 step 5): flush the durable cost ledger's persist chain so
+    // observed spend reaches disk before exit — a lost increment would
+    // undercount the money floor (the one accepted residual is SIGKILL).
+    try {
+      await getAgentCostLedger().flush()
+    } catch (err) {
+      console.error('[quit] cost ledger flush failed', err)
     }
   })()
     .catch((err) => {

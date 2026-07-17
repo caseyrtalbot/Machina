@@ -631,6 +631,9 @@ describe('budget thresholds and breaker signals (step 6)', () => {
   function makeBudgetHarness(opts: {
     matchFor: () => ActiveTurnMatch | null
     getWriteBudget?: (threadId: string) => number | undefined
+    getSlugWriteBudget?: (
+      threadId: string
+    ) => { slug: string; maxWritesPerMinute: number } | undefined
     headSha?: string | null
   }): BudgetHarness {
     const recordWrites = vi.fn((): PendingChange => ({}) as PendingChange)
@@ -651,6 +654,7 @@ describe('budget thresholds and breaker signals (step 6)', () => {
       headSha: () => (opts.headSha === undefined ? 'sha-start' : opts.headSha),
       commitsBetween: () => ['unexplained-sha'],
       getWriteBudget: opts.getWriteBudget,
+      getSlugWriteBudget: opts.getSlugWriteBudget,
       breaker
     })
     return { watcher, recordWrites, breaker }
@@ -699,6 +703,78 @@ describe('budget thresholds and breaker signals (step 6)', () => {
     h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`b${i}.ts`)))
     for (const call of h.recordWrites.mock.calls) {
       expect((call[0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    }
+  })
+
+  // ── Phase 3 step 5: opt-in per-(root, slug) aggregate write limiter ──
+
+  it('flags the batch crossing the slug aggregate while every per-thread threshold holds (step 5)', () => {
+    // The exact scenario the per-thread golden test above pins as NOT
+    // flagging without the field: two same-slug threads, 4+4 writes.
+    let active = matchForThread('th-a')
+    const h = makeBudgetHarness({
+      matchFor: () => active,
+      getWriteBudget: () => 10,
+      getSlugWriteBudget: () => ({ slug: 'agent-a', maxWritesPerMinute: 5 })
+    })
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`a${i}.ts`)))
+    active = matchForThread('th-b')
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`b${i}.ts`)))
+    // First batch: aggregate 4 < 5. Second: aggregate 8 ≥ 5 while each
+    // per-thread limiter holds 4 < 10.
+    expect((h.recordWrites.mock.calls[0][0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    expect((h.recordWrites.mock.calls[1][0] as RecordWritesOpts).flags?.highVelocity).toBe(true)
+    // Still exactly one velocity observation per attributed batch; the
+    // exceeded flag folds both ceilings — same 3-consecutive kill discipline.
+    expect(h.breaker.noteVelocity).toHaveBeenCalledTimes(2)
+    expect(h.breaker.noteVelocity.mock.calls[0][0]).toMatchObject({ exceeded: false })
+    expect(h.breaker.noteVelocity.mock.calls[1][0]).toMatchObject({ exceeded: true })
+  })
+
+  it('a degraded-attribution turn still records into the BINDING slug aggregate (v1.3.4 review fix)', () => {
+    // Thread B's turn degraded to the adapter identity ('cli-claude') while
+    // its binding still names the slug. Keying the limiter by the turn's
+    // agentId would shard the pool into two independent allowances; keying
+    // by the binding slug (what getSlugWriteBudget now returns) keeps ONE
+    // aggregate, so B's 4 writes cross the ceiling A's 4 writes primed.
+    let active = matchForThread('th-a')
+    const h = makeBudgetHarness({
+      matchFor: () => active,
+      getWriteBudget: () => 10,
+      getSlugWriteBudget: () => ({ slug: 'agent-a', maxWritesPerMinute: 5 })
+    })
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`a${i}.ts`)))
+    active = makeMatch({
+      turn: {
+        ...makeMatch().turn,
+        threadId: 'th-b',
+        turnId: 'turn-th-b',
+        agentId: 'cli-claude'
+      },
+      attributionSuspect: true
+    })
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`b${i}.ts`)))
+    expect((h.recordWrites.mock.calls[0][0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    expect((h.recordWrites.mock.calls[1][0] as RecordWritesOpts).flags?.highVelocity).toBe(true)
+  })
+
+  it('an absent slug budget leaves behavior identical to today: no slug limiter, no aggregate flag', () => {
+    // Same 4+4 same-slug traffic with the provider returning undefined
+    // (field absent in every existing harness snapshot): nothing flags.
+    let active = matchForThread('th-a')
+    const h = makeBudgetHarness({
+      matchFor: () => active,
+      getWriteBudget: () => 5,
+      getSlugWriteBudget: () => undefined
+    })
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`a${i}.ts`)))
+    active = matchForThread('th-b')
+    h.watcher.handleBatch(Array.from({ length: 4 }, (_, i) => ev(`b${i}.ts`)))
+    for (const call of h.recordWrites.mock.calls) {
+      expect((call[0] as RecordWritesOpts).flags?.highVelocity).toBe(false)
+    }
+    for (const call of h.breaker.noteVelocity.mock.calls) {
+      expect(call[0]).toMatchObject({ exceeded: false })
     }
   })
 
