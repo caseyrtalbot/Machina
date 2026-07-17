@@ -1145,8 +1145,11 @@ Every clause maps to at least one step's DONE bar; no clause is deferred.
 - **OQ8 — workspace-switch PTY visibility (unratified since Phase 2 step 6).**
   Q: How are live PTYs from a switched-away workspace surfaced?
   **Recommendation: ratify the standing option (a) verbatim — a one-line tray note
-  naming those threads + per-thread manual kill via the Phase-2 step-6 machinery — at
-  Phase 3 kickoff, landing inside steps 1-2's tray work.** This is a blocker-class OQ
+  naming those threads + per-thread manual kill via the Phase-2 step-6 machinery.**
+  (Status 2026-07-17: the "landing inside steps 1-2's tray work" window has passed —
+  steps 1-2 landed WITHOUT the graft, recorded in the step-2 DONE block; ratification
+  is still open and the next natural landing window is the step-6 tray/loop work,
+  with step 6's root fence as the standing interim.) This is a blocker-class OQ
   now, not severable: loops + canvas cards multiply cross-root live PTYs. Until
   ratified, step 6 fences firings to the current workspace root (a strictly-safer
   interim that ratification can relax). Options: (a) tray note + manual kill — cheap,

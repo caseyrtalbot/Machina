@@ -42,7 +42,10 @@ Cross-step rules:
 
 - Use the `TE_DIR` constant everywhere; a hardcoded `.machina` is a bug except inside
   `HARNESS_PROTECTED_GLOBS`. Files under 800 lines. `thread-store.ts` is at ~830 lines —
-  route around it (new small stores, not growth).
+  route around it (new small stores, not growth). (Corrected at the Phase-3 spec pass:
+  it was actually 1009 by then — "route around it" failed twice, Phase 2 steps 3 and 8
+  both grew it; Phase 3 step 3's dock-store extraction brought it to 786. See the
+  stale-claim ledger in `06-phase-3-specs.md`.)
 - Any deliberate deviation from the contracts amends `01-interface-contracts.md` in the
   same commit. Version plan: one minor bump to **v1.2 at step 1** (the §3 promotion is
   the structural change), then v1.2.x patch entries per landing step in §8, mirroring
@@ -1084,6 +1087,10 @@ the default if unanswered)
   containment for all of Phase 2. §4 framing unchanged: not a security boundary.
 - Per-slug budget AGGREGATION (N same-slug threads share one allowance) deferred to
   Phase 3 loops; Phase 2 semantics are per-thread-per-slug, documented and tested.
+  **Corrected 2026-07-17 (Phase 3 step 5, v1.3.4):** landed — opt-in
+  `maxTurnsPerSlug` / `maxWritesPerMinutePerSlug` aggregate ceilings beside the
+  unchanged per-thread semantics (parity direction; one commit before the scheduler).
+  See the contracts §5 aggregation subsection and the 06 step-5 DONE block.
 - SKILL.md frontmatter (budgets included) is agent-writable — tamper channel named;
   snapshot-at-bind is the mitigation; protected-glob widening rejected this phase.
 - Raw-view interactive input during an open turn is attributed to the thread's turn
@@ -1110,7 +1117,8 @@ the default if unanswered)
 - Phase-1 residuals that remain: TOCTOU narrowed-not-closed (stale-diff + v1.1.5);
   TE_DIR app-state watcher blind spot by design; concurrent same-root agents flagged
   not isolated (worktrees remain the PLAN-Q11 answer if usage demands); legacy DockTab
-  terminal PTY leak (strip supersedes); renderer "workspace" filter naming overload;
+  terminal PTY leak (strip supersedes; closed 2026-07-14 at Phase 3 step 3 — the
+  variant was deleted entirely); renderer "workspace" filter naming overload;
   discard vs open dirty editor doc (a racing autosave can resurrect rejected content —
   no Phase-2 step touches it); state.md knowledge-indexing still deferred
   (prompt-composition only).

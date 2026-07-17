@@ -1,7 +1,8 @@
 # Machina → Agentic Development Workstation: Vision & Build Plan
 
 Canonical plan for the workstation track. Approved 2026-07-05. Companion docs:
-`00-seam-audit.md` (file:line evidence), `01-interface-contracts.md` (Phase 1 contracts).
+`00-seam-audit.md` (file:line evidence), `01-interface-contracts.md` (the typed
+contracts — live, versioned in its §8 changelog; "Phase 1 contracts" at approval time).
 
 ## Context
 
@@ -78,7 +79,7 @@ Deliverables shipped: `00-seam-audit.md` (work orders with file:line evidence),
 `01-interface-contracts.md` (workspace service, git service, session/adapter/projection
 types, gate-parity mechanism, harness schema, reserved IPC channels).
 
-### Phase 1 — Tracer bullet (the daily-driver seed) — steps 1–2 DONE (`76d0699`, `3198ddd`)
+### Phase 1 — Tracer bullet (the daily-driver seed) — COMPLETE (2026-07-06, all six steps; dated DONE blocks in `02-phase-1-specs.md`)
 
 Canonical order (v1.1, reordered after the 11-agent adversarial pass — gate parity
 consumes GitService, so the substrate lands first; the snapshot stays wired until the
@@ -144,7 +145,9 @@ third-party hardening — hash-pinned tool descriptions, registry defaults (curr
 - Knowledge features keep working behind the capability toggle — zero feature loss.
 - Safety moves in the parity direction only; the verification gate stays
   agent-inaccessible; no window where neither snapshot nor commit-per-approval covers
-  rollback.
+  rollback. (Status 2026-07-06: the pre-run snapshot was retired at Phase 1 step 5
+  behind the G1–G8 evidence gate — rollback is the approvals gate exclusively; the
+  no-coverage-gap rule stands unchanged.)
 - Existing patterns extended, not paralleled (store shape, 4-step IPC registration,
   dock-adapter shape).
 

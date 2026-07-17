@@ -404,4 +404,6 @@ automated transcripts (step-6 smoke 11/11; step-5 P1/P2 in
 - TE_DIR app-state subpaths are a watcher blind spot by design; do not widen excludes.
 - state.md indexing deferred (prompt-composition only in Phase 1).
 - Legacy DockTab terminal tabs still leak PTYs on close (pre-existing; strip supersedes).
+  (Closed 2026-07-14, Phase 3 step 3, contracts v1.3.2: the `kind:'terminal'` DockTab
+  variant was deleted entirely — the leak path no longer exists.)
 - Renderer "workspace" filter naming overload — schedule the rename.

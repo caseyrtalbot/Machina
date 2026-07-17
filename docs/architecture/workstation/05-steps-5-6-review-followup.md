@@ -139,4 +139,6 @@ that carries this RESOLVED flip stamps steps 5+6 DONE (HANDOFF.md sections updat
 `HANDOFF-PHASE2-STEPS-5-6.md` deleted per its own instruction). The "Notable minors"
 above were record-only findings — treat each as unresolved unless a fix is verified on
 disk. OQ7 (before step 8) and OQ8 (the severable step-6 workspace-switch graft) remain
-pending Casey.
+pending Casey. (Status 2026-07-17: OQ7 was RESOLVED by Casey 2026-07-09 — the frozen
+ten-role roster, recorded in contracts §5 and the 04 step-8 spec; OQ8 remains open,
+now blocker-class at Phase 3 step 6.)

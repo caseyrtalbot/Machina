@@ -92,8 +92,9 @@ failure.
 (and thus only re-snapshots) when no live session is bound
 (`cli-thread-spawner.ts:164-167`); turns 2..n on a live PTY run with no fresh snapshot.
 Rollback today can lose earlier approved-in-spirit turns along with a bad final turn.
-Commit-per-approval (Phase 1 step 4) fixes this properly; until then this is a known
-limitation, not a regression to introduce.
+Commit-per-approval (Phase 1 steps 2–3 in the final numbering — per-turn snapshot at
+step 2, queue-based commit-per-approval at step 3; this doc predates the reorder) fixes
+this properly; until then this is a known limitation, not a regression to introduce.
 
 **Interception constraint.** The CLI runs as an independent child process — its writes
 cannot be routed through `HitlGate` in-process. Gate parity therefore means post-hoc
@@ -115,7 +116,9 @@ in `01-interface-contracts.md` §4. Per-CLI native hooks (Claude Code
 
 Remaining manual check (needs a display; not runnable in CI): live dock↔canvas migration
 of a session with an active foreground process, verifying no dropped output during the
-re-attach window. Tracked as a Phase 1 step-3 acceptance item.
+re-attach window. Tracked as a Phase 1 step-4 acceptance item (final numbering); CLOSED
+2026-07-14 at workstation Phase 3 step 3 — the tick-counter run passed watched live
+(evidence: the step-3 DONE block in `06-phase-3-specs.md`).
 
 ## 5. Coordination with the production-grade plan
 
@@ -137,3 +140,7 @@ draft said `docs/refactor-log/`; that directory does not exist — reconciled he
   Source: 4-lens adversarial verification (52 claims examined; all §1/§3/§4 citations
   confirmed exact). Also noted: `vault-git.ts:28`'s own doc comment says
   `.te/no-auto-commit` — stale source comment; the real flag is `<TE_DIR>/no-auto-commit`.
+- 2026-07-17 (doc lint): two Phase-1 step pointers predating the final step numbering
+  reconciled in place — commit-per-approval was steps 2–3 (§4 wrote "step 4"), and the
+  dock↔canvas migration acceptance was step 4 (§4 wrote "step-3"), the latter also
+  annotated CLOSED at workstation Phase 3 step 3.
