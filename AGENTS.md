@@ -1,9 +1,11 @@
 # AGENTS.md
 
 Codex-specific instructions for `/Users/caseytalbot/Projects/thought-engine`.
-`CLAUDE.md` remains the fuller project reference. This file is intentionally curated from
-it rather than kept as a byte-identical mirror. `npm run sync:agents` is a no-op guard so
-the scoped instructions cannot be overwritten accidentally.
+`CLAUDE.md` remains the fuller project reference. This file is a curated subset, not a
+byte-identical mirror — but wherever both documents cover the same ground, the wording
+must be identical: one source of truth, twice named. When an architecture fact changes,
+update both files with the same words in the same change. `npm run sync:agents` is a
+no-op guard so the scoped instructions cannot be overwritten accidentally.
 
 ## Read first
 
@@ -11,15 +13,14 @@ For workstation-track work, reconstruct the live gate from disk before editing:
 
 1. `docs/architecture/workstation/HANDOFF.md` — current shipped state and next gate.
 2. `docs/architecture/workstation/PLAN.md` — locked vision, primitives, phases, invariants.
-3. The active phase spec — currently `docs/architecture/workstation/04-phase-2-specs.md`.
+3. The active phase spec — the one HANDOFF.md names (currently
+   `docs/architecture/workstation/06-phase-3-specs.md`).
 4. `docs/architecture/workstation/01-interface-contracts.md` for any touched boundary.
 5. Any follow-up document named by the handoff.
 
 Trust those files over memory, older drafts, or stale line numbers. Use `rg` to re-locate
-symbols before editing. Phase 2 steps 1–7 are shipped and hardened. Casey resolved OQ7
-on 2026-07-09: Step 8 uses a curated ten-agent spectrum spanning guided, architecture,
-engineering, and raw-tool bridge roles; the active implementation must reconcile that
-decision into the handoff, PLAN, phase spec, and contracts before landing.
+symbols before editing. Do not trust phase/step state restated in this file or in memory;
+HANDOFF.md is the only authority for where the workstation track stands.
 
 The untracked `.agents/skills/thought-engine-council/` tree belongs to Casey. Do not edit,
 delete, stage, or commit it.
@@ -88,6 +89,18 @@ New IPC behavior follows the existing four-site pattern:
 
 Main owns workspace roots and security-relevant decisions. Do not trust renderer-supplied
 roots, harness identities, or approval state when main can resolve them authoritatively.
+
+**Singleton editor surface**: the dock holds at most ONE editor tab (`{ kind: 'editor' }`,
+kind-keyed like graph/ghosts/health — no path). Note identity lives only in editor-store
+(`openTabs`/`activeNotePath`); the editor surface's internal note-tab bar is the
+multi-note UX. Open notes via `openNoteInEditor(path, { preview?, title? })` from
+dock-store — never by constructing an editor DockTab with a path (the type forbids it)
+and never by pairing `setActiveNote` with a manual dock open. Rationale: per-path editor
+dock tabs co-mounted N editor surfaces under KeepAlive that all read the single global
+`activeNotePath` and corrupted each other. Legacy per-path editor tabs in old thread
+files fold to one at the dock-store seed boundary (paths harvested into
+`editor-store.restoreTabs`). Agent-driven editor opens carry the note as
+`DockAction.notePath`, not on the tab.
 
 ## Workstation safety invariants
 
