@@ -228,13 +228,13 @@ const FOCUS_CANVAS_TOOL: NativeToolSpec = {
 const OPEN_DOCK_TAB_TOOL: NativeToolSpec = {
   name: 'open_dock_tab',
   description:
-    'Open a surface dock tab in the current thread. Expands the dock if it was collapsed. Tab kinds: canvas, editor, terminal, graph, ghosts, health. canvas/editor/terminal accept an optional id, path, or sessionId; the others take no payload. Returns the new tab index.',
+    'Open a surface dock tab in the current thread. Expands the dock if it was collapsed. Tab kinds: canvas, editor, graph, ghosts, health. canvas accepts an optional canvasId (distinct ids open distinct canvas tabs). The editor is a single surface: at most one editor tab exists, and passing a path shows that note in it (repeat calls with different paths retarget the same tab, they do not open more tabs). graph/ghosts/health take no payload. Returns the new tab index.',
   input_schema: {
     type: 'object',
     properties: {
       kind: {
         type: 'string',
-        enum: ['canvas', 'editor', 'terminal', 'graph', 'ghosts', 'health'],
+        enum: ['canvas', 'editor', 'graph', 'ghosts', 'health'],
         description: 'Dock tab kind to open.'
       },
       canvasId: {
@@ -243,11 +243,8 @@ const OPEN_DOCK_TAB_TOOL: NativeToolSpec = {
       },
       path: {
         type: 'string',
-        description: 'Vault-relative path when kind="editor". Defaults to "".'
-      },
-      sessionId: {
-        type: 'string',
-        description: 'Terminal session id when kind="terminal". Defaults to "".'
+        description:
+          'Note path to show when kind="editor". Optional: omitting it just focuses the editor surface.'
       }
     },
     required: ['kind']

@@ -16,9 +16,9 @@ vi.mock('../../canvas/CanvasView', () => ({
   )
 }))
 vi.mock('../dock-adapters/EditorDockAdapter', () => ({
-  EditorDockAdapter: ({ initialPath }: { initialPath: string }) => (
-    <div data-testid="mock-editor">{initialPath}</div>
-  )
+  // The singleton editor surface takes no props — note identity lives in
+  // editor-store, not on the dock tab.
+  EditorDockAdapter: () => <div data-testid="mock-editor" />
 }))
 vi.mock('../dock-adapters/TerminalDockAdapter', () => ({
   TerminalDockAdapter: () => <div data-testid="mock-terminal" />
@@ -36,7 +36,7 @@ vi.mock('../../health/HealthPanel', () => ({
 describe('DockTabContent render dispatch (terminal variant retired)', () => {
   const cases: ReadonlyArray<{ tab: DockTab; testId: string; content?: string }> = [
     { tab: { kind: 'canvas', id: 'c1' }, testId: 'mock-canvas', content: 'c1' },
-    { tab: { kind: 'editor', path: '/v/a.md' }, testId: 'mock-editor', content: '/v/a.md' },
+    { tab: { kind: 'editor' }, testId: 'mock-editor' },
     { tab: { kind: 'graph' }, testId: 'mock-graph' },
     { tab: { kind: 'ghosts' }, testId: 'mock-ghosts' },
     { tab: { kind: 'health' }, testId: 'mock-health' }

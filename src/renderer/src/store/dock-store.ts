@@ -3,6 +3,7 @@ import { DOCK_TAB_KINDS, type DockTab } from '@shared/dock-types'
 import type { Thread } from '@shared/thread-types'
 import { TE_DIR } from '@shared/constants'
 import { setActiveCanvas } from './canvas-store'
+import { useEditorStore } from './editor-store'
 import { useTerminalStripStore } from './terminal-strip-store'
 import { useThreadStore } from './thread-store'
 
@@ -54,16 +55,17 @@ interface DockState {
 }
 
 /**
- * Stable identity for focus-vs-open dedupe. Every remaining kind has one —
- * the `kind: 'terminal'` DockTab variant is retired (Phase 3 step 3): plain
- * terminals live in the strip, agent sessions in ThreadPanel's agent surface.
+ * Stable identity for focus-vs-open dedupe. Every kind except canvas is a
+ * kind-keyed singleton — editor included: note identity lives in editor-store,
+ * not in the dock tab (see dock-types.ts). The `kind: 'terminal'` DockTab
+ * variant is retired (Phase 3 step 3): plain terminals live in the strip,
+ * agent sessions in ThreadPanel's agent surface.
  */
 function dockTabIdentity(t: DockTab): string {
   switch (t.kind) {
-    case 'editor':
-      return `editor:${t.path}`
     case 'canvas':
       return `canvas:${t.id}`
+    case 'editor':
     case 'graph':
     case 'ghosts':
     case 'health':
@@ -77,12 +79,34 @@ function activeThreadId(): string | null {
 
 /**
  * Disk seeds pass through the transparent thread-md decoder, so a legacy
- * thread file can still carry a retired tab kind (`terminal` predates Phase 3
- * step 3). Such a tab has no render surface anymore — drop it at the seed
- * boundary instead of mounting a dead tab.
+ * thread file can carry shapes the current model retired:
+ * - a retired tab kind (`terminal` predates Phase 3 step 3) — dropped; it has
+ *   no render surface anymore.
+ * - per-path `{ kind: 'editor', path }` tabs (predate the singleton editor
+ *   surface) — folded to one `{ kind: 'editor' }` tab, with their paths
+ *   harvested so the caller can restore them into editor-store's note tabs.
  */
-function knownKinds(tabs: readonly DockTab[]): DockTab[] {
-  return tabs.filter((t) => (DOCK_TAB_KINDS as readonly string[]).includes(t.kind))
+function sanitizeTabs(raw: readonly DockTab[]): {
+  tabs: DockTab[]
+  legacyEditorPaths: string[]
+} {
+  const tabs: DockTab[] = []
+  const legacyEditorPaths: string[] = []
+  let hasEditor = false
+  for (const t of raw) {
+    if (!(DOCK_TAB_KINDS as readonly string[]).includes(t.kind)) continue
+    if (t.kind === 'editor') {
+      const legacyPath = (t as { path?: unknown }).path
+      if (typeof legacyPath === 'string' && legacyPath !== '') legacyEditorPaths.push(legacyPath)
+      if (!hasEditor) {
+        tabs.push({ kind: 'editor' })
+        hasEditor = true
+      }
+      continue
+    }
+    tabs.push(t)
+  }
+  return { tabs, legacyEditorPaths }
 }
 
 export const useDockStore = create<DockState>((set, get) => ({
@@ -203,17 +227,27 @@ export const useDockStore = create<DockState>((set, get) => ({
   setDockCollapsed: (collapsed) =>
     set((s) => (s.dockCollapsed === collapsed ? s : { dockCollapsed: collapsed })),
 
-  seedFromThreads: (threads) =>
+  seedFromThreads: (threads) => {
+    const harvested: string[] = []
     set({
       dockTabsByThreadId: Object.fromEntries(
-        threads.map((t) => [t.id, knownKinds(t.dockState.tabs)])
+        threads.map((t) => {
+          const { tabs, legacyEditorPaths } = sanitizeTabs(t.dockState.tabs)
+          harvested.push(...legacyEditorPaths)
+          return [t.id, tabs]
+        })
       )
-    }),
+    })
+    useEditorStore.getState().restoreTabs(harvested)
+  },
 
-  seedThreadTabs: (threadId, tabs) =>
+  seedThreadTabs: (threadId, tabs) => {
+    const { tabs: clean, legacyEditorPaths } = sanitizeTabs(tabs)
     set((s) => ({
-      dockTabsByThreadId: { ...s.dockTabsByThreadId, [threadId]: knownKinds(tabs) }
-    })),
+      dockTabsByThreadId: { ...s.dockTabsByThreadId, [threadId]: clean }
+    }))
+    useEditorStore.getState().restoreTabs(legacyEditorPaths)
+  },
 
   setThreadTabs: (threadId, tabs) =>
     set((s) => ({ dockTabsByThreadId: { ...s.dockTabsByThreadId, [threadId]: tabs } })),
@@ -245,14 +279,13 @@ export async function validateThreadTabs(
   // Run filesystem existence checks in parallel; preserve original tab order.
   const checks = await Promise.all(
     tabs.map(async (t) => {
-      if (t.kind === 'editor' && t.path !== '') {
-        return window.api.fs.fileExists(t.path)
-      }
       if (t.kind === 'canvas' && t.id !== 'default') {
         // Named canvases are real per-id stores (3.8); drop tabs whose file is gone.
         return window.api.fs.fileExists(`${vault}/${TE_DIR}/canvas/${t.id}.json`)
       }
-      // The static kinds (graph, ghosts, health) are always valid in v1.
+      // The kind-keyed surfaces (editor, graph, ghosts, health) reference no
+      // per-tab resource — always valid. Missing note files are editor-store's
+      // concern, not the dock's.
       return true
     })
   )
@@ -291,6 +324,22 @@ export async function flushDockState(id: string): Promise<void> {
  * import cycle, so thread-store can register it on its own store at top level
  * (activeThreadId changes) while this module registers it here (tab changes).
  */
+/**
+ * The one way to open a note in the workbench: focus (or open) the singleton
+ * editor dock surface, then route note identity into editor-store. Callers
+ * must not open editor dock tabs directly — note paths never live in dock
+ * state (see dock-types.ts).
+ */
+export function openNoteInEditor(
+  path: string,
+  opts?: { readonly preview?: boolean; readonly title?: string }
+): void {
+  useDockStore.getState().openOrFocusDockTab({ kind: 'editor' })
+  const editor = useEditorStore.getState()
+  if (opts?.preview) editor.openPreviewTab(path, opts.title)
+  else editor.openTab(path, opts?.title)
+}
+
 export function syncActiveCanvas(): void {
   const threadId = useThreadStore.getState().activeThreadId
   if (!threadId) return

@@ -6,7 +6,7 @@ import type { HarnessSummary } from '@shared/harness-types'
 import type { AgentCommits } from '@shared/git-types'
 import { TE_DIR } from '@shared/constants'
 import { useThreadStore } from '../../store/thread-store'
-import { useDockStore } from '../../store/dock-store'
+import { openNoteInEditor, useDockStore } from '../../store/dock-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeStatusStore } from '../../store/claude-status-store'
 import { useHarnessStore } from '../../store/harness-store'
@@ -86,7 +86,7 @@ export function buildPaletteItems(opts: PaletteSourcesOptions): PaletteItem[] {
       subtitle: f.path,
       run: () => {
         opts.closePalette()
-        useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: f.path })
+        openNoteInEditor(f.path)
       }
     })
   }
@@ -354,7 +354,7 @@ export function noteHitItems(
       subtitle: `${hit.semantic === true ? 'semantic · ' : ''}${hit.snippet || hit.path}`,
       run: () => {
         opts.closePalette()
-        useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: hit.path })
+        openNoteInEditor(hit.path)
       }
     }))
 }

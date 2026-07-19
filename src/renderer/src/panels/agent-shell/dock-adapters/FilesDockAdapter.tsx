@@ -11,8 +11,6 @@ import { useSettingsStore } from '../../../store/settings-store'
 import { useSidebarFilterStore } from '../../../store/sidebar-filter-store'
 import { useSidebarSelectionStore } from '../../../store/sidebar-selection-store'
 import { filterSidebarFiles } from './sidebar-filtering'
-import { useThreadStore } from '../../../store/thread-store'
-import { useDockStore } from '../../../store/dock-store'
 import { useUiStore } from '../../../store/ui-store'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from '../../../hooks/useCanvasAwareness'
 import { useAgentStates } from '../../../hooks/use-agent-states'
@@ -386,17 +384,11 @@ export function FilesDockAdapter({ onOpenSettings }: FilesDockAdapterProps = {})
         }
         case 'delete': {
           await window.api.shell.trashItem(action.path)
+          // Note identity lives in editor-store only; the singleton editor
+          // dock tab references no path, so closing the note tab is enough.
           useEditorStore.getState().closeTab(action.path)
           const current = useVaultStore.getState().files
           useVaultStore.getState().setFiles(current.filter((f) => f.path !== action.path))
-          // Drop a stale Editor dock tab for this path on the active thread.
-          const threadId = useThreadStore.getState().activeThreadId
-          if (threadId) {
-            const dock = useDockStore.getState()
-            const tabs = dock.dockTabsByThreadId[threadId] ?? []
-            const idx = tabs.findIndex((t) => t.kind === 'editor' && t.path === action.path)
-            if (idx >= 0) dock.removeDockTab(idx)
-          }
           break
         }
       }

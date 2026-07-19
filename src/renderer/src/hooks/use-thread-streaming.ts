@@ -6,7 +6,7 @@ import type { ThreadMessage, ToolCall } from '@shared/thread-types'
 // display-only (its thread:save calls are metadata merges for cli threads).
 import '../store/thread-sync'
 import { useThreadStore } from '../store/thread-store'
-import { useDockStore } from '../store/dock-store'
+import { openNoteInEditor, useDockStore } from '../store/dock-store'
 import { AUTH_ERROR_BODY } from '../panels/agent-shell/ThreadMessage'
 
 export function useThreadStreaming(): void {
@@ -139,8 +139,16 @@ export function useThreadStreaming(): void {
     const off = window.api.on.agentNativeDockAction((evt) => {
       const active = useThreadStore.getState().activeThreadId
       if (active !== evt.threadId) return
-      if (evt.action === 'open') addDockTab(evt.tab)
-      else if (evt.action === 'close') removeDockTab(evt.index)
+      if (evt.action === 'open') {
+        if (evt.tab.kind === 'editor') {
+          // Editor is a kind-keyed singleton: focus-or-open it, and route the
+          // agent's requested note (if any) into editor-store.
+          if (evt.notePath) openNoteInEditor(evt.notePath)
+          else useDockStore.getState().openOrFocusDockTab({ kind: 'editor' })
+        } else {
+          addDockTab(evt.tab)
+        }
+      } else if (evt.action === 'close') removeDockTab(evt.index)
     })
     return off
   }, [addDockTab, removeDockTab])

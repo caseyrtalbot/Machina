@@ -190,6 +190,12 @@ export default function App() {
       const { root: path } = await window.api.workspace.open(requestedPath)
       await loadVault(path)
       const state = useVaultStore.getState().state
+      if (state?.openTabs && state.openTabs.length > 0) {
+        // Restore the editor note-tab set, dropping notes deleted since the
+        // last session (mirrors the dock's named-canvas validation).
+        const exists = await Promise.all(state.openTabs.map((p) => window.api.fs.fileExists(p)))
+        useEditorStore.getState().restoreTabs(state.openTabs.filter((_, i) => exists[i]))
+      }
       if (state?.lastOpenNote) {
         useEditorStore.getState().setActiveNote(state.lastOpenNote)
       }

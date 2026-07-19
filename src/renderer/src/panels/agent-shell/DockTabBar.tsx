@@ -33,25 +33,18 @@ interface TabMenuTarget {
   readonly position: ContextMenuPosition
 }
 
-function basenameOf(path: string): string {
-  const trimmed = path.replace(/\/+$/, '')
-  const slash = trimmed.lastIndexOf('/')
-  return slash >= 0 ? trimmed.slice(slash + 1) : trimmed
-}
-
 function tabLabel(tab: DockTab): string {
   switch (tab.kind) {
-    case 'editor':
-      return tab.path ? basenameOf(tab.path) : 'untitled'
     case 'canvas':
       return tab.id === 'default' ? 'canvas' : tab.id
     default:
+      // Kind-keyed surfaces (editor, graph, ghosts, health) label by kind;
+      // the editor surface's own note-tab bar names the open notes.
       return tab.kind
   }
 }
 
 function tabTooltip(tab: DockTab): string | undefined {
-  if (tab.kind === 'editor' && tab.path) return tab.path
   if (tab.kind === 'canvas' && tab.id !== 'default') return `canvas · ${tab.id}`
   return undefined
 }

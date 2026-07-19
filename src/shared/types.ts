@@ -160,6 +160,10 @@ export interface UiPersistedState {
 export interface VaultState {
   version: number
   lastOpenNote: string | null
+  /** Editor note-tab set (paths, in tab order). The singleton editor surface
+   * owns note identity, so open notes persist here — not as dock tabs.
+   * Optional so state.json files written before this field rehydrate cleanly. */
+  openTabs?: readonly string[]
   fileTreeCollapseState: Record<string, boolean>
   ui?: UiPersistedState
 }

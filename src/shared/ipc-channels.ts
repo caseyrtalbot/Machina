@@ -8,7 +8,12 @@ import type { InfraHealth } from './engine/vault-health'
 import type { Block } from './engine/block-model'
 import type { DockTab } from './dock-types'
 
-export type DockAction = { action: 'open'; tab: DockTab } | { action: 'close'; index: number }
+// `notePath` rides alongside an editor open: the editor DockTab is kind-keyed
+// (no path — see dock-types.ts), so the note to show travels outside the tab
+// and is routed into editor-store by the renderer handler.
+export type DockAction =
+  | { action: 'open'; tab: DockTab; notePath?: string }
+  | { action: 'close'; index: number }
 
 export interface IpcChannels {
   // --- Filesystem ---

@@ -49,6 +49,12 @@ interface EditorStore {
   mapPaths: (oldPath: string, newPath: string) => void
 
   openTab: (path: string, title?: string) => void
+  /**
+   * Merge paths into openTabs WITHOUT activating, flushing, or touching
+   * history. For restore flows only: state.json rehydration and the dock
+   * seed boundary folding legacy per-path editor tabs.
+   */
+  restoreTabs: (paths: readonly string[]) => void
   /** Open file in a transient preview tab. Replaced by the next preview open. */
   openPreviewTab: (path: string, title?: string) => void
   /** Promote the current preview tab to a permanent (pinned) tab. */
@@ -200,6 +206,20 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       previewTabPath: state.previewTabPath === path ? null : state.previewTabPath,
       historyStack: history.stack,
       historyIndex: history.index
+    })
+  },
+
+  restoreTabs: (paths) => {
+    if (paths.length === 0) return
+    set((s) => {
+      const seen = new Set(s.openTabs.map((t) => t.path))
+      const added: Tab[] = []
+      for (const p of paths) {
+        if (seen.has(p)) continue
+        seen.add(p)
+        added.push({ path: p, title: titleFromPath(p) })
+      }
+      return added.length > 0 ? { openTabs: [...s.openTabs, ...added] } : s
     })
   },
 

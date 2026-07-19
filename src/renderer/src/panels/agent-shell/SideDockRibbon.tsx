@@ -19,7 +19,7 @@ import {
 import type { DockTab } from '@shared/dock-types'
 import { borderRadius, colors, transitions } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
-import { useDockStore } from '../../store/dock-store'
+import { openNoteInEditor, useDockStore } from '../../store/dock-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
 import { openStripTerminal } from './terminal-migration'
@@ -54,9 +54,9 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
 
   async function openEditor() {
     const editorState = useEditorStore.getState()
-    const fallback = editorState.activeNotePath ?? editorState.openTabs[0]?.path ?? null
-    if (fallback) {
-      openOrFocusDockTab({ kind: 'editor', path: fallback })
+    if (editorState.activeNotePath || editorState.openTabs.length > 0) {
+      // Editor-store already has notes — just surface the singleton editor tab.
+      openOrFocusDockTab({ kind: 'editor' })
       return
     }
     // No prior note — create an Untitled scratch note in the vault root and open it.
@@ -70,8 +70,7 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
       const content = `---\ntitle: ${title}\ncreated: ${today}\ntags: []\n---\n\n`
       await window.api.fs.writeFile(filePath, content)
     }
-    editorState.openTab(filePath, title)
-    openOrFocusDockTab({ kind: 'editor', path: filePath })
+    openNoteInEditor(filePath, { title })
   }
 
   const canToggleAutoAccept = activeThread?.agent === 'machina-native'

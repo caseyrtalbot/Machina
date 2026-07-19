@@ -68,17 +68,15 @@ describe('dock-store tab actions (migrated from thread-store, behavior-preservin
   })
 
   it('openOrFocusDockTab focuses an existing identity instead of duplicating', () => {
-    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: '/v/a.md' })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor' })
     useDockStore.getState().openOrFocusDockTab({ kind: 'graph' })
-    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: '/v/a.md' })
+    useDockStore.getState().openOrFocusDockTab({ kind: 'editor' })
     const s = useDockStore.getState()
-    expect(s.dockTabsByThreadId['a']).toEqual([
-      { kind: 'editor', path: '/v/a.md' },
-      { kind: 'graph' }
-    ])
+    expect(s.dockTabsByThreadId['a']).toEqual([{ kind: 'editor' }, { kind: 'graph' }])
     expect(s.dockActiveIndexByThreadId['a']).toBe(0)
-    // Distinct editor paths and canvas ids are distinct identities.
-    useDockStore.getState().openOrFocusDockTab({ kind: 'editor', path: '/v/b.md' })
+    // Distinct canvas ids are distinct identities; editor is a kind-keyed
+    // singleton (note identity lives in editor-store).
+    useDockStore.getState().openOrFocusDockTab({ kind: 'canvas', id: 'c2' })
     expect(useDockStore.getState().dockTabsByThreadId['a']).toHaveLength(3)
   })
 
@@ -236,13 +234,14 @@ describe('flushDockState (migrated from thread-store)', () => {
 })
 
 describe('validateThreadTabs', () => {
-  it('drops tabs whose backing files are missing, keeps the rest in order', async () => {
+  it('drops named-canvas tabs whose backing files are missing, keeps the rest in order', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.fs.fileExists = vi.fn(async (p: string) => !p.includes('gone'))
     useDockStore.setState({
       dockTabsByThreadId: {
         a: [
-          { kind: 'editor', path: '/v/gone.md' },
+          // Editor is kind-keyed (no backing file) — never dropped by validation.
+          { kind: 'editor' },
           { kind: 'graph' },
           { kind: 'canvas', id: 'default' },
           { kind: 'canvas', id: 'gone-canvas' }
@@ -251,6 +250,7 @@ describe('validateThreadTabs', () => {
     })
     await validateThreadTabs('/v', 'a', () => true)
     expect(useDockStore.getState().dockTabsByThreadId['a']).toEqual([
+      { kind: 'editor' },
       { kind: 'graph' },
       { kind: 'canvas', id: 'default' }
     ])
@@ -259,7 +259,7 @@ describe('validateThreadTabs', () => {
   it('writes nothing once the workspace fence reports stale', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.fs.fileExists = vi.fn().mockResolvedValue(false)
-    const tabs = [{ kind: 'editor', path: '/v/gone.md' } satisfies DockTab]
+    const tabs = [{ kind: 'canvas', id: 'gone-canvas' } satisfies DockTab]
     useDockStore.setState({ dockTabsByThreadId: { a: tabs } })
     await validateThreadTabs('/v', 'a', () => false)
     expect(useDockStore.getState().dockTabsByThreadId['a']).toBe(tabs)

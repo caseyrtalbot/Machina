@@ -33,6 +33,7 @@ function gatherVaultState(): VaultState {
   return {
     version: vault.state?.version ?? 1,
     lastOpenNote: editor.activeNotePath,
+    openTabs: editor.openTabs.map((t) => t.path),
     fileTreeCollapseState: { ...ui.fileTreeCollapseState },
     ui: {
       backlinkCollapsed: { ...ui.backlinkCollapsed },
@@ -115,17 +116,20 @@ export function registerQuitHandler(): () => void {
 
 /**
  * Subscribe to store changes and auto-persist.
- * Editor: persists when the active note changes. Ui-store: every change is
- * persisted state (collapse maps, bookmarks, dismissals), so any change
- * schedules a debounced write.
+ * Editor: persists when the active note or the note-tab set changes (the
+ * openTabs array is immutable, so a reference check suffices). Ui-store:
+ * every change is persisted state (collapse maps, bookmarks, dismissals),
+ * so any change schedules a debounced write.
  * Returns an unsubscribe function.
  */
 export function subscribeVaultPersist(): () => void {
   let prevNotePath = useEditorStore.getState().activeNotePath
+  let prevOpenTabs = useEditorStore.getState().openTabs
 
   const unsubEditor = useEditorStore.subscribe((state) => {
-    if (state.activeNotePath !== prevNotePath) {
+    if (state.activeNotePath !== prevNotePath || state.openTabs !== prevOpenTabs) {
       prevNotePath = state.activeNotePath
+      prevOpenTabs = state.openTabs
       schedulePersist()
     }
   })

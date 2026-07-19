@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useVaultStore } from '../store/vault-store'
 import { useThreadStore } from '../store/thread-store'
 import { useDockStore } from '../store/dock-store'
+import { useEditorStore } from '../store/editor-store'
 import { formatModelLabel } from '@shared/format-model-label'
 import type { DockTab } from '@shared/dock-types'
 
@@ -23,11 +24,12 @@ function vaultName(vaultPath: string | null): string {
  * Renders inside the WindowDragRegion: vault accent dot → vault name → "/"
  * → active surface title → optional live indicator → agent label on the right.
  *
- * The crumb tracks the *active dock surface* for the active thread, not the
- * editor-store's `activeNotePath`. When the dock holds an editor, the note's
- * title appears; when the dock is empty or shows a non-editor surface, the
- * crumb falls back to the active thread's title. This avoids leaving a stale
- * note title in the chrome after the editor surface is closed.
+ * The crumb tracks the *active dock surface* for the active thread. When the
+ * active surface is the (singleton) editor, the active note's title appears —
+ * note identity comes from editor-store's `activeNotePath`, since the editor
+ * dock tab carries no path. When the dock is empty or shows a non-editor
+ * surface, the crumb falls back to the active thread's title, so no stale
+ * note title lingers in the chrome after the editor surface is closed.
  */
 export function TitlebarBreadcrumb() {
   const vaultPath = useVaultStore((s) => s.vaultPath)
@@ -48,19 +50,19 @@ export function TitlebarBreadcrumb() {
   const inFlight = useThreadStore((s) =>
     s.activeThreadId ? Boolean(s.inFlightByThreadId[s.activeThreadId]) : false
   )
+  const activeNotePath = useEditorStore((s) => s.activeNotePath)
 
   const crumb = useMemo(() => {
-    if (activeDockTab?.kind === 'editor') {
-      const path = activeDockTab.path
-      const id = fileToId[path]
+    if (activeDockTab?.kind === 'editor' && activeNotePath) {
+      const id = fileToId[activeNotePath]
       const artifact = id ? fileToTitle[id] : undefined
-      return artifact?.title ?? basenameNoExt(path)
+      return artifact?.title ?? basenameNoExt(activeNotePath)
     }
     if (activeThread) {
       return activeThread.title || 'Thread'
     }
     return null
-  }, [activeDockTab, activeThread, fileToId, fileToTitle])
+  }, [activeDockTab, activeNotePath, activeThread, fileToId, fileToTitle])
 
   const agentLabel = activeThread?.model ? formatModelLabel(activeThread.model) : null
 

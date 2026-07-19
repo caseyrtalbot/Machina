@@ -114,6 +114,7 @@ describe('vault-persist integration', () => {
       expect(state).toEqual({
         version: 2,
         lastOpenNote: '/test/vault/notes/hello.md',
+        openTabs: [],
         fileTreeCollapseState: { '/docs': true },
         ui: {
           backlinkCollapsed: { 'note-1': true },

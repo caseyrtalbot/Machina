@@ -51,6 +51,7 @@ vi.mock('../../../store/vault-store', () => ({
 }))
 
 vi.mock('../../../store/dock-store', () => ({
+  openNoteInEditor: vi.fn(),
   useDockStore: Object.assign(
     vi.fn((selector) =>
       selector({
@@ -211,21 +212,11 @@ describe('HealthPanel', () => {
     expect(screen.getByText('Stale worker index')).toBeDefined()
   })
 
-  it('clicking file link calls setActiveNote and opens an editor dock tab', async () => {
+  it('clicking file link opens the note in the editor surface', async () => {
     const now = Date.now()
-    const mockOpenOrFocus = vi.fn()
-    const mockSetActiveNote = vi.fn()
-
-    const { useDockStore } = await import('../../../store/dock-store')
-    ;(useDockStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-      openOrFocusDockTab: mockOpenOrFocus
-    })
-
-    const { useEditorStore } = await import('../../../store/editor-store')
-    ;(useEditorStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-      activeNotePath: null,
-      setActiveNote: mockSetActiveNote
-    })
+    const { openNoteInEditor } = await import('../../../store/dock-store')
+    const mockOpenNote = vi.mocked(openNoteInEditor)
+    mockOpenNote.mockClear()
 
     mockHealthState.status = 'degraded'
     mockHealthState.lastDerivedAt = now
@@ -247,8 +238,7 @@ describe('HealthPanel', () => {
     const fileLink = screen.getByText('broken.md')
     fireEvent.click(fileLink)
 
-    expect(mockSetActiveNote).toHaveBeenCalledWith('/vault/broken.md')
-    expect(mockOpenOrFocus).toHaveBeenCalledWith({ kind: 'editor', path: '/vault/broken.md' })
+    expect(mockOpenNote).toHaveBeenCalledWith('/vault/broken.md')
   })
 
   it('refresh button disables for 500ms after click', async () => {

@@ -46,7 +46,7 @@ function renderTab(tab: DockTab) {
     case 'canvas':
       return <LazyCanvasView canvasId={tab.id} />
     case 'editor':
-      return <LazyEditorAdapter initialPath={tab.path} />
+      return <LazyEditorAdapter />
     case 'graph':
       return <LazyGraph />
     case 'ghosts':

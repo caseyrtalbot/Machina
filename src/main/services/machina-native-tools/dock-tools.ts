@@ -11,7 +11,8 @@ function buildDockTab(input: Record<string, unknown>): DockTab | { error: string
     case 'canvas':
       return { kind: 'canvas', id: typeof input.canvasId === 'string' ? input.canvasId : 'default' }
     case 'editor':
-      return { kind: 'editor', path: typeof input.path === 'string' ? input.path : '' }
+      // Kind-keyed singleton — the note path travels as DockAction.notePath.
+      return { kind: 'editor' }
     default:
       return { kind: kind as 'graph' | 'ghosts' | 'health' }
   }
@@ -25,7 +26,13 @@ export function openDockTab(input: Record<string, unknown>, ctx: ToolContext): N
   if ('error' in built) {
     return { ok: false, error: { code: 'IO_FATAL', message: built.error } }
   }
-  ctx.emitDockAction({ action: 'open', tab: built })
+  const notePath =
+    built.kind === 'editor' && typeof input.path === 'string' && input.path !== ''
+      ? input.path
+      : undefined
+  ctx.emitDockAction(
+    notePath ? { action: 'open', tab: built, notePath } : { action: 'open', tab: built }
+  )
   const index = ctx.dockTabsSnapshot ? ctx.dockTabsSnapshot.length : null
   return { ok: true, output: { opened: built, index } }
 }

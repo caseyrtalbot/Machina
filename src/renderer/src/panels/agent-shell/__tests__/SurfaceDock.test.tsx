@@ -6,12 +6,8 @@ import { SurfaceDock } from '../SurfaceDock'
 import type { Thread } from '@shared/thread-types'
 import type { DockTab } from '@shared/dock-types'
 
-const tabsA: DockTab[] = [
-  { kind: 'editor', path: '/v/A.md' },
-  { kind: 'graph' },
-  { kind: 'health' }
-]
-const tabsB: DockTab[] = [{ kind: 'editor', path: '/v/B.md' }]
+const tabsA: DockTab[] = [{ kind: 'editor' }, { kind: 'graph' }, { kind: 'health' }]
+const tabsB: DockTab[] = [{ kind: 'editor' }]
 
 const thread = (id: string): Thread => ({
   id,
@@ -67,10 +63,10 @@ describe('SurfaceDock activeIndex on thread switch', () => {
 
     // empty-state must NOT appear; the single editor tab on thread b is rendered
     expect(screen.queryByTestId('dock-empty-state')).toBeNull()
-    // and the visible tab is the one from thread b
+    // and the visible tab is the one from thread b (kind-keyed label)
     const remaining = tabBar()
     expect(remaining).toHaveLength(1)
-    expect(within(remaining[0]).getByText('B.md')).toBeTruthy()
+    expect(within(remaining[0]).getByText('editor')).toBeTruthy()
   })
 
   it('survives a switch back to the multi-tab thread by starting at index 0', () => {

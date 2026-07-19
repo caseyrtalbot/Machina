@@ -4,6 +4,7 @@ import { ThreadMessage, AUTH_ERROR_BODY } from '../ThreadMessage'
 import { useVaultStore } from '../../../store/vault-store'
 import { useThreadStore } from '../../../store/thread-store'
 import { useDockStore } from '../../../store/dock-store'
+import { useEditorStore } from '../../../store/editor-store'
 import type { ThreadMessage as TM } from '@shared/thread-types'
 
 const userMsg: TM = { role: 'user', body: 'hello', sentAt: '' }
@@ -143,7 +144,7 @@ describe('ThreadMessage — wikilinks', () => {
     expect(screen.queryByText(/\[\[/)).toBeNull()
   })
 
-  it('clicking a resolvable wikilink opens an editor dock tab', () => {
+  it('clicking a resolvable wikilink opens the editor surface with the note', () => {
     render(
       <ThreadMessage
         message={{ role: 'assistant', body: 'Open [[Career Decisions]] now.', sentAt: '' }}
@@ -151,7 +152,8 @@ describe('ThreadMessage — wikilinks', () => {
     )
     fireEvent.click(screen.getByText('Career Decisions'))
     const tabs = useDockStore.getState().dockTabsByThreadId['t1']
-    expect(tabs).toEqual([{ kind: 'editor', path: '/vault/Career Decisions.md' }])
+    expect(tabs).toEqual([{ kind: 'editor' }])
+    expect(useEditorStore.getState().activeNotePath).toBe('/vault/Career Decisions.md')
   })
 
   it('leaves wikilinks inside inline code untouched', () => {

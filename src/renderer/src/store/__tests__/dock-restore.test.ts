@@ -52,24 +52,24 @@ describe('dock restore', () => {
     useThreadStore.setState({
       threadsById: {
         a: sampleThread('a', [{ kind: 'graph' }]),
-        b: sampleThread('b', [{ kind: 'editor', path: '/v/note.md' }, { kind: 'health' }])
+        b: sampleThread('b', [{ kind: 'editor' }, { kind: 'health' }])
       }
     })
     useDockStore.setState({
       dockTabsByThreadId: {
         a: [{ kind: 'graph' }],
-        b: [{ kind: 'editor', path: '/v/note.md' }, { kind: 'health' }]
+        b: [{ kind: 'editor' }, { kind: 'health' }]
       }
     })
     await useThreadStore.getState().selectThread('b')
     expect(useDockStore.getState().dockTabsByThreadId['b']).toEqual([
-      { kind: 'editor', path: '/v/note.md' },
+      { kind: 'editor' },
       { kind: 'health' }
     ])
     await useThreadStore.getState().selectThread('a')
     expect(useDockStore.getState().dockTabsByThreadId['a']).toEqual([{ kind: 'graph' }])
     expect(useDockStore.getState().dockTabsByThreadId['b']).toEqual([
-      { kind: 'editor', path: '/v/note.md' },
+      { kind: 'editor' },
       { kind: 'health' }
     ])
   })
@@ -79,9 +79,11 @@ describe('dock restore', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).api.fs.fileExists = vi.fn(async (p: string) => !p.includes('gone'))
     useThreadStore.setState({ threadsById: { a: sampleThread('a', []) } })
+    // Named canvases are the only dock tabs with a per-tab backing resource;
+    // the editor tab is kind-keyed and never validated against a file.
     useDockStore.setState({
       dockTabsByThreadId: {
-        a: [{ kind: 'editor', path: '/v/gone.md' }, { kind: 'graph' }]
+        a: [{ kind: 'canvas', id: 'gone' }, { kind: 'graph' }]
       }
     })
     await useThreadStore.getState().selectThread('a')

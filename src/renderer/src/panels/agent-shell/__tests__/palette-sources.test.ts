@@ -104,7 +104,8 @@ describe('palette-sources', () => {
     expect(fileItem).toBeDefined()
     fileItem!.run()
     const tabs = useDockStore.getState().dockTabsByThreadId['a']
-    expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/spark.md' })
+    expect(tabs?.[0]).toEqual({ kind: 'editor' })
+    expect(useEditorStore.getState().activeNotePath).toBe('/v/notes/spark.md')
   })
 
   it('emits one canvas entry per discovered canvas id (3.8 per-id stores)', () => {
@@ -171,7 +172,8 @@ describe('palette-sources', () => {
     items[0].run()
     expect(close).toHaveBeenCalled()
     const tabs = useDockStore.getState().dockTabsByThreadId['a']
-    expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/deep.md' })
+    expect(tabs?.[0]).toEqual({ kind: 'editor' })
+    expect(useEditorStore.getState().activeNotePath).toBe('/v/notes/deep.md')
   })
 
   it('opening the canvas surface routes the dock tab to the default canvas', () => {
@@ -298,7 +300,8 @@ describe('palette-sources — step 4 terminal + editor actions', () => {
       editor.openTabs.some((t) => t.path === '/v/notes/deep.md' && t.title === 'deep.md')
     ).toBe(true)
     const tabs = useDockStore.getState().dockTabsByThreadId['a']
-    expect(tabs?.[0]).toEqual({ kind: 'editor', path: '/v/notes/deep.md' })
+    expect(tabs?.[0]).toEqual({ kind: 'editor' })
+    expect(useEditorStore.getState().activeNotePath).toBe('/v/notes/deep.md')
   })
 
   it('open-file-in-editor does nothing when the picker returns null', async () => {

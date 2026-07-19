@@ -137,6 +137,19 @@ describe('registerQuitHandler', () => {
     expect(window.api.lifecycle.quitReady).toHaveBeenCalledTimes(1)
   })
 
+  it('persists the editor note-tab set (openTabs) in state.json', () => {
+    useEditorStore.setState({
+      openTabs: [
+        { path: '/vault/a.md', title: 'a' },
+        { path: '/vault/b.md', title: 'b' }
+      ]
+    })
+    flushVaultState()
+    const writeState = window.api.vault.writeState as ReturnType<typeof vi.fn>
+    const payload = writeState.mock.calls.at(-1)?.[1] as { openTabs?: readonly string[] }
+    expect(payload.openTabs).toEqual(['/vault/a.md', '/vault/b.md'])
+  })
+
   it('flushes the active thread dock tabs on quit', async () => {
     useThreadStore.setState({
       vaultPath: '/vault',
@@ -144,7 +157,7 @@ describe('registerQuitHandler', () => {
       threadsById: { a: sampleThread('a') }
     })
     useDockStore.setState({
-      dockTabsByThreadId: { a: [{ kind: 'graph' }, { kind: 'editor', path: '/vault/n.md' }] }
+      dockTabsByThreadId: { a: [{ kind: 'graph' }, { kind: 'editor' }] }
     })
 
     registerQuitHandler()
@@ -152,10 +165,7 @@ describe('registerQuitHandler', () => {
 
     expect(window.api.thread.save).toHaveBeenCalledTimes(1)
     const saved = (window.api.thread.save as ReturnType<typeof vi.fn>).mock.calls[0][1] as Thread
-    expect(saved.dockState.tabs).toEqual([
-      { kind: 'graph' },
-      { kind: 'editor', path: '/vault/n.md' }
-    ])
+    expect(saved.dockState.tabs).toEqual([{ kind: 'graph' }, { kind: 'editor' }])
     expect(window.api.lifecycle.quitReady).toHaveBeenCalledTimes(1)
   })
 
@@ -219,6 +229,7 @@ describe('gatherVaultState reads ui-store directly', () => {
     expect(writeState.mock.calls[0][1]).toEqual({
       version: 3,
       lastOpenNote: '/vault/notes/hello.md',
+      openTabs: [],
       fileTreeCollapseState: { '/vault/docs': true },
       ui: {
         backlinkCollapsed: { '/vault/notes/hello.md': false },

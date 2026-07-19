@@ -7,13 +7,15 @@ import type {
   IpcEventData
 } from '../shared/ipc-channels'
 
-// Under the KeepAlive panel architecture, each open tab keeps its editor (and its
-// per-path event subscriptions) mounted, so listeners on channels like
-// `doc:external-change` scale with the number of open tabs. These listeners are
-// legitimate and torn down on unmount, but they trip Node's default 10-listener
-// warning heuristic. Raise the cap to give headroom while still catching a real
-// runaway (unbounded) leak.
-ipcRenderer.setMaxListeners(50)
+// The editor dock surface is a singleton (see dock-types.ts), so doc:* event
+// listeners no longer scale with open note tabs. The remaining legitimate
+// fan-out is canvas split editors (one useDocument per split-open card), which
+// can exceed Node's default 10-listener warning heuristic in split-heavy
+// sessions. Keep a modest cap as headroom; a count past 50 would still warn
+// and would indicate a real leak or an unplanned fan-out (design a module-level
+// fan-in subscription at that point instead of raising this further).
+// Optional call: unit tests mock electron with a partial ipcRenderer.
+ipcRenderer.setMaxListeners?.(50)
 
 export function typedInvoke<C extends IpcChannel>(
   channel: C,
