@@ -1,12 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import {
-  borderRadius,
-  colors,
-  floatingPanel,
-  transitions,
-  typography,
-  zIndex
-} from '../../design/tokens'
+import { useCallback, useState } from 'react'
+import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { Overlay } from '../../components/overlay/Overlay'
 
 export function CanvasWelcomeCard() {
   const [isHovered, setIsHovered] = useState(false)
@@ -248,25 +242,12 @@ const CANVAS_SHORTCUTS: ReadonlyArray<readonly [keys: string, action: string]> =
  * Click anywhere or press Escape to close.
  */
 export function ShortcutOverlay({ onClose }: { readonly onClose: () => void }) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', handler, { capture: true })
-    return () => window.removeEventListener('keydown', handler, { capture: true })
-  }, [onClose])
-
   return (
-    <div
-      data-testid="canvas-shortcut-overlay"
-      className="absolute inset-0 flex items-center justify-center"
-      style={{ zIndex: zIndex.modal, backgroundColor: colors.scrim.modal }}
-      onClick={onClose}
-    >
+    <Overlay open onClose={onClose} containment="parent">
       <div
+        data-testid="canvas-shortcut-overlay"
+        // Click anywhere closes — the panel too, not just the scrim.
+        onClick={onClose}
         style={{
           width: 340,
           padding: '20px 24px',
@@ -328,6 +309,6 @@ export function ShortcutOverlay({ onClose }: { readonly onClose: () => void }) {
           Click anywhere or press Esc to close
         </div>
       </div>
-    </div>
+    </Overlay>
   )
 }

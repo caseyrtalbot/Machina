@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { colors } from '../../design/tokens'
+import { Modal } from '../../components/overlay/Modal'
 
 type Mode = 'new' | 'append'
 
@@ -56,153 +57,146 @@ export function SaveTextCardDialog({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="save-text-card-title"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: colors.scrim.modal }}
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabelledBy="save-text-card-title"
+      panelClassName="border p-4 w-[480px] max-h-[70vh] flex flex-col gap-3"
+      panelStyle={{
+        backgroundColor: colors.bg.elevated,
+        borderColor: colors.border.default,
+        borderRadius: 0,
+        color: colors.text.primary
+      }}
     >
-      <div
-        className="border p-4 w-[480px] max-h-[70vh] flex flex-col gap-3"
-        style={{
-          backgroundColor: colors.bg.elevated,
-          borderColor: colors.border.default,
-          borderRadius: 0,
-          color: colors.text.primary
-        }}
-        onClick={(e) => e.stopPropagation()}
+      <h2
+        id="save-text-card-title"
+        className="text-sm font-semibold"
+        style={{ color: colors.text.primary, margin: 0 }}
       >
-        <h2
-          id="save-text-card-title"
-          className="text-sm font-semibold"
-          style={{ color: colors.text.primary, margin: 0 }}
-        >
-          Save text card
-        </h2>
-        <div className="flex items-center gap-4 text-sm">
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="radio"
-              name="save-mode"
-              checked={mode === 'new'}
-              onChange={() => setMode('new')}
-            />
-            New file
-          </label>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="radio"
-              name="save-mode"
-              checked={mode === 'append'}
-              onChange={() => setMode('append')}
-            />
-            Append to existing
-          </label>
-        </div>
+        Save text card
+      </h2>
+      <div className="flex items-center gap-4 text-sm">
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input
+            type="radio"
+            name="save-mode"
+            checked={mode === 'new'}
+            onChange={() => setMode('new')}
+          />
+          New file
+        </label>
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input
+            type="radio"
+            name="save-mode"
+            checked={mode === 'append'}
+            onChange={() => setMode('append')}
+          />
+          Append to existing
+        </label>
+      </div>
 
-        {mode === 'new' ? (
-          <>
-            <div className="text-xs" style={{ color: colors.text.secondary }}>
-              Folder
+      {mode === 'new' ? (
+        <>
+          <div className="text-xs" style={{ color: colors.text.secondary }}>
+            Folder
+          </div>
+          <div
+            className="border overflow-auto"
+            style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 180 }}
+          >
+            {folders.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFolder(f)}
+                className="w-full text-left px-2 py-1 text-xs"
+                style={{
+                  backgroundColor: f === folder ? colors.accent.muted : 'transparent'
+                }}
+              >
+                {f || '/'}
+              </button>
+            ))}
+          </div>
+          <div className="text-xs" style={{ color: colors.text.secondary }}>
+            Filename
+          </div>
+          <input
+            type="text"
+            value={filename}
+            onChange={(e) => setFilename(e.target.value)}
+            className="px-2 py-1 text-sm bg-transparent border"
+            style={{ borderColor: colors.border.default, borderRadius: 0 }}
+          />
+          {collisionWarning && (
+            <div className="text-xs" style={{ color: 'var(--signal-warn)' }}>
+              {collisionWarning} A unique suffix will be added on save.
             </div>
-            <div
-              className="border overflow-auto"
-              style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 180 }}
-            >
-              {folders.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFolder(f)}
-                  className="w-full text-left px-2 py-1 text-xs"
-                  style={{
-                    backgroundColor: f === folder ? colors.accent.muted : 'transparent'
-                  }}
-                >
-                  {f || '/'}
-                </button>
-              ))}
-            </div>
-            <div className="text-xs" style={{ color: colors.text.secondary }}>
-              Filename
-            </div>
-            <input
-              type="text"
-              value={filename}
-              onChange={(e) => setFilename(e.target.value)}
-              className="px-2 py-1 text-sm bg-transparent border"
-              style={{ borderColor: colors.border.default, borderRadius: 0 }}
-            />
-            {collisionWarning && (
-              <div className="text-xs" style={{ color: 'var(--signal-warn)' }}>
-                {collisionWarning} A unique suffix will be added on save.
+          )}
+        </>
+      ) : (
+        <>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search vault files..."
+            className="px-2 py-1 text-sm bg-transparent border"
+            style={{ borderColor: colors.border.default, borderRadius: 0 }}
+          />
+          <div
+            className="border overflow-auto"
+            style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 240 }}
+          >
+            {filteredFiles.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setSelectedFile(f)}
+                className="w-full text-left px-2 py-1 text-xs"
+                style={{
+                  backgroundColor: f === selectedFile ? colors.accent.muted : 'transparent'
+                }}
+              >
+                {f}
+              </button>
+            ))}
+            {filteredFiles.length === 0 && (
+              <div className="px-2 py-2 text-xs" style={{ color: colors.text.secondary }}>
+                No matches
               </div>
             )}
-          </>
-        ) : (
-          <>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search vault files..."
-              className="px-2 py-1 text-sm bg-transparent border"
-              style={{ borderColor: colors.border.default, borderRadius: 0 }}
-            />
-            <div
-              className="border overflow-auto"
-              style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 240 }}
-            >
-              {filteredFiles.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setSelectedFile(f)}
-                  className="w-full text-left px-2 py-1 text-xs"
-                  style={{
-                    backgroundColor: f === selectedFile ? colors.accent.muted : 'transparent'
-                  }}
-                >
-                  {f}
-                </button>
-              ))}
-              {filteredFiles.length === 0 && (
-                <div className="px-2 py-2 text-xs" style={{ color: colors.text.secondary }}>
-                  No matches
-                </div>
-              )}
-            </div>
-          </>
-        )}
+          </div>
+        </>
+      )}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1 text-xs"
-            style={{ color: colors.text.secondary }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            className="px-3 py-1 text-xs"
-            style={{
-              backgroundColor: canSave ? colors.accent.default : colors.bg.surface,
-              color: canSave ? 'var(--color-accent-fg)' : colors.text.muted,
-              borderRadius: 0,
-              opacity: canSave ? 1 : 0.5,
-              cursor: canSave ? 'pointer' : 'default'
-            }}
-          >
-            Save
-          </button>
-        </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-1 text-xs"
+          style={{ color: colors.text.secondary }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave}
+          className="px-3 py-1 text-xs"
+          style={{
+            backgroundColor: canSave ? colors.accent.default : colors.bg.surface,
+            color: canSave ? 'var(--color-accent-fg)' : colors.text.muted,
+            borderRadius: 0,
+            opacity: canSave ? 1 : 0.5,
+            cursor: canSave ? 'pointer' : 'default'
+          }}
+        >
+          Save
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }

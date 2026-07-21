@@ -10,6 +10,7 @@ import {
   type HarnessAudienceFilter,
   type HarnessCategoryFilter
 } from './harness-gallery-model'
+import { harnessUi } from './harness-styles'
 
 const CATEGORY_FILTERS: readonly HarnessCategoryFilter[] = [
   ALL_HARNESS_FILTERS,
@@ -48,32 +49,35 @@ export function HarnessTemplateCatalog({
   }
 
   return (
-    <section aria-labelledby="harness-template-heading" className="harness-gallery-section">
-      <div className="harness-gallery-section-heading">
+    <section aria-labelledby="harness-template-heading">
+      <div className={harnessUi.sectionHeading}>
         <div>
-          <h2 id="harness-template-heading">Local agent templates</h2>
-          <p>
+          <h2 id="harness-template-heading" className={harnessUi.sectionHeadingTitle}>
+            Local agent templates
+          </h2>
+          <p className={harnessUi.sectionHeadingLede}>
             Each template becomes a reviewable harness. On first run, give it a concrete task brief.
           </p>
         </div>
-        <div className="harness-catalog-filters">
-          <div role="group" aria-label="Filter templates by category" className="harness-tabs">
+        <div className={harnessUi.catalogFilters}>
+          <div role="group" aria-label="Filter templates by category" className={harnessUi.tabs}>
             {CATEGORY_FILTERS.map((filter) => (
               <button
                 key={filter}
                 type="button"
                 aria-pressed={category === filter}
-                className="harness-tab"
+                className={harnessUi.tab}
                 onClick={() => setCategory(filter)}
               >
                 {filter === ALL_HARNESS_FILTERS ? 'All' : filter}
               </button>
             ))}
           </div>
-          <label className="harness-audience-filter">
-            <span>Audience</span>
+          <label className={harnessUi.audienceFilter}>
+            <span className={harnessUi.audienceFilterLabel}>Audience</span>
             <select
               aria-label="Filter templates by audience"
+              className={harnessUi.audienceFilterSelect}
               value={audience}
               onChange={(event) => setAudience(event.target.value as HarnessAudienceFilter)}
             >
@@ -88,68 +92,74 @@ export function HarnessTemplateCatalog({
         </div>
       </div>
 
-      <div className="harness-card-grid" data-testid="harness-template-grid">
+      <div className={harnessUi.cardGrid} data-testid="harness-template-grid">
         {templates.map((template) => {
           const isExpanded = expanded.has(template.id)
           const isCreating = creatingSlug === template.id
           return (
             <article
               key={template.id}
-              className="harness-card"
+              className={harnessUi.card}
               data-testid={`harness-template-card-${template.id}`}
             >
-              <div className="harness-card-kicker">
+              <div className={harnessUi.cardKicker}>
                 <span>{template.category}</span>
                 <span>{template.adapter}</span>
               </div>
-              <h3>{template.label}</h3>
-              <p className="harness-card-description">{template.description}</p>
-              <div className="harness-audience-list" aria-label="Intended audience">
+              <h3 className={harnessUi.cardTitle}>{template.label}</h3>
+              <p className={harnessUi.cardDescription}>{template.description}</p>
+              <div className={harnessUi.audienceList} aria-label="Intended audience">
                 {template.audience.map((audience) => (
-                  <span key={audience}>{audience}</span>
+                  <span key={audience} className={harnessUi.audienceTag}>
+                    {audience}
+                  </span>
                 ))}
               </div>
 
-              <dl className="harness-card-facts">
-                <div>
-                  <dt>Budget</dt>
-                  <dd>
+              <dl className={harnessUi.factList}>
+                <div className={harnessUi.factRow}>
+                  <dt className={harnessUi.factTerm}>Budget</dt>
+                  <dd className={harnessUi.factValue}>
                     {template.budgets.maxTurns} turns · {template.budgets.maxWritesPerMinute}{' '}
                     writes/min
                   </dd>
                 </div>
-                <div>
-                  <dt>Scope</dt>
-                  <dd>{template.scope.allowedGlobs.join(', ') || 'No writable globs'}</dd>
+                <div className={harnessUi.factRow}>
+                  <dt className={harnessUi.factTerm}>Scope</dt>
+                  <dd className={harnessUi.factValue}>
+                    {template.scope.allowedGlobs.join(', ') || 'No writable globs'}
+                  </dd>
                 </div>
-                <div>
-                  <dt>Verifier</dt>
-                  <dd>verify.sh</dd>
+                <div className={harnessUi.factRow}>
+                  <dt className={harnessUi.factTerm}>Verifier</dt>
+                  <dd className={harnessUi.factValue}>verify.sh</dd>
                 </div>
               </dl>
 
               {isExpanded && (
-                <div className="harness-card-details" id={`harness-details-${template.id}`}>
-                  <strong>Goal</strong>
-                  <p>{template.scope.goal}</p>
-                  <strong>Forbidden</strong>
-                  <p>{template.scope.forbiddenGlobs.join(', ')}</p>
-                  <strong>Acceptance</strong>
-                  <p>{template.scope.acceptance}</p>
-                  <strong>Deterministic verifier</strong>
-                  <pre>{template.verifySh}</pre>
-                  <strong>First run</strong>
-                  <p>
+                <div className={harnessUi.cardDetails} id={`harness-details-${template.id}`}>
+                  <strong className={harnessUi.cardDetailsLabel}>Goal</strong>
+                  <p className={harnessUi.cardDetailsText}>{template.scope.goal}</p>
+                  <strong className={harnessUi.cardDetailsLabel}>Forbidden</strong>
+                  <p className={harnessUi.cardDetailsText}>
+                    {template.scope.forbiddenGlobs.join(', ')}
+                  </p>
+                  <strong className={harnessUi.cardDetailsLabel}>Acceptance</strong>
+                  <p className={harnessUi.cardDetailsText}>{template.scope.acceptance}</p>
+                  <strong className={harnessUi.cardDetailsLabel}>Deterministic verifier</strong>
+                  <pre className={harnessUi.pre}>{template.verifySh}</pre>
+                  <strong className={harnessUi.cardDetailsLabel}>First run</strong>
+                  <p className={harnessUi.cardDetailsText}>
                     This role has no task context yet. Thought Engine requires a concrete brief
                     before it can start.
                   </p>
                 </div>
               )}
 
-              <div className="harness-card-actions">
+              <div className={harnessUi.cardActions}>
                 <button
                   type="button"
-                  className="harness-button harness-button-secondary"
+                  className={`${harnessUi.button} ${harnessUi.buttonSecondary}`}
                   aria-expanded={isExpanded}
                   aria-controls={`harness-details-${template.id}`}
                   onClick={() => toggleExpanded(template.id)}
@@ -158,7 +168,7 @@ export function HarnessTemplateCatalog({
                 </button>
                 <button
                   type="button"
-                  className="harness-button harness-button-primary"
+                  className={`${harnessUi.button} ${harnessUi.buttonPrimary}`}
                   disabled={creatingSlug !== null}
                   onClick={() => {
                     if (template.requiresConfiguration) onConfigure(template)

@@ -14,6 +14,7 @@ import {
   type ImportMode
 } from './import-logic'
 import { colors, borderRadius } from '../../design/tokens'
+import { Modal } from '../../components/overlay/Modal'
 
 interface ImportPaletteProps {
   readonly open: boolean
@@ -49,18 +50,6 @@ export function ImportPalette({
       requestAnimationFrame(() => inputRef.current?.focus())
     }
   }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [open, onClose])
 
   const activeTitle = useMemo(() => {
     if (!activeNotePath) return null
@@ -126,162 +115,146 @@ export function ImportPalette({
     [graph, artifacts, fileToId, containerWidth, containerHeight, onImport, onClose, canvas]
   )
 
-  if (!open) return null
-
   const isEmpty = graph.nodes.length === 0
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 50,
+    <Modal
+      open={open}
+      onClose={onClose}
+      variant="top"
+      topOffset={80}
+      containment="parent"
+      zLayer="surfacePopover"
+      ariaLabel="Import notes"
+      panelStyle={{
+        width: 420,
+        maxHeight: 480,
+        background: colors.bg.elevated,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: borderRadius.container,
         display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingTop: 80,
-        background: colors.scrim.modal
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}
-      onClick={onClose}
     >
       <div
         style={{
-          width: 420,
-          maxHeight: 480,
-          background: colors.bg.elevated,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: borderRadius.container,
           display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 14px',
+          borderBottom: `1px solid ${colors.border.subtle}`
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        <div
+        <input
+          ref={inputRef}
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Filter tags..."
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '10px 14px',
-            borderBottom: `1px solid ${colors.border.subtle}`
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            color: colors.text.primary,
+            fontSize: 14
+          }}
+        />
+        <kbd
+          style={{
+            fontSize: 11,
+            color: colors.text.muted,
+            background: 'rgba(255, 255, 255, 0.06)',
+            padding: '2px 6px',
+            borderRadius: borderRadius.inline,
+            border: `1px solid ${colors.border.subtle}`
           }}
         >
-          <input
-            ref={inputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter tags..."
+          {'\u2318'}G
+        </kbd>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+        {isEmpty ? (
+          <div
             style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              color: colors.text.primary,
-              fontSize: 14
-            }}
-          />
-          <kbd
-            style={{
-              fontSize: 11,
+              padding: '32px 16px',
+              textAlign: 'center',
               color: colors.text.muted,
-              background: 'rgba(255, 255, 255, 0.06)',
-              padding: '2px 6px',
-              borderRadius: borderRadius.inline,
-              border: `1px solid ${colors.border.subtle}`
+              fontSize: 13
             }}
           >
-            {'\u2318'}G
-          </kbd>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-          {isEmpty ? (
-            <div
-              style={{
-                padding: '32px 16px',
-                textAlign: 'center',
-                color: colors.text.muted,
-                fontSize: 13
-              }}
-            >
-              No notes indexed yet
-            </div>
-          ) : (
-            <>
-              {/* Neighborhood */}
-              <PaletteRow
-                disabled={!activeNoteId}
-                onClick={() => setNeighborhoodExpanded((v) => !v)}
-              >
-                <span style={{ marginRight: 6, fontSize: 10 }}>
-                  {neighborhoodExpanded ? '\u25BE' : '\u25B6'}
+            No notes indexed yet
+          </div>
+        ) : (
+          <>
+            {/* Neighborhood */}
+            <PaletteRow disabled={!activeNoteId} onClick={() => setNeighborhoodExpanded((v) => !v)}>
+              <span style={{ marginRight: 6, fontSize: 10 }}>
+                {neighborhoodExpanded ? '\u25BE' : '\u25B6'}
+              </span>
+              <span>
+                Neighborhood of{' '}
+                <span style={{ color: colors.accent.default }}>
+                  {activeTitle ?? 'no active note'}
                 </span>
-                <span>
-                  Neighborhood of{' '}
-                  <span style={{ color: colors.accent.default }}>
-                    {activeTitle ?? 'no active note'}
+              </span>
+            </PaletteRow>
+
+            {neighborhoodExpanded &&
+              activeNoteId &&
+              neighborhoodCounts.map(({ depth, count }) => (
+                <PaletteRow
+                  key={depth}
+                  indent
+                  onClick={() =>
+                    handleImport({
+                      mode: 'neighborhood',
+                      activeNodeId: activeNoteId,
+                      depth
+                    })
+                  }
+                >
+                  <span style={{ color: colors.text.secondary }}>
+                    {depth} hop{depth > 1 ? 's' : ''}
                   </span>
-                </span>
-              </PaletteRow>
+                  <CountBadge count={count} />
+                </PaletteRow>
+              ))}
 
-              {neighborhoodExpanded &&
-                activeNoteId &&
-                neighborhoodCounts.map(({ depth, count }) => (
-                  <PaletteRow
-                    key={depth}
-                    indent
-                    onClick={() =>
-                      handleImport({
-                        mode: 'neighborhood',
-                        activeNodeId: activeNoteId,
-                        depth
-                      })
-                    }
-                  >
-                    <span style={{ color: colors.text.secondary }}>
-                      {depth} hop{depth > 1 ? 's' : ''}
-                    </span>
-                    <CountBadge count={count} />
-                  </PaletteRow>
-                ))}
+            <Separator />
 
-              <Separator />
+            {/* Hub Notes */}
+            <PaletteRow onClick={() => handleImport({ mode: 'hub' })}>
+              <span>Hub Notes (top {HUB_COUNT})</span>
+              <CountBadge count={hubCount} />
+            </PaletteRow>
 
-              {/* Hub Notes */}
-              <PaletteRow onClick={() => handleImport({ mode: 'hub' })}>
-                <span>Hub Notes (top {HUB_COUNT})</span>
-                <CountBadge count={hubCount} />
-              </PaletteRow>
+            <Separator />
 
-              <Separator />
+            {/* Tags */}
+            {filteredTags.map(({ tag, count }) => {
+              const cappedCount = Math.min(count, IMPORT_CAP)
+              const isCapped = count > IMPORT_CAP
+              return (
+                <PaletteRow key={tag} onClick={() => handleImport({ mode: 'tag', tag })}>
+                  <span>
+                    Tag: <span style={{ color: colors.accent.default }}>#{tag}</span>
+                  </span>
+                  <CountBadge count={cappedCount} suffix={isCapped ? ` of ${count}` : undefined} />
+                </PaletteRow>
+              )
+            })}
 
-              {/* Tags */}
-              {filteredTags.map(({ tag, count }) => {
-                const cappedCount = Math.min(count, IMPORT_CAP)
-                const isCapped = count > IMPORT_CAP
-                return (
-                  <PaletteRow key={tag} onClick={() => handleImport({ mode: 'tag', tag })}>
-                    <span>
-                      Tag: <span style={{ color: colors.accent.default }}>#{tag}</span>
-                    </span>
-                    <CountBadge
-                      count={cappedCount}
-                      suffix={isCapped ? ` of ${count}` : undefined}
-                    />
-                  </PaletteRow>
-                )
-              })}
-
-              {filteredTags.length === 0 && searchQuery && (
-                <div style={{ padding: '12px 16px', color: colors.text.muted, fontSize: 13 }}>
-                  No matching tags
-                </div>
-              )}
-            </>
-          )}
-        </div>
+            {filteredTags.length === 0 && searchQuery && (
+              <div style={{ padding: '12px 16px', color: colors.text.muted, fontSize: 13 }}>
+                No matching tags
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 

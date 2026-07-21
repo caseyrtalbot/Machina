@@ -6,7 +6,7 @@
  * on disk when they appear here — Approve blesses them into history, Reject
  * reverts via git. Never phrase the queue as write-blocking.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import type { PendingChange } from '@shared/git-types'
 import { isForeignRoot, isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
@@ -15,6 +15,7 @@ import { AgentBreakerNotices } from './agent-breaker-notice'
 import { flagChips } from './approval-flags'
 import { REVERT_AGENT_EVENT, RevertAgentSection } from './RevertAgentSection'
 import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { Overlay } from '../../components/overlay/Overlay'
 
 const PATHS_SHOWN_MAX = 6
 const TRIGGER_BUTTON_SIZE = 26
@@ -37,7 +38,6 @@ export function ApprovalsTray() {
   const [hovered, setHovered] = useState(false)
   // Palette-routed revert request (step 5): arms RevertAgentSection's confirm.
   const [revertRequest, setRevertRequest] = useState<string | null>(null)
-  const popoverRef = useRef<HTMLDivElement | null>(null)
   const unhealthy = isWatcherUnhealthy(watcherHealth)
 
   // Initial badge count + health snapshot; afterwards approvals:changed and
@@ -53,13 +53,6 @@ export function ApprovalsTray() {
   useEffect(() => {
     if (!open) return
     void refresh()
-    const onPointerDown = (e: PointerEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
   }, [open, refresh])
 
   // Palette "Revert harness: <slug>" entries route here (step 5): the tray is
@@ -105,11 +98,17 @@ export function ApprovalsTray() {
   }, [])
 
   return (
-    <div ref={popoverRef} style={{ position: 'relative', display: 'inline-flex' }}>
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
       <button
         type="button"
         data-testid="approvals-tray-button"
         onClick={toggle}
+        // The popover's outside-mousedown listener (Overlay) only wraps the
+        // popover panel, not this trigger — without this guard a click here
+        // while open would fire Overlay's close AND this button's toggle,
+        // net effect a reopen instead of a close. Stopping propagation keeps
+        // the trigger the sole source of truth for its own open state.
+        onMouseDown={(event) => event.stopPropagation()}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         aria-label={`Agent approvals: ${pending} pending${
@@ -190,28 +189,33 @@ export function ApprovalsTray() {
         )}
       </button>
 
-      {open && (
+      <Overlay
+        open={open}
+        onClose={() => setOpen(false)}
+        variant="popover"
+        zLayer="dockPopover"
+        style={{
+          position: 'fixed',
+          top: 44,
+          right: 10,
+          width: 440,
+          maxHeight: '72vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: floatingPanel.glass.bg,
+          backdropFilter: floatingPanel.glass.blur,
+          WebkitBackdropFilter: floatingPanel.glass.blur,
+          border: `1px solid ${colors.border.subtle}`,
+          borderRadius: floatingPanel.borderRadius,
+          boxShadow: floatingPanel.shadowCompact,
+          overflow: 'hidden'
+        }}
+      >
         <div
           data-testid="approvals-popover"
           role="dialog"
           aria-label="Agent approvals"
-          style={{
-            position: 'fixed',
-            top: 44,
-            right: 10,
-            width: 440,
-            maxHeight: '72vh',
-            display: 'flex',
-            flexDirection: 'column',
-            background: floatingPanel.glass.bg,
-            backdropFilter: floatingPanel.glass.blur,
-            WebkitBackdropFilter: floatingPanel.glass.blur,
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: floatingPanel.borderRadius,
-            boxShadow: floatingPanel.shadowCompact,
-            zIndex: 1200,
-            overflow: 'hidden'
-          }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
         >
           <div
             style={{
@@ -337,7 +341,7 @@ export function ApprovalsTray() {
             )}
           </div>
         </div>
-      )}
+      </Overlay>
     </div>
   )
 }

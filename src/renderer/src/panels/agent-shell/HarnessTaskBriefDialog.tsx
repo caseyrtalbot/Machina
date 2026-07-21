@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { TE_DIR } from '@shared/constants'
 import {
   HARNESS_TASK_BRIEF_MAX_LENGTH,
   validateHarnessTaskBrief,
   type HarnessSummary
 } from '@shared/harness-types'
-import { colors, floatingPanel, zIndex } from '../../design/tokens'
+import { floatingPanel } from '../../design/tokens'
+import { Modal } from '../../components/overlay/Modal'
 import { runHarness } from '../../store/harness-run'
 import { useAgentDispatchStore } from '../../store/agent-dispatch-store'
 import { useThreadStore } from '../../store/thread-store'
-import './HarnessGallery.css'
+import { harnessUi } from './harness-styles'
 
 interface HarnessTaskBriefDialogProps {
   readonly summary: HarnessSummary
@@ -24,7 +25,6 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
   const persistedLaunch = useAgentDispatchStore((state) =>
     workspacePath ? state.harnessLaunchByWorkspace[workspacePath]?.[summary.slug] : undefined
   )
-  const dialogRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const startingRef = useRef(false)
   const validation = validateHarnessTaskBrief(taskBrief)
@@ -33,26 +33,6 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
     persistedLaunch?.status === 'indeterminate' ||
     (!starting && persistedLaunch?.status === 'starting')
   const launchStatus = launchRefused ? 'refused' : persistedBlock ? 'indeterminate' : null
-
-  useEffect(() => {
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    textareaRef.current?.focus()
-
-    function onWindowKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape' && !startingRef.current) {
-        event.preventDefault()
-        event.stopPropagation()
-        onClose()
-      }
-    }
-
-    window.addEventListener('keydown', onWindowKeyDown, true)
-    return () => {
-      window.removeEventListener('keydown', onWindowKeyDown, true)
-      previouslyFocused?.focus()
-    }
-  }, [onClose])
 
   async function startRun(): Promise<void> {
     const checked = validateHarnessTaskBrief(taskBrief)
@@ -91,192 +71,182 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
     }
   }
 
-  function trapFocus(event: React.KeyboardEvent<HTMLDivElement>): void {
-    if (event.key !== 'Tab') return
-    const focusable = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      ) ?? []
-    )
-    if (focusable.length === 0) return
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   return (
-    <div
-      className="harness-gallery-backdrop"
-      style={{ background: colors.scrim.modal, zIndex: zIndex.modal }}
-      onMouseDown={(event) => {
-        if (event.currentTarget === event.target && !startingRef.current) onClose()
+    <Modal
+      open
+      onClose={onClose}
+      canDismiss={!starting}
+      scrimBlur="blur(4px)"
+      className={harnessUi.backdropPad}
+      ariaLabelledBy="harness-task-title"
+      ariaBusy={starting}
+      initialFocusRef={textareaRef}
+      panelClassName={harnessUi.taskDialog}
+      panelStyle={{
+        background: floatingPanel.glass.bg,
+        backdropFilter: floatingPanel.glass.blur,
+        WebkitBackdropFilter: floatingPanel.glass.blur,
+        boxShadow: floatingPanel.shadow
       }}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-busy={starting}
-        aria-labelledby="harness-task-title"
-        className="harness-task-dialog"
-        style={{
-          background: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          boxShadow: floatingPanel.shadow
+      <header className={harnessUi.header}>
+        <div>
+          <div className={harnessUi.eyebrow}>Mandatory run context</div>
+          <h1 id="harness-task-title" className={harnessUi.headerTitle}>
+            Brief {summary.name}
+          </h1>
+          <p className={harnessUi.headerLede}>
+            Give this role one concrete task. Rules and scope remain authoritative.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={harnessUi.closeButton}
+          aria-label="Close task brief"
+          disabled={starting}
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </header>
+
+      <form
+        className={harnessUi.taskBody}
+        onSubmit={(event) => {
+          event.preventDefault()
+          void startRun()
         }}
-        onKeyDown={trapFocus}
       >
-        <header className="harness-gallery-header">
+        <section
+          className={`${harnessUi.taskPanel} ${harnessUi.taskRoleColumns}`}
+          aria-labelledby="harness-task-role-heading"
+        >
           <div>
-            <div className="harness-gallery-eyebrow">Mandatory run context</div>
-            <h1 id="harness-task-title">Brief {summary.name}</h1>
-            <p>Give this role one concrete task. Rules and scope remain authoritative.</p>
+            <h2 id="harness-task-role-heading" className={harnessUi.taskPanelHeading}>
+              Selected role
+            </h2>
+            <strong className={harnessUi.taskRoleName}>{summary.name}</strong>
+            <p className={harnessUi.taskPanelText}>{summary.description}</p>
           </div>
+          <dl className={harnessUi.taskRoleFacts}>
+            <div className={harnessUi.taskRoleFactRow}>
+              <dt className={harnessUi.taskFactTerm}>Adapter</dt>
+              <dd className={harnessUi.taskFactValue}>{summary.adapter}</dd>
+            </div>
+            {summary.budgets !== undefined && (
+              <div className={harnessUi.taskRoleFactRow}>
+                <dt className={harnessUi.taskFactTerm}>Budget</dt>
+                <dd className={harnessUi.taskFactValue}>
+                  {summary.budgets.maxTurns} turns · {summary.budgets.maxWritesPerMinute} writes/min
+                </dd>
+              </div>
+            )}
+          </dl>
+        </section>
+
+        <section className={harnessUi.taskPanel} aria-labelledby="harness-task-scope-heading">
+          <h2 id="harness-task-scope-heading" className={harnessUi.taskPanelHeading}>
+            Declared scope
+          </h2>
+          <p className={harnessUi.scopeBoundary}>
+            These globs guide the agent; they are not a sandbox. Writes reach disk before the
+            approvals review.
+          </p>
+          {summary.scope === undefined ? (
+            <p className={harnessUi.taskPanelText}>
+              The installed contract at{' '}
+              <code>
+                {TE_DIR}/agents/{summary.slug}/scope.json
+              </code>{' '}
+              declares allowed and forbidden paths.
+            </p>
+          ) : (
+            <>
+              <p className={harnessUi.taskPanelText}>{summary.scope.goal}</p>
+              <div className={harnessUi.scopeRow}>
+                <strong className={harnessUi.taskFactTerm}>Allowed</strong>
+                <code className={harnessUi.scopeCode}>
+                  {summary.scope.allowedGlobs.join(', ') || 'No writable paths'}
+                </code>
+              </div>
+              <div className={harnessUi.scopeRow}>
+                <strong className={harnessUi.taskFactTerm}>Forbidden</strong>
+                <code className={harnessUi.scopeCode}>
+                  {summary.scope.forbiddenGlobs.join(', ')}
+                </code>
+              </div>
+            </>
+          )}
+        </section>
+
+        <label className={harnessUi.taskField}>
+          <span className={harnessUi.taskFieldLabel}>Task brief · required</span>
+          <textarea
+            ref={textareaRef}
+            className={harnessUi.taskFieldTextarea}
+            aria-label="Task brief"
+            aria-describedby="harness-task-validation harness-task-count"
+            rows={7}
+            value={taskBrief}
+            readOnly={starting || launchStatus === 'indeterminate'}
+            onChange={(event) => setTaskBrief(event.target.value)}
+            placeholder="Name the target, desired outcome, and evidence or validation expected."
+          />
+        </label>
+        <div className={harnessUi.validationRow} aria-live="polite">
+          <span id="harness-task-validation" data-valid={validation.ok ? 'true' : 'false'}>
+            {validation.ok ? 'Task brief ready.' : validation.error}
+          </span>
+          <span
+            id="harness-task-count"
+            data-over-limit={normalizedCount > HARNESS_TASK_BRIEF_MAX_LENGTH ? 'true' : 'false'}
+          >
+            {normalizedCount.toLocaleString()} / {HARNESS_TASK_BRIEF_MAX_LENGTH.toLocaleString()}
+          </span>
+        </div>
+
+        <div className={harnessUi.taskProgress} role="status" aria-live="polite">
+          {starting ? 'Starting harness. The task brief will stay here if launch fails.' : ''}
+        </div>
+
+        {launchStatus !== null && (
+          <div role="alert" className={harnessUi.createError}>
+            <strong>
+              {launchStatus === 'indeterminate'
+                ? 'Launch status is unknown.'
+                : 'Run could not start.'}
+            </strong>
+            <span>
+              {launchStatus === 'indeterminate'
+                ? 'The original request may still execute. Do not retry this brief. Stop or Kill cannot prove the pending request was cancelled; close this dialog, inspect Threads and the terminal, and wait for settlement.'
+                : 'Run did not start. Your task brief is preserved; resolve the reported issue and try again.'}
+            </span>
+          </div>
+        )}
+
+        <div className={harnessUi.taskActions}>
           <button
             type="button"
-            className="harness-gallery-close"
-            aria-label="Close task brief"
+            className={`${harnessUi.button} ${harnessUi.buttonSecondary}`}
             disabled={starting}
             onClick={onClose}
           >
-            ×
+            Cancel
           </button>
-        </header>
-
-        <form
-          className="harness-task-body"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void startRun()
-          }}
-        >
-          <section className="harness-task-role" aria-labelledby="harness-task-role-heading">
-            <div>
-              <h2 id="harness-task-role-heading">Selected role</h2>
-              <strong>{summary.name}</strong>
-              <p>{summary.description}</p>
-            </div>
-            <dl>
-              <div>
-                <dt>Adapter</dt>
-                <dd>{summary.adapter}</dd>
-              </div>
-              {summary.budgets !== undefined && (
-                <div>
-                  <dt>Budget</dt>
-                  <dd>
-                    {summary.budgets.maxTurns} turns · {summary.budgets.maxWritesPerMinute}{' '}
-                    writes/min
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </section>
-
-          <section className="harness-task-scope" aria-labelledby="harness-task-scope-heading">
-            <h2 id="harness-task-scope-heading">Declared scope</h2>
-            <p className="harness-task-scope-boundary">
-              These globs guide the agent; they are not a sandbox. Writes reach disk before the
-              approvals review.
-            </p>
-            {summary.scope === undefined ? (
-              <p>
-                The installed contract at{' '}
-                <code>
-                  {TE_DIR}/agents/{summary.slug}/scope.json
-                </code>{' '}
-                declares allowed and forbidden paths.
-              </p>
-            ) : (
-              <>
-                <p>{summary.scope.goal}</p>
-                <div>
-                  <strong>Allowed</strong>
-                  <code>{summary.scope.allowedGlobs.join(', ') || 'No writable paths'}</code>
-                </div>
-                <div>
-                  <strong>Forbidden</strong>
-                  <code>{summary.scope.forbiddenGlobs.join(', ')}</code>
-                </div>
-              </>
-            )}
-          </section>
-
-          <label className="harness-task-field">
-            <span>Task brief · required</span>
-            <textarea
-              ref={textareaRef}
-              aria-label="Task brief"
-              aria-describedby="harness-task-validation harness-task-count"
-              rows={7}
-              value={taskBrief}
-              readOnly={starting || launchStatus === 'indeterminate'}
-              onChange={(event) => setTaskBrief(event.target.value)}
-              placeholder="Name the target, desired outcome, and evidence or validation expected."
-            />
-          </label>
-          <div className="harness-task-validation-row" aria-live="polite">
-            <span id="harness-task-validation" data-valid={validation.ok ? 'true' : 'false'}>
-              {validation.ok ? 'Task brief ready.' : validation.error}
-            </span>
-            <span
-              id="harness-task-count"
-              data-over-limit={normalizedCount > HARNESS_TASK_BRIEF_MAX_LENGTH ? 'true' : 'false'}
-            >
-              {normalizedCount.toLocaleString()} / {HARNESS_TASK_BRIEF_MAX_LENGTH.toLocaleString()}
-            </span>
-          </div>
-
-          <div className="harness-task-progress" role="status" aria-live="polite">
-            {starting ? 'Starting harness. The task brief will stay here if launch fails.' : ''}
-          </div>
-
-          {launchStatus !== null && (
-            <div role="alert" className="harness-create-error">
-              <strong>
-                {launchStatus === 'indeterminate'
-                  ? 'Launch status is unknown.'
-                  : 'Run could not start.'}
-              </strong>
-              <span>
-                {launchStatus === 'indeterminate'
-                  ? 'The original request may still execute. Do not retry this brief. Stop or Kill cannot prove the pending request was cancelled; close this dialog, inspect Threads and the terminal, and wait for settlement.'
-                  : 'Run did not start. Your task brief is preserved; resolve the reported issue and try again.'}
-              </span>
-            </div>
-          )}
-
-          <div className="harness-task-actions">
-            <button
-              type="button"
-              className="harness-button harness-button-secondary"
-              disabled={starting}
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="harness-button harness-button-primary"
-              disabled={!validation.ok || launchStatus === 'indeterminate'}
-              aria-disabled={!validation.ok || starting || launchStatus === 'indeterminate'}
-            >
-              {starting
-                ? 'Starting…'
-                : launchStatus === 'indeterminate'
-                  ? 'Do not retry'
-                  : 'Start harness'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <button
+            type="submit"
+            className={`${harnessUi.button} ${harnessUi.buttonPrimary}`}
+            disabled={!validation.ok || launchStatus === 'indeterminate'}
+            aria-disabled={!validation.ok || starting || launchStatus === 'indeterminate'}
+          >
+            {starting
+              ? 'Starting…'
+              : launchStatus === 'indeterminate'
+                ? 'Do not retry'
+                : 'Start harness'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }

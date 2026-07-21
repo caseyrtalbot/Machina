@@ -1,18 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { HarnessCreateRequest, HarnessSummary, HarnessTemplate } from '@shared/harness-types'
-import { colors, floatingPanel, zIndex } from '../../design/tokens'
+import { floatingPanel } from '../../design/tokens'
+import { Modal } from '../../components/overlay/Modal'
 import { showToast } from '../../components/Toast'
 import { notifyError } from '../../utils/error-logger'
 import { IpcTimeoutError, withTimeout } from '../../utils/ipc-timeout'
 import { useHarnessStore } from '../../store/harness-store'
 import { HarnessBuilderForm } from './HarnessBuilderForm'
 import { HarnessTemplateCatalog } from './HarnessTemplateCatalog'
+import { harnessUi } from './harness-styles'
 import {
   HARNESS_CATALOG,
   seedHarnessBuilderState,
   type HarnessBuilderState
 } from './harness-gallery-model'
-import './HarnessGallery.css'
 
 interface HarnessGalleryProps {
   readonly open: boolean
@@ -58,31 +59,7 @@ export function HarnessGallery({
   const [submitError, setSubmitError] = useState<CreationError | null>(null)
   const [created, setCreated] = useState<CreatedHarness | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const dialogRef = useRef<HTMLDivElement>(null)
   const submittingRef = useRef(false)
-
-  useEffect(() => {
-    if (!open) return
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    closeButtonRef.current?.focus()
-
-    function onWindowKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape' && !submittingRef.current) {
-        event.preventDefault()
-        event.stopPropagation()
-        onClose()
-      }
-    }
-
-    window.addEventListener('keydown', onWindowKeyDown, true)
-    return () => {
-      window.removeEventListener('keydown', onWindowKeyDown, true)
-      previouslyFocused?.focus()
-    }
-  }, [open, onClose])
-
-  if (!open) return null
 
   function openBuilder(template?: HarnessTemplate): void {
     if (submittingRef.current) return
@@ -143,137 +120,120 @@ export function HarnessGallery({
     }
   }
 
-  function trapFocus(event: React.KeyboardEvent<HTMLDivElement>): void {
-    if (event.key !== 'Tab') return
-    const focusable = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
-      ) ?? []
-    )
-    if (focusable.length === 0) return
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   return (
-    <div
-      className="harness-gallery-backdrop"
-      style={{ background: colors.scrim.modal, zIndex: zIndex.modal }}
-      onMouseDown={(event) => {
-        if (event.currentTarget === event.target && !submittingRef.current) onClose()
+    <Modal
+      open={open}
+      onClose={onClose}
+      canDismiss={creatingSlug === null}
+      scrimBlur="blur(4px)"
+      className={harnessUi.backdropPad}
+      ariaLabelledBy="harness-gallery-title"
+      ariaBusy={creatingSlug !== null}
+      initialFocusRef={closeButtonRef}
+      panelClassName={harnessUi.galleryDialog}
+      panelStyle={{
+        background: floatingPanel.glass.bg,
+        backdropFilter: floatingPanel.glass.blur,
+        WebkitBackdropFilter: floatingPanel.glass.blur,
+        boxShadow: floatingPanel.shadow
       }}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-busy={creatingSlug !== null}
-        aria-labelledby="harness-gallery-title"
-        className="harness-gallery-dialog"
-        style={{
-          background: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          boxShadow: floatingPanel.shadow
-        }}
-        onKeyDown={trapFocus}
-      >
-        <header className="harness-gallery-header">
-          <div>
-            <div className="harness-gallery-eyebrow">Workspace agents</div>
-            <h1 id="harness-gallery-title">Create a local agent</h1>
-            <p>Templates are generated locally, linted before creation, and never overwrite.</p>
+      <header className={harnessUi.header}>
+        <div>
+          <div className={harnessUi.eyebrow}>Workspace agents</div>
+          <h1 id="harness-gallery-title" className={harnessUi.headerTitle}>
+            Create a local agent
+          </h1>
+          <p className={harnessUi.headerLede}>
+            Templates are generated locally, linted before creation, and never overwrite.
+          </p>
+        </div>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className={harnessUi.closeButton}
+          aria-label="Close agent gallery"
+          disabled={creatingSlug !== null}
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </header>
+
+      <nav className={harnessUi.modeTabs} aria-label="Harness gallery mode">
+        <button
+          type="button"
+          className={harnessUi.modeTab}
+          aria-current={mode === 'templates' ? 'page' : undefined}
+          disabled={creatingSlug !== null}
+          onClick={() => setMode('templates')}
+        >
+          Templates
+        </button>
+        <button
+          type="button"
+          className={harnessUi.modeTab}
+          aria-current={mode === 'builder' ? 'page' : undefined}
+          disabled={creatingSlug !== null}
+          onClick={() => openBuilder()}
+        >
+          Build blank
+        </button>
+      </nav>
+
+      <main className={harnessUi.galleryBody}>
+        {submitError !== null && (
+          <div role="alert" className={harnessUi.createError}>
+            <strong>
+              {submitError.uncertain ? 'Creation status is unknown.' : 'Harness was not created.'}
+            </strong>
+            <span>
+              {submitError.message}
+              {submitError.uncertain
+                ? ' Check installed agents before retrying; main may still finish.'
+                : ''}
+            </span>
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="harness-gallery-close"
-            aria-label="Close agent gallery"
-            disabled={creatingSlug !== null}
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </header>
-
-        <nav className="harness-gallery-mode-tabs" aria-label="Harness gallery mode">
-          <button
-            type="button"
-            aria-current={mode === 'templates' ? 'page' : undefined}
-            disabled={creatingSlug !== null}
-            onClick={() => setMode('templates')}
-          >
-            Templates
-          </button>
-          <button
-            type="button"
-            aria-current={mode === 'builder' ? 'page' : undefined}
-            disabled={creatingSlug !== null}
-            onClick={() => openBuilder()}
-          >
-            Build blank
-          </button>
-        </nav>
-
-        <main className="harness-gallery-body">
-          {submitError !== null && (
-            <div role="alert" className="harness-create-error">
-              <strong>
-                {submitError.uncertain ? 'Creation status is unknown.' : 'Harness was not created.'}
-              </strong>
-              <span>
-                {submitError.message}
-                {submitError.uncertain
-                  ? ' Check installed agents before retrying; main may still finish.'
-                  : ''}
-              </span>
+        )}
+        {created !== null && (
+          <div role="status" className={harnessUi.createSuccess}>
+            <div className={harnessUi.createSuccessDetails}>
+              <strong>Created {created.slug}</strong>
+              <span className={harnessUi.createSuccessPath}>{created.root}</span>
+              <small className={harnessUi.createSuccessNote}>
+                A concrete task brief is required before this harness can start.
+              </small>
             </div>
-          )}
-          {created !== null && (
-            <div role="status" className="harness-create-success">
-              <div>
-                <strong>Created {created.slug}</strong>
-                <span>{created.root}</span>
-                <small>A concrete task brief is required before this harness can start.</small>
-              </div>
-              {created.summary !== null && (
-                <button
-                  type="button"
-                  className="harness-button harness-button-primary"
-                  onClick={() => {
-                    onClose()
-                    onRequestRun?.(created.summary as HarnessSummary)
-                  }}
-                >
-                  Set task &amp; run
-                </button>
-              )}
-            </div>
-          )}
+            {created.summary !== null && (
+              <button
+                type="button"
+                className={`${harnessUi.button} ${harnessUi.buttonPrimary}`}
+                onClick={() => {
+                  onClose()
+                  onRequestRun?.(created.summary as HarnessSummary)
+                }}
+              >
+                Set task &amp; run
+              </button>
+            )}
+          </div>
+        )}
 
-          {mode === 'templates' ? (
-            <HarnessTemplateCatalog
-              creatingSlug={creatingSlug}
-              onConfigure={openBuilder}
-              onCreate={(request) => void createHarness(request)}
-            />
-          ) : (
-            <HarnessBuilderForm
-              value={builder}
-              submitting={creatingSlug !== null}
-              onChange={setBuilder}
-              onCreate={(request) => void createHarness(request)}
-            />
-          )}
-        </main>
-      </div>
-    </div>
+        {mode === 'templates' ? (
+          <HarnessTemplateCatalog
+            creatingSlug={creatingSlug}
+            onConfigure={openBuilder}
+            onCreate={(request) => void createHarness(request)}
+          />
+        ) : (
+          <HarnessBuilderForm
+            value={builder}
+            submitting={creatingSlug !== null}
+            onChange={setBuilder}
+            onCreate={(request) => void createHarness(request)}
+          />
+        )}
+      </main>
+    </Modal>
   )
 }

@@ -2,17 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import {
-  colors,
-  borderRadius,
-  typography,
-  transitions,
-  floatingPanel,
-  zIndex
-} from '../design/tokens'
+import { colors, borderRadius, typography, transitions, floatingPanel } from '../design/tokens'
 import { ACCENT_PRESETS, type AccentId } from '../design/accent-presets'
 import { EMBEDDING_MODEL_DOWNLOAD_MB } from '@shared/engine/embeddings'
 import { FontPicker } from './FontPicker'
+import { Modal } from './overlay/Modal'
 
 interface EmbeddingsStatus {
   enabled: boolean
@@ -347,19 +341,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
     setBodyFont(name)
   }
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    if (isOpen) closeRef.current?.focus()
-  }, [isOpen])
-
   const vaultName = vaultPath?.split('/').pop() ?? null
 
   const [hasKey, setHasKey] = useState<boolean | null>(null)
@@ -412,304 +393,394 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   }
 
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center"
-      style={{
-        zIndex: zIndex.modal,
-        opacity: isOpen ? 1 : 0,
-        pointerEvents: isOpen ? 'auto' : 'none',
-        transition: `opacity ${transitions.modalFade}`
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      keepMounted
+      ariaLabelledBy="settings-dialog-title"
+      initialFocusRef={closeRef}
+      style={{ transition: `opacity ${transitions.modalFade}` }}
+      panelClassName="settings-shell relative flex flex-col"
+      panelStyle={{
+        width: 'min(560px, calc(100vw - 64px))',
+        maxHeight: 'min(720px, calc(100vh - 96px))',
+        backgroundColor: colors.bg.base,
+        border: `1px solid ${colors.border.subtle}`,
+        borderRadius: borderRadius.container,
+        boxShadow: floatingPanel.shadow,
+        transform: isOpen ? 'scale(1)' : 'scale(0.98)',
+        transition: `transform ${transitions.surface}`
       }}
     >
-      {/* Scrim — click to dismiss */}
+      {/* Header */}
       <div
-        aria-hidden
-        onClick={onClose}
-        className="absolute inset-0"
-        style={{ background: colors.scrim.modal }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-dialog-title"
-        className="settings-shell relative flex flex-col"
-        style={{
-          width: 'min(560px, calc(100vw - 64px))',
-          maxHeight: 'min(720px, calc(100vh - 96px))',
-          backgroundColor: colors.bg.base,
-          border: `1px solid ${colors.border.subtle}`,
-          borderRadius: borderRadius.container,
-          boxShadow: floatingPanel.shadow,
-          transform: isOpen ? 'scale(1)' : 'scale(0.98)',
-          transition: `transform ${transitions.surface}`
-        }}
+        className="settings-header flex items-center justify-between px-4 py-3 flex-shrink-0"
+        style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
       >
-        {/* Header */}
-        <div
-          className="settings-header flex items-center justify-between px-4 py-3 flex-shrink-0"
-          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
-        >
-          <div className="flex flex-col gap-2">
-            <span
-              className="settings-kicker"
-              style={{
-                fontFamily: typography.fontFamily.mono,
-                fontSize: typography.metadata.size,
-                letterSpacing: typography.metadata.letterSpacing,
-                textTransform: typography.metadata.textTransform,
-                color: colors.text.muted
-              }}
-            >
-              Workspace
-            </span>
-            <span
-              id="settings-dialog-title"
-              className="settings-title"
-              style={{
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 12,
-                letterSpacing: typography.metadata.letterSpacing,
-                textTransform: typography.metadata.textTransform,
-                color: colors.text.primary,
-                fontWeight: 500
-              }}
-            >
-              Settings
-            </span>
-          </div>
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={onClose}
-            className="settings-close-btn"
-            aria-label="Close settings"
-            style={{ borderRadius: borderRadius.inline }}
+        <div className="flex flex-col gap-2">
+          <span
+            className="settings-kicker"
+            style={{
+              fontFamily: typography.fontFamily.mono,
+              fontSize: typography.metadata.size,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              color: colors.text.muted
+            }}
           >
+            Workspace
+          </span>
+          <span
+            id="settings-dialog-title"
+            className="settings-title"
+            style={{
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 12,
+              letterSpacing: typography.metadata.letterSpacing,
+              textTransform: typography.metadata.textTransform,
+              color: colors.text.primary,
+              fontWeight: 500
+            }}
+          >
+            Settings
+          </span>
+        </div>
+        <button
+          ref={closeRef}
+          type="button"
+          onClick={onClose}
+          className="settings-close-btn"
+          aria-label="Close settings"
+          style={{ borderRadius: borderRadius.inline }}
+        >
+          <svg
+            width={12}
+            height={12}
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          >
+            <line x1="3" y1="3" x2="11" y2="11" />
+            <line x1="11" y1="3" x2="3" y2="11" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Single scrollable content */}
+      <div className="settings-content flex-1 overflow-y-auto">
+        {/* ── Appearance ── */}
+        <SectionHeading>Appearance</SectionHeading>
+        <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
+        {accentId === 'custom' && (
+          <div style={{ padding: '0 0 14px' }}>
+            <input
+              type="text"
+              value={customAccentHex}
+              onChange={(e) => setCustomAccentHex(e.target.value)}
+              spellCheck={false}
+              aria-label="Custom accent hex"
+              placeholder="#ffb454"
+              className="settings-input text-xs"
+              style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+            />
+          </div>
+        )}
+
+        {/* ── Tweaks ── */}
+        <SectionHeading>Tweaks</SectionHeading>
+        <SettingRow label="Density">
+          <SegmentedControl
+            ariaLabel="Density"
+            value={env.density}
+            options={[
+              { value: 'compact', label: 'Compact' },
+              { value: 'default', label: 'Default' },
+              { value: 'comfy', label: 'Comfy' }
+            ]}
+            onChange={(v) => setEnv('density', v)}
+          />
+        </SettingRow>
+        <SettingRow label="Corners">
+          <SegmentedControl
+            ariaLabel="Corner radii"
+            value={env.radii}
+            options={[
+              { value: 'square', label: 'Square' },
+              { value: 'soft', label: 'Soft' }
+            ]}
+            onChange={(v) => setEnv('radii', v)}
+          />
+        </SettingRow>
+        <SettingRow label="Background">
+          <SegmentedControl
+            ariaLabel="Background tint"
+            value={env.backgroundTint}
+            options={[
+              { value: 'pure', label: 'Pure' },
+              { value: 'near-black', label: 'Near' },
+              { value: 'warm', label: 'Warm' }
+            ]}
+            onChange={(v) => setEnv('backgroundTint', v)}
+          />
+        </SettingRow>
+        <SettingRow label="Canvas Grid">
+          <Toggle
+            value={env.canvasGrid}
+            onChange={(v) => setEnv('canvasGrid', v)}
+            ariaLabel="Show canvas dot grid"
+          />
+        </SettingRow>
+
+        {/* ── Typography ── */}
+        <SectionHeading>Typography</SectionHeading>
+        <SettingRow label="Font">
+          <FontPicker value={bodyFont} onChange={handleFontChange} />
+        </SettingRow>
+        <SettingRow label="Code Font">
+          <FontPicker value={monoFont} onChange={setMonoFont} categoryFilter="monospace" />
+        </SettingRow>
+        <SettingRow label="Card Titles">
+          <SliderInput
+            value={env.cardTitleFontSize}
+            min={10}
+            max={15}
+            step={1}
+            unit="px"
+            onChange={(v) => setEnv('cardTitleFontSize', v)}
+          />
+        </SettingRow>
+        <SettingRow label="Card Text">
+          <SliderInput
+            value={env.cardBodyFontSize}
+            min={10}
+            max={20}
+            step={1}
+            unit="px"
+            onChange={(v) => setEnv('cardBodyFontSize', v)}
+          />
+        </SettingRow>
+        <SettingRow label="File Tree">
+          <SliderInput
+            value={env.sidebarFontSize}
+            min={11}
+            max={16}
+            step={1}
+            unit="px"
+            onChange={(v) => setEnv('sidebarFontSize', v)}
+          />
+        </SettingRow>
+
+        {/* ── Editor ── */}
+        <SectionHeading>Editor</SectionHeading>
+        <SettingRow label="Default Mode">
+          <SelectInput
+            value={defaultEditorMode}
+            options={[
+              { value: 'rich', label: 'Rich' },
+              { value: 'source', label: 'Source' }
+            ]}
+            onChange={(v) => setDefaultEditorMode(v as 'rich' | 'source')}
+          />
+        </SettingRow>
+        <SettingRow label="Autosave">
+          <SliderInput
+            value={autosaveInterval}
+            min={500}
+            max={10000}
+            step={500}
+            onChange={setAutosaveInterval}
+            unit="ms"
+          />
+        </SettingRow>
+        <SettingRow label="Spell Check">
+          <Toggle value={spellCheck} onChange={setSpellCheck} ariaLabel="Spell check" />
+        </SettingRow>
+
+        {/* ── Search ── */}
+        <SectionHeading>Search</SectionHeading>
+        <SettingRow label="Semantic Search">
+          <Toggle
+            value={semanticSearch}
+            onChange={handleSemanticSearch}
+            ariaLabel="Semantic search"
+          />
+        </SettingRow>
+        <p
+          style={{
+            margin: '2px 0 10px',
+            color: colors.text.muted,
+            fontFamily: typography.fontFamily.mono,
+            fontSize: 10,
+            lineHeight: 1.5
+          }}
+        >
+          Meaning-based results merged into search, computed fully on-device. First enable downloads
+          a one-time ~{EMBEDDING_MODEL_DOWNLOAD_MB} MB model.
+          {semanticSearch && embedStatus ? ` Status: ${describeEmbeddings(embedStatus)}.` : ''}
+        </p>
+
+        {/* ── Vault ── */}
+        <SectionHeading>Vault</SectionHeading>
+        <div className="settings-vault-card">
+          <div className="flex items-center gap-2 min-w-0">
             <svg
-              width={12}
-              height={12}
+              width={14}
+              height={14}
               viewBox="0 0 14 14"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.4"
+              strokeWidth="1.3"
               strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ color: colors.text.muted, flexShrink: 0 }}
             >
-              <line x1="3" y1="3" x2="11" y2="11" />
-              <line x1="11" y1="3" x2="3" y2="11" />
+              <path d="M7 1L1.5 3.5v4L7 10l5.5-2.5v-4L7 1z" />
+              <path d="M1.5 3.5L7 6l5.5-2.5" />
+              <line x1="7" y1="6" x2="7" y2="10" />
             </svg>
+            <div className="flex flex-col min-w-0">
+              <span
+                className="truncate"
+                style={{
+                  color: colors.text.primary,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 12
+                }}
+              >
+                {vaultName ?? 'No vault'}
+              </span>
+              <span
+                className="truncate"
+                title={vaultPath ?? ''}
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 10
+                }}
+              >
+                {vaultPath ?? 'Select a vault to get started'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onChangeVault}
+            className="settings-button transition-colors flex-shrink-0"
+            style={{ color: colors.text.secondary }}
+          >
+            {vaultPath ? 'Change' : 'Open'}
           </button>
         </div>
 
-        {/* Single scrollable content */}
-        <div className="settings-content flex-1 overflow-y-auto">
-          {/* ── Appearance ── */}
-          <SectionHeading>Appearance</SectionHeading>
-          <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
-          {accentId === 'custom' && (
-            <div style={{ padding: '0 0 14px' }}>
-              <input
-                type="text"
-                value={customAccentHex}
-                onChange={(e) => setCustomAccentHex(e.target.value)}
-                spellCheck={false}
-                aria-label="Custom accent hex"
-                placeholder="#ffb454"
-                className="settings-input text-xs"
-                style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
-              />
-            </div>
-          )}
-
-          {/* ── Tweaks ── */}
-          <SectionHeading>Tweaks</SectionHeading>
-          <SettingRow label="Density">
-            <SegmentedControl
-              ariaLabel="Density"
-              value={env.density}
-              options={[
-                { value: 'compact', label: 'Compact' },
-                { value: 'default', label: 'Default' },
-                { value: 'comfy', label: 'Comfy' }
-              ]}
-              onChange={(v) => setEnv('density', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Corners">
-            <SegmentedControl
-              ariaLabel="Corner radii"
-              value={env.radii}
-              options={[
-                { value: 'square', label: 'Square' },
-                { value: 'soft', label: 'Soft' }
-              ]}
-              onChange={(v) => setEnv('radii', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Background">
-            <SegmentedControl
-              ariaLabel="Background tint"
-              value={env.backgroundTint}
-              options={[
-                { value: 'pure', label: 'Pure' },
-                { value: 'near-black', label: 'Near' },
-                { value: 'warm', label: 'Warm' }
-              ]}
-              onChange={(v) => setEnv('backgroundTint', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Canvas Grid">
-            <Toggle
-              value={env.canvasGrid}
-              onChange={(v) => setEnv('canvasGrid', v)}
-              ariaLabel="Show canvas dot grid"
-            />
-          </SettingRow>
-
-          {/* ── Typography ── */}
-          <SectionHeading>Typography</SectionHeading>
-          <SettingRow label="Font">
-            <FontPicker value={bodyFont} onChange={handleFontChange} />
-          </SettingRow>
-          <SettingRow label="Code Font">
-            <FontPicker value={monoFont} onChange={setMonoFont} categoryFilter="monospace" />
-          </SettingRow>
-          <SettingRow label="Card Titles">
-            <SliderInput
-              value={env.cardTitleFontSize}
-              min={10}
-              max={15}
-              step={1}
-              unit="px"
-              onChange={(v) => setEnv('cardTitleFontSize', v)}
-            />
-          </SettingRow>
-          <SettingRow label="Card Text">
-            <SliderInput
-              value={env.cardBodyFontSize}
-              min={10}
-              max={20}
-              step={1}
-              unit="px"
-              onChange={(v) => setEnv('cardBodyFontSize', v)}
-            />
-          </SettingRow>
-          <SettingRow label="File Tree">
-            <SliderInput
-              value={env.sidebarFontSize}
-              min={11}
-              max={16}
-              step={1}
-              unit="px"
-              onChange={(v) => setEnv('sidebarFontSize', v)}
-            />
-          </SettingRow>
-
-          {/* ── Editor ── */}
-          <SectionHeading>Editor</SectionHeading>
-          <SettingRow label="Default Mode">
-            <SelectInput
-              value={defaultEditorMode}
-              options={[
-                { value: 'rich', label: 'Rich' },
-                { value: 'source', label: 'Source' }
-              ]}
-              onChange={(v) => setDefaultEditorMode(v as 'rich' | 'source')}
-            />
-          </SettingRow>
-          <SettingRow label="Autosave">
-            <SliderInput
-              value={autosaveInterval}
-              min={500}
-              max={10000}
-              step={500}
-              onChange={setAutosaveInterval}
-              unit="ms"
-            />
-          </SettingRow>
-          <SettingRow label="Spell Check">
-            <Toggle value={spellCheck} onChange={setSpellCheck} ariaLabel="Spell check" />
-          </SettingRow>
-
-          {/* ── Search ── */}
-          <SectionHeading>Search</SectionHeading>
-          <SettingRow label="Semantic Search">
-            <Toggle
-              value={semanticSearch}
-              onChange={handleSemanticSearch}
-              ariaLabel="Semantic search"
-            />
-          </SettingRow>
-          <p
-            style={{
-              margin: '2px 0 10px',
-              color: colors.text.muted,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 10,
-              lineHeight: 1.5
-            }}
-          >
-            Meaning-based results merged into search, computed fully on-device. First enable
-            downloads a one-time ~{EMBEDDING_MODEL_DOWNLOAD_MB} MB model.
-            {semanticSearch && embedStatus ? ` Status: ${describeEmbeddings(embedStatus)}.` : ''}
-          </p>
-
-          {/* ── Vault ── */}
-          <SectionHeading>Vault</SectionHeading>
-          <div className="settings-vault-card">
-            <div className="flex items-center gap-2 min-w-0">
-              <svg
-                width={14}
-                height={14}
-                viewBox="0 0 14 14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ color: colors.text.muted, flexShrink: 0 }}
+        {/* ── machina-native ── */}
+        <SectionHeading>machina-native</SectionHeading>
+        <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
+          <div className="flex flex-col min-w-0 gap-2 w-full">
+            <span
+              style={{
+                color: colors.text.primary,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 12
+              }}
+            >
+              Anthropic API key
+            </span>
+            {hasKey === null ? (
+              <span
+                style={{
+                  color: colors.text.muted,
+                  fontFamily: typography.fontFamily.mono,
+                  fontSize: 10
+                }}
               >
-                <path d="M7 1L1.5 3.5v4L7 10l5.5-2.5v-4L7 1z" />
-                <path d="M1.5 3.5L7 6l5.5-2.5" />
-                <line x1="7" y1="6" x2="7" y2="10" />
-              </svg>
-              <div className="flex flex-col min-w-0">
+                checking...
+              </span>
+            ) : hasKey ? (
+              <div className="flex items-center justify-between gap-2">
                 <span
-                  className="truncate"
-                  style={{
-                    color: colors.text.primary,
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: 12
-                  }}
-                >
-                  {vaultName ?? 'No vault'}
-                </span>
-                <span
-                  className="truncate"
-                  title={vaultPath ?? ''}
                   style={{
                     color: colors.text.muted,
                     fontFamily: typography.fontFamily.mono,
-                    fontSize: 10
+                    fontSize: typography.metadata.size,
+                    letterSpacing: typography.metadata.letterSpacing,
+                    textTransform: typography.metadata.textTransform
                   }}
                 >
-                  {vaultPath ?? 'Select a vault to get started'}
+                  Key configured
                 </span>
+                <button
+                  type="button"
+                  onClick={clearKey}
+                  className="settings-button transition-colors flex-shrink-0"
+                  style={{ color: colors.text.secondary }}
+                >
+                  Clear
+                </button>
               </div>
-            </div>
-            <button
-              type="button"
-              onClick={onChangeVault}
-              className="settings-button transition-colors flex-shrink-0"
-              style={{ color: colors.text.secondary }}
+            ) : (
+              <div className="flex flex-col gap-2">
+                <input
+                  type="password"
+                  value={keyDraft}
+                  onChange={(e) => setKeyDraft(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="settings-select"
+                  style={{
+                    width: '100%',
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: 12
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void saveKey()
+                  }}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  {keyError && (
+                    <span
+                      style={{
+                        color: colors.claude.error,
+                        fontFamily: typography.fontFamily.mono,
+                        fontSize: 10
+                      }}
+                    >
+                      {keyError}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void saveKey()}
+                    disabled={!keyDraft.trim()}
+                    className="settings-primary-button transition-colors flex-shrink-0 ml-auto"
+                    style={{
+                      color: keyDraft.trim() ? colors.text.primary : colors.text.muted,
+                      opacity: keyDraft.trim() ? 1 : 0.5
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+            <span
+              style={{
+                color: colors.text.muted,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 10,
+                lineHeight: 1.5
+              }}
             >
-              {vaultPath ? 'Change' : 'Open'}
-            </button>
+              Stored encrypted via Electron safeStorage. Override with ANTHROPIC_API_KEY.
+            </span>
           </div>
+        </div>
 
-          {/* ── machina-native ── */}
-          <SectionHeading>machina-native</SectionHeading>
-          <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
-            <div className="flex flex-col min-w-0 gap-2 w-full">
+        {/* ── MCP server ── */}
+        <SectionHeading>MCP Server</SectionHeading>
+        <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
+          <div className="flex flex-col min-w-0 gap-2 w-full">
+            <div className="flex items-center justify-between gap-2">
               <span
                 style={{
                   color: colors.text.primary,
@@ -717,197 +788,93 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                   fontSize: 12
                 }}
               >
-                Anthropic API key
+                Local MCP endpoint
               </span>
-              {hasKey === null ? (
-                <span
-                  style={{
-                    color: colors.text.muted,
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: 10
-                  }}
-                >
-                  checking...
-                </span>
-              ) : hasKey ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    style={{
-                      color: colors.text.muted,
-                      fontFamily: typography.fontFamily.mono,
-                      fontSize: typography.metadata.size,
-                      letterSpacing: typography.metadata.letterSpacing,
-                      textTransform: typography.metadata.textTransform
-                    }}
-                  >
-                    Key configured
-                  </span>
-                  <button
-                    type="button"
-                    onClick={clearKey}
-                    className="settings-button transition-colors flex-shrink-0"
-                    style={{ color: colors.text.secondary }}
-                  >
-                    Clear
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="password"
-                    value={keyDraft}
-                    onChange={(e) => setKeyDraft(e.target.value)}
-                    placeholder="sk-ant-..."
-                    className="settings-select"
-                    style={{
-                      width: '100%',
-                      fontFamily: typography.fontFamily.mono,
-                      fontSize: 12
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void saveKey()
-                    }}
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    {keyError && (
-                      <span
-                        style={{
-                          color: colors.claude.error,
-                          fontFamily: typography.fontFamily.mono,
-                          fontSize: 10
-                        }}
-                      >
-                        {keyError}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void saveKey()}
-                      disabled={!keyDraft.trim()}
-                      className="settings-primary-button transition-colors flex-shrink-0 ml-auto"
-                      style={{
-                        color: keyDraft.trim() ? colors.text.primary : colors.text.muted,
-                        opacity: keyDraft.trim() ? 1 : 0.5
-                      }}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-              )}
               <span
                 style={{
-                  color: colors.text.muted,
+                  color: mcpStatus?.running ? colors.accent.default : colors.text.muted,
                   fontFamily: typography.fontFamily.mono,
-                  fontSize: 10,
-                  lineHeight: 1.5
+                  fontSize: typography.metadata.size,
+                  letterSpacing: typography.metadata.letterSpacing,
+                  textTransform: typography.metadata.textTransform
                 }}
               >
-                Stored encrypted via Electron safeStorage. Override with ANTHROPIC_API_KEY.
+                {mcpStatus === null
+                  ? 'checking...'
+                  : mcpStatus.running
+                    ? `Running · ${mcpStatus.toolCount} tools`
+                    : 'Not running'}
               </span>
             </div>
-          </div>
-
-          {/* ── MCP server ── */}
-          <SectionHeading>MCP Server</SectionHeading>
-          <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
-            <div className="flex flex-col min-w-0 gap-2 w-full">
+            {mcpStatus?.running && mcpStatus.url ? (
               <div className="flex items-center justify-between gap-2">
                 <span
+                  className="truncate"
+                  title={mcpStatus.url}
                   style={{
-                    color: colors.text.primary,
+                    color: colors.text.secondary,
                     fontFamily: typography.fontFamily.mono,
-                    fontSize: 12
+                    fontSize: 11
                   }}
                 >
-                  Local MCP endpoint
+                  {mcpStatus.url}
                 </span>
-                <span
-                  style={{
-                    color: mcpStatus?.running ? colors.accent.default : colors.text.muted,
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: typography.metadata.size,
-                    letterSpacing: typography.metadata.letterSpacing,
-                    textTransform: typography.metadata.textTransform
-                  }}
+                <button
+                  type="button"
+                  onClick={() => void copyMcpUrl()}
+                  className="settings-button transition-colors flex-shrink-0"
+                  style={{ color: colors.text.secondary }}
                 >
-                  {mcpStatus === null
-                    ? 'checking...'
-                    : mcpStatus.running
-                      ? `Running · ${mcpStatus.toolCount} tools`
-                      : 'Not running'}
-                </span>
+                  {mcpUrlCopied ? 'Copied' : 'Copy URL'}
+                </button>
               </div>
-              {mcpStatus?.running && mcpStatus.url ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className="truncate"
-                    title={mcpStatus.url}
-                    style={{
-                      color: colors.text.secondary,
-                      fontFamily: typography.fontFamily.mono,
-                      fontSize: 11
-                    }}
-                  >
-                    {mcpStatus.url}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void copyMcpUrl()}
-                    className="settings-button transition-colors flex-shrink-0"
-                    style={{ color: colors.text.secondary }}
-                  >
-                    {mcpUrlCopied ? 'Copied' : 'Copy URL'}
-                  </button>
-                </div>
-              ) : null}
-              <span
-                style={{
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: 10,
-                  lineHeight: 1.5
-                }}
-              >
-                {mcpStatus?.running
-                  ? 'Connect external agents: claude mcp add --transport http machina <URL>. Writes require in-app approval.'
-                  : 'Starts when a vault is open. Serves vault search, graph, and gated writes to external MCP clients.'}
-              </span>
-            </div>
-          </div>
-
-          {/* ── Reset ── */}
-          <div className="settings-footer gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onClose()
-                useClaudeStatusStore.getState().openOnboarding()
+            ) : null}
+            <span
+              style={{
+                color: colors.text.muted,
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 10,
+                lineHeight: 1.5
               }}
-              className="settings-button transition-colors"
-              style={{ color: colors.text.muted }}
             >
-              Run Setup
-            </button>
-            <button
-              type="button"
-              onClick={() => void window.api.app.revealLogs()}
-              className="settings-button transition-colors"
-              style={{ color: colors.text.muted }}
-            >
-              Reveal Logs
-            </button>
-            <button
-              type="button"
-              onClick={resetEnv}
-              className="settings-button transition-colors"
-              style={{ color: colors.text.muted }}
-            >
-              Reset to Defaults
-            </button>
+              {mcpStatus?.running
+                ? 'Connect external agents: claude mcp add --transport http machina <URL>. Writes require in-app approval.'
+                : 'Starts when a vault is open. Serves vault search, graph, and gated writes to external MCP clients.'}
+            </span>
           </div>
         </div>
+
+        {/* ── Reset ── */}
+        <div className="settings-footer gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onClose()
+              useClaudeStatusStore.getState().openOnboarding()
+            }}
+            className="settings-button transition-colors"
+            style={{ color: colors.text.muted }}
+          >
+            Run Setup
+          </button>
+          <button
+            type="button"
+            onClick={() => void window.api.app.revealLogs()}
+            className="settings-button transition-colors"
+            style={{ color: colors.text.muted }}
+          >
+            Reveal Logs
+          </button>
+          <button
+            type="button"
+            onClick={resetEnv}
+            className="settings-button transition-colors"
+            style={{ color: colors.text.muted }}
+          >
+            Reset to Defaults
+          </button>
+        </div>
       </div>
-    </div>
+    </Modal>
   )
 }

@@ -238,7 +238,7 @@ describe('HarnessGallery — creation lifecycle', () => {
           resolveCreate = resolve
         })
     )
-    const { onClose, container } = renderGallery()
+    const { onClose } = renderGallery()
     const button = within(screen.getByTestId('harness-template-card-test-fixer')).getByRole(
       'button',
       { name: 'Create' }
@@ -259,7 +259,7 @@ describe('HarnessGallery — creation lifecycle', () => {
       (screen.getByRole('button', { name: 'Build blank' }) as HTMLButtonElement).disabled
     ).toBe(true)
     fireEvent.keyDown(window, { key: 'Escape' })
-    fireEvent.mouseDown(container.querySelector('.harness-gallery-backdrop')!)
+    fireEvent.mouseDown(screen.getByRole('dialog', { name: 'Create a local agent' }).parentElement!)
     expect(onClose).not.toHaveBeenCalled()
     resolveCreate?.({ ok: true, root: '/v/.machina/agents/test-fixer' })
     await screen.findByRole('status')
@@ -300,7 +300,7 @@ describe('HarnessGallery — modal accessibility', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledOnce()
-    fireEvent.mouseDown(view.container.querySelector('.harness-gallery-backdrop')!)
+    fireEvent.mouseDown(dialog.parentElement!)
     expect(onClose).toHaveBeenCalledTimes(2)
 
     view.rerender(<HarnessGallery open={false} onClose={onClose} />)

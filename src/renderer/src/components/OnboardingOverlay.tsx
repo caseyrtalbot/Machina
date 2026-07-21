@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import {
   Terminal,
   CircleUser,
@@ -9,7 +9,8 @@ import {
 } from 'lucide-react'
 import { useClaudeStatus } from '../hooks/use-claude-status'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors, floatingPanel, typography, zIndex } from '../design/tokens'
+import { colors, floatingPanel, typography } from '../design/tokens'
+import { Modal } from './overlay/Modal'
 
 const RECHECK_INTERVAL_MS = 5_000
 const AUTO_DISMISS_MS = 2_000
@@ -243,7 +244,6 @@ export function OnboardingOverlay() {
   const status = useClaudeStatus()
   const showOnboarding = useClaudeStatusStore((s) => s.showOnboarding)
   const dismissOnboarding = useClaudeStatusStore((s) => s.dismissOnboarding)
-  const panelRef = useRef<HTMLDivElement>(null)
   // API key is the default agent path; CLI install is the alternative.
   const [mode, setMode] = useState<'api-key' | 'cli'>('api-key')
   const [justSaved, setJustSaved] = useState(false)
@@ -284,74 +284,50 @@ export function OnboardingOverlay() {
     return () => clearTimeout(timer)
   }, [showOnboarding, justSaved, dismissOnboarding])
 
-  // ESC to dismiss
-  useEffect(() => {
-    if (!showOnboarding) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        dismissOnboarding()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown, { capture: true })
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
-  }, [showOnboarding, dismissOnboarding])
-
-  if (!showOnboarding) return null
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) dismissOnboarding()
-  }
-
   const isReady = status.installed && status.authenticated
 
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center"
-      style={{ zIndex: zIndex.modal, backgroundColor: colors.scrim.modal }}
-      onClick={handleBackdropClick}
+    <Modal
+      open={showOnboarding}
+      onClose={dismissOnboarding}
+      panelClassName="overflow-hidden"
+      panelStyle={{
+        width: 340,
+        backgroundColor: floatingPanel.glass.bg,
+        backdropFilter: floatingPanel.glass.blur,
+        WebkitBackdropFilter: floatingPanel.glass.blur,
+        border: `1px solid ${colors.border.subtle}`,
+        boxShadow: floatingPanel.shadow
+      }}
     >
-      <div
-        ref={panelRef}
-        className="te-popover-enter overflow-hidden"
-        style={{
-          width: 340,
-          backgroundColor: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          border: `1px solid ${colors.border.subtle}`,
-          boxShadow: floatingPanel.shadow
-        }}
-      >
-        <div className="px-6 py-6">
-          {mode === 'api-key' && <ApiKeyStep onSaved={() => setJustSaved(true)} />}
-          {mode === 'cli' && !status.installed && <InstallStep />}
-          {mode === 'cli' && status.installed && !status.authenticated && <AuthStep />}
-          {mode === 'cli' && isReady && (
-            <ReadyStep email={status.email} subscriptionType={status.subscriptionType} />
-          )}
-        </div>
-
-        {!(mode === 'cli' && isReady) && (
-          <div
-            className="flex items-center justify-center gap-4 py-2.5 text-xs"
-            style={{
-              borderTop: `1px solid var(--line-faint)`,
-              color: colors.text.muted
-            }}
-          >
-            <button
-              onClick={() => setMode(mode === 'api-key' ? 'cli' : 'api-key')}
-              className="transition-colors te-onboarding-skip"
-            >
-              {mode === 'api-key' ? 'Install the Claude CLI instead' : 'Use an API key instead'}
-            </button>
-            <button onClick={dismissOnboarding} className="transition-colors te-onboarding-skip">
-              Skip for now
-            </button>
-          </div>
+      <div className="px-6 py-6">
+        {mode === 'api-key' && <ApiKeyStep onSaved={() => setJustSaved(true)} />}
+        {mode === 'cli' && !status.installed && <InstallStep />}
+        {mode === 'cli' && status.installed && !status.authenticated && <AuthStep />}
+        {mode === 'cli' && isReady && (
+          <ReadyStep email={status.email} subscriptionType={status.subscriptionType} />
         )}
       </div>
-    </div>
+
+      {!(mode === 'cli' && isReady) && (
+        <div
+          className="flex items-center justify-center gap-4 py-2.5 text-xs"
+          style={{
+            borderTop: `1px solid var(--line-faint)`,
+            color: colors.text.muted
+          }}
+        >
+          <button
+            onClick={() => setMode(mode === 'api-key' ? 'cli' : 'api-key')}
+            className="transition-colors te-onboarding-skip"
+          >
+            {mode === 'api-key' ? 'Install the Claude CLI instead' : 'Use an API key instead'}
+          </button>
+          <button onClick={dismissOnboarding} className="transition-colors te-onboarding-skip">
+            Skip for now
+          </button>
+        </div>
+      )}
+    </Modal>
   )
 }
