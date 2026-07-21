@@ -20,9 +20,6 @@ other document; if you find a conflicting plan, stop and flag it.
 Trust files on disk over memory, older drafts, or stale line numbers. Use `rg` to
 re-locate symbols before editing.
 
-The untracked `.agents/skills/thought-engine-council/` tree belongs to Casey. Do not edit,
-delete, stage, or commit it.
-
 ## Multi-agent workflow
 
 - When two or more workstreams are independent, dispatch them in one wave with explicit,
