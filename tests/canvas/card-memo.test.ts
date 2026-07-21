@@ -88,6 +88,7 @@ vi.mock('@renderer/design/tokens', () => ({
     border: { subtle: '#222' }
   },
   typography: { fontFamily: { mono: 'monospace', sans: 'sans-serif' } },
+  LANGUAGE_COLORS: {},
   getArtifactColor: vi.fn(() => '#fff')
 }))
 vi.mock('@engine/vault-event-hub', () => ({
@@ -99,7 +100,7 @@ vi.mock('@shared/format-elapsed', () => ({
 vi.mock('@renderer/system-artifacts/system-artifact-runtime', () => ({
   openArtifactInEditor: vi.fn()
 }))
-vi.mock('@renderer/panels/workbench/workbench-artifact-placement', () => ({
+vi.mock('@renderer/panels/canvas/workbench-artifact-placement', () => ({
   restorePatternSnapshot: vi.fn()
 }))
 
@@ -114,8 +115,8 @@ describe('card memo wrappers', () => {
     { name: 'TerminalCard', path: '@renderer/panels/canvas/TerminalCard' },
     { name: 'FileViewCard', path: '@renderer/panels/canvas/FileViewCard' },
     { name: 'ProjectFolderCard', path: '@renderer/panels/canvas/ProjectFolderCard' },
-    { name: 'WorkbenchFileCard', path: '@renderer/panels/workbench/WorkbenchFileCard' },
-    { name: 'SystemArtifactCard', path: '@renderer/panels/workbench/SystemArtifactCard' }
+    { name: 'WorkbenchFileCard', path: '@renderer/panels/canvas/WorkbenchFileCard' },
+    { name: 'SystemArtifactCard', path: '@renderer/panels/canvas/SystemArtifactCard' }
   ]
 
   it.each(cardModules)('$name default export is wrapped in React.memo', async ({ path }) => {

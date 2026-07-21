@@ -1,27 +1,12 @@
 import { useCallback, memo } from 'react'
-import { CardShell } from '../canvas/CardShell'
-import { useCanvas } from '../canvas/canvas-store-context'
-import { colors, transitions, typography } from '../../design/tokens'
+import { CardShell } from './CardShell'
+import { useCanvas } from './canvas-store-context'
+import { colors, LANGUAGE_COLORS, transitions, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import './workbench-animations.css'
 
 interface WorkbenchFileCardProps {
   node: CanvasNode
-}
-
-const LANGUAGE_COLORS: Record<string, string> = {
-  typescript: '#3178c6',
-  typescriptreact: '#3178c6',
-  javascript: '#f7df1e',
-  javascriptreact: '#61dafb',
-  json: '#e6a817',
-  css: '#a855f7',
-  html: '#e34f26',
-  markdown: '#94a3b8',
-  python: '#3776ab',
-  rust: '#dea584',
-  go: '#00add8',
-  shell: '#94e2d5'
 }
 
 function getFileIcon(language: string): string {

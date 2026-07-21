@@ -8,6 +8,10 @@
 // N editor surfaces that all read the single global activeNotePath and
 // corrupted each other. Legacy `{ kind: 'editor', path }` tabs from old
 // thread files are folded at the dock-store seed boundary.
+// `canvas` is the ONE variant that carries an `id` (Phase 1 step 4, plan of
+// record): multiple canvases are real — each id keys its own store instance in
+// the canvas-store registry, so two canvas tabs are two documents. Every other
+// surface is a kind-keyed singleton; do not add ids to them.
 export type DockTab =
   | { kind: 'canvas'; id: string }
   | { kind: 'editor' }

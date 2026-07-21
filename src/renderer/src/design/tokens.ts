@@ -114,6 +114,24 @@ export const colors = {
 
 export type CalloutPaletteKey = keyof typeof colors.callout
 
+// Language identity colors for project-file cards (WorkbenchFileCard).
+// Deliberate exception to the OKLCH family: these are the languages' brand
+// colors, kept recognizable (TS blue, JS yellow) rather than remapped.
+export const LANGUAGE_COLORS: Record<string, string> = {
+  typescript: '#3178c6',
+  typescriptreact: '#3178c6',
+  javascript: '#f7df1e',
+  javascriptreact: '#61dafb',
+  json: '#e6a817',
+  css: '#a855f7',
+  html: '#e34f26',
+  markdown: '#94a3b8',
+  python: '#3776ab',
+  rust: '#dea584',
+  go: '#00add8',
+  shell: '#94e2d5'
+}
+
 /* ── OKLCH Perceptually Uniform Palette ──────────────────────────────────
  * All artifact types use L=0.75, C=0.15 (varying only hue) for equal
  * visual weight regardless of color. Exception: note uses C=0.03

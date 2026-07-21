@@ -30,7 +30,7 @@ UI primitives, chrome with opinions. Grounded in the 2026-07-21 renderer audit
 modal/overlay implementations, divergent empty/loading states, canvas-privilege residue
 in shell and stores).
 
-### Phase 1 — Excise canvas privilege
+### Phase 1 — Excise canvas privilege (complete 2026-07-21)
 
 1. Remove the active-canvas proxy (`dock-store.ts` `syncActiveCanvas`/`setActiveCanvas`).
    Palette/sidebar actions that target "the canvas" take an explicit canvas context or

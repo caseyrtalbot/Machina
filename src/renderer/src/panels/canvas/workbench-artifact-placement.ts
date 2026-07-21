@@ -25,7 +25,7 @@ export async function restorePatternSnapshot(
     return
   }
 
-  const { deserializeCanvas } = await import('../canvas/canvas-io')
+  const { deserializeCanvas } = await import('./canvas-io')
   const parsed = deserializeCanvas(content)
   if (!parsed.ok) return
   const snapshot = parsed.value

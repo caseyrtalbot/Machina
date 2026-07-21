@@ -16,8 +16,8 @@ export const LazyCards: Record<
   markdown: lazy(() => import('./MarkdownCard')),
   image: lazy(() => import('./ImageCard')),
   pdf: lazy(() => import('./PdfCard')),
-  'project-file': lazy(() => import('../../panels/workbench/WorkbenchFileCard')),
-  'system-artifact': lazy(() => import('../../panels/workbench/SystemArtifactCard')),
+  'project-file': lazy(() => import('./WorkbenchFileCard')),
+  'system-artifact': lazy(() => import('./SystemArtifactCard')),
   'file-view': lazy(() => import('./FileViewCard')),
   'project-folder': lazy(() => import('./ProjectFolderCard')),
   'terminal-block': lazy(() => import('./BlockCard'))
