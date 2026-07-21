@@ -36,9 +36,12 @@ in shell and stores).
    Palette/sidebar actions that target "the canvas" take an explicit canvas context or
    disable when none is focused.
    → verify: no proxy consumers remain (grep), `npm run check` green.
-2. Move canvas autosave subscription and the canvas-era vault-open event out of
-   `App.tsx` boot into the canvas surface's own lifecycle.
-   → verify: autosave fires on canvas edit; vault open works from the welcome card.
+2. Move the canvas autosave subscription out of `App.tsx` boot into the canvas
+   surface's own lifecycle. (Scoped 2026-07-21: the `te:open-vault` listener stays
+   app-level — it is the general vault-switch mechanism, dispatched by ApprovalsTray
+   and FilesDockAdapter too, and its handler needs App-coupled `orchestrateLoad`.
+   Retiring the window-event indirection is a backlog item.)
+   → verify: autosave fires on canvas edit.
 3. Fold `panels/workbench/` into `panels/canvas/` (it is canvas internals) and replace
    its 12 hardcoded hex values with tokens in the same move.
    → verify: `project-file`/`system-artifact` cards render unchanged.
@@ -106,6 +109,9 @@ deliberately dropped:
   parallel agent usage demands it; MCP third-party hardening (hash-pinned tool
   descriptions).
 - Graph/canvas convergence decision (D2 follow-up, after Phase 2).
+- Extract `orchestrateLoad` from `App.tsx` into a callable module so vault switching
+  (welcome card, ApprovalsTray, FilesDockAdapter) invokes it directly and the
+  `te:open-vault` window-event indirection can be deleted.
 
 ## Invariants (every phase)
 
