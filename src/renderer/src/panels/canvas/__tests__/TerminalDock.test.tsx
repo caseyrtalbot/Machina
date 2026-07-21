@@ -2,6 +2,8 @@ import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { TerminalStatus } from '../useTerminalStatus'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 // --- Controlled mock state ---
 
@@ -10,25 +12,16 @@ const mockSetViewport = vi.fn()
 const mockSetFocusedTerminal = vi.fn()
 const mockSetSelection = vi.fn()
 
-vi.mock('../../../store/canvas-store', () => ({
-  useCanvasStore: Object.assign(
-    (selector: (s: Record<string, unknown>) => unknown) =>
-      selector({
-        nodes: mockNodes,
-        setViewport: mockSetViewport,
-        setFocusedTerminal: mockSetFocusedTerminal,
-        setSelection: mockSetSelection
-      }),
-    {
-      getState: () => ({
-        nodes: mockNodes,
-        setViewport: mockSetViewport,
-        setFocusedTerminal: mockSetFocusedTerminal,
-        setSelection: mockSetSelection
-      })
-    }
-  )
-}))
+function seedCanvasStore(): void {
+  const store = getCanvasStore(DEFAULT_CANVAS_ID)
+  store.setState({
+    ...store.getInitialState(),
+    nodes: mockNodes,
+    setViewport: mockSetViewport,
+    setFocusedTerminal: mockSetFocusedTerminal,
+    setSelection: mockSetSelection
+  })
+}
 
 let mockStatuses: readonly TerminalStatus[] = []
 
@@ -38,6 +31,15 @@ vi.mock('../useTerminalStatus', () => ({
 
 // Dynamic import after mocks are registered
 const { TerminalDock } = await import('../TerminalDock')
+
+function renderDock(props: { containerWidth: number; containerHeight: number }) {
+  seedCanvasStore()
+  return render(
+    <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+      <TerminalDock {...props} />
+    </CanvasStoreProvider>
+  )
+}
 
 // --- Helpers ---
 
@@ -98,7 +100,7 @@ describe('TerminalDock', () => {
     mockNodes = [makeTextNode('t1'), makeTextNode('t2')]
     mockStatuses = []
 
-    const { container } = render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    const { container } = renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     expect(container.innerHTML).toBe('')
   })
@@ -109,7 +111,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1, n2, makeTextNode('text-1')]
     mockStatuses = [makeStatus('term-1', 'idle', 'demo'), makeStatus('term-2', 'busy', 'project')]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     const pills = screen.getAllByTestId('terminal-pill')
     expect(pills).toHaveLength(2)
@@ -123,7 +125,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1, n2]
     mockStatuses = [makeStatus('term-1', 'idle'), makeStatus('term-2', 'busy')]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     // Should NOT have pills
     expect(screen.queryAllByTestId('terminal-pill')).toHaveLength(0)
@@ -144,7 +146,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1]
     mockStatuses = [makeStatus('term-1')]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     const collapsed = screen.getByTestId('terminal-dock-collapsed')
     fireEvent.click(collapsed)
@@ -156,7 +158,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1]
     mockStatuses = [makeStatus('term-1')]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     const bar = screen.getByTestId('terminal-dock-bar')
     expect(bar.className).toContain('te-card-enter')
@@ -167,7 +169,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1]
     mockStatuses = [makeStatus('term-1')]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     const pill = screen.getByTestId('terminal-pill')
     fireEvent.click(pill)
@@ -187,7 +189,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1]
     mockStatuses = [makeStatus('term-1')]
 
-    render(<TerminalDock containerWidth={0} containerHeight={800} />)
+    renderDock({ containerWidth: 0, containerHeight: 800 })
 
     const pill = screen.getByTestId('terminal-pill')
     fireEvent.click(pill)
@@ -202,7 +204,7 @@ describe('TerminalDock', () => {
     mockNodes = [n1]
     mockStatuses = [makeStatus('term-1')]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={0} />)
+    renderDock({ containerWidth: 1200, containerHeight: 0 })
 
     const pill = screen.getByTestId('terminal-pill')
     fireEvent.click(pill)
@@ -227,7 +229,7 @@ describe('TerminalDock', () => {
       makeStatus('t-dead', 'dead')
     ]
 
-    render(<TerminalDock containerWidth={1200} containerHeight={800} />)
+    renderDock({ containerWidth: 1200, containerHeight: 800 })
 
     const dots = screen.getAllByTestId('status-dot')
     expect(dots).toHaveLength(5)

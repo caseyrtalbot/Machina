@@ -1,5 +1,5 @@
 import { useMemo, memo } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { colors, EDGE_KIND_COLORS } from '../../design/tokens'
 import type { CanvasEdge, CanvasNode, CanvasSide } from '@shared/canvas-types'
 
@@ -48,10 +48,11 @@ interface EdgePathProps {
 }
 
 function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
-  const isSelected = useCanvasStore((s) => s.selectedEdgeId === edge.id)
-  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
-  const hoveredNodeId = useCanvasStore((s) => s.hoveredNodeId)
-  const showAllEdges = useCanvasStore((s) => s.showAllEdges)
+  const canvas = useCanvasApi()
+  const isSelected = useCanvas((s) => s.selectedEdgeId === edge.id)
+  const selectedNodeIds = useCanvas((s) => s.selectedNodeIds)
+  const hoveredNodeId = useCanvas((s) => s.hoveredNodeId)
+  const showAllEdges = useCanvas((s) => s.showAllEdges)
 
   const from_node = nodeMap.get(edge.fromNode)
   const to_node = nodeMap.get(edge.toNode)
@@ -97,7 +98,7 @@ function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
         style={{ cursor: 'pointer' }}
         onClick={(e) => {
           e.stopPropagation()
-          useCanvasStore.getState().setSelectedEdge(edge.id)
+          canvas.getState().setSelectedEdge(edge.id)
         }}
       />
       <path
@@ -127,9 +128,9 @@ const MemoEdgePath = memo(
 )
 
 export function EdgeLayer() {
-  const nodes = useCanvasStore((s) => s.nodes)
-  const edges = useCanvasStore((s) => s.edges)
-  const zoom = useCanvasStore((s) => s.viewport.zoom)
+  const nodes = useCanvas((s) => s.nodes)
+  const edges = useCanvas((s) => s.edges)
+  const zoom = useCanvas((s) => s.viewport.zoom)
 
   const nodeMap = useMemo(() => {
     const m = new Map<string, CanvasNode>()

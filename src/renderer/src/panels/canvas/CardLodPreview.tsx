@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { colors, borderRadius } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNode } from '@shared/canvas-types'
 import { getCardTypeColor } from './canvas-colors'
@@ -18,9 +18,9 @@ const CLICK_SLOP_PX = 3
  * Draggable so coarse rearrangement works below the full-card zoom threshold.
  */
 function CardLodPreviewInner({ node }: CardLodPreviewProps) {
-  const setSelection = useCanvasStore((s) => s.setSelection)
-  const toggleSelection = useCanvasStore((s) => s.toggleSelection)
-  const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
+  const setSelection = useCanvas((s) => s.setSelection)
+  const toggleSelection = useCanvas((s) => s.toggleSelection)
+  const isSelected = useCanvas((s) => s.selectedNodeIds.has(node.id))
   const { onDragStart } = useNodeDrag(node.id)
   const pointerDownAt = useRef<{ x: number; y: number } | null>(null)
 

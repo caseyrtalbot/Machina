@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import {
   subscribeCanvasAutosave,
   flushCanvasSave
 } from '../../src/renderer/src/store/canvas-autosave'
 import { createCanvasNode } from '../../src/shared/canvas-types'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 // Mock the IPC layer
 vi.mock('../../src/renderer/src/panels/canvas/canvas-io', () => ({
@@ -24,7 +26,7 @@ describe('canvas-autosave', () => {
     vi.clearAllMocks()
 
     // Load a canvas so filePath is set
-    useCanvasStore.getState().loadCanvas('/test/canvas.json', {
+    store.getState().loadCanvas('/test/canvas.json', {
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 }
@@ -39,11 +41,9 @@ describe('canvas-autosave', () => {
     const unsub = subscribeCanvasAutosave()
 
     // Trigger dirty state
-    useCanvasStore
-      .getState()
-      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+    store.getState().addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
 
-    expect(useCanvasStore.getState().isDirty).toBe(true)
+    expect(store.getState().isDirty).toBe(true)
     expect(saveCanvas).not.toHaveBeenCalled()
 
     // Advance past debounce
@@ -52,7 +52,7 @@ describe('canvas-autosave', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(saveCanvas).toHaveBeenCalledWith('/test/canvas.json', expect.any(Object))
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    expect(store.getState().isDirty).toBe(false)
 
     unsub()
   })
@@ -72,9 +72,7 @@ describe('canvas-autosave', () => {
     const unsub = subscribeCanvasAutosave()
 
     // First mutation
-    useCanvasStore
-      .getState()
-      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+    store.getState().addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
 
     // Wait 1s (less than debounce)
     vi.advanceTimersByTime(1000)
@@ -92,14 +90,12 @@ describe('canvas-autosave', () => {
   })
 
   it('flushCanvasSave writes immediately', async () => {
-    useCanvasStore
-      .getState()
-      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+    store.getState().addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
 
     await flushCanvasSave()
 
     expect(saveCanvas).toHaveBeenCalledWith('/test/canvas.json', expect.any(Object))
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    expect(store.getState().isDirty).toBe(false)
   })
 
   it('flushCanvasSave drains a mutation that lands mid-save instead of leaving it queued', async () => {
@@ -111,9 +107,7 @@ describe('canvas-autosave', () => {
         })
     )
 
-    useCanvasStore
-      .getState()
-      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+    store.getState().addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
 
     const flush = flushCanvasSave()
     expect(saveCanvas).toHaveBeenCalledTimes(1)
@@ -121,7 +115,7 @@ describe('canvas-autosave', () => {
     // Mutation lands while the flush's first write is still in flight. Quit
     // must not proceed with this version sitting in a debounce timer that
     // will never run.
-    useCanvasStore
+    store
       .getState()
       .addNode(createCanvasNode('text', { x: 10, y: 10 }, { width: 200, height: 200 }))
 
@@ -129,12 +123,12 @@ describe('canvas-autosave', () => {
     await flush
 
     expect(saveCanvas).toHaveBeenCalledTimes(2)
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    expect(store.getState().isDirty).toBe(false)
   })
 
   it('does not save when no filePath is loaded', async () => {
-    useCanvasStore.getState().closeCanvas()
-    useCanvasStore.setState({ isDirty: true })
+    store.getState().closeCanvas()
+    store.setState({ isDirty: true })
 
     await flushCanvasSave()
 
@@ -144,9 +138,7 @@ describe('canvas-autosave', () => {
   it('cleans up timer on unsubscribe', () => {
     const unsub = subscribeCanvasAutosave()
 
-    useCanvasStore
-      .getState()
-      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+    store.getState().addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
 
     unsub()
 
@@ -165,14 +157,12 @@ describe('canvas-autosave', () => {
         })
     )
 
-    useCanvasStore
-      .getState()
-      .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
+    store.getState().addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
     vi.advanceTimersByTime(2000)
     expect(saveCanvas).toHaveBeenCalledTimes(1)
 
     // Mutation lands while the write is still in flight
-    useCanvasStore
+    store
       .getState()
       .addNode(createCanvasNode('text', { x: 10, y: 10 }, { width: 200, height: 200 }))
 
@@ -180,26 +170,26 @@ describe('canvas-autosave', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // markSaved no-oped: the mid-save mutation must not be flipped clean
-    expect(useCanvasStore.getState().isDirty).toBe(true)
+    expect(store.getState().isDirty).toBe(true)
 
     // The autosaver rescheduled and persists the mutation
     await vi.advanceTimersByTimeAsync(2000)
     expect(saveCanvas).toHaveBeenCalledTimes(2)
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    expect(store.getState().isDirty).toBe(false)
 
     unsub()
   })
 
   it('flushCanvasSave persists viewport drift even when not dirty', async () => {
-    useCanvasStore.getState().setViewport({ x: 50, y: 25, zoom: 1.2 })
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    store.getState().setViewport({ x: 50, y: 25, zoom: 1.2 })
+    expect(store.getState().isDirty).toBe(false)
 
     await flushCanvasSave()
 
     expect(saveCanvas).toHaveBeenCalledTimes(1)
     const [, file] = vi.mocked(saveCanvas).mock.calls[0]
     expect(file.viewport).toEqual({ x: 50, y: 25, zoom: 1.2 })
-    expect(useCanvasStore.getState().savedViewport).toEqual({ x: 50, y: 25, zoom: 1.2 })
+    expect(store.getState().savedViewport).toEqual({ x: 50, y: 25, zoom: 1.2 })
   })
 
   it('flushCanvasSave skips the write when viewport matches the saved one', async () => {
@@ -210,16 +200,16 @@ describe('canvas-autosave', () => {
   it('saves on pan-end when the viewport drifted', async () => {
     const unsub = subscribeCanvasAutosave()
 
-    useCanvasStore.getState().setInteracting(true)
-    useCanvasStore.getState().setViewport({ x: 100, y: 0, zoom: 1 })
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    store.getState().setInteracting(true)
+    store.getState().setViewport({ x: 100, y: 0, zoom: 1 })
+    expect(store.getState().isDirty).toBe(false)
     expect(saveCanvas).not.toHaveBeenCalled()
 
-    useCanvasStore.getState().setInteracting(false)
+    store.getState().setInteracting(false)
     await vi.advanceTimersByTimeAsync(2000)
 
     expect(saveCanvas).toHaveBeenCalledTimes(1)
-    expect(useCanvasStore.getState().isDirty).toBe(false)
+    expect(store.getState().isDirty).toBe(false)
 
     unsub()
   })
@@ -227,8 +217,8 @@ describe('canvas-autosave', () => {
   it('does not save on pan-end when the viewport did not move', async () => {
     const unsub = subscribeCanvasAutosave()
 
-    useCanvasStore.getState().setInteracting(true)
-    useCanvasStore.getState().setInteracting(false)
+    store.getState().setInteracting(true)
+    store.getState().setInteracting(false)
     await vi.advanceTimersByTimeAsync(5000)
 
     expect(saveCanvas).not.toHaveBeenCalled()
@@ -238,30 +228,30 @@ describe('canvas-autosave', () => {
 
   describe('markSaved version safety', () => {
     it('clears dirty and records the saved viewport when the version matches', () => {
-      useCanvasStore
+      store
         .getState()
         .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
-      const { dirtyVersion, viewport } = useCanvasStore.getState()
+      const { dirtyVersion, viewport } = store.getState()
 
-      useCanvasStore.getState().markSaved(dirtyVersion, viewport)
+      store.getState().markSaved(dirtyVersion, viewport)
 
-      expect(useCanvasStore.getState().isDirty).toBe(false)
-      expect(useCanvasStore.getState().savedViewport).toEqual(viewport)
+      expect(store.getState().isDirty).toBe(false)
+      expect(store.getState().savedViewport).toEqual(viewport)
     })
 
     it('no-ops on a stale version', () => {
-      useCanvasStore
+      store
         .getState()
         .addNode(createCanvasNode('text', { x: 0, y: 0 }, { width: 200, height: 200 }))
-      const stale = useCanvasStore.getState().dirtyVersion
-      useCanvasStore
+      const stale = store.getState().dirtyVersion
+      store
         .getState()
         .addNode(createCanvasNode('text', { x: 10, y: 10 }, { width: 200, height: 200 }))
 
-      useCanvasStore.getState().markSaved(stale, { x: 9, y: 9, zoom: 9 })
+      store.getState().markSaved(stale, { x: 9, y: 9, zoom: 9 })
 
-      expect(useCanvasStore.getState().isDirty).toBe(true)
-      expect(useCanvasStore.getState().savedViewport).not.toEqual({ x: 9, y: 9, zoom: 9 })
+      expect(store.getState().isDirty).toBe(true)
+      expect(store.getState().savedViewport).not.toEqual({ x: 9, y: 9, zoom: 9 })
     })
   })
 })

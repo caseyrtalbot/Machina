@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useMemo, useState } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { useCanvasViewport } from './use-canvas-viewport'
 import { useCanvasSelection } from './use-canvas-selection'
 import { colors, canvasTokens, transitions } from '../../design/tokens'
@@ -87,7 +87,7 @@ export function CanvasSurface({
 }: CanvasSurfaceProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const { gridDotVisibility, canvasGrid } = useEnv()
-  const viewport = useCanvasStore((s) => s.viewport)
+  const viewport = useCanvas((s) => s.viewport)
   const { onWheel, onPointerDown } = useCanvasViewport(containerRef)
   const { rect, onSelectionStart, wasSelectionDrag } = useCanvasSelection()
 

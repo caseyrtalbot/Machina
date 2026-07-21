@@ -1,17 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  DEFAULT_CANVAS_ID,
-  getCanvasStore,
-  getActiveCanvasId,
-  setActiveCanvas,
-  useCanvasStore
-} from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import {
   subscribeCanvasAutosave,
   flushCanvasSave
 } from '../../src/renderer/src/store/canvas-autosave'
 import { useThreadStore } from '../../src/renderer/src/store/thread-store'
-import { useDockStore } from '../../src/renderer/src/store/dock-store'
+import { useDockStore, getFocusedCanvasId } from '../../src/renderer/src/store/dock-store'
 import { createCanvasNode, type CanvasFile } from '../../src/shared/canvas-types'
 
 // Mock the IPC layer
@@ -36,10 +30,10 @@ function node(x = 0, y = 0) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setActiveCanvas(DEFAULT_CANVAS_ID)
   const def = getCanvasStore(DEFAULT_CANVAS_ID)
   def.setState(def.getInitialState())
   useThreadStore.setState(useThreadStore.getInitialState())
+  useDockStore.setState(useDockStore.getInitialState())
 })
 
 describe('per-canvas store instances (3.8)', () => {
@@ -57,65 +51,29 @@ describe('per-canvas store instances (3.8)', () => {
     expect(b.getState().nodes).toHaveLength(0)
     expect(getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes).toHaveLength(0)
   })
+})
 
-  it('switching the active canvas redirects the proxy and preserves both states', () => {
-    const a = getCanvasStore('switch-a')
-    const b = getCanvasStore('switch-b')
-    a.setState(a.getInitialState())
-    b.setState(b.getInitialState())
-
-    setActiveCanvas('switch-a')
-    expect(getActiveCanvasId()).toBe('switch-a')
-    useCanvasStore.getState().addNode(node(0, 0))
-    useCanvasStore.getState().addNode(node(10, 10))
-
-    setActiveCanvas('switch-b')
-    expect(useCanvasStore.getState().nodes).toHaveLength(0)
-    useCanvasStore.getState().addNode(node(50, 50))
-
-    // Both canvases kept their own state across the switches.
-    setActiveCanvas('switch-a')
-    expect(useCanvasStore.getState().nodes).toHaveLength(2)
-    expect(a.getState().nodes).toHaveLength(2)
-    expect(b.getState().nodes).toHaveLength(1)
-  })
-
-  it('proxy subscribe follows active-canvas swaps', () => {
-    const a = getCanvasStore('sub-a')
-    const b = getCanvasStore('sub-b')
-    a.setState(a.getInitialState())
-    b.setState(b.getInitialState())
-    b.getState().addNode(node())
-
-    setActiveCanvas('sub-a')
-    const listener = vi.fn()
-    const unsub = useCanvasStore.subscribe(listener)
-
-    // Swap notifies once so subscribers re-read the now-effective state.
-    setActiveCanvas('sub-b')
-    expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener.mock.calls[0][0].nodes).toHaveLength(1)
-
-    // After the swap, mutations on the new active instance notify too.
-    b.getState().addNode(node(5, 5))
-    expect(listener).toHaveBeenCalledTimes(2)
-
-    // Mutations on the no-longer-active instance do not.
-    a.getState().addNode(node(9, 9))
-    expect(listener).toHaveBeenCalledTimes(2)
-
-    unsub()
-  })
-
-  it('activating a canvas dock tab points the proxy at that canvas', () => {
+describe('focused canvas (Phase 1 step 1: no last-seen fallback)', () => {
+  it('resolves the active canvas dock tab of the active thread', () => {
     useThreadStore.setState({ activeThreadId: 't1' })
     useDockStore.setState({ dockTabsByThreadId: { t1: [{ kind: 'canvas', id: 'dock-x' }] } })
     useDockStore.getState().setDockActiveIndex('t1', 0)
-    expect(getActiveCanvasId()).toBe('dock-x')
+    expect(getFocusedCanvasId()).toBe('dock-x')
+  })
 
-    // A non-canvas tab keeps the last canvas active.
+  it('is null when a non-canvas tab is active — never the last-seen canvas', () => {
+    useThreadStore.setState({ activeThreadId: 't1' })
+    useDockStore.setState({ dockTabsByThreadId: { t1: [{ kind: 'canvas', id: 'dock-x' }] } })
+    useDockStore.getState().setDockActiveIndex('t1', 0)
+    expect(getFocusedCanvasId()).toBe('dock-x')
+
+    // addDockTab activates the new (graph) tab.
     useDockStore.getState().addDockTab({ kind: 'graph' })
-    expect(getActiveCanvasId()).toBe('dock-x')
+    expect(getFocusedCanvasId()).toBeNull()
+  })
+
+  it('is null with no active thread', () => {
+    expect(getFocusedCanvasId()).toBeNull()
   })
 })
 
@@ -128,13 +86,14 @@ describe('multi-canvas autosave and quit-flush', () => {
     vi.useRealTimers()
   })
 
-  it('a dirty non-active instance autosaves independently', async () => {
+  it('a dirty unfocused instance autosaves independently', async () => {
     const bg = getCanvasStore('autosave-bg')
     bg.setState(bg.getInitialState())
     bg.getState().loadCanvas('/test/autosave-bg.json', emptyFile())
     const unsub = subscribeCanvasAutosave()
 
-    expect(getActiveCanvasId()).toBe(DEFAULT_CANVAS_ID)
+    // No dock state at all: this canvas is not focused anywhere.
+    expect(getFocusedCanvasId()).toBeNull()
     bg.getState().addNode(node())
 
     await vi.advanceTimersByTimeAsync(2000)
@@ -156,7 +115,7 @@ describe('multi-canvas autosave and quit-flush', () => {
     unsub()
   })
 
-  it('flushCanvasSave flushes every dirty instance, not just the active one', async () => {
+  it('flushCanvasSave flushes every dirty instance, focused or not', async () => {
     const a = getCanvasStore('flush-a')
     const b = getCanvasStore('flush-b')
     a.setState(a.getInitialState())
@@ -164,7 +123,6 @@ describe('multi-canvas autosave and quit-flush', () => {
     a.getState().loadCanvas('/test/flush-a.json', emptyFile())
     b.getState().loadCanvas('/test/flush-b.json', emptyFile())
 
-    setActiveCanvas('flush-a')
     a.getState().addNode(node())
     b.getState().addNode(node(20, 20))
 

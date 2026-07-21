@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import matter from 'gray-matter'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { openNoteInEditor } from '../../store/dock-store'
 import { CardShell } from './CardShell'
 import { borderRadius, colors } from '../../design/tokens'
@@ -67,7 +67,8 @@ export function FileViewCard({ node }: FileViewCardProps) {
   const [modified, setModified] = useState(false)
   const [lineDelta, setLineDelta] = useState('')
 
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const canvas = useCanvasApi()
+  const removeNode = useCanvas((s) => s.removeNode)
 
   const filePath = node.content
   const sectionId = typeof node.metadata.section === 'string' ? node.metadata.section : null
@@ -240,7 +241,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
   // editing surface (would clobber debounced section edits).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const focusedId = useCanvasStore.getState().focusedCardId
+      const focusedId = canvas.getState().focusedCardId
       if (focusedId !== node.id) return
       if (e.key !== 'r' && e.key !== 'R') return
       if (shouldIgnoreCanvasHotkey(e)) return
@@ -250,7 +251,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [node.id, handleRefresh])
+  }, [node.id, handleRefresh, canvas])
 
   // Double-click: open in editor
   const handleDoubleClick = useCallback(() => {
@@ -258,20 +259,20 @@ export function FileViewCard({ node }: FileViewCardProps) {
   }, [filePath, filename])
 
   const openInEditor = useCallback(() => {
-    useCanvasStore.getState().openSplit(filePath)
-  }, [filePath])
+    canvas.getState().openSplit(filePath)
+  }, [filePath, canvas])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      useCanvasStore.getState().setCardContextMenu({
+      canvas.getState().setCardContextMenu({
         x: e.clientX,
         y: e.clientY,
         nodeId: node.id
       })
     },
-    [node.id]
+    [node.id, canvas]
   )
 
   return (

@@ -1,17 +1,18 @@
 import { useCallback, useRef } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from './canvas-store-context'
+import type { CanvasStoreApi } from '../../store/canvas-store'
 import type { CanvasNode, CanvasViewport } from '@shared/canvas-types'
 import { getCardTypeColor } from './canvas-colors'
 
 let minimapInteractionTimer: ReturnType<typeof setTimeout> | null = null
 
-function markMinimapInteracting(active: boolean) {
+function markMinimapInteracting(store: CanvasStoreApi, active: boolean) {
   if (minimapInteractionTimer) clearTimeout(minimapInteractionTimer)
   if (active) {
-    useCanvasStore.getState().setInteracting(true)
+    store.getState().setInteracting(true)
   } else {
     minimapInteractionTimer = setTimeout(() => {
-      useCanvasStore.getState().setInteracting(false)
+      store.getState().setInteracting(false)
     }, 150)
   }
 }
@@ -75,9 +76,10 @@ export function CanvasMinimap({
   readonly containerWidth: number
   readonly containerHeight: number
 }) {
-  const nodes = useCanvasStore((s) => s.nodes)
-  const viewport = useCanvasStore((s) => s.viewport)
-  const setViewport = useCanvasStore((s) => s.setViewport)
+  const canvas = useCanvasApi()
+  const nodes = useCanvas((s) => s.nodes)
+  const viewport = useCanvas((s) => s.viewport)
+  const setViewport = useCanvas((s) => s.setViewport)
   const minimapRef = useRef<HTMLDivElement>(null)
 
   const bounds = computeCanvasBounds(nodes)
@@ -136,7 +138,7 @@ export function CanvasMinimap({
     (e: React.PointerEvent) => {
       e.stopPropagation()
       e.preventDefault()
-      markMinimapInteracting(true)
+      markMinimapInteracting(canvas, true)
 
       const rect = minimapRef.current?.getBoundingClientRect()
       if (!rect) return
@@ -152,7 +154,7 @@ export function CanvasMinimap({
       }
 
       const onUp = () => {
-        markMinimapInteracting(false)
+        markMinimapInteracting(canvas, false)
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
       }
@@ -160,7 +162,7 @@ export function CanvasMinimap({
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
     },
-    [totalBounds.minX, totalBounds.minY, scale, panToCanvasPoint]
+    [totalBounds.minX, totalBounds.minY, scale, panToCanvasPoint, canvas]
   )
 
   return (

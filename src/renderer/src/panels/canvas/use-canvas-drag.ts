@@ -1,8 +1,9 @@
 import { useCallback, useRef } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
+import { useCanvasApi, useCanvasId } from './canvas-store-context'
 import { getMinSize, type CanvasNodeType } from '@shared/canvas-types'
 import { perfMark, perfMeasure } from '../../utils/perf-marks'
-import { getActiveCommandStack, moveNodesCommand, resizeNodeCommand } from './canvas-commands'
+import { getCommandStack, moveNodesCommand, resizeNodeCommand } from './canvas-commands'
 import {
   ALIGN_SNAP_THRESHOLD_PX,
   AlignmentGuideOverlay,
@@ -14,13 +15,13 @@ import {
 /** Module-level interaction debounce to prevent timer stacking */
 let interactionTimer: ReturnType<typeof setTimeout> | null = null
 
-function markInteracting(active: boolean) {
+function markInteracting(store: CanvasStoreApi, active: boolean) {
   if (interactionTimer) clearTimeout(interactionTimer)
   if (active) {
-    useCanvasStore.getState().setInteracting(true)
+    store.getState().setInteracting(true)
   } else {
     interactionTimer = setTimeout(() => {
-      useCanvasStore.getState().setInteracting(false)
+      store.getState().setInteracting(false)
     }, 150)
   }
 }
@@ -34,6 +35,8 @@ export function snapToGrid(value: number, gridSize: number): number {
 }
 
 export function useNodeDrag(nodeId: string) {
+  const canvas = useCanvasApi()
+  const canvasId = useCanvasId()
   const dragStart = useRef<{
     x: number
     y: number
@@ -46,7 +49,7 @@ export function useNodeDrag(nodeId: string) {
     (e: React.PointerEvent) => {
       perfMark('drag-start')
       e.stopPropagation()
-      const { nodes, selectedNodeIds, viewport } = useCanvasStore.getState()
+      const { nodes, selectedNodeIds, viewport } = canvas.getState()
       const node = nodes.find((n) => n.id === nodeId)
       if (!node) return
 
@@ -70,7 +73,7 @@ export function useNodeDrag(nodeId: string) {
         ny: node.position.y,
         groupPositions
       }
-      markInteracting(true)
+      markInteracting(canvas, true)
 
       // Alignment guides: snap the dragged card (the primary card in a group
       // drag) against every non-dragged card's edges/centers. Guides render
@@ -101,7 +104,7 @@ export function useNodeDrag(nodeId: string) {
         const dx = (me.clientX - dragStart.current.x) / zoom
         const dy = (me.clientY - dragStart.current.y) / zoom
 
-        const { moveNode, moveNodes } = useCanvasStore.getState()
+        const { moveNode, moveNodes } = canvas.getState()
         const positions = dragStart.current.groupPositions
 
         if (positions.size > 1) {
@@ -176,7 +179,7 @@ export function useNodeDrag(nodeId: string) {
       }
 
       const onUp = () => {
-        markInteracting(false)
+        markInteracting(canvas, false)
         // Guides exist only while dragging. Zero latestGuides first so a
         // still-pending RAF update reconciles to nothing instead of
         // resurrecting lines after destroy.
@@ -184,7 +187,7 @@ export function useNodeDrag(nodeId: string) {
         guideOverlay?.destroy()
         // Flush final position if a RAF is still pending
         if (rafPending) {
-          const { moveNode: mv, moveNodes: mvs } = useCanvasStore.getState()
+          const { moveNode: mv, moveNodes: mvs } = canvas.getState()
           if (latestMultiUpdates) {
             mvs(latestMultiUpdates)
           } else {
@@ -198,9 +201,9 @@ export function useNodeDrag(nodeId: string) {
 
         // Push the completed move onto the command stack so ⌘Z undoes it.
         // Execute re-applies the end positions already in the store (no-op).
-        const stack = getActiveCommandStack()
+        const stack = getCommandStack(canvasId)
         if (start && stack) {
-          const current = useCanvasStore.getState().nodes
+          const current = canvas.getState().nodes
           const before = new Map<string, { x: number; y: number }>()
           const after = new Map<string, { x: number; y: number }>()
           if (start.groupPositions.size > 1) {
@@ -221,7 +224,7 @@ export function useNodeDrag(nodeId: string) {
             const b = before.get(id)
             return !b || b.x !== pos.x || b.y !== pos.y
           })
-          if (moved) stack.execute(moveNodesCommand(before, after))
+          if (moved) stack.execute(moveNodesCommand(canvas, before, after))
         }
         perfMeasure('canvas-drag', 'drag-start')
       }
@@ -229,30 +232,32 @@ export function useNodeDrag(nodeId: string) {
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
     },
-    [nodeId]
+    [nodeId, canvas, canvasId]
   )
 
   return { onDragStart }
 }
 
 export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
+  const canvas = useCanvasApi()
+  const canvasId = useCanvasId()
   const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
 
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
       perfMark('resize-start')
       e.stopPropagation()
-      const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId)
+      const node = canvas.getState().nodes.find((n) => n.id === nodeId)
       if (!node) return
 
-      const zoom = useCanvasStore.getState().viewport.zoom
+      const zoom = canvas.getState().viewport.zoom
       resizeStart.current = {
         x: e.clientX,
         y: e.clientY,
         w: node.size.width,
         h: node.size.height
       }
-      markInteracting(true)
+      markInteracting(canvas, true)
 
       const webviews = Array.from(document.querySelectorAll('webview')) as HTMLElement[]
       const previousPointerEvents = new Map<HTMLElement, string>()
@@ -278,7 +283,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
           resizeRafPending = true
           requestAnimationFrame(() => {
             resizeRafPending = false
-            useCanvasStore.getState().resizeNode(nodeId, {
+            canvas.getState().resizeNode(nodeId, {
               width: latestWidth,
               height: latestHeight
             })
@@ -287,10 +292,10 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
       }
 
       const onUp = () => {
-        markInteracting(false)
+        markInteracting(canvas, false)
         // Flush final size if a RAF is still pending
         if (resizeRafPending) {
-          useCanvasStore.getState().resizeNode(nodeId, {
+          canvas.getState().resizeNode(nodeId, {
             width: latestWidth,
             height: latestHeight
           })
@@ -301,12 +306,13 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
         window.removeEventListener('pointerup', onUp)
 
         // Push the completed resize onto the command stack so ⌘Z undoes it.
-        const stack = getActiveCommandStack()
+        const stack = getCommandStack(canvasId)
         if (start && stack) {
-          const n = useCanvasStore.getState().nodes.find((cn) => cn.id === nodeId)
+          const n = canvas.getState().nodes.find((cn) => cn.id === nodeId)
           if (n && (n.size.width !== start.w || n.size.height !== start.h)) {
             stack.execute(
               resizeNodeCommand(
+                canvas,
                 nodeId,
                 { width: start.w, height: start.h },
                 { width: n.size.width, height: n.size.height }
@@ -328,7 +334,7 @@ export function useNodeResize(nodeId: string, nodeType: CanvasNodeType) {
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
     },
-    [nodeId, nodeType]
+    [nodeId, nodeType, canvas, canvasId]
   )
 
   return { onResizeStart }

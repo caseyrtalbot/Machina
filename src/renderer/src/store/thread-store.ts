@@ -8,7 +8,7 @@ import type {
 } from '@shared/thread-types'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { useTerminalStripStore } from './terminal-strip-store'
-import { flushDockState, syncActiveCanvas, useDockStore, validateThreadTabs } from './dock-store'
+import { flushDockState, useDockStore, validateThreadTabs } from './dock-store'
 import { useCliSessionStore } from './cli-session-store'
 import { transportFor, type DispatchStatus, type SendTurnResult } from './agent-transport'
 import {
@@ -730,11 +730,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
     })
   }
 }))
-
-// The active-canvas indirection also depends on activeThreadId, so the shared
-// sync (declared in dock-store, which owns the tab state) is registered on
-// this store too. Own-store subscribe only — cycle-safe, see dock-store header.
-useThreadStore.subscribe(syncActiveCanvas)
 
 /** Truncate a serialized payload so history summaries stay token-bounded. */
 function clip(s: string, max: number): string {

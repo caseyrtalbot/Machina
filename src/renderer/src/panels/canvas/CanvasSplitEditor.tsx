@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { colors } from '../../design/tokens'
 import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
 import { useDocument } from '../../hooks/useDocument'
@@ -13,7 +13,7 @@ interface CanvasSplitEditorProps {
 export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
-  const closeSplit = useCanvasStore((s) => s.closeSplit)
+  const closeSplit = useCanvas((s) => s.closeSplit)
 
   // All file I/O goes through DocumentManager
   const doc = useDocument(filePath)

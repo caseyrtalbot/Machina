@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, memo } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { logError } from '../../utils/error-logger'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
@@ -26,7 +26,7 @@ function mimeFromPath(path: string): string {
 }
 
 export function ImageCard({ node }: ImageCardProps): React.ReactElement {
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const removeNode = useCanvas((s) => s.removeNode)
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)

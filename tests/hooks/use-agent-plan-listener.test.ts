@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import type { CanvasMutationPlan } from '../../src/shared/canvas-mutation-types'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 // Capture the IPC callback so we can simulate events
 let capturedCallback: ((data: { plan: CanvasMutationPlan; canvasPath: string }) => void) | null =
@@ -55,7 +57,7 @@ const makePlan = (id: string): CanvasMutationPlan => ({
 
 describe('useAgentPlanListener', () => {
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
     capturedCallback = null
     mockUnsubscribe.mockClear()
     vi.mocked(window.api.on.canvasAgentPlanAccepted).mockClear()
@@ -73,14 +75,14 @@ describe('useAgentPlanListener', () => {
 
   it('calls applyAgentPlan on the store when event fires for the loaded canvas', () => {
     const canvasPath = '/test/canvas.canvas'
-    useCanvasStore.getState().loadCanvas(canvasPath, {
+    store.getState().loadCanvas(canvasPath, {
       version: 1,
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       focusFrames: {}
     })
-    const spy = vi.spyOn(useCanvasStore.getState(), 'applyAgentPlan')
+    const spy = vi.spyOn(store.getState(), 'applyAgentPlan')
     renderHook(() => useAgentPlanListener())
 
     const plan = makePlan('test1')
@@ -88,7 +90,7 @@ describe('useAgentPlanListener', () => {
 
     // applyAgentPlan is on the store instance, but getState() returns a new ref
     // after set() calls, so check the store state instead
-    const { nodes } = useCanvasStore.getState()
+    const { nodes } = store.getState()
     expect(nodes).toHaveLength(1)
     expect(nodes[0].id).toBe('n_test1')
     expect(nodes[0].content).toBe('agent-added')
@@ -96,7 +98,7 @@ describe('useAgentPlanListener', () => {
   })
 
   it('skips apply when canvasPath does not match the loaded canvas', () => {
-    useCanvasStore.getState().loadCanvas('/test/canvas-a.canvas', {
+    store.getState().loadCanvas('/test/canvas-a.canvas', {
       version: 1,
       nodes: [],
       edges: [],
@@ -109,7 +111,7 @@ describe('useAgentPlanListener', () => {
 
     // Plan targeted a different canvas; the loaded canvas should not be mutated
     // in memory (otherwise we'd silently corrupt the wrong canvas).
-    expect(useCanvasStore.getState().nodes).toHaveLength(0)
+    expect(store.getState().nodes).toHaveLength(0)
   })
 
   it('unsubscribes on unmount', () => {

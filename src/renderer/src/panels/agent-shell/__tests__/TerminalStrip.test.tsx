@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, fireEvent, act, screen, within } from '@testing-library/react'
 import { useThreadStore } from '../../../store/thread-store'
+import { useDockStore } from '../../../store/dock-store'
+import { DEFAULT_CANVAS_ID } from '../../../store/canvas-store'
 import { useTerminalStripStore } from '../../../store/terminal-strip-store'
 import { TerminalStrip } from '../TerminalStrip'
 import type { TerminalStripSession } from '@shared/dock-types'
@@ -46,6 +48,12 @@ function stubs(): HTMLElement[] {
 beforeEach(() => {
   useThreadStore.setState(useThreadStore.getInitialState())
   useThreadStore.setState({ activeThreadId: THREAD_ID })
+  // "Move to canvas" targets the FOCUSED canvas only — seed an active canvas tab.
+  useDockStore.setState(useDockStore.getInitialState())
+  useDockStore.setState({
+    dockTabsByThreadId: { [THREAD_ID]: [{ kind: 'canvas', id: DEFAULT_CANVAS_ID }] },
+    dockActiveIndexByThreadId: { [THREAD_ID]: 0 }
+  })
   useTerminalStripStore.setState(useTerminalStripStore.getInitialState(), true)
   killMock.mockClear()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,6 +131,23 @@ describe('TerminalStrip', () => {
       name: 'Move to canvas'
     }) as HTMLButtonElement
     expect(rebound.disabled).toBe(false)
+  })
+
+  it('disables "Move to canvas" when no canvas tab is focused', () => {
+    // Replace the seeded canvas tab with a graph tab: no focused canvas.
+    useDockStore.setState({
+      dockTabsByThreadId: { [THREAD_ID]: [{ kind: 'graph' }] },
+      dockActiveIndexByThreadId: { [THREAD_ID]: 0 }
+    })
+    seedStrip([{ tabId: 'tab-1', sessionId: 'sess-1', cwd: '/v/alpha' }], 'tab-1')
+    render(<TerminalStrip />)
+
+    fireEvent.contextMenu(tab('tab-1'), { clientX: 40, clientY: 500 })
+    const menu = screen.getByTestId('terminal-strip-menu')
+    const moveItem = within(menu).getByRole('menuitem', {
+      name: 'Move to canvas'
+    }) as HTMLButtonElement
+    expect(moveItem.disabled).toBe(true)
   })
 
   it('keeps visited tabs mounted with display:none after switching away', () => {

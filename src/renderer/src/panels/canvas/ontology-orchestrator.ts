@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvasApi } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import type { OntologySnapshot, OntologyLayoutResult } from '@shared/engine/ontology-types'
 import type { OntologyWorkerResponse } from './ontology-worker'
@@ -32,6 +32,7 @@ const IDLE_STATE: OntologyOrchestratorState = {
 }
 
 export function useOntologyOrchestrator(commandStack: React.RefObject<CommandStack | null>) {
+  const canvas = useCanvasApi()
   const [state, setState] = useState<OntologyOrchestratorState>(IDLE_STATE)
   const workerRef = useRef<Worker | null>(null)
 
@@ -43,7 +44,7 @@ export function useOntologyOrchestrator(commandStack: React.RefObject<CommandSta
   }, [])
 
   const startOrganize = useCallback(() => {
-    const { nodes, viewport } = useCanvasStore.getState()
+    const { nodes, viewport } = canvas.getState()
     const { fileToId, artifacts, graph } = useVaultStore.getState()
 
     if (nodes.length === 0) return
@@ -143,13 +144,13 @@ export function useOntologyOrchestrator(commandStack: React.RefObject<CommandSta
       cardSizes,
       origin
     })
-  }, [])
+  }, [canvas])
 
   const applyResult = useCallback(() => {
     if (!state.pendingSnapshot || !state.pendingLayout || !commandStack.current) return
-    applyOntologyResult(state.pendingSnapshot, state.pendingLayout, commandStack.current)
+    applyOntologyResult(canvas, state.pendingSnapshot, state.pendingLayout, commandStack.current)
     setState(IDLE_STATE)
-  }, [state.pendingSnapshot, state.pendingLayout, commandStack])
+  }, [canvas, state.pendingSnapshot, state.pendingLayout, commandStack])
 
   const cancel = useCallback(() => {
     if (workerRef.current) {

@@ -4,7 +4,7 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirro
 import { machinaCodeTheme } from './shared/code-theme'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
 import { borderRadius, colors } from '../../design/tokens'
 import type { CanvasNode, CodeNodeMeta } from '@shared/canvas-types'
@@ -21,9 +21,9 @@ interface CodeCardProps {
 export function CodeCard({ node }: CodeCardProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
-  const updateContent = useCanvasStore((s) => s.updateNodeContent)
-  const updateMetadata = useCanvasStore((s) => s.updateNodeMetadata)
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const updateContent = useCanvas((s) => s.updateNodeContent)
+  const updateMetadata = useCanvas((s) => s.updateNodeMetadata)
+  const removeNode = useCanvas((s) => s.removeNode)
 
   const meta = node.metadata as unknown as CodeNodeMeta
   const language = (meta.language ?? 'typescript') as SupportedLanguage

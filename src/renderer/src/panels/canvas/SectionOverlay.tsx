@@ -1,4 +1,4 @@
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { canvasTokens, ontologyColors, typography } from '../../design/tokens'
 
 export function SectionOverlay({
@@ -6,9 +6,9 @@ export function SectionOverlay({
 }: {
   readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number }
 }) {
-  const ontologyLayout = useCanvasStore((s) => s.ontologyLayout)
-  const ontologySnapshot = useCanvasStore((s) => s.ontologySnapshot)
-  const ontologyIsStale = useCanvasStore((s) => s.ontologyIsStale)
+  const ontologyLayout = useCanvas((s) => s.ontologyLayout)
+  const ontologySnapshot = useCanvas((s) => s.ontologySnapshot)
+  const ontologyIsStale = useCanvas((s) => s.ontologyIsStale)
 
   if (!ontologyLayout || !ontologySnapshot) return null
 

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import type { CanvasEdge, CanvasNode } from '@shared/canvas-types'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 let mockNodes: CanvasNode[] = []
 let mockEdges: CanvasEdge[] = []
@@ -11,26 +13,20 @@ let mockHoveredNodeId: string | null = null
 let mockShowAllEdges = false
 const mockSetSelectedEdge = vi.fn()
 
-vi.mock('../../../store/canvas-store', () => ({
-  useCanvasStore: Object.assign(
-    (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        nodes: mockNodes,
-        edges: mockEdges,
-        viewport: { x: 0, y: 0, zoom: mockZoom },
-        selectedEdgeId: mockSelectedEdgeId,
-        selectedNodeIds: mockSelectedNodeIds,
-        hoveredNodeId: mockHoveredNodeId,
-        showAllEdges: mockShowAllEdges,
-        setSelectedEdge: mockSetSelectedEdge
-      }),
-    {
-      getState: () => ({
-        setSelectedEdge: mockSetSelectedEdge
-      })
-    }
-  )
-}))
+function seedCanvasStore(): void {
+  const store = getCanvasStore(DEFAULT_CANVAS_ID)
+  store.setState({
+    ...store.getInitialState(),
+    nodes: mockNodes,
+    edges: mockEdges,
+    viewport: { x: 0, y: 0, zoom: mockZoom },
+    selectedEdgeId: mockSelectedEdgeId,
+    selectedNodeIds: mockSelectedNodeIds,
+    hoveredNodeId: mockHoveredNodeId,
+    showAllEdges: mockShowAllEdges,
+    setSelectedEdge: mockSetSelectedEdge
+  })
+}
 
 vi.mock('../edge-styling', () => ({
   getEdgeStrokeDasharray: () => undefined,
@@ -65,9 +61,14 @@ function makeEdge(
 }
 
 // Lazy import so mocks are registered first
-async function loadEdgeLayer() {
-  const mod = await import('../EdgeLayer')
-  return mod.EdgeLayer
+async function renderEdgeLayer() {
+  const { EdgeLayer } = await import('../EdgeLayer')
+  seedCanvasStore()
+  return render(
+    <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+      <EdgeLayer />
+    </CanvasStoreProvider>
+  )
 }
 
 describe('EdgeLayer', () => {
@@ -84,8 +85,7 @@ describe('EdgeLayer', () => {
 
   it('renders an edge path when both nodes exist', async () => {
     mockShowAllEdges = true
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     const paths = container.querySelectorAll('path')
     // 2 paths per edge: hit area + visible (showAllEdges reveals the visible path)
     expect(paths.length).toBe(2)
@@ -93,8 +93,7 @@ describe('EdgeLayer', () => {
 
   it('renders nothing for an edge referencing a missing node', async () => {
     mockEdges = [makeEdge('e1', 'a', 'missing')]
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     // Should have 0 visible paths (no <g data-canvas-edge>)
     const groups = container.querySelectorAll('[data-canvas-edge]')
     expect(groups.length).toBe(0)
@@ -104,8 +103,7 @@ describe('EdgeLayer', () => {
     // Behavioral regression: with 2 nodes and 1 edge, the Map-based lookup
     // resolves both endpoints and renders the edge correctly
     mockEdges = [makeEdge('e1', 'a', 'b', 'connection')]
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     const groups = container.querySelectorAll('[data-canvas-edge]')
     expect(groups.length).toBe(1)
   })
@@ -114,8 +112,7 @@ describe('EdgeLayer', () => {
     mockEdges = [makeEdge('e1', 'a', 'b', 'connection')]
     mockHoveredNodeId = null
 
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     // Hit path + visible path both mount for baseline-visible user edges
     const paths = container.querySelectorAll('path')
     expect(paths.length).toBe(2)
@@ -128,8 +125,7 @@ describe('EdgeLayer', () => {
     mockEdges = [makeEdge('e1', 'a', 'b', 'imports')]
     mockZoom = 0.5
 
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     expect(container.querySelectorAll('[data-canvas-edge]').length).toBe(0)
     expect(container.querySelectorAll('path').length).toBe(0)
   })
@@ -139,8 +135,7 @@ describe('EdgeLayer', () => {
     mockZoom = 0.5
     mockHoveredNodeId = 'a'
 
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     const paths = container.querySelectorAll('path')
     expect(paths.length).toBe(2)
     expect(paths[1].getAttribute('opacity')).toBe('0.6')
@@ -150,8 +145,7 @@ describe('EdgeLayer', () => {
     mockEdges = [{ ...makeEdge('e1', 'a', 'b'), hidden: true }]
     mockHoveredNodeId = 'a'
 
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     const groups = container.querySelectorAll('[data-canvas-edge]')
     expect(groups.length).toBe(1)
   })
@@ -160,8 +154,7 @@ describe('EdgeLayer', () => {
     mockEdges = [{ ...makeEdge('e1', 'a', 'b'), hidden: true }]
     mockSelectedNodeIds = new Set(['b'])
 
-    const EdgeLayer = await loadEdgeLayer()
-    const { container } = render(<EdgeLayer />)
+    const { container } = await renderEdgeLayer()
     const groups = container.querySelectorAll('[data-canvas-edge]')
     expect(groups.length).toBe(1)
   })

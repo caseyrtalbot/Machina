@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
 import { logError } from '../../utils/error-logger'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { CardShell } from './CardShell'
@@ -30,7 +30,8 @@ export function stripFrontmatterForDisplay(content: string): string {
 export function NoteCard({ node }: NoteCardProps) {
   const [body, setBody] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const canvas = useCanvasApi()
+  const removeNode = useCanvas((s) => s.removeNode)
   // The node.content holds the vault file path
   const filePath = node.content
   const artifactId = useVaultStore((s) => s.fileToId[filePath])
@@ -59,15 +60,18 @@ export function NoteCard({ node }: NoteCardProps) {
   const html = useMemo(() => (body ? markdownToHtml(body) : ''), [body])
 
   // CMD+click on wikilinks in static HTML
-  const handleWikilinkClick = useCallback((e: React.MouseEvent) => {
-    if (!e.metaKey) return
-    const el = (e.target as HTMLElement).closest('[data-wikilink-target]')
-    if (!el) return
-    const linkTarget = el.getAttribute('data-wikilink-target')
-    if (linkTarget) {
-      useCanvasStore.getState().openSplit(linkTarget)
-    }
-  }, [])
+  const handleWikilinkClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!e.metaKey) return
+      const el = (e.target as HTMLElement).closest('[data-wikilink-target]')
+      if (!el) return
+      const linkTarget = el.getAttribute('data-wikilink-target')
+      if (linkTarget) {
+        canvas.getState().openSplit(linkTarget)
+      }
+    },
+    [canvas]
+  )
 
   // Single loader shared by initial load and vault-change reloads
   const loadBody = useCallback(async () => {
@@ -189,20 +193,20 @@ export function NoteCard({ node }: NoteCardProps) {
   }, [html, mermaidSvgs])
 
   const openInEditor = useCallback(() => {
-    useCanvasStore.getState().openSplit(filePath)
-  }, [filePath])
+    canvas.getState().openSplit(filePath)
+  }, [filePath, canvas])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      useCanvasStore.getState().setCardContextMenu({
+      canvas.getState().setCardContextMenu({
         x: e.clientX,
         y: e.clientY,
         nodeId: node.id
       })
     },
-    [node.id]
+    [node.id, canvas]
   )
 
   return (

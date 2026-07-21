@@ -12,11 +12,12 @@ import {
   Undo2,
   type LucideIcon
 } from 'lucide-react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
+import type { CanvasStoreApi } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useSettingsStore } from '../../store/settings-store'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
-import { getActiveCommandStack, layoutCommand } from './canvas-commands'
+import { getCommandStack, layoutCommand } from './canvas-commands'
 import { colors, zIndex } from '../../design/tokens'
 
 interface CanvasToolbarProps {
@@ -110,8 +111,8 @@ function EnvSlider({
 }
 
 /** Compute the canvas-space point at the center of the visible surface. */
-function getViewportCenter(): { x: number; y: number } {
-  const vp = useCanvasStore.getState().viewport
+function getViewportCenter(store: CanvasStoreApi): { x: number; y: number } {
+  const vp = store.getState().viewport
   const el = document.querySelector('[data-canvas-surface]')
   const w = el?.clientWidth ?? 1920
   const h = el?.clientHeight ?? 1080
@@ -178,14 +179,16 @@ export function CanvasToolbar({
   organizePhase,
   onClear
 }: CanvasToolbarProps): React.ReactElement {
-  const viewport = useCanvasStore((s) => s.viewport)
-  const setViewport = useCanvasStore((s) => s.setViewport)
-  const focusFrames = useCanvasStore((s) => s.focusFrames)
-  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
-  const nodes = useCanvasStore((s) => s.nodes)
+  const canvas = useCanvasApi()
+  const canvasId = useCanvasId()
+  const viewport = useCanvas((s) => s.viewport)
+  const setViewport = useCanvas((s) => s.setViewport)
+  const focusFrames = useCanvas((s) => s.focusFrames)
+  const selectedNodeIds = useCanvas((s) => s.selectedNodeIds)
+  const nodes = useCanvas((s) => s.nodes)
   const hasNodes = nodes.length > 0
-  const showAllEdges = useCanvasStore((s) => s.showAllEdges)
-  const toggleShowAllEdges = useCanvasStore((s) => s.toggleShowAllEdges)
+  const showAllEdges = useCanvas((s) => s.showAllEdges)
+  const toggleShowAllEdges = useCanvas((s) => s.toggleShowAllEdges)
   const gridDotVisibility = useSettingsStore((s) => s.env.gridDotVisibility)
   const cardBlur = useSettingsStore((s) => s.env.cardBlur)
   const cardOpacity = useSettingsStore((s) => s.env.cardOpacity)
@@ -532,17 +535,15 @@ export function CanvasToolbar({
               className="sidebar-popover-item"
               style={{ color: colors.text.primary }}
               onClick={() => {
-                const center = getViewportCenter()
+                const center = getViewportCenter(canvas)
                 const { artifacts, graph, fileToId } = useVaultStore.getState()
                 const fileToIdMap = new Map(Object.entries(fileToId))
                 const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
-                const cmd = layoutCommand(() =>
-                  useCanvasStore
-                    .getState()
-                    .applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+                const cmd = layoutCommand(canvas, () =>
+                  canvas.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
                 )
                 if (cmd) {
-                  const stack = getActiveCommandStack()
+                  const stack = getCommandStack(canvasId)
                   if (stack) stack.execute(cmd)
                   else void cmd.execute()
                 }
@@ -558,13 +559,13 @@ export function CanvasToolbar({
                 className="sidebar-popover-item"
                 style={{ color: colors.text.secondary }}
                 onClick={() => {
-                  const cmd = layoutCommand(() =>
-                    useCanvasStore
+                  const cmd = layoutCommand(canvas, () =>
+                    canvas
                       .getState()
-                      .applyTileLayout(p.id as TilePattern, getViewportCenter())
+                      .applyTileLayout(p.id as TilePattern, getViewportCenter(canvas))
                   )
                   if (cmd) {
-                    const stack = getActiveCommandStack()
+                    const stack = getCommandStack(canvasId)
                     if (stack) stack.execute(cmd)
                     else void cmd.execute()
                   }
@@ -602,7 +603,7 @@ export function CanvasToolbar({
             <button
               key={slot}
               onClick={(e) => {
-                const store = useCanvasStore.getState()
+                const store = canvas.getState()
                 if (e.altKey && filled) {
                   store.clearFocusFrame(slotKey)
                 } else {

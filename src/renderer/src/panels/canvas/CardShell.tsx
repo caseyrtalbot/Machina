@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
 import {
@@ -17,11 +17,7 @@ import {
   endConnectionDrag,
   isConnectionDragActive
 } from './ConnectionDragOverlay'
-import {
-  convertNodeTypeCommand,
-  getActiveCommandStack,
-  removeNodeViaCallback
-} from './canvas-commands'
+import { convertNodeTypeCommand, getCommandStack, removeNodeViaCallback } from './canvas-commands'
 import {
   CARD_TYPE_INFO,
   type CanvasNode,
@@ -70,6 +66,8 @@ function ConvertMenu({
   readonly onClose: () => void
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const canvas = useCanvasApi()
+  const canvasId = useCanvasId()
   const targets = VALID_CONVERSIONS[nodeType]
 
   useEffect(() => {
@@ -127,9 +125,9 @@ function ConvertMenu({
             }}
             onClick={(e) => {
               e.stopPropagation()
-              const cmd = convertNodeTypeCommand(nodeId, target)
+              const cmd = convertNodeTypeCommand(canvas, nodeId, target)
               if (cmd) {
-                const stack = getActiveCommandStack()
+                const stack = getCommandStack(canvasId)
                 if (stack) stack.execute(cmd)
                 else void cmd.execute()
               }
@@ -210,17 +208,19 @@ export function CardShell({
   headerActions
 }: CardShellProps) {
   const copyText = filePath ?? title
-  const isSelected = useCanvasStore((s) => s.selectedNodeIds.has(node.id))
-  const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
-  const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
-  const isPinPulsing = useCanvasStore((s) => s.recentlyPinnedNodeIds.has(node.id))
-  const isInteracting = useCanvasStore((s) => s.isInteracting)
-  const setSelection = useCanvasStore((s) => s.setSelection)
-  const toggleSelection = useCanvasStore((s) => s.toggleSelection)
-  const setHoveredNode = useCanvasStore((s) => s.setHoveredNode)
-  const setFocusedCard = useCanvasStore((s) => s.setFocusedCard)
-  const lockCard = useCanvasStore((s) => s.lockCard)
-  const unlockCard = useCanvasStore((s) => s.unlockCard)
+  const canvas = useCanvasApi()
+  const canvasId = useCanvasId()
+  const isSelected = useCanvas((s) => s.selectedNodeIds.has(node.id))
+  const isFocused = useCanvas((s) => s.focusedCardId === node.id)
+  const isLocked = useCanvas((s) => s.lockedCardId === node.id)
+  const isPinPulsing = useCanvas((s) => s.recentlyPinnedNodeIds.has(node.id))
+  const isInteracting = useCanvas((s) => s.isInteracting)
+  const setSelection = useCanvas((s) => s.setSelection)
+  const toggleSelection = useCanvas((s) => s.toggleSelection)
+  const setHoveredNode = useCanvas((s) => s.setHoveredNode)
+  const setFocusedCard = useCanvas((s) => s.setFocusedCard)
+  const lockCard = useCanvas((s) => s.lockCard)
+  const unlockCard = useCanvas((s) => s.unlockCard)
   const { cardBlur, cardTitleFontSize } = useEnv()
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
@@ -311,11 +311,11 @@ export function CardShell({
   // Route close through the command stack so ⌘Z restores the card (and its
   // edges). The card's own onClose still runs — terminal cards kill their PTY.
   const handleClose = useCallback(() => {
-    const stack = getActiveCommandStack()
-    const cmd = stack ? removeNodeViaCallback(node.id, onClose) : null
+    const stack = getCommandStack(canvasId)
+    const cmd = stack ? removeNodeViaCallback(canvas, node.id, onClose) : null
     if (stack && cmd) stack.execute(cmd)
     else onClose()
-  }, [node.id, onClose])
+  }, [node.id, onClose, canvas, canvasId])
 
   return (
     <div
@@ -621,7 +621,15 @@ export function CardShell({
               style={style}
               onPointerDown={(e) => {
                 e.stopPropagation()
-                startConnectionDrag(node.id, side, e.clientX, e.clientY, e.nativeEvent)
+                startConnectionDrag(
+                  canvas,
+                  canvasId,
+                  node.id,
+                  side,
+                  e.clientX,
+                  e.clientY,
+                  e.nativeEvent
+                )
               }}
               onPointerUp={(e) => {
                 e.stopPropagation()

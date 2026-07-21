@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { logError } from '../utils/error-logger'
-import { useCanvasStore } from '../store/canvas-store'
+import { useCanvasApi } from '../panels/canvas/canvas-store-context'
 import { useVaultStore } from '../store/vault-store'
 import { colors, typography } from '../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
@@ -27,6 +27,7 @@ interface ClaudeContextResult {
 export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): ClaudeContextResult {
   const [contextCardCount, setContextCardCount] = useState(0)
   const [contextError, setContextError] = useState(false)
+  const canvas = useCanvasApi()
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const vaultPathRef = useRef(vaultPath)
   vaultPathRef.current = vaultPath
@@ -37,7 +38,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
     if (!isClaudeCard) return
 
     const getFingerprint = () => {
-      const { nodes } = useCanvasStore.getState()
+      const { nodes } = canvas.getState()
       return nodes
         .filter((n) => n.id !== node.id && n.type !== 'terminal')
         .map((n) => n.id)
@@ -45,9 +46,9 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
         .join(',')
     }
     let prevFingerprint = getFingerprint()
-    let lastNodesRef = useCanvasStore.getState().nodes
+    let lastNodesRef = canvas.getState().nodes
 
-    const unsub = useCanvasStore.subscribe((state) => {
+    const unsub = canvas.subscribe((state) => {
       if (state.nodes === lastNodesRef) return
       lastNodesRef = state.nodes
 
@@ -57,7 +58,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
 
       import('../engine/context-serializer')
         .then(({ buildCanvasContext }) => {
-          const { nodes } = useCanvasStore.getState()
+          const { nodes } = canvas.getState()
           const contextFilePath = vaultPathRef.current
             ? `${vaultPathRef.current}/${TE_DIR}/context-${node.id}.txt`
             : undefined
@@ -71,7 +72,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
     })
 
     return () => unsub()
-  }, [isClaudeCard, node.id])
+  }, [isClaudeCard, node.id, canvas])
 
   // Clean up context file on unmount
   useEffect(() => {

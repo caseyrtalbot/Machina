@@ -1,15 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import TextCard from '../TextCard'
-import { useCanvasStore } from '../../../store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 import { hashContent } from '../text-card-save'
 
 beforeEach(() => {
   globalThis.window = globalThis.window ?? ({} as Window & typeof globalThis)
   // @ts-expect-error test stub
   window.api = { fs: { mkdir: vi.fn(), listFiles: vi.fn(), writeFile: vi.fn() } }
-  useCanvasStore.setState({ nodes: [] } as never)
+  getCanvasStore(DEFAULT_CANVAS_ID).setState({ nodes: [] } as never)
 })
+
+function renderTextCard(node: Parameters<typeof TextCard>[0]['node']) {
+  return render(
+    <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+      <TextCard node={node} />
+    </CanvasStoreProvider>
+  )
+}
 
 const baseNode = {
   id: 't1',
@@ -22,7 +31,7 @@ const baseNode = {
 
 describe('TextCard', () => {
   it('renders a contenteditable surface (read-only by default)', () => {
-    render(<TextCard node={baseNode} />)
+    renderTextCard(baseNode)
     const editable = document.querySelector('[contenteditable]') as HTMLElement
     expect(editable).toBeTruthy()
     expect(editable.getAttribute('contenteditable')).toBe('false')
@@ -33,7 +42,7 @@ describe('TextCard', () => {
       ...baseNode,
       metadata: { savedToPath: 'Inbox/hello.md', savedContentHash: hashContent('hello') }
     }
-    render(<TextCard node={node} />)
+    renderTextCard(node)
     const badge = screen.queryByTitle(/open inbox\/hello\.md/i)
     expect(badge).toBeTruthy()
     expect(badge?.textContent).toContain('Inbox/hello.md')
@@ -45,12 +54,12 @@ describe('TextCard', () => {
       content: 'edited content',
       metadata: { savedToPath: 'Inbox/hello.md', savedContentHash: 'stale-hash-value' }
     }
-    render(<TextCard node={node} />)
+    renderTextCard(node)
     expect(screen.queryByTitle(/open inbox\/hello\.md/i)).toBeNull()
   })
 
   it('renders the header save button', () => {
-    render(<TextCard node={baseNode} />)
+    renderTextCard(baseNode)
     expect(screen.queryByTestId('text-card-save-button')).toBeTruthy()
   })
 })

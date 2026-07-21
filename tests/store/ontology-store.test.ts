@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useCanvasStore } from '@renderer/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '@renderer/store/canvas-store'
 import { groupId, revisionId } from '@shared/engine/ontology-types'
 import type { OntologySnapshot, OntologyLayoutResult } from '@shared/engine/ontology-types'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 function makeTestSnapshot(): OntologySnapshot {
   return {
@@ -90,34 +92,34 @@ function makeTestLayout(): OntologyLayoutResult {
 
 describe('canvas-store ontology actions', () => {
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
   })
 
   it('applyOntology sets snapshot and layout', () => {
     const snapshot = makeTestSnapshot()
     const layout = makeTestLayout()
-    useCanvasStore.getState().applyOntology(snapshot, layout)
+    store.getState().applyOntology(snapshot, layout)
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.ontologySnapshot).toEqual(snapshot)
     expect(state.ontologyLayout).toEqual(layout)
     expect(state.ontologyIsStale).toBe(false)
   })
 
   it('clearOntology resets ontology state', () => {
-    useCanvasStore.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
-    useCanvasStore.getState().clearOntology()
+    store.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
+    store.getState().clearOntology()
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.ontologySnapshot).toBeNull()
     expect(state.ontologyLayout).toBeNull()
   })
 
   it('moveCardToSection updates cardIds', () => {
-    useCanvasStore.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
-    useCanvasStore.getState().moveCardToSection('c1', groupId('g2'))
+    store.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
+    store.getState().moveCardToSection('c1', groupId('g2'))
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     const g1 = state.ontologySnapshot!.groupsById.g1
     const g2 = state.ontologySnapshot!.groupsById.g2
     expect(g1.cardIds).not.toContain('c1')
@@ -125,29 +127,29 @@ describe('canvas-store ontology actions', () => {
   })
 
   it('moveCardToSection removes empty group', () => {
-    useCanvasStore.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
+    store.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
     // Move c3 (only card in g2) to g1
-    useCanvasStore.getState().moveCardToSection('c3', groupId('g1'))
+    store.getState().moveCardToSection('c3', groupId('g1'))
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.ontologySnapshot!.groupsById.g2).toBeUndefined()
     expect(state.ontologySnapshot!.rootGroupIds).not.toContain(groupId('g2'))
   })
 
   it('removeSection moves cards to ungrouped', () => {
-    useCanvasStore.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
-    useCanvasStore.getState().removeSection(groupId('g2'))
+    store.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
+    store.getState().removeSection(groupId('g2'))
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.ontologySnapshot!.groupsById.g2).toBeUndefined()
     expect(state.ontologySnapshot!.ungroupedNoteIds).toContain('c3')
   })
 
   it('removeSection with children moves all cards to ungrouped', () => {
-    useCanvasStore.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
-    useCanvasStore.getState().removeSection(groupId('g1'))
+    store.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
+    store.getState().removeSection(groupId('g1'))
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.ontologySnapshot!.groupsById.g1).toBeUndefined()
     expect(state.ontologySnapshot!.groupsById.g1a).toBeUndefined()
     expect(state.ontologySnapshot!.ungroupedNoteIds).toContain('c1')
@@ -156,10 +158,10 @@ describe('canvas-store ontology actions', () => {
   })
 
   it('updateSection cascades colorToken to children', () => {
-    useCanvasStore.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
-    useCanvasStore.getState().updateSection(groupId('g1'), { colorToken: 'ontology-red' })
+    store.getState().applyOntology(makeTestSnapshot(), makeTestLayout())
+    store.getState().updateSection(groupId('g1'), { colorToken: 'ontology-red' })
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.ontologySnapshot!.groupsById.g1.colorToken).toBe('ontology-red')
     expect(state.ontologySnapshot!.groupsById.g1a.colorToken).toBe('ontology-red')
   })

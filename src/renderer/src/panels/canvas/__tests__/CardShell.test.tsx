@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 const mockSetSelection = vi.fn()
 const mockToggleSelection = vi.fn()
@@ -12,22 +15,25 @@ const mockUnlockCard = vi.fn()
 let mockFocusedCardId: string | null = null
 let mockLockedCardId: string | null = null
 
-vi.mock('../../../store/canvas-store', () => ({
-  useCanvasStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({
-      selectedNodeIds: new Set<string>(),
-      focusedCardId: mockFocusedCardId,
-      lockedCardId: mockLockedCardId,
-      recentlyPinnedNodeIds: new Set<string>(),
-      setSelection: mockSetSelection,
-      toggleSelection: mockToggleSelection,
-      setHoveredNode: mockSetHoveredNode,
-      setFocusedCard: mockSetFocusedCard,
-      lockCard: mockLockCard,
-      unlockCard: mockUnlockCard,
-      updateNodeType: vi.fn()
-    })
-}))
+function seedCanvasStore(): void {
+  const store = getCanvasStore(DEFAULT_CANVAS_ID)
+  store.setState({
+    ...store.getInitialState(),
+    focusedCardId: mockFocusedCardId,
+    lockedCardId: mockLockedCardId,
+    setSelection: mockSetSelection,
+    toggleSelection: mockToggleSelection,
+    setHoveredNode: mockSetHoveredNode,
+    setFocusedCard: mockSetFocusedCard,
+    lockCard: mockLockCard,
+    unlockCard: mockUnlockCard
+  })
+}
+
+function renderCardShell(ui: ReactElement) {
+  seedCanvasStore()
+  return render(<CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>{ui}</CanvasStoreProvider>)
+}
 
 vi.mock('../use-canvas-drag', () => ({
   useNodeDrag: () => ({ onDragStart: vi.fn() }),
@@ -69,7 +75,7 @@ describe('CardShell terminal activation', () => {
     const { CardShell } = await import('../CardShell')
     const onActivateContentClick = vi.fn()
 
-    const { container } = render(
+    const { container } = renderCardShell(
       <CardShell
         node={makeTerminalNode()}
         title="Terminal"
@@ -94,7 +100,7 @@ describe('CardShell terminal activation', () => {
     const { CardShell } = await import('../CardShell')
     const onActivateContentClick = vi.fn()
 
-    const { container } = render(
+    const { container } = renderCardShell(
       <CardShell
         node={makeTerminalNode()}
         title="Terminal"

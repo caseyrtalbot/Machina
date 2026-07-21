@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 import { useThreadStore } from '../../store/thread-store'
+import { useFocusedCanvasId } from '../../store/dock-store'
 import { useTerminalStripStore } from '../../store/terminal-strip-store'
 import type { TerminalStripSession } from '@shared/dock-types'
 import { TerminalDockAdapter } from './dock-adapters/TerminalDockAdapter'
@@ -34,6 +35,7 @@ export function TerminalStrip() {
   const discardPendingKill = useTerminalStripStore((s) => s.discardPendingKill)
 
   const [menu, setMenu] = useState<{ position: ContextMenuPosition; tabId: string } | null>(null)
+  const focusedCanvasId = useFocusedCanvasId()
 
   // Closed-while-unbound sessions of the ACTIVE thread stay rendered (hidden,
   // same key, same parent — the mounted webview instance must survive) until
@@ -212,7 +214,8 @@ export function TerminalStrip() {
             {
               id: 'move-to-canvas',
               label: 'Move to canvas',
-              disabled: menuSession.sessionId === '',
+              // Targets the FOCUSED canvas only — no last-seen fallback.
+              disabled: menuSession.sessionId === '' || focusedCanvasId === null,
               onSelect: () => stripToCanvas(threadId, menuSession.tabId)
             },
             {

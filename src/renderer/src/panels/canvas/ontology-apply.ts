@@ -5,29 +5,30 @@
  */
 
 import type { OntologySnapshot, OntologyLayoutResult } from '@shared/engine/ontology-types'
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
 import type { CommandStack } from './canvas-commands'
 
 export function applyOntologyResult(
+  store: CanvasStoreApi,
   snapshot: OntologySnapshot,
   layout: OntologyLayoutResult,
   commandStack: CommandStack
 ): void {
-  const store = useCanvasStore.getState()
+  const initial = store.getState()
 
   // Capture pre-apply state for undo
   const prevPositions = new Map<string, { x: number; y: number }>()
-  for (const node of store.nodes) {
+  for (const node of initial.nodes) {
     if (layout.cardPositions[node.id]) {
       prevPositions.set(node.id, { ...node.position })
     }
   }
-  const prevSnapshot = store.ontologySnapshot
-  const prevLayout = store.ontologyLayout
+  const prevSnapshot = initial.ontologySnapshot
+  const prevLayout = initial.ontologyLayout
 
   commandStack.execute({
     execute: () => {
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       // Set ontology semantic + geometry state
       s.applyOntology(snapshot, layout)
       // Move cards to their computed positions
@@ -39,7 +40,7 @@ export function applyOntologyResult(
       }
     },
     undo: () => {
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       // Restore previous card positions
       for (const [cardId, pos] of prevPositions) {
         s.moveNode(cardId, pos)

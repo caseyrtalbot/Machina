@@ -1,7 +1,7 @@
 import { useCallback, memo } from 'react'
 import { logError } from '../../utils/error-logger'
 import { CardShell } from '../canvas/CardShell'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from '../canvas/canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import { colors, getArtifactColor, typography } from '../../design/tokens'
 import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
@@ -85,7 +85,8 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
   const filePath = meta.filePath ?? ''
   const accentColor = getArtifactColor(kind)
 
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const canvas = useCanvasApi()
+  const removeNode = useCanvas((s) => s.removeNode)
   const vaultPath = useVaultStore((s) => s.vaultPath)
 
   const handleClose = useCallback(() => {
@@ -100,11 +101,11 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
 
   const handleRestore = useCallback(() => {
     if (meta.snapshotPath && vaultPath) {
-      restorePatternSnapshot(meta.snapshotPath, vaultPath).catch((err) =>
+      restorePatternSnapshot(canvas, meta.snapshotPath, vaultPath).catch((err) =>
         logError('snapshot-restore', err)
       )
     }
-  }, [meta.snapshotPath, vaultPath])
+  }, [meta.snapshotPath, vaultPath, canvas])
 
   return (
     <CardShell

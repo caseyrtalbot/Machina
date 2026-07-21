@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { DOCK_TAB_KINDS, type DockTab } from '@shared/dock-types'
 import type { Thread } from '@shared/thread-types'
 import { TE_DIR } from '@shared/constants'
-import { setActiveCanvas } from './canvas-store'
 import { useEditorStore } from './editor-store'
 import { useTerminalStripStore } from './terminal-strip-store'
 import { useThreadStore } from './thread-store'
@@ -14,7 +13,7 @@ import { useThreadStore } from './thread-store'
  * Import-cycle contract: this module and thread-store import each other.
  * That is safe ONLY because neither module's top level reads the other's
  * bindings — all cross-store access happens inside actions, subscribers, or
- * the hoisted `syncActiveCanvas`/`flushDockState` function declarations.
+ * the hoisted `flushDockState` function declaration.
  * Keep it that way: a top-level `useThreadStore.…` call here (or a top-level
  * read of a non-function export from this file over there) breaks under the
  * ESM cycle depending on which module loads first.
@@ -24,8 +23,8 @@ import { useThreadStore } from './thread-store'
  * sequential setState calls, one per store — not one atomic set as when both
  * flags lived in thread-store. Between the two sets, a non-React subscriber
  * could observe dockCollapsed and chatCollapsed both true. Benign today
- * (React 18 batches the renders; syncActiveCanvas ignores the pair;
- * persistLayout reads final state) — do NOT add a subscriber that acts on
+ * (React 18 batches the renders; persistLayout reads final state) — do NOT
+ * add a subscriber that acts on
  * the collapsed-flag pair mid-action; read it only after both sets settle.
  */
 interface DockState {
@@ -315,16 +314,6 @@ export async function flushDockState(id: string): Promise<void> {
 }
 
 /**
- * Active-canvas indirection (3.8): whenever the active dock tab is a canvas,
- * point the global `useCanvasStore` proxy at that canvas's store instance.
- * Non-canvas tabs keep the last canvas active so palette/sidebar actions that
- * target "the canvas" keep meaning the one the user last looked at.
- *
- * A function DECLARATION on purpose: it is hoisted across the thread-store
- * import cycle, so thread-store can register it on its own store at top level
- * (activeThreadId changes) while this module registers it here (tab changes).
- */
-/**
  * The one way to open a note in the workbench: focus (or open) the singleton
  * editor dock surface, then route note identity into editor-store. Callers
  * must not open editor dock tabs directly — note paths never live in dock
@@ -340,13 +329,29 @@ export function openNoteInEditor(
   else editor.openTab(path, opts?.title)
 }
 
-export function syncActiveCanvas(): void {
+/**
+ * The canvas the user is looking at RIGHT NOW: the active thread's active dock
+ * tab, when that tab is a canvas — null otherwise. This is the only sanctioned
+ * "the canvas" for code outside the canvas tree (dock rails, terminal
+ * migration, palette): callers must disable/no-op on null rather than falling
+ * back to a last-seen canvas.
+ */
+export function getFocusedCanvasId(): string | null {
   const threadId = useThreadStore.getState().activeThreadId
-  if (!threadId) return
+  if (!threadId) return null
   const s = useDockStore.getState()
   const tabs = s.dockTabsByThreadId[threadId] ?? []
   const tab = tabs[s.dockActiveIndexByThreadId[threadId] ?? 0]
-  if (tab?.kind === 'canvas') setActiveCanvas(tab.id)
+  return tab?.kind === 'canvas' ? tab.id : null
 }
 
-useDockStore.subscribe(syncActiveCanvas)
+/** Reactive form of {@link getFocusedCanvasId}. */
+export function useFocusedCanvasId(): string | null {
+  const threadId = useThreadStore((s) => s.activeThreadId)
+  return useDockStore((s) => {
+    if (!threadId) return null
+    const tabs = s.dockTabsByThreadId[threadId] ?? []
+    const tab = tabs[s.dockActiveIndexByThreadId[threadId] ?? 0]
+    return tab?.kind === 'canvas' ? tab.id : null
+  })
+}

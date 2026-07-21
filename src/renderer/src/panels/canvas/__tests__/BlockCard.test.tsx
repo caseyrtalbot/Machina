@@ -10,6 +10,8 @@ import {
   appendOutput
 } from '@shared/engine/block-model'
 import { useBlockStore } from '../../../store/block-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 vi.mock('../CardShell', () => ({
   CardShell: ({
@@ -26,13 +28,6 @@ vi.mock('../CardShell', () => ({
       {titleExtra ? <div data-testid="card-title-extra">{titleExtra}</div> : null}
       <div data-testid="card-content">{children}</div>
     </div>
-  )
-}))
-
-vi.mock('../../../store/canvas-store', () => ({
-  useCanvasStore: Object.assign(
-    (selector: (s: Record<string, unknown>) => unknown) => selector({ removeNode: vi.fn() }),
-    { getState: () => ({ removeNode: vi.fn() }) }
   )
 }))
 
@@ -97,9 +92,19 @@ function makeBlockNode(
   }
 }
 
+function renderBlockCard(BlockCard: typeof import('../BlockCard').default, node: CanvasNode) {
+  return render(
+    <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+      <BlockCard node={node} />
+    </CanvasStoreProvider>
+  )
+}
+
 describe('BlockCard', () => {
   beforeEach(() => {
     useBlockStore.setState(useBlockStore.getInitialState())
+    const store = getCanvasStore(DEFAULT_CANVAS_ID)
+    store.setState({ ...store.getInitialState() })
   })
   afterEach(() => {
     cleanup()
@@ -108,14 +113,14 @@ describe('BlockCard', () => {
   it('renders the command as the card title', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'ls -la', 0))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     expect(screen.getByTestId('card-title').textContent).toContain('ls -la')
   })
 
   it('shows exit code chip for completed blocks (success)', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hi\n'))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const status = screen.getByTestId('block-status')
     expect(status.textContent).toContain('0')
     expect(status.getAttribute('data-state')).toBe('completed')
@@ -124,7 +129,7 @@ describe('BlockCard', () => {
   it('shows exit code chip for completed blocks (failure)', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'false', 1))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const status = screen.getByTestId('block-status')
     expect(status.textContent).toContain('1')
     expect(status.getAttribute('data-exit-ok')).toBe('false')
@@ -133,7 +138,7 @@ describe('BlockCard', () => {
   it('shows running indicator for running blocks', async () => {
     useBlockStore.getState().applyUpdate('s1', buildRunning('b1', 's1', 'sleep 100'))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const status = screen.getByTestId('block-status')
     expect(status.getAttribute('data-state')).toBe('running')
     expect(screen.getByTestId('block-spinner')).toBeTruthy()
@@ -142,7 +147,7 @@ describe('BlockCard', () => {
   it('shows cancelled badge for cancelled blocks', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCancelled('b1', 's1', 'sleep 100'))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const status = screen.getByTestId('block-status')
     expect(status.getAttribute('data-state')).toBe('cancelled')
     expect(status.textContent?.toLowerCase()).toContain('cancelled')
@@ -153,28 +158,27 @@ describe('BlockCard', () => {
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hello world\n'))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     expect(screen.getByTestId('block-output').textContent).toContain('hello world')
   })
 
   it('renders cwd basename when available', async () => {
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'pwd', 0))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const cwd = screen.getByTestId('block-cwd')
     expect(cwd.textContent).toContain('work')
   })
 
   it('falls back to metadata when block is not in the store', async () => {
     const { default: BlockCard } = await import('../BlockCard')
-    render(
-      <BlockCard
-        node={makeBlockNode('s1', 'b-missing', {
-          command: 'archived-command',
-          exitCode: 0,
-          cwd: '/tmp/old'
-        })}
-      />
+    renderBlockCard(
+      BlockCard,
+      makeBlockNode('s1', 'b-missing', {
+        command: 'archived-command',
+        exitCode: 0,
+        cwd: '/tmp/old'
+      })
     )
     expect(screen.getByTestId('card-title').textContent).toContain('archived-command')
     expect(screen.getByTestId('block-status').getAttribute('data-state')).toBe('archived')
@@ -182,14 +186,13 @@ describe('BlockCard', () => {
 
   it('renders the persisted output snapshot for archived pins', async () => {
     const { default: BlockCard } = await import('../BlockCard')
-    render(
-      <BlockCard
-        node={makeBlockNode('s1', 'b-missing', {
-          command: 'ls -la',
-          exitCode: 0,
-          outputSnapshot: 'file1.txt\nfile2.txt\n'
-        })}
-      />
+    renderBlockCard(
+      BlockCard,
+      makeBlockNode('s1', 'b-missing', {
+        command: 'ls -la',
+        exitCode: 0,
+        outputSnapshot: 'file1.txt\nfile2.txt\n'
+      })
     )
     const output = screen.getByTestId('block-output')
     expect(output.textContent).toContain('file1.txt')
@@ -200,7 +203,7 @@ describe('BlockCard', () => {
     const fake = 'AKIA' + 'IOSFODNN7EXAMPLE'
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', `export K=${fake}`, 0))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const title = screen.getByTestId('card-title').textContent ?? ''
     expect(title).not.toContain(fake)
     expect(title).toContain('export K=')
@@ -211,7 +214,7 @@ describe('BlockCard', () => {
     try {
       useBlockStore.getState().applyUpdate('s1', buildRunning('b1', 's1', 'sleep 100'))
       const { default: BlockCard } = await import('../BlockCard')
-      render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+      renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
       const before = screen.getByTestId('block-elapsed').textContent
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000)
@@ -226,11 +229,15 @@ describe('BlockCard', () => {
   it('updates when the underlying block transitions running → completed', async () => {
     useBlockStore.getState().applyUpdate('s1', buildRunning('b1', 's1', 'make'))
     const { default: BlockCard } = await import('../BlockCard')
-    const { rerender } = render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    const { rerender } = renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     expect(screen.getByTestId('block-status').getAttribute('data-state')).toBe('running')
 
     useBlockStore.getState().applyUpdate('s1', buildCompleted('b1', 's1', 'make', 2))
-    rerender(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    rerender(
+      <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+        <BlockCard node={makeBlockNode('s1', 'b1')} />
+      </CanvasStoreProvider>
+    )
     const status = screen.getByTestId('block-status')
     expect(status.getAttribute('data-state')).toBe('completed')
     expect(status.textContent).toContain('2')
@@ -243,7 +250,7 @@ describe('BlockCard', () => {
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const output = screen.getByTestId('block-output')
     // 5.6 will replace the secret bytes with mask glyphs; here we assert the
     // card renders the secret count so the masking wiring has something to read.
@@ -256,7 +263,7 @@ describe('BlockCard', () => {
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const reveal = screen.getByTestId('block-reveal-toggle')
     expect(reveal.getAttribute('data-revealed')).toBe('false')
     fireEvent.click(reveal)
@@ -271,7 +278,7 @@ describe('BlockCard', () => {
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'env', 0, `AWS_ACCESS_KEY_ID=${fake}\n`))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const output = screen.getByTestId('block-output')
     expect(output.textContent).not.toContain(fake)
     expect(output.textContent).toContain('AWS_ACCESS_KEY_ID=')
@@ -286,7 +293,7 @@ describe('BlockCard', () => {
       .getState()
       .applyUpdate('s1', buildCompleted('b1', 's1', 'echo hi', 0, 'hello world\n'))
     const { default: BlockCard } = await import('../BlockCard')
-    render(<BlockCard node={makeBlockNode('s1', 'b1')} />)
+    renderBlockCard(BlockCard, makeBlockNode('s1', 'b1'))
     const output = screen.getByTestId('block-output')
     expect(output.textContent).toContain('hello world')
     expect(output.textContent).not.toContain('•')

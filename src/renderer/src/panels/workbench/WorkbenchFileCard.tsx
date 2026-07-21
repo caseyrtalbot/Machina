@@ -1,6 +1,6 @@
 import { useCallback, memo } from 'react'
 import { CardShell } from '../canvas/CardShell'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from '../canvas/canvas-store-context'
 import { colors, transitions, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import './workbench-animations.css'
@@ -49,7 +49,7 @@ export function WorkbenchFileCard({ node }: WorkbenchFileCardProps) {
   const touchCount = (meta?.touchCount as number) ?? 0
   const isActive = meta?.isActive === true
 
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const removeNode = useCanvas((s) => s.removeNode)
 
   const handleClose = useCallback(() => {
     removeNode(node.id)

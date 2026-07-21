@@ -1,6 +1,6 @@
 import { createCanvasNode, type CanvasNode, type CanvasViewport } from '@shared/canvas-types'
-import { getActiveCanvasId, getCanvasStore } from '../../store/canvas-store'
-import { useDockStore } from '../../store/dock-store'
+import { getCanvasStore, type CanvasStoreApi } from '../../store/canvas-store'
+import { getFocusedCanvasId, useDockStore } from '../../store/dock-store'
 import { useTerminalStripStore } from '../../store/terminal-strip-store'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -26,9 +26,10 @@ export function viewportWorldCenter(
 }
 
 /**
- * Move a strip session onto the active canvas as a terminal card.
+ * Move a strip session onto the focused canvas as a terminal card.
  * Order: create the card, reveal the canvas (its webview reconnects and takes
  * over the session), then detach from the strip — detach never kills the PTY.
+ * Null when no canvas tab is focused (the UI disables the action then).
  */
 export function stripToCanvas(threadId: string, tabId: string): CanvasNode | null {
   const strip = useTerminalStripStore.getState()
@@ -37,7 +38,8 @@ export function stripToCanvas(threadId: string, tabId: string): CanvasNode | nul
   // action, this is the belt-and-suspenders check).
   if (!session || !session.sessionId) return null
 
-  const canvasId = getActiveCanvasId()
+  const canvasId = getFocusedCanvasId()
+  if (!canvasId) return null
   const store = getCanvasStore(canvasId)
   const center = viewportWorldCenter(store.getState().viewport, {
     width: typeof window === 'undefined' ? 1920 : window.innerWidth,
@@ -54,11 +56,13 @@ export function stripToCanvas(threadId: string, tabId: string): CanvasNode | nul
 }
 
 /**
- * Move a canvas terminal card into the strip of the active thread.
- * Order mirrors stripToCanvas: attach first (the strip webview reconnects),
- * then remove the card with preserveSession so the PTY survives.
+ * Move a terminal card from its canvas into the strip of the active thread.
+ * The caller passes the card's own canvas store — the card knows which canvas
+ * it lives on; nothing here guesses. Order mirrors stripToCanvas: attach first
+ * (the strip webview reconnects), then remove the card with preserveSession so
+ * the PTY survives.
  */
-export function canvasToStrip(node: CanvasNode): boolean {
+export function canvasToStrip(canvas: CanvasStoreApi, node: CanvasNode): boolean {
   const threadId = useThreadStore.getState().activeThreadId
   if (!threadId || node.type !== 'terminal' || !node.content) return false
   const cwd =
@@ -66,7 +70,7 @@ export function canvasToStrip(node: CanvasNode): boolean {
       ? node.metadata.initialCwd
       : (useVaultStore.getState().vaultPath ?? '/')
   useTerminalStripStore.getState().attach(threadId, { sessionId: node.content, cwd })
-  getCanvasStore(getActiveCanvasId()).getState().removeNode(node.id, { preserveSession: true })
+  canvas.getState().removeNode(node.id, { preserveSession: true })
   return true
 }
 

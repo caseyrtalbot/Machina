@@ -1,54 +1,56 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 describe('showAllEdges', () => {
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
   })
 
   it('defaults to false', () => {
-    expect(useCanvasStore.getState().showAllEdges).toBe(false)
+    expect(store.getState().showAllEdges).toBe(false)
   })
 
   it('toggles to true then back to false', () => {
-    useCanvasStore.getState().toggleShowAllEdges()
-    expect(useCanvasStore.getState().showAllEdges).toBe(true)
-    useCanvasStore.getState().toggleShowAllEdges()
-    expect(useCanvasStore.getState().showAllEdges).toBe(false)
+    store.getState().toggleShowAllEdges()
+    expect(store.getState().showAllEdges).toBe(true)
+    store.getState().toggleShowAllEdges()
+    expect(store.getState().showAllEdges).toBe(false)
   })
 
   it('defaults to false on loadCanvas when the file has no showAllEdges', () => {
-    useCanvasStore.getState().toggleShowAllEdges()
-    expect(useCanvasStore.getState().showAllEdges).toBe(true)
+    store.getState().toggleShowAllEdges()
+    expect(store.getState().showAllEdges).toBe(true)
 
-    useCanvasStore.getState().loadCanvas('test.canvas', {
+    store.getState().loadCanvas('test.canvas', {
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 }
     })
-    expect(useCanvasStore.getState().showAllEdges).toBe(false)
+    expect(store.getState().showAllEdges).toBe(false)
   })
 
   it('restores showAllEdges from the loaded file', () => {
-    useCanvasStore.getState().loadCanvas('test.canvas', {
+    store.getState().loadCanvas('test.canvas', {
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       showAllEdges: true
     })
-    expect(useCanvasStore.getState().showAllEdges).toBe(true)
+    expect(store.getState().showAllEdges).toBe(true)
   })
 
   it('is persisted via toCanvasFile', () => {
-    useCanvasStore.getState().toggleShowAllEdges()
-    const file = useCanvasStore.getState().toCanvasFile()
+    store.getState().toggleShowAllEdges()
+    const file = store.getState().toCanvasFile()
     expect(file.showAllEdges).toBe(true)
   })
 
   it('toggling marks the canvas dirty so the toggle persists', () => {
-    expect(useCanvasStore.getState().isDirty).toBe(false)
-    useCanvasStore.getState().toggleShowAllEdges()
-    expect(useCanvasStore.getState().isDirty).toBe(true)
+    expect(store.getState().isDirty).toBe(false)
+    store.getState().toggleShowAllEdges()
+    expect(store.getState().isDirty).toBe(true)
   })
 })
 

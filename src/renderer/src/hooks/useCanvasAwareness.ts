@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
-import { useCanvasStore } from '../store/canvas-store'
+import { useStore } from 'zustand'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../store/canvas-store'
+import { useFocusedCanvasId } from '../store/dock-store'
 import { useVaultStore } from '../store/vault-store'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { GraphEdge } from '@shared/types'
@@ -57,10 +59,18 @@ export function deriveCanvasConnectionCounts(
 // React hooks wrapping the pure functions
 // ---------------------------------------------------------------------------
 
-/** Subscribe to canvas store and derive the set of file paths on canvas. */
+const NO_PATHS: ReadonlySet<string> = new Set()
+
+/**
+ * File paths on the FOCUSED canvas (active thread's active dock tab, when it
+ * is a canvas) — empty when no canvas is focused. The unconditional useStore
+ * call needs some store when unfocused; it reads the default instance but the
+ * result is discarded (hooks-order requirement, not a semantic fallback).
+ */
 export function useCanvasFilePaths(): ReadonlySet<string> {
-  const nodes = useCanvasStore((s) => s.nodes)
-  return useMemo(() => deriveCanvasFilePaths(nodes), [nodes])
+  const canvasId = useFocusedCanvasId()
+  const nodes = useStore(getCanvasStore(canvasId ?? DEFAULT_CANVAS_ID), (s) => s.nodes)
+  return useMemo(() => (canvasId ? deriveCanvasFilePaths(nodes) : NO_PATHS), [canvasId, nodes])
 }
 
 /** Derive connection counts for on-canvas files from the knowledge graph. */

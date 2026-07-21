@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 describe('viewport interaction flagging', () => {
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
     vi.useFakeTimers()
   })
 
@@ -21,38 +23,38 @@ describe('viewport interaction flagging', () => {
       // the store state changes triggered by the hook's event handlers
 
       // Direct store verification: setInteracting exists and works
-      useCanvasStore.getState().setInteracting(true)
-      expect(useCanvasStore.getState().isInteracting).toBe(true)
+      store.getState().setInteracting(true)
+      expect(store.getState().isInteracting).toBe(true)
 
-      useCanvasStore.getState().setInteracting(false)
-      expect(useCanvasStore.getState().isInteracting).toBe(false)
+      store.getState().setInteracting(false)
+      expect(store.getState().isInteracting).toBe(false)
     })
 
     it('delays clearing isInteracting by 150ms', () => {
-      useCanvasStore.getState().setInteracting(true)
-      expect(useCanvasStore.getState().isInteracting).toBe(true)
+      store.getState().setInteracting(true)
+      expect(store.getState().isInteracting).toBe(true)
 
       // Simulate what markViewportInteracting(false) does
       setTimeout(() => {
-        useCanvasStore.getState().setInteracting(false)
+        store.getState().setInteracting(false)
       }, 150)
 
       // Not yet cleared
       vi.advanceTimersByTime(100)
-      expect(useCanvasStore.getState().isInteracting).toBe(true)
+      expect(store.getState().isInteracting).toBe(true)
 
       // Now cleared
       vi.advanceTimersByTime(50)
-      expect(useCanvasStore.getState().isInteracting).toBe(false)
+      expect(store.getState().isInteracting).toBe(false)
     })
   })
 
   describe('markMinimapInteracting', () => {
     it('sets isInteracting true immediately when active', () => {
       // Verify the store mechanism works for minimap interaction
-      expect(useCanvasStore.getState().isInteracting).toBe(false)
-      useCanvasStore.getState().setInteracting(true)
-      expect(useCanvasStore.getState().isInteracting).toBe(true)
+      expect(store.getState().isInteracting).toBe(false)
+      store.getState().setInteracting(true)
+      expect(store.getState().isInteracting).toBe(true)
     })
   })
 

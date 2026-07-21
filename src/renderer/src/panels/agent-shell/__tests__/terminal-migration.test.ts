@@ -41,6 +41,12 @@ beforeEach(() => {
 
   useThreadStore.setState({ activeThreadId: THREAD })
   useVaultStore.setState({ vaultPath: '/vault' })
+  // stripToCanvas targets the FOCUSED canvas only (Phase 1 step 1): seed the
+  // thread with an active canvas dock tab.
+  useDockStore.setState({
+    dockTabsByThreadId: { [THREAD]: [{ kind: 'canvas', id: DEFAULT_CANVAS_ID }] },
+    dockActiveIndexByThreadId: { [THREAD]: 0 }
+  })
 })
 
 describe('viewportWorldCenter', () => {
@@ -60,8 +66,23 @@ describe('stripToCanvas', () => {
 
     expect(node).toBeNull()
     expect(getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes).toHaveLength(0)
-    expect(useDockStore.getState().dockTabsByThreadId[THREAD] ?? []).toHaveLength(0)
+    // No tab beyond the seeded canvas tab.
+    expect(useDockStore.getState().dockTabsByThreadId[THREAD]).toEqual([
+      { kind: 'canvas', id: DEFAULT_CANVAS_ID }
+    ])
     // Session stays in the strip untouched.
+    expect(useTerminalStripStore.getState().byThreadId[THREAD]?.sessions).toHaveLength(1)
+    expect(killMock).not.toHaveBeenCalled()
+  })
+
+  it('returns null when no canvas tab is focused — never a last-seen fallback', () => {
+    const tabId = useTerminalStripStore.getState().spawn(THREAD, '/vault')
+    useTerminalStripStore.getState().bindSession(THREAD, tabId, 'sess-x')
+    // addDockTab activates the new (graph) tab, unfocusing the canvas.
+    useDockStore.getState().addDockTab({ kind: 'graph' })
+
+    expect(stripToCanvas(THREAD, tabId)).toBeNull()
+    expect(getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes).toHaveLength(0)
     expect(useTerminalStripStore.getState().byThreadId[THREAD]?.sessions).toHaveLength(1)
     expect(killMock).not.toHaveBeenCalled()
   })
@@ -97,7 +118,7 @@ describe('canvasToStrip', () => {
     const node = createCanvasNode('terminal', { x: 0, y: 0 }, { content: '' })
     getCanvasStore(DEFAULT_CANVAS_ID).getState().addNode(node)
 
-    expect(canvasToStrip(node)).toBe(false)
+    expect(canvasToStrip(getCanvasStore(DEFAULT_CANVAS_ID), node)).toBe(false)
     expect(useTerminalStripStore.getState().byThreadId[THREAD]).toBeUndefined()
     expect(getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes).toHaveLength(1)
     expect(killMock).not.toHaveBeenCalled()
@@ -114,7 +135,7 @@ describe('canvasToStrip', () => {
     const removeNodeSpy = vi.fn(canvas.getState().removeNode)
     canvas.setState({ removeNode: removeNodeSpy })
 
-    expect(canvasToStrip(node)).toBe(true)
+    expect(canvasToStrip(canvas, node)).toBe(true)
 
     const strip = useTerminalStripStore.getState().byThreadId[THREAD]
     expect(strip?.sessions).toHaveLength(1)
@@ -132,7 +153,7 @@ describe('canvasToStrip', () => {
     const node = createCanvasNode('terminal', { x: 0, y: 0 }, { content: 'sess-2', metadata: {} })
     getCanvasStore(DEFAULT_CANVAS_ID).getState().addNode(node)
 
-    expect(canvasToStrip(node)).toBe(true)
+    expect(canvasToStrip(getCanvasStore(DEFAULT_CANVAS_ID), node)).toBe(true)
     expect(useTerminalStripStore.getState().byThreadId[THREAD]?.sessions[0].cwd).toBe('/vault')
   })
 
@@ -140,7 +161,7 @@ describe('canvasToStrip', () => {
     useThreadStore.setState({ activeThreadId: null })
     const node = createCanvasNode('terminal', { x: 0, y: 0 }, { content: 'sess-3' })
 
-    expect(canvasToStrip(node)).toBe(false)
+    expect(canvasToStrip(getCanvasStore(DEFAULT_CANVAS_ID), node)).toBe(false)
   })
 })
 
@@ -305,7 +326,7 @@ describe('single-projection invariant (Phase 3 step 3)', () => {
     getCanvasStore(DEFAULT_CANVAS_ID).getState().addNode(node)
 
     const transitions = recordTransitions('sess-inv2', () => {
-      expect(canvasToStrip(node)).toBe(true)
+      expect(canvasToStrip(getCanvasStore(DEFAULT_CANVAS_ID), node)).toBe(true)
     })
 
     expect(Math.min(...transitions)).toBeGreaterThanOrEqual(1)
@@ -326,7 +347,7 @@ describe('single-projection invariant (Phase 3 step 3)', () => {
     expect(stripToCanvas(THREAD, tabId)).toBeNull()
     expect(projectionCount('sess-rt')).toBe(1)
 
-    expect(canvasToStrip(node!)).toBe(true)
+    expect(canvasToStrip(getCanvasStore(DEFAULT_CANVAS_ID), node!)).toBe(true)
     expect(projectionCount('sess-rt')).toBe(1)
     expect(killMock).not.toHaveBeenCalled()
   })

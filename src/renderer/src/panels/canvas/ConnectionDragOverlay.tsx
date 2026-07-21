@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
+import type { CanvasStoreApi } from '../../store/canvas-store'
 import {
   createCanvasEdge,
   createCanvasNode,
@@ -8,9 +9,11 @@ import {
   type CanvasNode
 } from '@shared/canvas-types'
 import { colors, EDGE_KIND_COLORS } from '../../design/tokens'
-import { addEdgeCommand, addNodeWithEdgeCommand, getActiveCommandStack } from './canvas-commands'
+import { addEdgeCommand, addNodeWithEdgeCommand, getCommandStack } from './canvas-commands'
 
 interface DragState {
+  store: CanvasStoreApi
+  canvasId: string
   fromNodeId: string
   fromSide: CanvasSide
   cursorX: number
@@ -29,6 +32,8 @@ export function isConnectionDragActive(): boolean {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function startConnectionDrag(
+  store: CanvasStoreApi,
+  canvasId: string,
   fromNodeId: string,
   fromSide: CanvasSide,
   clientX: number,
@@ -40,7 +45,15 @@ export function startConnectionDrag(
     : event.altKey
       ? 'tension'
       : 'connection'
-  const state = { fromNodeId, fromSide, cursorX: clientX, cursorY: clientY, edgeKind }
+  const state = {
+    store,
+    canvasId,
+    fromNodeId,
+    fromSide,
+    cursorX: clientX,
+    cursorY: clientY,
+    edgeKind
+  }
   dragRef.current = state
   setDragFn?.(state)
 }
@@ -51,9 +64,9 @@ export function endConnectionDrag(toNodeId: string, toSide: CanvasSide): void {
   if (!drag) return
   if (drag.fromNodeId !== toNodeId) {
     const edge = createCanvasEdge(drag.fromNodeId, toNodeId, drag.fromSide, toSide, drag.edgeKind)
-    const stack = getActiveCommandStack()
-    if (stack) stack.execute(addEdgeCommand(edge))
-    else useCanvasStore.getState().addEdge(edge)
+    const stack = getCommandStack(drag.canvasId)
+    if (stack) stack.execute(addEdgeCommand(drag.store, edge))
+    else drag.store.getState().addEdge(edge)
   }
   dragRef.current = null
   setDragFn?.(null)
@@ -75,8 +88,8 @@ function getAnchorPoint(node: CanvasNode, side: CanvasSide): { x: number; y: num
 }
 
 function DragPreviewLine({ drag }: { drag: DragState }) {
-  const viewport = useCanvasStore((s) => s.viewport)
-  const nodes = useCanvasStore((s) => s.nodes)
+  const viewport = useCanvas((s) => s.viewport)
+  const nodes = useCanvas((s) => s.nodes)
 
   const sourceNode = nodes.find((n) => n.id === drag.fromNodeId)
   if (!sourceNode) return null
@@ -161,7 +174,7 @@ export function ConnectionDragOverlay() {
         const surface = document.querySelector('[data-canvas-surface]')
         if (surface) {
           const surfaceRect = surface.getBoundingClientRect()
-          const { viewport } = useCanvasStore.getState()
+          const { viewport } = drag.store.getState()
 
           // Screen coords → canvas coords
           const canvasX = (e.clientX - surfaceRect.left - viewport.x) / viewport.zoom
@@ -188,11 +201,11 @@ export function ConnectionDragOverlay() {
           )
 
           // One gesture, one undo step: card + edge together
-          const stack = getActiveCommandStack()
+          const stack = getCommandStack(drag.canvasId)
           if (stack) {
-            stack.execute(addNodeWithEdgeCommand(newNode, edge))
+            stack.execute(addNodeWithEdgeCommand(drag.store, newNode, edge))
           } else {
-            const s = useCanvasStore.getState()
+            const s = drag.store.getState()
             s.addNode(newNode)
             s.addEdge(edge)
           }

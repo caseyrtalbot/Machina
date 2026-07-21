@@ -1,5 +1,5 @@
 import { createCanvasNode } from '@shared/canvas-types'
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
 import { useSettingsStore } from '../../store/settings-store'
 import { useVaultStore } from '../../store/vault-store'
 import { resolveNewPath, slugifyFilename } from './text-card-save'
@@ -26,10 +26,13 @@ function relativize(absolutePath: string, vaultPath: string): string {
  * canvas as a `note` card bound to that path, and select+lock it for editing.
  * Bypasses the three-step text-card → save-as-new dialog flow.
  */
-export async function createNoteAtCursor(position: {
-  x: number
-  y: number
-}): Promise<CreateResult> {
+export async function createNoteAtCursor(
+  store: CanvasStoreApi,
+  position: {
+    x: number
+    y: number
+  }
+): Promise<CreateResult> {
   try {
     const vaultPath = useVaultStore.getState().vaultPath
     if (!vaultPath) return { ok: false, error: 'No vault open' }
@@ -47,12 +50,12 @@ export async function createNoteAtCursor(position: {
     const rel = relativize(absPath, vaultPath)
 
     const node = createCanvasNode('note', position, { content: rel })
-    const store = useCanvasStore.getState()
-    store.addNode(node)
-    store.setSelection(new Set([node.id]))
-    store.setFocusedCard(node.id)
-    store.lockCard(node.id)
-    store.centerOnNode?.(node.id)
+    const s = store.getState()
+    s.addNode(node)
+    s.setSelection(new Set([node.id]))
+    s.setFocusedCard(node.id)
+    s.lockCard(node.id)
+    s.centerOnNode?.(node.id)
 
     return { ok: true }
   } catch (err) {

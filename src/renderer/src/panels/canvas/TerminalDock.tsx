@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { useTerminalStatus, type TerminalStatus } from './useTerminalStatus'
 import {
   colors,
@@ -141,10 +141,10 @@ export function TerminalDock({
   containerWidth,
   containerHeight
 }: TerminalDockProps): React.ReactElement | null {
-  const nodes = useCanvasStore((s) => s.nodes)
-  const setViewport = useCanvasStore((s) => s.setViewport)
-  const setFocusedTerminal = useCanvasStore((s) => s.setFocusedTerminal)
-  const setSelection = useCanvasStore((s) => s.setSelection)
+  const nodes = useCanvas((s) => s.nodes)
+  const setViewport = useCanvas((s) => s.setViewport)
+  const setFocusedTerminal = useCanvas((s) => s.setFocusedTerminal)
+  const setSelection = useCanvas((s) => s.setSelection)
 
   const terminalNodes = nodes.filter((n) => n.type === 'terminal')
   const statuses = useTerminalStatus(terminalNodes)

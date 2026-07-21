@@ -1,4 +1,4 @@
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { colors, typography } from '../../design/tokens'
 
 /**
@@ -10,7 +10,7 @@ export function ClusterLabels({
 }: {
   readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number }
 }) {
-  const labels = useCanvasStore((s) => s.clusterLabels)
+  const labels = useCanvas((s) => s.clusterLabels)
 
   if (labels.length === 0) return null
 

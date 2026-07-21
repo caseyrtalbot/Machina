@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { EDGE_KIND_COLORS, transitions } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
@@ -37,9 +37,10 @@ interface EdgeDotsProps {
 }
 
 export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
-  const nodes = useCanvasStore((s) => s.nodes)
-  const edges = useCanvasStore((s) => s.edges)
-  const viewport = useCanvasStore((s) => s.viewport)
+  const canvas = useCanvasApi()
+  const nodes = useCanvas((s) => s.nodes)
+  const edges = useCanvas((s) => s.edges)
+  const viewport = useCanvas((s) => s.viewport)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
   const dots = useMemo(() => {
@@ -98,11 +99,14 @@ export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
     return Array.from(seen.values())
   }, [nodes, edges, viewport, containerWidth, containerHeight])
 
-  const handleClick = useCallback((nodeId: string) => {
-    const { centerOnNode, setFocusedCard } = useCanvasStore.getState()
-    centerOnNode?.(nodeId)
-    setFocusedCard(nodeId)
-  }, [])
+  const handleClick = useCallback(
+    (nodeId: string) => {
+      const { centerOnNode, setFocusedCard } = canvas.getState()
+      centerOnNode?.(nodeId)
+      setFocusedCard(nodeId)
+    },
+    [canvas]
+  )
 
   if (dots.length === 0) return null
 

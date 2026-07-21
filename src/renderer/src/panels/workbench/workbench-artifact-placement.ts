@@ -1,4 +1,4 @@
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
 
 type FsReader = (path: string) => Promise<string>
 
@@ -9,6 +9,7 @@ const defaultFsReader: FsReader = (path) => window.api.fs.readFile(path)
  * into the current canvas. Used by SystemArtifactCard's restore action.
  */
 export async function restorePatternSnapshot(
+  store: CanvasStoreApi,
   snapshotPath: string,
   vaultPath: string,
   reader: FsReader = defaultFsReader
@@ -31,14 +32,14 @@ export async function restorePatternSnapshot(
 
   if (snapshot.nodes.length === 0 && snapshot.edges.length === 0) return
 
-  const store = useCanvasStore.getState()
-  const existingNodeIds = new Set(store.nodes.map((n) => n.id))
-  const existingEdgeIds = new Set(store.edges.map((e) => e.id))
+  const s = store.getState()
+  const existingNodeIds = new Set(s.nodes.map((n) => n.id))
+  const existingEdgeIds = new Set(s.edges.map((e) => e.id))
 
   const newNodes = snapshot.nodes.filter((n) => !existingNodeIds.has(n.id))
   const newEdges = snapshot.edges.filter((e) => !existingEdgeIds.has(e.id))
 
   if (newNodes.length === 0 && newEdges.length === 0) return
 
-  useCanvasStore.getState().addNodesAndEdges(newNodes, newEdges)
+  store.getState().addNodesAndEdges(newNodes, newEdges)
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { createCanvasNode, createCanvasEdge } from '../../src/shared/canvas-types'
 import {
   CommandStack,
@@ -14,6 +14,8 @@ import {
   computeAlignmentSnap,
   ALIGN_SNAP_THRESHOLD_PX
 } from '../../src/renderer/src/panels/canvas/canvas-alignment'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 function fakeRect(width: number, height: number): DOMRect {
   return {
@@ -33,8 +35,8 @@ describe('canvas spatial parity (3.7)', () => {
   let stack: CommandStack
 
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
-    useCanvasStore.getState().loadCanvas('/test/canvas.canvas', {
+    store.setState(store.getInitialState())
+    store.getState().loadCanvas('/test/canvas.canvas', {
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 }
@@ -48,17 +50,17 @@ describe('canvas spatial parity (3.7)', () => {
       const a = createCanvasNode('text', { x: 10, y: 20 }, { content: 'original' })
       const b = createCanvasNode('text', { x: 300, y: 20 })
       const edge = createCanvasEdge(a.id, b.id, 'right', 'left', 'connection')
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
       s.addEdge(edge)
       s.setSelection(new Set([a.id, b.id]))
 
-      const cmd = duplicateSelectionCommand()
+      const cmd = duplicateSelectionCommand(store)
       expect(cmd).not.toBeNull()
       stack.execute(cmd!)
 
-      const after = useCanvasStore.getState()
+      const after = store.getState()
       expect(after.nodes).toHaveLength(4)
       const clones = after.nodes.filter((n) => n.id !== a.id && n.id !== b.id)
       expect(clones).toHaveLength(2)
@@ -78,12 +80,12 @@ describe('canvas spatial parity (3.7)', () => {
       expect(after.selectedNodeIds).toEqual(cloneIds)
 
       await stack.undo()
-      const undone = useCanvasStore.getState()
+      const undone = store.getState()
       expect(undone.nodes.map((n) => n.id).sort()).toEqual([a.id, b.id].sort())
       expect(undone.edges.map((e) => e.id)).toEqual([edge.id])
 
       await stack.redo()
-      const redone = useCanvasStore.getState()
+      const redone = store.getState()
       expect(redone.nodes).toHaveLength(4)
       // Redo re-inserts the SAME clone ids (built once at command build time)
       expect(new Set(redone.nodes.map((n) => n.id))).toEqual(new Set([a.id, b.id, ...cloneIds]))
@@ -93,30 +95,30 @@ describe('canvas spatial parity (3.7)', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
       const outside = createCanvasNode('text', { x: 500, y: 0 })
       const edge = createCanvasEdge(a.id, outside.id, 'right', 'left')
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(outside)
       s.addEdge(edge)
       s.setSelection(new Set([a.id]))
 
-      stack.execute(duplicateSelectionCommand()!)
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
+      stack.execute(duplicateSelectionCommand(store)!)
+      expect(store.getState().edges).toHaveLength(1)
     })
 
     it('never attaches a duplicated terminal card to the original PTY session', () => {
       const term = createCanvasNode('terminal', { x: 0, y: 0 }, { content: 'sess-live' })
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(term)
       s.setSelection(new Set([term.id]))
 
-      stack.execute(duplicateSelectionCommand()!)
-      const clone = useCanvasStore.getState().nodes.find((n) => n.id !== term.id)
+      stack.execute(duplicateSelectionCommand(store)!)
+      const clone = store.getState().nodes.find((n) => n.id !== term.id)
       expect(clone!.type).toBe('terminal')
       expect(clone!.content).toBe('')
     })
 
     it('returns null with an empty selection', () => {
-      expect(duplicateSelectionCommand()).toBeNull()
+      expect(duplicateSelectionCommand(store)).toBeNull()
     })
 
     it('undo kills the PTY a duplicated terminal spawned and clears focus/lock', async () => {
@@ -124,20 +126,20 @@ describe('canvas spatial parity (3.7)', () => {
       ;(window as { api?: unknown }).api = { terminal: { kill } }
       try {
         const term = createCanvasNode('terminal', { x: 0, y: 0 }, { content: 'sess-original' })
-        const s = useCanvasStore.getState()
+        const s = store.getState()
         s.addNode(term)
         s.setSelection(new Set([term.id]))
 
-        stack.execute(duplicateSelectionCommand()!)
-        const clone = useCanvasStore.getState().nodes.find((n) => n.id !== term.id)!
+        stack.execute(duplicateSelectionCommand(store)!)
+        const clone = store.getState().nodes.find((n) => n.id !== term.id)!
         // TerminalCard spawns a session for the empty clone and writes the
         // live session id back into the node; the card may also be locked.
-        useCanvasStore.getState().updateNodeContent(clone.id, 'sess-clone')
-        useCanvasStore.getState().lockCard(clone.id)
-        useCanvasStore.getState().setFocusedTerminal(clone.id)
+        store.getState().updateNodeContent(clone.id, 'sess-clone')
+        store.getState().lockCard(clone.id)
+        store.getState().setFocusedTerminal(clone.id)
 
         await stack.undo()
-        const undone = useCanvasStore.getState()
+        const undone = store.getState()
         expect(kill).toHaveBeenCalledWith('sess-clone')
         expect(undone.nodes.map((n) => n.id)).toEqual([term.id])
         expect(undone.focusedCardId).toBeNull()
@@ -153,16 +155,16 @@ describe('canvas spatial parity (3.7)', () => {
   describe('copy / paste', () => {
     it('paste inserts fresh-id clones with cascading offsets; undo-redo round-trips', async () => {
       const a = createCanvasNode('text', { x: 100, y: 100 }, { content: 'copy me' })
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.setSelection(new Set([a.id]))
 
-      expect(copySelectionToClipboard()).toBe(1)
+      expect(copySelectionToClipboard(store)).toBe(1)
 
-      stack.execute(pasteClipboardCommand()!)
-      stack.execute(pasteClipboardCommand()!)
+      stack.execute(pasteClipboardCommand(store)!)
+      stack.execute(pasteClipboardCommand(store)!)
 
-      const after = useCanvasStore.getState()
+      const after = store.getState()
       expect(after.nodes).toHaveLength(3)
       const pastes = after.nodes.filter((n) => n.id !== a.id)
       expect(new Set(pastes.map((n) => n.id)).size).toBe(2)
@@ -177,26 +179,26 @@ describe('canvas spatial parity (3.7)', () => {
 
       await stack.undo()
       await stack.undo()
-      expect(useCanvasStore.getState().nodes.map((n) => n.id)).toEqual([a.id])
+      expect(store.getState().nodes.map((n) => n.id)).toEqual([a.id])
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes).toHaveLength(2)
+      expect(store.getState().nodes).toHaveLength(2)
     })
 
     it('copies intra-selection edges and remaps them on paste', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
       const b = createCanvasNode('text', { x: 300, y: 0 })
       const edge = createCanvasEdge(a.id, b.id, 'right', 'left', 'tension', 'pull')
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
       s.addEdge(edge)
       s.setSelection(new Set([a.id, b.id]))
 
-      copySelectionToClipboard()
-      stack.execute(pasteClipboardCommand()!)
+      copySelectionToClipboard(store)
+      stack.execute(pasteClipboardCommand(store)!)
 
-      const after = useCanvasStore.getState()
+      const after = store.getState()
       const pastedEdge = after.edges.find((e) => e.id !== edge.id)
       expect(pastedEdge).toBeDefined()
       expect(pastedEdge!.kind).toBe('tension')
@@ -206,19 +208,19 @@ describe('canvas spatial parity (3.7)', () => {
     })
 
     it('paste with an empty clipboard is a no-op command', () => {
-      expect(pasteClipboardCommand()).toBeNull()
+      expect(pasteClipboardCommand(store)).toBeNull()
     })
 
     it('copy with an empty selection leaves the clipboard untouched', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.setSelection(new Set([a.id]))
-      copySelectionToClipboard()
+      copySelectionToClipboard(store)
       s.clearSelection()
-      expect(copySelectionToClipboard()).toBe(0)
+      expect(copySelectionToClipboard(store)).toBe(0)
       // Previous clipboard still pastes
-      expect(pasteClipboardCommand()).not.toBeNull()
+      expect(pasteClipboardCommand(store)).not.toBeNull()
     })
   })
 
@@ -226,39 +228,39 @@ describe('canvas spatial parity (3.7)', () => {
     it('moves the nodes by the delta; undo restores, redo re-applies', async () => {
       const a = createCanvasNode('text', { x: 50, y: 60 })
       const b = createCanvasNode('text', { x: 200, y: 60 })
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
 
-      stack.execute(nudgeNodesCommand([a.id, b.id], 1, 0)!)
-      let positions = useCanvasStore.getState().nodes.map((n) => n.position)
+      stack.execute(nudgeNodesCommand(store, [a.id, b.id], 1, 0)!)
+      let positions = store.getState().nodes.map((n) => n.position)
       expect(positions).toEqual([
         { x: 51, y: 60 },
         { x: 201, y: 60 }
       ])
 
-      stack.execute(nudgeNodesCommand([a.id], 0, -24)!)
-      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 51, y: 36 })
+      stack.execute(nudgeNodesCommand(store, [a.id], 0, -24)!)
+      expect(store.getState().nodes[0].position).toEqual({ x: 51, y: 36 })
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 51, y: 60 })
+      expect(store.getState().nodes[0].position).toEqual({ x: 51, y: 60 })
 
       await stack.undo()
-      positions = useCanvasStore.getState().nodes.map((n) => n.position)
+      positions = store.getState().nodes.map((n) => n.position)
       expect(positions).toEqual([
         { x: 50, y: 60 },
         { x: 200, y: 60 }
       ])
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 51, y: 60 })
+      expect(store.getState().nodes[0].position).toEqual({ x: 51, y: 60 })
     })
 
     it('returns null for zero delta or unknown ids', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(a)
-      expect(nudgeNodesCommand([a.id], 0, 0)).toBeNull()
-      expect(nudgeNodesCommand(['missing'], 1, 0)).toBeNull()
+      store.getState().addNode(a)
+      expect(nudgeNodesCommand(store, [a.id], 0, 0)).toBeNull()
+      expect(nudgeNodesCommand(store, ['missing'], 1, 0)).toBeNull()
     })
   })
 
@@ -275,16 +277,16 @@ describe('canvas spatial parity (3.7)', () => {
 
     it('blocks while a context menu is open so menu arrows do not nudge cards', () => {
       const ref = visibleContainerRef()
-      expect(isSpatialShortcutBlocked(ref)).toBe(false)
+      expect(isSpatialShortcutBlocked(store, ref)).toBe(false)
 
       const menu = document.createElement('div')
       menu.setAttribute('role', 'menu')
       menu.getBoundingClientRect = () => fakeRect(160, 120)
       document.body.appendChild(menu)
-      expect(isSpatialShortcutBlocked(ref)).toBe(true)
+      expect(isSpatialShortcutBlocked(store, ref)).toBe(true)
 
       menu.remove()
-      expect(isSpatialShortcutBlocked(ref)).toBe(false)
+      expect(isSpatialShortcutBlocked(store, ref)).toBe(false)
     })
 
     it('ignores a zero-size menu hidden behind another KeepAlive tab', () => {
@@ -293,7 +295,7 @@ describe('canvas spatial parity (3.7)', () => {
       hidden.setAttribute('role', 'menu')
       hidden.getBoundingClientRect = () => fakeRect(0, 0)
       document.body.appendChild(hidden)
-      expect(isSpatialShortcutBlocked(ref)).toBe(false)
+      expect(isSpatialShortcutBlocked(store, ref)).toBe(false)
     })
   })
 

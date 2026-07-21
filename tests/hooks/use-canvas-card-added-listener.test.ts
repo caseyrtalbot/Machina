@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import type { CanvasNode } from '../../src/shared/canvas-types'
 import { useCanvasCardAddedListener } from '../../src/renderer/src/hooks/use-canvas-card-added-listener'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 const node: CanvasNode = {
   id: 'pin_1',
@@ -23,11 +25,11 @@ function dispatchCardAdded(detail: {
 
 describe('useCanvasCardAddedListener', () => {
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
   })
 
   afterEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
   })
 
   it('adds the pinned node to the matching live canvas', () => {
@@ -35,7 +37,7 @@ describe('useCanvasCardAddedListener', () => {
 
     dispatchCardAdded({ canvasId: 'default', cardId: node.id, node })
 
-    const state = useCanvasStore.getState()
+    const state = store.getState()
     expect(state.nodes).toEqual([node])
     expect([...state.selectedNodeIds]).toEqual([node.id])
   })
@@ -45,7 +47,7 @@ describe('useCanvasCardAddedListener', () => {
 
     dispatchCardAdded({ canvasId: 'side', cardId: node.id, node })
 
-    expect(useCanvasStore.getState().nodes).toEqual([])
+    expect(store.getState().nodes).toEqual([])
   })
 
   it('does not duplicate an already-added node', () => {
@@ -54,6 +56,6 @@ describe('useCanvasCardAddedListener', () => {
     dispatchCardAdded({ canvasId: 'default', cardId: node.id, node })
     dispatchCardAdded({ canvasId: 'default', cardId: node.id, node })
 
-    expect(useCanvasStore.getState().nodes).toHaveLength(1)
+    expect(store.getState().nodes).toHaveLength(1)
   })
 })

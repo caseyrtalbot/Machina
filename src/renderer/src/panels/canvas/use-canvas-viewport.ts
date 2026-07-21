@@ -1,16 +1,17 @@
 import { useCallback, useRef, useEffect } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
+import { useCanvasApi } from './canvas-store-context'
 import { perfMark, perfMeasure } from '../../utils/perf-marks'
 
 let vpInteractionTimer: ReturnType<typeof setTimeout> | null = null
 
-function markViewportInteracting(active: boolean) {
+function markViewportInteracting(store: CanvasStoreApi, active: boolean) {
   if (vpInteractionTimer) clearTimeout(vpInteractionTimer)
   if (active) {
-    useCanvasStore.getState().setInteracting(true)
+    store.getState().setInteracting(true)
   } else {
     vpInteractionTimer = setTimeout(() => {
-      useCanvasStore.getState().setInteracting(false)
+      store.getState().setInteracting(false)
     }, 150)
   }
 }
@@ -27,6 +28,7 @@ interface ViewportHandlers {
 export function useCanvasViewport(
   containerRef: React.RefObject<HTMLDivElement | null>
 ): ViewportHandlers {
+  const canvas = useCanvasApi()
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0, vx: 0, vy: 0 })
   const spaceHeld = useRef(false)
@@ -59,7 +61,7 @@ export function useCanvasViewport(
       if (target.closest('.xterm')) return
 
       // Focus lock: let wheel events pass through to the locked card's content
-      const { lockedCardId } = useCanvasStore.getState()
+      const { lockedCardId } = canvas.getState()
       if (lockedCardId) {
         // Allow native scroll inside the locked card's content area
         if (target.closest('.canvas-card-content')) return
@@ -70,8 +72,8 @@ export function useCanvasViewport(
 
       e.preventDefault()
       perfMark('wheel-start')
-      markViewportInteracting(true)
-      const { viewport } = useCanvasStore.getState()
+      markViewportInteracting(canvas, true)
+      const { viewport } = canvas.getState()
       const container = containerRef.current
       if (!container) return
 
@@ -107,73 +109,76 @@ export function useCanvasViewport(
         wheelRaf.current = requestAnimationFrame(() => {
           wheelRaf.current = 0
           if (pendingViewport.current) {
-            useCanvasStore.getState().setViewport(pendingViewport.current)
+            canvas.getState().setViewport(pendingViewport.current)
             pendingViewport.current = null
           }
-          markViewportInteracting(false)
+          markViewportInteracting(canvas, false)
           perfMeasure('canvas-wheel', 'wheel-start')
         })
       }
     },
-    [containerRef]
+    [containerRef, canvas]
   )
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    // Block panning while a card is focus-locked
-    if (useCanvasStore.getState().lockedCardId) return
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      // Block panning while a card is focus-locked
+      if (canvas.getState().lockedCardId) return
 
-    // Middle-click or Space+left-click to pan
-    const shouldPan = e.button === 1 || (e.button === 0 && spaceHeld.current)
-    if (!shouldPan) return
+      // Middle-click or Space+left-click to pan
+      const shouldPan = e.button === 1 || (e.button === 0 && spaceHeld.current)
+      if (!shouldPan) return
 
-    e.preventDefault()
-    perfMark('pan-start')
-    isPanning.current = true
-    markViewportInteracting(true)
-    const { viewport } = useCanvasStore.getState()
-    panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
+      e.preventDefault()
+      perfMark('pan-start')
+      isPanning.current = true
+      markViewportInteracting(canvas, true)
+      const { viewport } = canvas.getState()
+      panStart.current = { x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y }
 
-    let latestPanX = viewport.x
-    let latestPanY = viewport.y
-    let panRafPending = false
+      let latestPanX = viewport.x
+      let latestPanY = viewport.y
+      let panRafPending = false
 
-    const onMove = (me: PointerEvent) => {
-      if (!isPanning.current) return
-      latestPanX = panStart.current.vx + (me.clientX - panStart.current.x)
-      latestPanY = panStart.current.vy + (me.clientY - panStart.current.y)
+      const onMove = (me: PointerEvent) => {
+        if (!isPanning.current) return
+        latestPanX = panStart.current.vx + (me.clientX - panStart.current.x)
+        latestPanY = panStart.current.vy + (me.clientY - panStart.current.y)
 
-      if (!panRafPending) {
-        panRafPending = true
-        requestAnimationFrame(() => {
-          panRafPending = false
-          useCanvasStore.getState().setViewport({
+        if (!panRafPending) {
+          panRafPending = true
+          requestAnimationFrame(() => {
+            panRafPending = false
+            canvas.getState().setViewport({
+              x: latestPanX,
+              y: latestPanY,
+              zoom: canvas.getState().viewport.zoom
+            })
+          })
+        }
+      }
+
+      const onUp = () => {
+        isPanning.current = false
+        // Flush final position if a RAF is still pending
+        if (panRafPending) {
+          canvas.getState().setViewport({
             x: latestPanX,
             y: latestPanY,
-            zoom: useCanvasStore.getState().viewport.zoom
+            zoom: canvas.getState().viewport.zoom
           })
-        })
+        }
+        markViewportInteracting(canvas, false)
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        perfMeasure('canvas-pan', 'pan-start')
       }
-    }
 
-    const onUp = () => {
-      isPanning.current = false
-      // Flush final position if a RAF is still pending
-      if (panRafPending) {
-        useCanvasStore.getState().setViewport({
-          x: latestPanX,
-          y: latestPanY,
-          zoom: useCanvasStore.getState().viewport.zoom
-        })
-      }
-      markViewportInteracting(false)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      perfMeasure('canvas-pan', 'pan-start')
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }, [])
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    [canvas]
+  )
 
   return { onWheel, onPointerDown }
 }

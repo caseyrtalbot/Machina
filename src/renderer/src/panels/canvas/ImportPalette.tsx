@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useVaultStore } from '../../store/vault-store'
 import { useEditorStore } from '../../store/editor-store'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvasApi } from './canvas-store-context'
 import {
   buildIdToPath,
   collectUniqueTags,
@@ -30,6 +30,7 @@ export function ImportPalette({
   containerWidth,
   containerHeight
 }: ImportPaletteProps): React.ReactElement | null {
+  const canvas = useCanvasApi()
   const [searchQuery, setSearchQuery] = useState('')
   const [neighborhoodExpanded, setNeighborhoodExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -95,7 +96,7 @@ export function ImportPalette({
       if (imported.nodes.length === 0) return
 
       const idToPath = buildIdToPath(fileToId)
-      const existingNodes = useCanvasStore.getState().nodes
+      const existingNodes = canvas.getState().nodes
       const originX = computeOriginOffset(existingNodes)
       const { nodes: canvasNodes, edges: canvasEdges } = graphToCanvas(
         imported.nodes,
@@ -108,21 +109,21 @@ export function ImportPalette({
       const nodeIds = canvasNodes.map((n) => n.id)
 
       const executeFn = (): void => {
-        const store = useCanvasStore.getState()
+        const store = canvas.getState()
         for (const node of canvasNodes) store.addNode(node)
         for (const edge of canvasEdges) store.addEdge(edge)
         store.setViewport(viewport)
       }
 
       const undoFn = (): void => {
-        const store = useCanvasStore.getState()
+        const store = canvas.getState()
         for (const id of nodeIds) store.removeNode(id)
       }
 
       onImport(executeFn, undoFn)
       onClose()
     },
-    [graph, artifacts, fileToId, containerWidth, containerHeight, onImport, onClose]
+    [graph, artifacts, fileToId, containerWidth, containerHeight, onImport, onClose, canvas]
   )
 
   if (!open) return null

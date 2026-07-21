@@ -1,8 +1,8 @@
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { borderRadius, colors, typography } from '../../design/tokens'
 
 export function ZoomIndicator() {
-  const zoom = useCanvasStore((s) => s.viewport.zoom)
+  const zoom = useCanvas((s) => s.viewport.zoom)
   const zoomPercent = Math.round(zoom * 100)
 
   // key={zoomPercent} forces remount on zoom change, restarting the CSS animation.

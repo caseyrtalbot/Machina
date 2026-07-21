@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
 import { getCanvasEditorExtensions } from './shared/tiptap-config'
 import { colors } from '../../design/tokens'
@@ -11,9 +11,9 @@ interface MarkdownCardProps {
 }
 
 export function MarkdownCard({ node }: MarkdownCardProps) {
-  const updateContent = useCanvasStore((s) => s.updateNodeContent)
-  const updateMetadata = useCanvasStore((s) => s.updateNodeMetadata)
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const updateContent = useCanvas((s) => s.updateNodeContent)
+  const updateMetadata = useCanvas((s) => s.updateNodeMetadata)
+  const removeNode = useCanvas((s) => s.removeNode)
 
   const meta = node.metadata as unknown as MarkdownNodeMeta
   const viewMode = meta.viewMode ?? 'rendered'

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
+import { useCanvasApi } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import {
   copySelectionToClipboard,
@@ -20,8 +21,8 @@ interface CanvasKeyboardShortcutOptions {
   readonly setImportOpen: (open: boolean) => void
 }
 
-function isEditingSurfaceActive(): boolean {
-  if (useCanvasStore.getState().focusedTerminalId) return true
+function isEditingSurfaceActive(store: CanvasStoreApi): boolean {
+  if (store.getState().focusedTerminalId) return true
   if (document.activeElement?.tagName === 'TEXTAREA') return true
   if (document.activeElement?.tagName === 'INPUT') return true
   if ((document.activeElement as HTMLElement | null)?.isContentEditable) return true
@@ -61,10 +62,13 @@ function isCanvasHidden(containerRef: RefObject<HTMLElement | null>): boolean {
  * canvas panel is hidden behind another KeepAlive tab (display:none collapses
  * its rect to zero). Exported for tests.
  */
-export function isSpatialShortcutBlocked(containerRef: RefObject<HTMLElement | null>): boolean {
-  if (isEditingSurfaceActive()) return true
+export function isSpatialShortcutBlocked(
+  store: CanvasStoreApi,
+  containerRef: RefObject<HTMLElement | null>
+): boolean {
+  if (isEditingSurfaceActive(store)) return true
   if (isMenuOpen()) return true
-  if (useCanvasStore.getState().lockedCardId) return true
+  if (store.getState().lockedCardId) return true
   return isCanvasHidden(containerRef)
 }
 
@@ -75,8 +79,11 @@ const ARROW_DELTAS: Record<string, { dx: number; dy: number }> = {
   ArrowRight: { dx: 1, dy: 0 }
 }
 
-function viewportCenter(containerRef: RefObject<HTMLElement | null>): { x: number; y: number } {
-  const vp = useCanvasStore.getState().viewport
+function viewportCenter(
+  store: CanvasStoreApi,
+  containerRef: RefObject<HTMLElement | null>
+): { x: number; y: number } {
+  const vp = store.getState().viewport
   const w = containerRef.current?.clientWidth ?? 1920
   const h = containerRef.current?.clientHeight ?? 1080
   return {
@@ -86,11 +93,12 @@ function viewportCenter(containerRef: RefObject<HTMLElement | null>): { x: numbe
 }
 
 function noteAnchorPosition(
+  store: CanvasStoreApi,
   containerRef: RefObject<HTMLElement | null>,
   lastMouseClient: { x: number; y: number } | null
 ): { x: number; y: number } {
   const el = containerRef.current
-  if (!el || !lastMouseClient) return viewportCenter(containerRef)
+  if (!el || !lastMouseClient) return viewportCenter(store, containerRef)
   const rect = el.getBoundingClientRect()
   if (
     lastMouseClient.x < rect.left ||
@@ -98,9 +106,9 @@ function noteAnchorPosition(
     lastMouseClient.y < rect.top ||
     lastMouseClient.y > rect.bottom
   ) {
-    return viewportCenter(containerRef)
+    return viewportCenter(store, containerRef)
   }
-  const vp = useCanvasStore.getState().viewport
+  const vp = store.getState().viewport
   return {
     x: (lastMouseClient.x - rect.left - vp.x) / vp.zoom,
     y: (lastMouseClient.y - rect.top - vp.y) / vp.zoom
@@ -112,6 +120,7 @@ export function useCanvasKeyboardShortcuts({
   containerRef,
   setImportOpen
 }: CanvasKeyboardShortcutOptions): void {
+  const canvas = useCanvasApi()
   // Track last mouse position over the canvas container so `n` anchors the new
   // note to where the cursor actually is, not the viewport center.
   const lastMouseClientRef = useRef<{ x: number; y: number } | null>(null)
@@ -137,68 +146,73 @@ export function useCanvasKeyboardShortcuts({
       if (e.metaKey && frameSlot) {
         e.preventDefault()
         if (e.shiftKey) {
-          useCanvasStore.getState().saveFocusFrame(frameSlot)
+          canvas.getState().saveFocusFrame(frameSlot)
         } else {
-          useCanvasStore.getState().jumpToFocusFrame(frameSlot)
+          canvas.getState().jumpToFocusFrame(frameSlot)
         }
         return
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const { selectedEdgeId, selectedNodeIds } = useCanvasStore.getState()
-        if (isEditingSurfaceActive()) return
+        const { selectedEdgeId, selectedNodeIds } = canvas.getState()
+        if (isEditingSurfaceActive(canvas)) return
 
         if (selectedEdgeId) {
-          const cmd = removeEdgeCommand(selectedEdgeId)
+          const cmd = removeEdgeCommand(canvas, selectedEdgeId)
           if (cmd) commandStack.current.execute(cmd)
         }
         if (selectedNodeIds.size > 0) {
-          const cmd = removeNodesCommand([...selectedNodeIds])
+          const cmd = removeNodesCommand(canvas, [...selectedNodeIds])
           if (cmd) commandStack.current.execute(cmd)
         }
       }
 
       if (e.key === 'j' || e.key === 'k') {
-        if (isEditingSurfaceActive()) return
+        if (isEditingSurfaceActive(canvas)) return
 
         e.preventDefault()
         if (e.key === 'j') {
-          useCanvasStore.getState().focusNextCard()
+          canvas.getState().focusNextCard()
         } else {
-          useCanvasStore.getState().focusPrevCard()
+          canvas.getState().focusPrevCard()
         }
       }
 
       if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (isEditingSurfaceActive()) return
+        if (isEditingSurfaceActive(canvas)) return
         e.preventDefault()
-        const position = noteAnchorPosition(containerRef, lastMouseClientRef.current)
-        void createNoteAtCursor(position)
+        const position = noteAnchorPosition(canvas, containerRef, lastMouseClientRef.current)
+        void createNoteAtCursor(canvas, position)
       }
 
       const arrow = ARROW_DELTAS[e.key]
       if (arrow && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (isSpatialShortcutBlocked(containerRef)) return
-        const { selectedNodeIds } = useCanvasStore.getState()
+        if (isSpatialShortcutBlocked(canvas, containerRef)) return
+        const { selectedNodeIds } = canvas.getState()
         if (selectedNodeIds.size === 0) return
         e.preventDefault()
         const step = e.shiftKey ? SNAP_GRID_SIZE : 1
-        const cmd = nudgeNodesCommand([...selectedNodeIds], arrow.dx * step, arrow.dy * step)
+        const cmd = nudgeNodesCommand(
+          canvas,
+          [...selectedNodeIds],
+          arrow.dx * step,
+          arrow.dy * step
+        )
         if (cmd) commandStack.current.execute(cmd)
       }
 
       if (e.key === 'Escape') {
-        const { lockedCardId } = useCanvasStore.getState()
+        const { lockedCardId } = canvas.getState()
         if (lockedCardId) {
-          useCanvasStore.getState().unlockCard()
+          canvas.getState().unlockCard()
         } else {
-          useCanvasStore.getState().setFocusedCard(null)
+          canvas.getState().setFocusedCard(null)
         }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [commandStack, containerRef])
+  }, [commandStack, containerRef, canvas])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -227,26 +241,26 @@ export function useCanvasKeyboardShortcuts({
         setImportOpen(true)
       } else if (key === 'e' && e.shiftKey) {
         e.preventDefault()
-        const { splitFilePath: sp } = useCanvasStore.getState()
+        const { splitFilePath: sp } = canvas.getState()
         if (sp) {
-          useCanvasStore.getState().closeSplit()
+          canvas.getState().closeSplit()
         } else {
-          const focusedId = useCanvasStore.getState().focusedCardId
+          const focusedId = canvas.getState().focusedCardId
           const focusedNode = focusedId
-            ? useCanvasStore.getState().nodes.find((n) => n.id === focusedId)
+            ? canvas.getState().nodes.find((n) => n.id === focusedId)
             : null
           if (focusedNode?.content) {
-            useCanvasStore.getState().openSplit(focusedNode.content)
+            canvas.getState().openSplit(focusedNode.content)
           }
         }
       } else if (key === 'a' && !e.shiftKey) {
-        if (isSpatialShortcutBlocked(containerRef)) return
+        if (isSpatialShortcutBlocked(canvas, containerRef)) return
         e.preventDefault()
-        const { nodes } = useCanvasStore.getState()
-        useCanvasStore.getState().setSelection(new Set(nodes.map((n) => n.id)))
+        const { nodes } = canvas.getState()
+        canvas.getState().setSelection(new Set(nodes.map((n) => n.id)))
       } else if (key === 'd' && !e.shiftKey) {
-        if (isSpatialShortcutBlocked(containerRef)) return
-        const cmd = duplicateSelectionCommand()
+        if (isSpatialShortcutBlocked(canvas, containerRef)) return
+        const cmd = duplicateSelectionCommand(canvas)
         if (cmd) {
           e.preventDefault()
           commandStack.current.execute(cmd)
@@ -254,29 +268,29 @@ export function useCanvasKeyboardShortcuts({
       } else if (key === 'c' && !e.shiftKey) {
         // Only claim ⌘C when canvas cards are actually copied; otherwise the
         // native text copy proceeds untouched.
-        if (isSpatialShortcutBlocked(containerRef)) return
-        if (copySelectionToClipboard() > 0) e.preventDefault()
+        if (isSpatialShortcutBlocked(canvas, containerRef)) return
+        if (copySelectionToClipboard(canvas) > 0) e.preventDefault()
       } else if (key === 'v' && !e.shiftKey) {
-        if (isSpatialShortcutBlocked(containerRef)) return
-        const cmd = pasteClipboardCommand()
+        if (isSpatialShortcutBlocked(canvas, containerRef)) return
+        const cmd = pasteClipboardCommand(canvas)
         if (cmd) {
           e.preventDefault()
           commandStack.current.execute(cmd)
         }
       } else if (key === 'l') {
         e.preventDefault()
-        const center = viewportCenter(containerRef)
+        const center = viewportCenter(canvas, containerRef)
         if (e.shiftKey) {
           const { artifacts, graph, fileToId } = useVaultStore.getState()
           const fileToIdMap = new Map(Object.entries(fileToId))
           const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
-          const cmd = layoutCommand(() =>
-            useCanvasStore.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+          const cmd = layoutCommand(canvas, () =>
+            canvas.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
           )
           if (cmd) commandStack.current.execute(cmd)
         } else {
-          const cmd = layoutCommand(() =>
-            useCanvasStore.getState().applyTileLayout('grid-2x2', center)
+          const cmd = layoutCommand(canvas, () =>
+            canvas.getState().applyTileLayout('grid-2x2', center)
           )
           if (cmd) commandStack.current.execute(cmd)
         }
@@ -284,5 +298,5 @@ export function useCanvasKeyboardShortcuts({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [commandStack, containerRef, setImportOpen])
+  }, [commandStack, containerRef, setImportOpen, canvas])
 }

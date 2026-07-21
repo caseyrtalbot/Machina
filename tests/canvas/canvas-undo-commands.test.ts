@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { createCanvasNode, createCanvasEdge } from '../../src/shared/canvas-types'
 import {
   CommandStack,
   registerCommandStack,
-  getActiveCommandStack,
+  getCommandStack,
   removeNodesCommand,
   removeNodeViaCallback,
   addEdgeCommand,
@@ -17,6 +17,7 @@ import {
   clearCanvasCommand
 } from '../../src/renderer/src/panels/canvas/canvas-commands'
 
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 const killMock = vi.fn()
 
 function installApiMock(): void {
@@ -27,8 +28,8 @@ describe('canvas undo commands', () => {
   let stack: CommandStack
 
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
-    useCanvasStore.getState().loadCanvas('/test/canvas.canvas', {
+    store.setState(store.getInitialState())
+    store.getState().loadCanvas('/test/canvas.canvas', {
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 }
@@ -40,16 +41,16 @@ describe('canvas undo commands', () => {
 
   describe('active stack registry', () => {
     it('resolves the stack registered under the active canvas id', () => {
-      expect(getActiveCommandStack()).toBeNull()
+      expect(getCommandStack('default')).toBeNull()
       const unregister = registerCommandStack('default', stack)
-      expect(getActiveCommandStack()).toBe(stack)
+      expect(getCommandStack('default')).toBe(stack)
       unregister()
-      expect(getActiveCommandStack()).toBeNull()
+      expect(getCommandStack('default')).toBeNull()
     })
 
     it('does not resolve a stack registered under an inactive canvas id', () => {
       const unregister = registerCommandStack('some-other-canvas', stack)
-      expect(getActiveCommandStack()).toBeNull()
+      expect(getCommandStack('default')).toBeNull()
       unregister()
     })
 
@@ -59,9 +60,9 @@ describe('canvas undo commands', () => {
       const second = new CommandStack()
       const unregisterSecond = registerCommandStack('default', second)
       unregisterFirst()
-      expect(getActiveCommandStack()).toBe(second)
+      expect(getCommandStack('default')).toBe(second)
       unregisterSecond()
-      expect(getActiveCommandStack()).toBeNull()
+      expect(getCommandStack('default')).toBeNull()
     })
   })
 
@@ -70,29 +71,29 @@ describe('canvas undo commands', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
       const b = createCanvasNode('text', { x: 200, y: 0 })
       const edge = createCanvasEdge(a.id, b.id, 'right', 'left')
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
       s.addEdge(edge)
 
-      const cmd = removeNodesCommand([a.id])
+      const cmd = removeNodesCommand(store, [a.id])
       expect(cmd).not.toBeNull()
       stack.execute(cmd!)
-      expect(useCanvasStore.getState().nodes.map((n) => n.id)).toEqual([b.id])
-      expect(useCanvasStore.getState().edges).toHaveLength(0)
+      expect(store.getState().nodes.map((n) => n.id)).toEqual([b.id])
+      expect(store.getState().edges).toHaveLength(0)
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes).toHaveLength(2)
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
-      expect(useCanvasStore.getState().edges[0].id).toBe(edge.id)
+      expect(store.getState().nodes).toHaveLength(2)
+      expect(store.getState().edges).toHaveLength(1)
+      expect(store.getState().edges[0].id).toBe(edge.id)
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes.map((n) => n.id)).toEqual([b.id])
-      expect(useCanvasStore.getState().edges).toHaveLength(0)
+      expect(store.getState().nodes.map((n) => n.id)).toEqual([b.id])
+      expect(store.getState().edges).toHaveLength(0)
     })
 
     it('returns null when no node matches', () => {
-      expect(removeNodesCommand(['missing'])).toBeNull()
+      expect(removeNodesCommand(store, ['missing'])).toBeNull()
     })
   })
 
@@ -101,45 +102,45 @@ describe('canvas undo commands', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
       const b = createCanvasNode('text', { x: 200, y: 0 })
       const edge = createCanvasEdge(a.id, b.id, 'right', 'left')
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
       s.addEdge(edge)
 
-      const onClose = vi.fn(() => useCanvasStore.getState().removeNode(a.id))
-      const cmd = removeNodeViaCallback(a.id, onClose)
+      const onClose = vi.fn(() => store.getState().removeNode(a.id))
+      const cmd = removeNodeViaCallback(store, a.id, onClose)
       stack.execute(cmd!)
       expect(onClose).toHaveBeenCalledOnce()
-      expect(useCanvasStore.getState().nodes).toHaveLength(1)
+      expect(store.getState().nodes).toHaveLength(1)
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes).toHaveLength(2)
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
+      expect(store.getState().nodes).toHaveLength(2)
+      expect(store.getState().edges).toHaveLength(1)
     })
 
     it('undo is a no-op when the close callback never removed the node', async () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(a)
+      store.getState().addNode(a)
 
       // e.g. terminal close clicked during an in-flight restart: callback no-ops
       const onClose = vi.fn()
-      const cmd = removeNodeViaCallback(a.id, onClose)
+      const cmd = removeNodeViaCallback(store, a.id, onClose)
       stack.execute(cmd!)
-      expect(useCanvasStore.getState().nodes).toHaveLength(1)
+      expect(store.getState().nodes).toHaveLength(1)
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes).toHaveLength(1)
+      expect(store.getState().nodes).toHaveLength(1)
     })
   })
 
   describe('removeNode hygiene (store)', () => {
     it('clears focusedCardId, lockedCardId, and focusedTerminalId for the removed node', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(a)
-      useCanvasStore.setState({ focusedCardId: a.id, lockedCardId: a.id, focusedTerminalId: a.id })
+      store.getState().addNode(a)
+      store.setState({ focusedCardId: a.id, lockedCardId: a.id, focusedTerminalId: a.id })
 
-      useCanvasStore.getState().removeNode(a.id)
-      const after = useCanvasStore.getState()
+      store.getState().removeNode(a.id)
+      const after = store.getState()
       expect(after.focusedCardId).toBeNull()
       expect(after.lockedCardId).toBeNull()
       expect(after.focusedTerminalId).toBeNull()
@@ -147,16 +148,16 @@ describe('canvas undo commands', () => {
 
     it('kills the PTY session when removing a terminal node', () => {
       const term = createCanvasNode('terminal', { x: 0, y: 0 }, { content: 'sess-123' })
-      useCanvasStore.getState().addNode(term)
+      store.getState().addNode(term)
 
-      useCanvasStore.getState().removeNode(term.id)
+      store.getState().removeNode(term.id)
       expect(killMock).toHaveBeenCalledWith('sess-123')
     })
 
     it('does not kill anything for non-terminal nodes', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 }, { content: 'sess-123' })
-      useCanvasStore.getState().addNode(a)
-      useCanvasStore.getState().removeNode(a.id)
+      store.getState().addNode(a)
+      store.getState().removeNode(a.id)
       expect(killMock).not.toHaveBeenCalled()
     })
   })
@@ -164,124 +165,124 @@ describe('canvas undo commands', () => {
   describe('moveNodesCommand', () => {
     it('undo restores start positions, redo re-applies end positions', async () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(a)
+      store.getState().addNode(a)
       const before = new Map([[a.id, { x: 0, y: 0 }]])
       const after = new Map([[a.id, { x: 150, y: 80 }]])
 
-      stack.execute(moveNodesCommand(before, after))
-      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 150, y: 80 })
+      stack.execute(moveNodesCommand(store, before, after))
+      expect(store.getState().nodes[0].position).toEqual({ x: 150, y: 80 })
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 0, y: 0 })
+      expect(store.getState().nodes[0].position).toEqual({ x: 0, y: 0 })
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 150, y: 80 })
+      expect(store.getState().nodes[0].position).toEqual({ x: 150, y: 80 })
     })
   })
 
   describe('resizeNodeCommand', () => {
     it('undo restores start size, redo re-applies end size', async () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(a)
+      store.getState().addNode(a)
       const start = { ...a.size }
 
-      stack.execute(resizeNodeCommand(a.id, start, { width: 500, height: 320 }))
-      expect(useCanvasStore.getState().nodes[0].size).toEqual({ width: 500, height: 320 })
+      stack.execute(resizeNodeCommand(store, a.id, start, { width: 500, height: 320 }))
+      expect(store.getState().nodes[0].size).toEqual({ width: 500, height: 320 })
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes[0].size).toEqual(start)
+      expect(store.getState().nodes[0].size).toEqual(start)
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes[0].size).toEqual({ width: 500, height: 320 })
+      expect(store.getState().nodes[0].size).toEqual({ width: 500, height: 320 })
     })
   })
 
   describe('edge commands', () => {
     it('addEdgeCommand undo removes the edge', async () => {
       const edge = createCanvasEdge('a', 'b', 'right', 'left')
-      stack.execute(addEdgeCommand(edge))
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
+      stack.execute(addEdgeCommand(store, edge))
+      expect(store.getState().edges).toHaveLength(1)
 
       await stack.undo()
-      expect(useCanvasStore.getState().edges).toHaveLength(0)
+      expect(store.getState().edges).toHaveLength(0)
 
       await stack.redo()
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
+      expect(store.getState().edges).toHaveLength(1)
     })
 
     it('removeEdgeCommand undo restores the edge', async () => {
       const edge = createCanvasEdge('a', 'b', 'right', 'left')
-      useCanvasStore.getState().addEdge(edge)
+      store.getState().addEdge(edge)
 
-      const cmd = removeEdgeCommand(edge.id)
+      const cmd = removeEdgeCommand(store, edge.id)
       stack.execute(cmd!)
-      expect(useCanvasStore.getState().edges).toHaveLength(0)
+      expect(store.getState().edges).toHaveLength(0)
 
       await stack.undo()
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
-      expect(useCanvasStore.getState().edges[0].id).toBe(edge.id)
+      expect(store.getState().edges).toHaveLength(1)
+      expect(store.getState().edges[0].id).toBe(edge.id)
     })
 
     it('removeEdgeCommand returns null for a missing edge', () => {
-      expect(removeEdgeCommand('missing')).toBeNull()
+      expect(removeEdgeCommand(store, 'missing')).toBeNull()
     })
 
     it('addNodeWithEdgeCommand adds and removes node+edge as one step', async () => {
       const src = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(src)
+      store.getState().addNode(src)
       const node = createCanvasNode('text', { x: 300, y: 0 })
       const edge = createCanvasEdge(src.id, node.id, 'right', 'left')
 
-      stack.execute(addNodeWithEdgeCommand(node, edge))
-      expect(useCanvasStore.getState().nodes).toHaveLength(2)
-      expect(useCanvasStore.getState().edges).toHaveLength(1)
+      stack.execute(addNodeWithEdgeCommand(store, node, edge))
+      expect(store.getState().nodes).toHaveLength(2)
+      expect(store.getState().edges).toHaveLength(1)
 
       await stack.undo()
-      expect(useCanvasStore.getState().nodes).toHaveLength(1)
-      expect(useCanvasStore.getState().edges).toHaveLength(0)
+      expect(store.getState().nodes).toHaveLength(1)
+      expect(store.getState().edges).toHaveLength(0)
     })
   })
 
   describe('convertNodeTypeCommand', () => {
     it('preserves content for text→markdown and resets metadata', async () => {
       const a = createCanvasNode('text', { x: 0, y: 0 }, { content: '# Keep me' })
-      useCanvasStore.getState().addNode(a)
+      store.getState().addNode(a)
 
-      stack.execute(convertNodeTypeCommand(a.id, 'markdown')!)
-      const converted = useCanvasStore.getState().nodes[0]
+      stack.execute(convertNodeTypeCommand(store, a.id, 'markdown')!)
+      const converted = store.getState().nodes[0]
       expect(converted.type).toBe('markdown')
       expect(converted.content).toBe('# Keep me')
       expect(converted.metadata).toEqual({ viewMode: 'rendered' })
 
       await stack.undo()
-      const restored = useCanvasStore.getState().nodes[0]
+      const restored = store.getState().nodes[0]
       expect(restored.type).toBe('text')
       expect(restored.content).toBe('# Keep me')
       expect(restored.metadata).toEqual(a.metadata)
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes[0].type).toBe('markdown')
-      expect(useCanvasStore.getState().nodes[0].content).toBe('# Keep me')
+      expect(store.getState().nodes[0].type).toBe('markdown')
+      expect(store.getState().nodes[0].content).toBe('# Keep me')
     })
 
     it('wipes content when converting to terminal, and undo restores it', async () => {
       const a = createCanvasNode('code', { x: 0, y: 0 }, { content: 'const x = 1' })
-      useCanvasStore.getState().addNode(a)
+      store.getState().addNode(a)
 
-      stack.execute(convertNodeTypeCommand(a.id, 'terminal')!)
-      expect(useCanvasStore.getState().nodes[0].content).toBe('')
+      stack.execute(convertNodeTypeCommand(store, a.id, 'terminal')!)
+      expect(store.getState().nodes[0].content).toBe('')
 
       await stack.undo()
-      const restored = useCanvasStore.getState().nodes[0]
+      const restored = store.getState().nodes[0]
       expect(restored.type).toBe('code')
       expect(restored.content).toBe('const x = 1')
     })
 
     it('returns null for a no-op conversion', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
-      useCanvasStore.getState().addNode(a)
-      expect(convertNodeTypeCommand(a.id, 'text')).toBeNull()
-      expect(convertNodeTypeCommand('missing', 'code')).toBeNull()
+      store.getState().addNode(a)
+      expect(convertNodeTypeCommand(store, a.id, 'text')).toBeNull()
+      expect(convertNodeTypeCommand(store, 'missing', 'code')).toBeNull()
     })
   })
 
@@ -289,33 +290,33 @@ describe('canvas undo commands', () => {
     it('undo restores pre-layout positions', async () => {
       const a = createCanvasNode('text', { x: -500, y: -500 })
       const b = createCanvasNode('text', { x: 900, y: 700 })
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
 
-      const cmd = layoutCommand(() =>
-        useCanvasStore.getState().applyTileLayout('grid-2x2', { x: 0, y: 0 })
+      const cmd = layoutCommand(store, () =>
+        store.getState().applyTileLayout('grid-2x2', { x: 0, y: 0 })
       )
       stack.execute(cmd!)
-      const tiled = useCanvasStore.getState().nodes.map((n) => ({ ...n.position }))
+      const tiled = store.getState().nodes.map((n) => ({ ...n.position }))
       expect(tiled).not.toEqual([
         { x: -500, y: -500 },
         { x: 900, y: 700 }
       ])
 
       await stack.undo()
-      const positions = useCanvasStore.getState().nodes.map((n) => n.position)
+      const positions = store.getState().nodes.map((n) => n.position)
       expect(positions).toEqual([
         { x: -500, y: -500 },
         { x: 900, y: 700 }
       ])
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes.map((n) => ({ ...n.position }))).toEqual(tiled)
+      expect(store.getState().nodes.map((n) => ({ ...n.position }))).toEqual(tiled)
     })
 
     it('returns null on an empty canvas', () => {
-      expect(layoutCommand(() => {})).toBeNull()
+      expect(layoutCommand(store, () => {})).toBeNull()
     })
   })
 
@@ -324,14 +325,14 @@ describe('canvas undo commands', () => {
       const a = createCanvasNode('text', { x: 0, y: 0 })
       const b = createCanvasNode('text', { x: 200, y: 0 })
       const edge = createCanvasEdge(a.id, b.id, 'right', 'left')
-      const s = useCanvasStore.getState()
+      const s = store.getState()
       s.addNode(a)
       s.addNode(b)
       s.addEdge(edge)
-      useCanvasStore.setState({ selectedNodeIds: new Set([a.id]), focusedCardId: a.id })
+      store.setState({ selectedNodeIds: new Set([a.id]), focusedCardId: a.id })
 
-      stack.execute(clearCanvasCommand())
-      const cleared = useCanvasStore.getState()
+      stack.execute(clearCanvasCommand(store))
+      const cleared = store.getState()
       expect(cleared.nodes).toHaveLength(0)
       expect(cleared.edges).toHaveLength(0)
       expect(cleared.selectedNodeIds.size).toBe(0)
@@ -339,12 +340,12 @@ describe('canvas undo commands', () => {
       expect(cleared.isDirty).toBe(true)
 
       await stack.undo()
-      const restored = useCanvasStore.getState()
+      const restored = store.getState()
       expect(restored.nodes.map((n) => n.id)).toEqual([a.id, b.id])
       expect(restored.edges.map((e) => e.id)).toEqual([edge.id])
 
       await stack.redo()
-      expect(useCanvasStore.getState().nodes).toHaveLength(0)
+      expect(store.getState().nodes).toHaveLength(0)
     })
   })
 })

@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
 import { colors } from '../../design/tokens'
 
@@ -15,7 +15,7 @@ function lastPathSegment(value: unknown): string | null {
 }
 
 function ProjectFolderCard({ node }: ProjectFolderCardProps) {
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const removeNode = useCanvas((s) => s.removeNode)
 
   const { relativePath, childCount } = node.metadata as {
     relativePath?: string

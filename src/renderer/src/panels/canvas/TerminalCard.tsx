@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState, useMemo, memo } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { useBlockStore } from '../../store/block-store'
 import { useVaultStore } from '../../store/vault-store'
 import { useClaudeContext } from '../../hooks/useClaudeContext'
@@ -106,15 +106,16 @@ export function TerminalCard({ node }: TerminalCardProps) {
   const agentPresence = useCliAgentPresence()
   const sessionAgent = node.content ? (agentPresence[node.content] ?? null) : null
 
-  const removeNode = useCanvasStore((s) => s.removeNode)
-  const updateContent = useCanvasStore((s) => s.updateNodeContent)
-  const addNode = useCanvasStore((s) => s.addNode)
-  const setFocusedTerminal = useCanvasStore((s) => s.setFocusedTerminal)
+  const canvas = useCanvasApi()
+  const removeNode = useCanvas((s) => s.removeNode)
+  const updateContent = useCanvas((s) => s.updateNodeContent)
+  const addNode = useCanvas((s) => s.addNode)
+  const setFocusedTerminal = useCanvas((s) => s.setFocusedTerminal)
   const sessionBlocks = useBlockStore((s) =>
     node.content ? (s.blocksBySession[node.content] ?? EMPTY_BLOCKS) : EMPTY_BLOCKS
   )
-  const isFocused = useCanvasStore((s) => s.focusedCardId === node.id)
-  const isLocked = useCanvasStore((s) => s.lockedCardId === node.id)
+  const isFocused = useCanvas((s) => s.focusedCardId === node.id)
+  const isLocked = useCanvas((s) => s.lockedCardId === node.id)
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const initialCwd = typeof node.metadata?.initialCwd === 'string' ? node.metadata.initialCwd : null
   const homePath = window.api.getHomePath?.() ?? ''
@@ -163,7 +164,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
         // No systemPrompt URL param needed — the command reads from file directly.
       } else {
         // Regular Claude live card: canvas context
-        const nodes = useCanvasStore.getState().nodes
+        const nodes = canvas.getState().nodes
         const contextFilePath = vaultPath
           ? `${vaultPath}/.machina/context-${node.id}.txt`
           : undefined
@@ -189,7 +190,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
     node.metadata?.actionId,
     node.metadata?.initialCwd,
     node.metadata?.initialCommand,
-    vaultPath
+    vaultPath,
+    canvas
   ])
 
   useEffect(() => {
@@ -308,16 +310,16 @@ export function TerminalCard({ node }: TerminalCardProps) {
   useEffect(() => {
     if (isFocused || isLocked) {
       setFocusedTerminal(node.id)
-    } else if (useCanvasStore.getState().focusedTerminalId === node.id) {
+    } else if (canvas.getState().focusedTerminalId === node.id) {
       setFocusedTerminal(null)
     }
 
     return () => {
-      if (useCanvasStore.getState().focusedTerminalId === node.id) {
+      if (canvas.getState().focusedTerminalId === node.id) {
         setFocusedTerminal(null)
       }
     }
-  }, [isFocused, isLocked, node.id, setFocusedTerminal])
+  }, [isFocused, isLocked, node.id, setFocusedTerminal, canvas])
 
   // ── Shell-hook banner ───────────────────────────────────────────────────
 
@@ -381,12 +383,12 @@ export function TerminalCard({ node }: TerminalCardProps) {
     if (sid) {
       window.api.terminal.kill(sid)
     }
-    if (useCanvasStore.getState().focusedTerminalId === node.id) {
+    if (canvas.getState().focusedTerminalId === node.id) {
       setFocusedTerminal(null)
     }
     removeNode(node.id)
     actionInFlight.current = false
-  }, [node.id, removeNode, setFocusedTerminal])
+  }, [node.id, removeNode, setFocusedTerminal, canvas])
 
   // ── Restart handler ─────────────────────────────────────────────────────
 
@@ -416,20 +418,20 @@ export function TerminalCard({ node }: TerminalCardProps) {
     actionInFlight.current = true
     // canvasToStrip attaches the live session to the strip, then removes this
     // card with preserveSession — the PTY must survive the surface change.
-    if (useCanvasStore.getState().focusedTerminalId === node.id) {
+    if (canvas.getState().focusedTerminalId === node.id) {
       setFocusedTerminal(null)
     }
-    canvasToStrip(node)
+    canvasToStrip(canvas, node)
     actionInFlight.current = false
-  }, [node, setFocusedTerminal])
+  }, [node, setFocusedTerminal, canvas])
 
   const handlePinLatestBlock = useCallback(() => {
     const block = pickPinnableBlock(sessionBlocks)
     if (!block) return
     const projection = buildBlockProjection(node, block)
     addNode(projection)
-    useCanvasStore.getState().markRecentlyPinned(projection.id)
-  }, [sessionBlocks, node, addNode])
+    canvas.getState().markRecentlyPinned(projection.id)
+  }, [sessionBlocks, node, addNode, canvas])
 
   const handleActivateContentClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const wv = webviewRef.current

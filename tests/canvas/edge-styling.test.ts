@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useCanvasStore } from '../../src/renderer/src/store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../src/renderer/src/store/canvas-store'
 import { createCanvasNode, createCanvasEdge } from '../../src/shared/canvas-types'
 import { EDGE_KIND_COLORS } from '../../src/renderer/src/design/tokens'
 import {
   getEdgeStrokeDasharray,
   getEdgeStrokeWidth
 } from '../../src/renderer/src/panels/canvas/edge-styling'
+
+const store = getCanvasStore(DEFAULT_CANVAS_ID)
 
 describe('edge styling helpers', () => {
   describe('getEdgeStrokeDasharray', () => {
@@ -55,7 +57,7 @@ describe('edge styling helpers', () => {
 
 describe('edge zoom reveal logic', () => {
   beforeEach(() => {
-    useCanvasStore.setState(useCanvasStore.getInitialState())
+    store.setState(store.getInitialState())
   })
 
   it('hidden imports edge is revealed when zoom > 0.8', () => {

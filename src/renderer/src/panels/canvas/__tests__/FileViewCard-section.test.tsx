@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render as rtlRender, waitFor } from '@testing-library/react'
 import { FileViewCard } from '../FileViewCard'
+import { CanvasStoreProvider } from '../canvas-store-context'
+import { DEFAULT_CANVAS_ID } from '../../../store/canvas-store'
+
+// The card reads its store from context now — wrap every render in the provider.
+const render = (ui: React.ReactElement) =>
+  rtlRender(<CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>{ui}</CanvasStoreProvider>)
 
 const FILE = `---
 kind: cluster

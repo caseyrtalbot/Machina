@@ -1,21 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-vi.mock('../../../store/canvas-store', () => ({
-  useCanvasStore: vi.fn((selector) => {
-    const state = {
-      viewport: { x: 0, y: 0, zoom: 1 },
-      setViewport: vi.fn(),
-      focusFrames: {},
-      selectedNodeIds: new Set<string>(),
-      nodes: [{ id: 'n1' }],
-      showAllEdges: false,
-      toggleShowAllEdges: vi.fn(),
-      jumpToFocusFrame: vi.fn()
-    }
-    return selector(state)
-  })
-}))
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 vi.mock('../../../store/vault-store', () => ({
   useVaultStore: Object.assign(
@@ -92,6 +78,16 @@ const baseProps = {
   onClear: vi.fn()
 }
 
+function renderToolbar(props: typeof baseProps) {
+  const store = getCanvasStore(DEFAULT_CANVAS_ID)
+  store.setState({ ...store.getInitialState(), nodes: [{ id: 'n1' }] as never })
+  return render(
+    <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+      <CanvasToolbar {...props} />
+    </CanvasStoreProvider>
+  )
+}
+
 describe('CanvasToolbar clear button', () => {
   afterEach(() => {
     cleanup()
@@ -99,13 +95,13 @@ describe('CanvasToolbar clear button', () => {
   })
 
   it('renders a clear button with data-testid="canvas-clear"', () => {
-    render(<CanvasToolbar {...baseProps} />)
+    renderToolbar(baseProps)
     expect(screen.getByTestId('canvas-clear')).toBeTruthy()
   })
 
   it('arms on first click without clearing, then calls onClear on confirm click', () => {
     const onClear = vi.fn()
-    render(<CanvasToolbar {...baseProps} onClear={onClear} />)
+    renderToolbar({ ...baseProps, onClear })
 
     const button = screen.getByTestId('canvas-clear')
     fireEvent.click(button)
@@ -121,7 +117,7 @@ describe('CanvasToolbar clear button', () => {
     vi.useFakeTimers()
     try {
       const onClear = vi.fn()
-      render(<CanvasToolbar {...baseProps} onClear={onClear} />)
+      renderToolbar({ ...baseProps, onClear })
 
       const button = screen.getByTestId('canvas-clear')
       fireEvent.click(button)

@@ -1,4 +1,4 @@
-import { createStore, useStore } from 'zustand'
+import { createStore } from 'zustand'
 import type { StoreApi } from 'zustand'
 import type { CanvasNode, CanvasEdge, CanvasViewport, CanvasFile } from '@shared/canvas-types'
 import { getDefaultMetadata } from '@shared/canvas-types'
@@ -723,64 +723,7 @@ export function onCanvasStoreCreated(
   }
 }
 
-const defaultCanvasStore = getCanvasStore(DEFAULT_CANVAS_ID)
-
-// ---------------------------------------------------------------------------
-// Active-canvas indirection (3.8): `useCanvasStore` keeps its historical
-// single-store call signature but delegates to the instance of the most
-// recently activated canvas dock tab. Existing call sites — components,
-// commands, module-level getState()/setState() — therefore operate on the
-// canvas the user is looking at; per-id binding is opt-in via getCanvasStore.
-// ---------------------------------------------------------------------------
-
-const activeCanvas = createStore<{ id: string; store: CanvasStoreApi }>(() => ({
-  id: DEFAULT_CANVAS_ID,
-  store: defaultCanvasStore
-}))
-
-export function setActiveCanvas(canvasId: string): void {
-  if (activeCanvas.getState().id === canvasId) return
-  activeCanvas.setState({ id: canvasId, store: getCanvasStore(canvasId) })
-}
-
-export function getActiveCanvasId(): string {
-  return activeCanvas.getState().id
-}
-
-function useActiveCanvasStore<T>(selector: (state: CanvasStore) => T): T {
-  const store = useStore(activeCanvas, (s) => s.store)
-  return useStore(store, selector)
-}
-
-type ActiveCanvasStoreHook = (<T>(selector: (state: CanvasStore) => T) => T) & {
-  getState: () => CanvasStore
-  getInitialState: () => CanvasStore
-  setState: CanvasStoreApi['setState']
-  subscribe: CanvasStoreApi['subscribe']
-}
-
-const subscribeActive: CanvasStoreApi['subscribe'] = (listener) => {
-  let unsubStore = activeCanvas.getState().store.subscribe(listener)
-  // Follow active-canvas swaps: re-subscribe to the new instance and notify
-  // once so subscribers re-read what is now the effective state.
-  const unsubActive = activeCanvas.subscribe((next, prev) => {
-    if (next.store === prev.store) return
-    unsubStore()
-    unsubStore = next.store.subscribe(listener)
-    listener(next.store.getState(), prev.store.getState())
-  })
-  return () => {
-    unsubStore()
-    unsubActive()
-  }
-}
-
-export const useCanvasStore: ActiveCanvasStoreHook = Object.assign(useActiveCanvasStore, {
-  getState: () => activeCanvas.getState().store.getState(),
-  getInitialState: () => activeCanvas.getState().store.getInitialState(),
-  setState: ((partial, replace) =>
-    activeCanvas
-      .getState()
-      .store.setState(partial as never, replace as never)) as CanvasStoreApi['setState'],
-  subscribe: subscribeActive
-})
+// The active-canvas proxy (`useCanvasStore`, 3.8) is gone (Phase 1 step 1):
+// canvas components bind per-id via panels/canvas/canvas-store-context; code
+// outside the canvas tree resolves dock-store's getFocusedCanvasId() or
+// disables itself when no canvas is focused.

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import { CardShell } from './CardShell'
 import { maskSecrets } from './block-pin'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { useBlockStore } from '../../store/block-store'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
@@ -166,7 +166,7 @@ function elapsedFor(state: BlockState | ResolvedState, now: number): string | nu
 }
 
 function BlockCardInner({ node }: BlockCardProps) {
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const removeNode = useCanvas((s) => s.removeNode)
   const sessionId = (node.metadata?.sessionId as string | undefined) ?? ''
   const blockId = (node.metadata?.blockId as string | undefined) ?? ''
 

@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CanvasSurface } from './CanvasSurface'
-import { useCanvasStore } from '../../store/canvas-store'
+import type { CanvasStoreApi } from '../../store/canvas-store'
+import { CanvasStoreProvider, useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
 import {
   createCanvasNode,
   getDefaultSize,
@@ -58,8 +59,8 @@ import {
 
 /** True when keystrokes belong to a text-editing surface, so global canvas
  * overlays (the `?` shortcut sheet) must not react. */
-function isTypingContext(): boolean {
-  if (useCanvasStore.getState().focusedTerminalId) return true
+function isTypingContext(canvas: CanvasStoreApi): boolean {
+  if (canvas.getState().focusedTerminalId) return true
   const el = document.activeElement as HTMLElement | null
   if (!el) return false
   if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return true
@@ -99,18 +100,28 @@ export function CanvasView({
 }: {
   readonly canvasId?: string
 } = {}): React.ReactElement {
-  const nodes = useCanvasStore((s) => s.nodes)
-  const pendingFolderMap = useCanvasStore((s) => s.pendingFolderMap)
-  const viewport = useCanvasStore((s) => s.viewport)
-  const clearSelection = useCanvasStore((s) => s.clearSelection)
-  const addNode = useCanvasStore((s) => s.addNode)
-  const setViewport = useCanvasStore((s) => s.setViewport)
-  const filePath = useCanvasStore((s) => s.filePath)
-  const addNodesAndEdges = useCanvasStore((s) => s.addNodesAndEdges)
-  const cardContextMenu = useCanvasStore((s) => s.cardContextMenu)
-  const setCardContextMenu = useCanvasStore((s) => s.setCardContextMenu)
-  const splitFilePath = useCanvasStore((s) => s.splitFilePath)
-  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds)
+  return (
+    <CanvasStoreProvider canvasId={canvasId}>
+      <CanvasViewInner />
+    </CanvasStoreProvider>
+  )
+}
+
+function CanvasViewInner(): React.ReactElement {
+  const canvasId = useCanvasId()
+  const canvas = useCanvasApi()
+  const nodes = useCanvas((s) => s.nodes)
+  const pendingFolderMap = useCanvas((s) => s.pendingFolderMap)
+  const viewport = useCanvas((s) => s.viewport)
+  const clearSelection = useCanvas((s) => s.clearSelection)
+  const addNode = useCanvas((s) => s.addNode)
+  const setViewport = useCanvas((s) => s.setViewport)
+  const filePath = useCanvas((s) => s.filePath)
+  const addNodesAndEdges = useCanvas((s) => s.addNodesAndEdges)
+  const cardContextMenu = useCanvas((s) => s.cardContextMenu)
+  const setCardContextMenu = useCanvas((s) => s.setCardContextMenu)
+  const splitFilePath = useCanvas((s) => s.splitFilePath)
+  const selectedNodeIds = useCanvas((s) => s.selectedNodeIds)
   const commandStack = useRef(new CommandStack())
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 })
@@ -134,7 +145,7 @@ export function CanvasView({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== '?' || e.metaKey || e.ctrlKey || e.altKey) return
-      if (isTypingContext()) return
+      if (isTypingContext(canvas)) return
       const rect = containerRef.current?.getBoundingClientRect()
       if (!rect || rect.width === 0 || rect.height === 0) return
       e.preventDefault()
@@ -142,7 +153,7 @@ export function CanvasView({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [canvas])
 
   const vaultPath = useVaultStore((s) => s.vaultPath)
   const artifacts = useVaultStore((s) => s.artifacts)
@@ -211,9 +222,9 @@ export function CanvasView({
     const dw = containerSize.width - prev.width
     const dh = containerSize.height - prev.height
     if (dw === 0 && dh === 0) return
-    const { x, y, zoom } = useCanvasStore.getState().viewport
+    const { x, y, zoom } = canvas.getState().viewport
     setViewport({ x: x + dw / 2, y: y + dh / 2, zoom })
-  }, [containerSize, setViewport])
+  }, [containerSize, setViewport, canvas])
 
   // Auto-center viewport when a canvas first loads
   useEffect(() => {
@@ -230,8 +241,8 @@ export function CanvasView({
 
     centeredForFileRef.current = filePath
 
-    const zoom = useCanvasStore.getState().viewport.zoom
-    const currentNodes = useCanvasStore.getState().nodes
+    const zoom = canvas.getState().viewport.zoom
+    const currentNodes = canvas.getState().nodes
 
     if (currentNodes.length === 0) {
       // Center on origin
@@ -257,7 +268,7 @@ export function CanvasView({
       y: height / 2 - centerY * zoom,
       zoom
     })
-  }, [filePath, containerSize, setViewport])
+  }, [filePath, containerSize, setViewport, canvas])
 
   // Build protected set: selected nodes + the card open in split editor
   const protectedIds = useMemo(() => {
@@ -277,10 +288,10 @@ export function CanvasView({
     (node: CanvasNode) => {
       commandStack.current.execute({
         execute: () => addNode(node),
-        undo: () => useCanvasStore.getState().removeNode(node.id)
+        undo: () => canvas.getState().removeNode(node.id)
       })
     },
-    [addNode]
+    [addNode, canvas]
   )
 
   const handleImportExecute = useCallback((execute: () => void, undo: () => void) => {
@@ -305,9 +316,9 @@ export function CanvasView({
     clearSelection()
     setContextMenu(null)
     setCardContextMenu(null)
-    useCanvasStore.getState().unlockCard()
-    useCanvasStore.getState().setFocusedCard(null)
-  }, [clearSelection, setCardContextMenu])
+    canvas.getState().unlockCard()
+    canvas.getState().setFocusedCard(null)
+  }, [clearSelection, setCardContextMenu, canvas])
 
   const handleAddCard = useCallback(
     (type: CanvasNodeType, overrides?: Partial<Pick<CanvasNode, 'content' | 'metadata'>>) => {
@@ -399,21 +410,21 @@ export function CanvasView({
   // Register centerOnNode bridge so external callers (e.g. command palette) can
   // focus a specific card by ID with smooth viewport centering.
   useEffect(() => {
-    useCanvasStore.getState().setCenterOnNode((nodeId) => {
-      const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId)
+    canvas.getState().setCenterOnNode((nodeId) => {
+      const node = canvas.getState().nodes.find((n) => n.id === nodeId)
       if (!node) return
       const cx = node.position.x + node.size.width / 2
       const cy = node.position.y + node.size.height / 2
-      const zoom = useCanvasStore.getState().viewport.zoom
-      useCanvasStore.getState().setViewport({
+      const zoom = canvas.getState().viewport.zoom
+      canvas.getState().setViewport({
         x: containerSize.width / 2 - cx * zoom,
         y: containerSize.height / 2 - cy * zoom,
         zoom
       })
-      useCanvasStore.getState().setSelection(new Set([nodeId]))
+      canvas.getState().setSelection(new Set([nodeId]))
     })
-    return () => useCanvasStore.getState().setCenterOnNode(null)
-  }, [containerSize])
+    return () => canvas.getState().setCenterOnNode(null)
+  }, [containerSize, canvas])
 
   // Folder-map: trigger analysis when a folder path is set.
   // We capture the path, clear pendingFolderMap immediately, and run the orchestrator.
@@ -427,11 +438,11 @@ export function CanvasView({
   useEffect(() => {
     if (!pendingFolderMap) return
     const path = pendingFolderMap
-    useCanvasStore.getState().setPendingFolderMap(null)
+    canvas.getState().setPendingFolderMap(null)
 
     void (async () => {
       try {
-        const startState = useCanvasStore.getState()
+        const startState = canvas.getState()
         const result = await mapFolderToCanvas(path, startState.nodes, setFolderMapProgress)
         if (result) {
           const semanticResult = augmentFolderMapWithVaultSemantics({
@@ -443,7 +454,7 @@ export function CanvasView({
             fileToId,
             artifactPathById
           })
-          const currentState = useCanvasStore.getState()
+          const currentState = canvas.getState()
           const additions = filterCanvasAdditions(
             [...semanticResult.nodes],
             [...semanticResult.edges],
@@ -470,23 +481,23 @@ export function CanvasView({
         setFolderMapProgress(null)
       }
     })()
-  }, [pendingFolderMap, graph, artifacts, fileToId, artifactPathById])
+  }, [pendingFolderMap, graph, artifacts, fileToId, artifactPathById, canvas])
 
   // Folder-map: apply plan to canvas with undo support
   const handleApplyPlan = useCallback(() => {
     if (!previewPlan) return
-    applyFolderMapPlan(previewPlan, commandStack.current)
+    applyFolderMapPlan(canvas, previewPlan, commandStack.current)
     const addNodeOps = previewPlan.ops.filter((op) => op.type === 'add-node')
     if (addNodeOps.length > 50) {
-      const allNodes = useCanvasStore.getState().nodes
+      const allNodes = canvas.getState().nodes
       const canvasEl = document.querySelector('[data-canvas-surface]')
       if (canvasEl) {
         const vp = computeImportViewport(allNodes, canvasEl.clientWidth, canvasEl.clientHeight)
-        useCanvasStore.getState().setViewport(vp)
+        canvas.getState().setViewport(vp)
       }
     }
     setPreviewPlan(null)
-  }, [previewPlan])
+  }, [previewPlan, canvas])
 
   const handleCancelPlan = useCallback(() => {
     setPreviewPlan(null)
@@ -508,7 +519,7 @@ export function CanvasView({
             onUndo={() => void commandStack.current.undo()}
             onRedo={() => void commandStack.current.redo()}
             onAddCard={() => {
-              const vp = useCanvasStore.getState().viewport
+              const vp = canvas.getState().viewport
               const node = createCanvasNode('text', {
                 x: -vp.x / vp.zoom + 200,
                 y: -vp.y / vp.zoom + 200
@@ -519,7 +530,7 @@ export function CanvasView({
             onOrganize={ontology.startOrganize}
             organizePhase={ontology.phase}
             onClear={() => {
-              commandStack.current.execute(clearCanvasCommand())
+              commandStack.current.execute(clearCanvasCommand(canvas))
             }}
           />
           <CanvasSurface
@@ -581,8 +592,8 @@ export function CanvasView({
           {nodes.length === 0 && vaultPath && artifacts.length === 0 && (
             <CanvasEmptyVaultCard
               onCreateNote={() => {
-                const vp = useCanvasStore.getState().viewport
-                void createNoteAtCursor({
+                const vp = canvas.getState().viewport
+                void createNoteAtCursor(canvas, {
                   x: (-vp.x + containerSize.width / 2) / vp.zoom,
                   y: (-vp.y + containerSize.height / 2) / vp.zoom
                 })
@@ -643,10 +654,10 @@ export function CanvasView({
                       commandStack.current.execute({
                         execute: () => addNodesAndEdges(newNodes, newEdges),
                         undo: () => {
-                          const store = useCanvasStore.getState()
+                          const store = canvas.getState()
                           const nodeIds = new Set(newNodes.map((n) => n.id))
                           const edgeIds = new Set(newEdges.map((e) => e.id))
-                          useCanvasStore.setState({
+                          canvas.setState({
                             nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
                             edges: store.edges.filter((e) => !edgeIds.has(e.id)),
                             isDirty: true
@@ -654,7 +665,7 @@ export function CanvasView({
                         }
                       })
                       // Fit viewport to all cards including new connections
-                      const allNodes = [...useCanvasStore.getState().nodes]
+                      const allNodes = [...canvas.getState().nodes]
                       const vp = computeImportViewport(
                         allNodes,
                         containerSize.width,
@@ -667,7 +678,7 @@ export function CanvasView({
                   onOpenInEditor={
                     isNote
                       ? () => {
-                          useCanvasStore.getState().openSplit(menuFilePath!)
+                          canvas.getState().openSplit(menuFilePath!)
                           setCardContextMenu(null)
                         }
                       : undefined

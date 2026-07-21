@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ImportPalette } from '../ImportPalette'
 import { useEditorStore } from '../../../store/editor-store'
 import { useVaultStore } from '../../../store/vault-store'
-import { useCanvasStore } from '../../../store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 describe('ImportPalette active note identity', () => {
   beforeEach(() => {
@@ -49,7 +50,7 @@ describe('ImportPalette active note identity', () => {
       }
     })
 
-    useCanvasStore.setState({ nodes: [], edges: [] })
+    getCanvasStore(DEFAULT_CANVAS_ID).setState({ nodes: [], edges: [] })
   })
 
   afterEach(() => {
@@ -58,13 +59,15 @@ describe('ImportPalette active note identity', () => {
 
   it('derives the active artifact from activeNotePath', () => {
     render(
-      <ImportPalette
-        open={true}
-        onClose={vi.fn()}
-        onImport={vi.fn()}
-        containerWidth={1200}
-        containerHeight={800}
-      />
+      <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+        <ImportPalette
+          open={true}
+          onClose={vi.fn()}
+          onImport={vi.fn()}
+          containerWidth={1200}
+          containerHeight={800}
+        />
+      </CanvasStoreProvider>
     )
 
     expect(screen.getByText('Neighborhood of')).toBeTruthy()

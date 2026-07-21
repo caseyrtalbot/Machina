@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { pdfjs } from './pdf-worker-setup'
 import './pdf-text-layer.css'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
 import { colors, borderRadius, typography, floatingPanel } from '../../design/tokens'
 import { createQuoteCard } from './pdf-quote'
@@ -49,9 +49,9 @@ function pageNumberForRange(range: Range): number | undefined {
 }
 
 export function PdfCard({ node }: PdfCardProps): React.ReactElement {
-  const removeNode = useCanvasStore((s) => s.removeNode)
-  const updateNodeMetadata = useCanvasStore((s) => s.updateNodeMetadata)
-  const addNodesAndEdges = useCanvasStore((s) => s.addNodesAndEdges)
+  const removeNode = useCanvas((s) => s.removeNode)
+  const updateNodeMetadata = useCanvas((s) => s.updateNodeMetadata)
+  const addNodesAndEdges = useCanvas((s) => s.addNodesAndEdges)
 
   const meta = node.metadata as unknown as PdfNodeMeta
   const src = meta.src || ''

@@ -1,6 +1,12 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render as rtlRender, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasNode } from '@shared/canvas-types'
+import { CanvasStoreProvider } from '../canvas-store-context'
+import { DEFAULT_CANVAS_ID } from '../../../store/canvas-store'
+
+// The card reads its store from context now — wrap every render in the provider.
+const render = (ui: React.ReactElement) =>
+  rtlRender(<CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>{ui}</CanvasStoreProvider>)
 
 // Stub design tokens so the component can reference colors without CSS vars
 vi.mock('../../../design/tokens', async (importOriginal) => {

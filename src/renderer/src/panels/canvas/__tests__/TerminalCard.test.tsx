@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasNode } from '@shared/canvas-types'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 
@@ -38,28 +40,30 @@ let mockLockedCardId: string | null = null
 const mockSetFocusedTerminal = vi.fn((id: string | null) => {
   mockFocusedTerminalId = id
 })
-const mockGetState = vi.fn(() => ({
-  nodes: [] as readonly CanvasNode[],
-  removeNode: mockRemoveNode,
-  focusedTerminalId: mockFocusedTerminalId
-}))
+function seedCanvasStore(): void {
+  const store = getCanvasStore(DEFAULT_CANVAS_ID)
+  store.setState({
+    ...store.getInitialState(),
+    removeNode: mockRemoveNode,
+    updateNodeContent: mockUpdateContent,
+    setFocusedTerminal: mockSetFocusedTerminal,
+    focusedCardId: mockFocusedCardId,
+    lockedCardId: mockLockedCardId,
+    focusedTerminalId: mockFocusedTerminalId
+  })
+}
 
-vi.mock('../../../store/canvas-store', () => ({
-  useCanvasStore: Object.assign(
-    (selector: (s: Record<string, unknown>) => unknown) =>
-      selector({
-        removeNode: mockRemoveNode,
-        updateNodeContent: mockUpdateContent,
-        setFocusedTerminal: mockSetFocusedTerminal,
-        focusedCardId: mockFocusedCardId,
-        lockedCardId: mockLockedCardId,
-        focusedTerminalId: mockFocusedTerminalId
-      }),
-    {
-      getState: mockGetState
-    }
+function renderTerminalCard(
+  TerminalCardComponent: (typeof import('../TerminalCard'))['TerminalCard'],
+  node: CanvasNode
+) {
+  seedCanvasStore()
+  return render(
+    <CanvasStoreProvider canvasId={DEFAULT_CANVAS_ID}>
+      <TerminalCardComponent node={node} />
+    </CanvasStoreProvider>
   )
-}))
+}
 
 vi.mock('../../../store/vault-store', () => ({
   useVaultStore: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -200,7 +204,7 @@ describe('TerminalCard (webview host)', () => {
   it('renders a webview element inside CardShell', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     expect(screen.getByTestId('card-shell')).toBeTruthy()
     const webview = container.querySelector('webview')
@@ -210,7 +214,7 @@ describe('TerminalCard (webview host)', () => {
   it('displays "Terminal" as title when no cwd is set', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     expect(screen.getByTestId('card-title').textContent).toBe('Terminal')
   })
@@ -220,7 +224,7 @@ describe('TerminalCard (webview host)', () => {
     const node = makeTerminalNode({
       metadata: { initialCwd: '/Users/test/Projects/myapp' }
     })
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     expect(screen.getByTestId('card-title').textContent).toBe('~/Projects/myapp')
   })
@@ -228,7 +232,7 @@ describe('TerminalCard (webview host)', () => {
   it('displays "Claude Live" for claude cards', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeClaudeNode()
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     expect(screen.getByTestId('card-title').textContent).toBe('Claude Live')
   })
@@ -236,7 +240,7 @@ describe('TerminalCard (webview host)', () => {
   it('sets webview preload path from api', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const webview = container.querySelector('webview')
     expect(webview?.getAttribute('preload')).toBe('file:///path/to/preload/terminal-webview.js')
@@ -245,7 +249,7 @@ describe('TerminalCard (webview host)', () => {
   it('passes sessionId in webview src when node has content', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-abc-123' })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const webview = container.querySelector('webview')
     const src = webview?.getAttribute('src') ?? ''
@@ -255,7 +259,7 @@ describe('TerminalCard (webview host)', () => {
   it('shows dead-session overlay and restart button when the renderer process goes away', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-dead' })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const { webview } = attachWebviewHarness(container)
 
@@ -269,7 +273,7 @@ describe('TerminalCard (webview host)', () => {
   it('shows the dead-session overlay on normal exit (session-exited ipc-message)', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-exited-normally' })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const { webview } = attachWebviewHarness(container)
 
@@ -287,7 +291,7 @@ describe('TerminalCard (webview host)', () => {
   it('kills session and removes node on close', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-to-close' })
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     // The CardShell mock doesn't render onClose, so we test handleClose indirectly.
     // Instead, verify the component initializes with the sessionId tracked.
@@ -306,7 +310,7 @@ describe('TerminalCard (webview host)', () => {
   it('sets pointer-events to none on webview when not locked', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const webview = container.querySelector('webview') as HTMLElement | null
     expect(webview?.style.pointerEvents).toBe('none')
@@ -317,7 +321,7 @@ describe('TerminalCard (webview host)', () => {
     const node = makeTerminalNode({
       metadata: { initialCwd: '/test/vault/subfolder' }
     })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const webview = container.querySelector('webview')
     const src = webview?.getAttribute('src') ?? ''
@@ -334,7 +338,7 @@ describe('TerminalCard (webview host)', () => {
         actionName: 'Librarian'
       }
     })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     const webview = container.querySelector('webview')
     const src = webview?.getAttribute('src') ?? ''
@@ -347,7 +351,7 @@ describe('TerminalCard (webview host)', () => {
 
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
     const { webview, send, focus } = attachWebviewHarness(container)
 
     expect(send).not.toHaveBeenCalled()
@@ -362,7 +366,7 @@ describe('TerminalCard (webview host)', () => {
   it('forwards the first content click into the terminal webview', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
     const { webview, send, focus, sendInputEvent } = attachWebviewHarness(container)
 
     Object.defineProperty(webview, 'offsetWidth', {
@@ -416,7 +420,7 @@ describe('TerminalCard (webview host)', () => {
 
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode()
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
     const { webview, send, focus } = attachWebviewHarness(container)
 
     dispatchWebviewEvent(webview, 'dom-ready')
@@ -439,7 +443,7 @@ describe('TerminalCard (webview host)', () => {
   it('rebinds webview listeners after restart and persists the replacement session id', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-old' })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
     const { webview } = attachWebviewHarness(container)
 
     await act(async () => {
@@ -485,7 +489,7 @@ describe('TerminalCard move-to-dock header action', () => {
   it('renders the action when the node has a live session', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-live' })
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     expect(screen.getByTestId('terminal-move-to-dock')).toBeTruthy()
   })
@@ -493,7 +497,7 @@ describe('TerminalCard move-to-dock header action', () => {
   it('does not render the action when the node has no session (empty content)', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: '' })
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     expect(screen.queryByTestId('terminal-move-to-dock')).toBeNull()
   })
@@ -501,7 +505,7 @@ describe('TerminalCard move-to-dock header action', () => {
   it('does not render the action once the session is dead', async () => {
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-dying' })
-    const { container } = render(<TerminalCard node={node} />)
+    const { container } = renderTerminalCard(TerminalCard, node)
 
     expect(screen.getByTestId('terminal-move-to-dock')).toBeTruthy()
 
@@ -521,14 +525,14 @@ describe('TerminalCard move-to-dock header action', () => {
     const { canvasToStrip } = await import('../../agent-shell/terminal-migration')
     const { TerminalCard } = await import('../TerminalCard')
     const node = makeTerminalNode({ content: 'session-migrate' })
-    render(<TerminalCard node={node} />)
+    renderTerminalCard(TerminalCard, node)
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('terminal-move-to-dock'))
     })
 
     expect(canvasToStrip).toHaveBeenCalledTimes(1)
-    expect(canvasToStrip).toHaveBeenCalledWith(node)
+    expect(canvasToStrip).toHaveBeenCalledWith(expect.anything(), node)
     expect(mockKill).not.toHaveBeenCalled()
   })
 })

@@ -1,5 +1,5 @@
 import { useState, useCallback, memo, useMemo } from 'react'
-import { useCanvasStore } from '../../store/canvas-store'
+import { useCanvas } from './canvas-store-context'
 import { useEditorStore } from '../../store/editor-store'
 import { CardShell } from './CardShell'
 import { RichTextCardEditor } from './RichTextCardEditor'
@@ -17,8 +17,8 @@ function TextCardImpl({ node }: TextCardProps) {
   const [committedContent, setCommittedContent] = useState(node.content)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const updateContent = useCanvasStore((s) => s.updateNodeContent)
-  const removeNode = useCanvasStore((s) => s.removeNode)
+  const updateContent = useCanvas((s) => s.updateNodeContent)
+  const removeNode = useCanvas((s) => s.removeNode)
   const openInEditor = useEditorStore((s) => s.setActiveNote)
 
   const { saveQuick } = useSaveTextCard()

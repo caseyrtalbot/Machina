@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { createElement, type ReactNode } from 'react'
 import { useSaveTextCard } from '../useSaveTextCard'
 import { useSettingsStore } from '../../../store/settings-store'
 import { useVaultStore } from '../../../store/vault-store'
-import { useCanvasStore } from '../../../store/canvas-store'
+import { DEFAULT_CANVAS_ID, getCanvasStore } from '../../../store/canvas-store'
+import { CanvasStoreProvider } from '../canvas-store-context'
+
+function wrapper({ children }: { children: ReactNode }) {
+  return createElement(CanvasStoreProvider, { canvasId: DEFAULT_CANVAS_ID }, children)
+}
+
+function renderSaveTextCardHook() {
+  return renderHook(() => useSaveTextCard(), { wrapper })
+}
 
 const mockFs = {
   mkdir: vi.fn(),
@@ -21,7 +31,7 @@ beforeEach(() => {
   window.api = { fs: mockFs }
   useSettingsStore.setState({ canvasTextSaveFolder: 'Inbox' })
   useVaultStore.setState({ vaultPath: '/vault' })
-  useCanvasStore.setState({
+  getCanvasStore(DEFAULT_CANVAS_ID).setState({
     nodes: [
       {
         id: 'n1',
@@ -41,7 +51,7 @@ describe('useSaveTextCard.saveQuick', () => {
     mockFs.listFiles.mockResolvedValue([])
     mockFs.writeFile.mockResolvedValue(undefined)
 
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       await result.current.saveQuick('n1')
     })
@@ -53,7 +63,7 @@ describe('useSaveTextCard.saveQuick', () => {
       '# Hello World\nbody'
     )
 
-    const node = useCanvasStore.getState().nodes[0]
+    const node = getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes[0]
     expect(node.metadata.savedToPath).toBe('Inbox/hello-world.md')
     expect(node.metadata.savedContentHash).toBeTypeOf('string')
   })
@@ -63,7 +73,7 @@ describe('useSaveTextCard.saveQuick', () => {
     mockFs.listFiles.mockResolvedValue(['hello-world.md'])
     mockFs.writeFile.mockResolvedValue(undefined)
 
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       await result.current.saveQuick('n1')
     })
@@ -79,20 +89,20 @@ describe('useSaveTextCard.saveQuick', () => {
     mockFs.listFiles.mockResolvedValue([])
     mockFs.writeFile.mockRejectedValue(new Error('disk full'))
 
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       const r = await result.current.saveQuick('n1')
       expect(r.ok).toBe(false)
       if (!r.ok) expect(r.error).toContain('disk full')
     })
 
-    const node = useCanvasStore.getState().nodes[0]
+    const node = getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes[0]
     expect(node.metadata.savedToPath).toBeUndefined()
   })
 
   it('returns error when vault is not set', async () => {
     useVaultStore.setState({ vaultPath: null })
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       const r = await result.current.saveQuick('n1')
       expect(r.ok).toBe(false)
@@ -107,7 +117,7 @@ describe('useSaveTextCard.saveAsNew', () => {
     mockFs.listFiles.mockResolvedValue([])
     mockFs.writeFile.mockResolvedValue(undefined)
 
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       await result.current.saveAsNew('n1', { folder: 'Notes/2026', filename: 'custom-name.md' })
     })
@@ -126,7 +136,7 @@ describe('useSaveTextCard.saveAppend', () => {
     mockFs.readFile.mockResolvedValue('existing body')
     mockFs.writeFile.mockResolvedValue(undefined)
 
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       await result.current.saveAppend('n1', 'Notes/target.md')
     })
@@ -136,13 +146,13 @@ describe('useSaveTextCard.saveAppend', () => {
       '/vault/Notes/target.md',
       'existing body\n\n# Hello World\nbody'
     )
-    const node = useCanvasStore.getState().nodes[0]
+    const node = getCanvasStore(DEFAULT_CANVAS_ID).getState().nodes[0]
     expect(node.metadata.savedToPath).toBe('Notes/target.md')
   })
 
   it('returns error when target file no longer exists', async () => {
     mockFs.fileExists.mockResolvedValue(false)
-    const { result } = renderHook(() => useSaveTextCard())
+    const { result } = renderSaveTextCardHook()
     await act(async () => {
       const r = await result.current.saveAppend('n1', 'Notes/missing.md')
       expect(r.ok).toBe(false)
