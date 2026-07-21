@@ -56,7 +56,8 @@ consumers in the same slice so nothing ships unused:
 1. `Modal`/`Overlay` — shared scrim, focus trap, escape, positioning. Migrate
    SettingsModal, CommandPalette, HarnessGallery (delete `HarnessGallery.css`),
    HarnessTaskBriefDialog, ApprovalsTray popover, ImportPalette, SaveTextCardDialog,
-   OnboardingOverlay.
+   OnboardingOverlay. (complete 2026-07-21, commit 638e2ef — plus the canvas
+   ShortcutOverlay, a ninth consumer the survey missed)
 2. `TabBar` — extract from `DockTabBar.tsx` (most complete: drag/reorder, context menu,
    animated close); adopt in editor note-tabs and terminal strip.
 3. `PanelHeader` — one header/toolbar pattern for Ghosts, Graph, Editor, and canvas
