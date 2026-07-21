@@ -48,6 +48,7 @@ import { OntologyPreview } from './OntologyPreview'
 import { useOntologyOrchestrator } from './ontology-orchestrator'
 import { useCanvasCardAddedListener } from '../../hooks/use-canvas-card-added-listener'
 import { DEFAULT_CANVAS_ID, useCanvasFileLifecycle } from './use-canvas-file-lifecycle'
+import { ensureCanvasAutosave } from '../../store/canvas-autosave'
 import { useCanvasKeyboardShortcuts } from './use-canvas-keyboard-shortcuts'
 import { applyFolderMapPlan } from './folder-map-apply'
 import { augmentFolderMapWithVaultSemantics } from './folder-map-semantic'
@@ -100,6 +101,9 @@ export function CanvasView({
 }: {
   readonly canvasId?: string
 } = {}): React.ReactElement {
+  // Autosave watches the whole store registry; the first surface mount wires
+  // it for the app's lifetime (see ensureCanvasAutosave for why no teardown).
+  useEffect(() => ensureCanvasAutosave(), [])
   return (
     <CanvasStoreProvider canvasId={canvasId}>
       <CanvasViewInner />

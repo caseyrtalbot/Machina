@@ -1,6 +1,9 @@
 /**
  * Canvas auto-save: debounced persistence of canvas state to disk.
- * Single autosaver for ALL canvas instances — wired once at the App level.
+ * Single autosaver for ALL canvas instances — wired once, on the first
+ * canvas surface mount (ensureCanvasAutosave), never torn down: the store
+ * registry outlives views, and app-level listeners (agent plans) can dirty
+ * a store whose canvas tab is closed.
  *
  * Mirrors the vault-persist pattern, per store instance (3.8 multi-canvas):
  * - 2s debounce after any canvas mutation (isDirty becomes true)
@@ -139,4 +142,18 @@ export function subscribeCanvasAutosave(): () => void {
     for (const timer of autosaveTimers.values()) clearTimeout(timer)
     autosaveTimers.clear()
   }
+}
+
+let autosaveWired = false
+
+/**
+ * Idempotent app-lifetime wiring, called from the canvas surface's mount.
+ * Deliberately never unsubscribed: stores stay in the registry after their
+ * canvas tab closes and can still be dirtied (e.g. an accepted agent plan),
+ * so the watcher must outlive any individual CanvasView.
+ */
+export function ensureCanvasAutosave(): void {
+  if (autosaveWired) return
+  autosaveWired = true
+  subscribeCanvasAutosave()
 }

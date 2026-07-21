@@ -32,7 +32,6 @@ import {
   registerQuitHandler
 } from './store/vault-persist'
 import { rehydrateUiStore } from './store/ui-store'
-import { subscribeCanvasAutosave } from './store/canvas-autosave'
 import { useAgentPlanListener } from './hooks/use-agent-plan-listener'
 import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { Artifact } from '@shared/types'
@@ -313,10 +312,6 @@ export default function App() {
 
   useEffect(() => {
     return subscribeVaultPersist()
-  }, [])
-
-  useEffect(() => {
-    return subscribeCanvasAutosave()
   }, [])
 
   // Single app-level subscription: the listener scans the store registry, so
