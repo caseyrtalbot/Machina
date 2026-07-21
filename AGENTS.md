@@ -7,20 +7,18 @@ must be identical: one source of truth, twice named. When an architecture fact c
 update both files with the same words in the same change. `npm run sync:agents` is a
 no-op guard so the scoped instructions cannot be overwritten accidentally.
 
-## Read first
+## Plan of record
 
-For workstation-track work, reconstruct the live gate from disk before editing:
+The only active plan is `docs/PLAN.md` (UI refactor + merged loops track). The identity
+decision — the canvas is a document type; there is no supervisor lens — is
+`docs/architecture/adr/0003-canvas-becomes-a-document-type.md`.
+`docs/architecture/interface-contracts.md` is the contract reference for shipped
+subsystems ("contracts §N / vX.Y" in code comments points there); all other build-track
+records were removed 2026-07-21 and live in git history only. Do not take scope from any
+other document; if you find a conflicting plan, stop and flag it.
 
-1. `docs/architecture/workstation/HANDOFF.md` — current shipped state and next gate.
-2. `docs/architecture/workstation/PLAN.md` — locked vision, primitives, phases, invariants.
-3. The active phase spec — the one HANDOFF.md names (currently
-   `docs/architecture/workstation/06-phase-3-specs.md`).
-4. `docs/architecture/workstation/01-interface-contracts.md` for any touched boundary.
-5. Any follow-up document named by the handoff.
-
-Trust those files over memory, older drafts, or stale line numbers. Use `rg` to re-locate
-symbols before editing. Do not trust phase/step state restated in this file or in memory;
-HANDOFF.md is the only authority for where the workstation track stands.
+Trust files on disk over memory, older drafts, or stale line numbers. Use `rg` to
+re-locate symbols before editing.
 
 The untracked `.agents/skills/thought-engine-council/` tree belongs to Casey. Do not edit,
 delete, stage, or commit it.

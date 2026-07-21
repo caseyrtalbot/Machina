@@ -109,7 +109,7 @@ Its writes are guarded in depth, summarized here at a high level:
 
 ### MCP server
 
-`src/main/services/mcp-server.ts` registers nine tools: six reads and three writes (`vault.write_file`, `vault.create_file`, `canvas.apply_plan`). Writes only register when a HITL gate is supplied; `mcp-lifecycle.ts` supplies a `TimeoutHitlGate` (30s auto-deny) plus a `WriteRateLimiter` in the app, while the headless stdio CLI (`src/main/mcp-cli.ts`) passes no gate and therefore stays reads-only.
+`src/main/services/mcp-server.ts` registers nine distinct tools: six reads and three writes (`vault.write_file`, `vault.create_file`, `canvas.apply_plan`); the three `vault.*` tools are additionally registered under `workspace.*` aliases (same handlers — the invoked name flows into the Spotlighting envelope and gate prompt). Writes only register when a HITL gate is supplied; `mcp-lifecycle.ts` supplies a `QueueHitlGate` that rides the global approval queue — write approvals appear as gate-confirm rows in the approvals tray, failing closed after 30 seconds with no response — plus a `WriteRateLimiter`. The headless stdio CLI (`src/main/mcp-cli.ts`) passes no gate and therefore stays reads-only.
 
 In production the server is live over an in-process Streamable HTTP transport bound to 127.0.0.1 (default port 41627, path `/mcp`), started from `src/main/index.ts`. Raw-content read tools wrap results in Spotlighting trust markers so downstream models can distinguish vault content from instructions. Transport rationale and the localhost hardening details are in [ADR 0002](adr/0002-in-process-mcp-streamable-http.md).
 
@@ -148,6 +148,7 @@ The engine kernel's purity pays off here: parser, graph builder, search, block d
 
 ## Further reading
 
+- [Plan of record](../PLAN.md) — the only active plan; identity decision in [ADR 0003](adr/0003-canvas-becomes-a-document-type.md)
 - [Block Protocol wire format](block-protocol.md)
 - [ADR 0001: native agent stays on @anthropic-ai/sdk](adr/0001-native-agent-stays-on-anthropic-sdk.md)
 - [ADR 0002: in-process MCP over Streamable HTTP](adr/0002-in-process-mcp-streamable-http.md)

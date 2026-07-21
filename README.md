@@ -23,8 +23,6 @@ Arrange your markdown notes as cards on an infinite canvas, watch a knowledge gr
 
 Machina is a macOS desktop app. Your notes are plain `.md` files on your disk. The engine reads them, never owns them.
 
-![Multi-provider AI chat beside a spatial canvas](docs/assets/agent-canvas.png)
-
 ## Why Machina
 
 Most note apps store ideas in a list. Thinking is not a list. Machina treats your vault as a graph of typed relationships and gives you three ways to work with it at once: a freeform spatial canvas, a force-directed graph view, and a rich markdown editor, all backed by a single dependency-free engine kernel.
@@ -54,8 +52,6 @@ You are not limited to one canvas. Each canvas gets its own store instance, and 
 
 A force-directed view of your vault, where notes are nodes and typed relationships are edges.
 
-![Force-directed knowledge graph](docs/assets/graph.png)
-
 - The engine builds the graph from your notes and emits seven distinct edge kinds: `connection`, `cluster`, `tension`, `appears_in`, `related`, `derived_from`, and `co-occurrence`. Six come from frontmatter and body wikilinks; co-occurrence is auto-detected.
 - Every edge carries provenance (`frontmatter`, `wikilink`, or `co-occurrence`), and co-occurrence edges include a confidence score.
 - Co-occurrence linking is tuned to be useful, not noisy: terms appearing in 20 or more files are skipped as too generic, terms in fewer than 2 files are ignored, edge weight uses inverse-log term frequency, and only pairs scoring at least 0.3 (and not already explicitly linked) earn an edge.
@@ -66,8 +62,6 @@ A force-directed view of your vault, where notes are nodes and typed relationshi
 ## Rich markdown editor
 
 A Tiptap 3 editor that edits `.md` notes as formatted rich text and round-trips back to clean markdown on disk.
-
-![Rich markdown editor](docs/assets/editor.png)
 
 - A two-tab bar toggles each file between a rich-text WYSIWYG view (Tiptap) and a raw markdown source view (a full CodeMirror 6 editor with line numbers, markdown highlighting, search, and history).
 - YAML frontmatter is preserved verbatim, and custom block and inline types only ship when they have working parse and serialize hooks, so saved files stay clean markdown.
@@ -118,7 +112,7 @@ Machina runs AI three ways. Only Anthropic's API is called by the app itself; th
 | Path | What it is | Guardrails |
 |---|---|---|
 | Native in-app agent | Built-in chat agent calling the Anthropic API directly (default model `claude-sonnet-4-6`). The most developed path. | Per-write approval with preview diff, path validation, write-velocity limiting, append-only audit log |
-| CLI agent threads | Spawn installed coding CLIs in managed PTYs: Claude Code, Codex, and Gemini, with session continuity (Codex threads resume their previous session). | Pre-run git snapshot of the vault for rollback; otherwise trusted to your level |
+| CLI agent threads | Spawn installed coding CLIs in managed PTYs: Claude Code, Codex, and Gemini, with session continuity (Codex threads resume their previous session). | Every turn's workspace writes are attributed and queued in the approvals tray — approve to commit (with agent trailers), reject to revert via git; otherwise trusted to your level |
 | Terminal CLIs by hand | Run any agent CLI yourself in the embedded terminal; presence badges show what is active. | Same filesystem reach as you |
 
 The native agent exposes **12 tools**: `read_note`, `list_vault`, `search_vault`, `write_note`, `edit_note`, `read_canvas`, `pin_to_canvas`, `unpin_from_canvas`, `list_canvases`, `focus_canvas`, `open_dock_tab`, `close_dock_tab`. It streams replies live, runs up to 8 tool-use rounds per turn, and times out after 60s of inactivity.

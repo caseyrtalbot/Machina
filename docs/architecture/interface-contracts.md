@@ -1,7 +1,11 @@
-# Workstation Phase 0 — Interface Contracts
+# Interface Contracts
 
-Typed contracts for the Phase 1 tracer bullet, written before code per the workstation
-plan. Companion to `00-seam-audit.md` (file:line evidence for every seam referenced here).
+> **CONTRACT REFERENCE.** The typed contracts here are authoritative for the shipped
+> subsystems they describe (source-code comments citing "contracts §N / vX.Y" point
+> here). Scope and plans live only in `docs/PLAN.md`. The build-track documents this
+> file once cited as companions (seam audit, phase specs, handoff) were removed
+> 2026-07-21; such citations, including in the §8 changelog, refer to git history.
+
 House conventions apply throughout: branded ids (`@shared/types`), `Result`-style
 structured errors over throws, the 4-step IPC pattern (`AGENTS.md`), files under 800
 lines.
@@ -193,7 +197,7 @@ it per turn in `CliThreadSpawner.input()` — **not** `sendUserMessage`, which h
 
 **Status 2026-07-06 (step 5, v1.1.4):** `commitPreAgentSnapshot` is RETIRED — both call
 sites (spawn + per-turn) removed after the G1–G8 evidence gate passed on fresh runs
-(`03-snapshot-retirement-evidence.md`). The `<TE_DIR>/no-auto-commit` opt-out retired with
+(evidence doc removed; git history). The `<TE_DIR>/no-auto-commit` opt-out retired with
 it: no automatic commits remain, so the paragraph above about its scope is historical.
 `isAutoCommitOptedOut` is deleted from `git-service.ts`; `isGitRepo` and the §2 substrate
 are unchanged.
@@ -432,7 +436,7 @@ Contract points (each traceable to a verified finding):
   approve/reject + `revertAgent` are proven on a real repo against the step 5 evidence
   checklist. No window where neither mechanism covers rollback.
   **Status 2026-07-06 (step 5, v1.1.4):** satisfied and closed — the G1–G8 evidence gate
-  passed on fresh runs at the landing HEAD (`03-snapshot-retirement-evidence.md`, all
+  passed on fresh runs at the landing HEAD (evidence doc removed; git history — all
   boxes checked; parity ledger records the never-covered cases honestly), and the
   snapshot was retired in the same step. Rollback coverage never gapped.
 
@@ -1289,9 +1293,7 @@ observed-spend floor), `getThreadCostUsd(threadId)` (per-thread, app-run).
 Loop-traffic calibration numbers (episode-reset masking, re-trip cadence, the
 aggregate trip at exactly firing N+1) are asserted — and summarized as the
 step-6 calibration table — in the header of
-tests/main/services/agent-breaker-loop-traffic.test.ts, the canonical record
-until the 06-phase-3-specs.md step-5 DONE block lands in the close-out pass
-and copies that table.
+tests/main/services/agent-breaker-loop-traffic.test.ts, the canonical record.
 
 ## 6. IPC channels (names reserved; registration follows the 4-step pattern)
 
@@ -1357,8 +1359,6 @@ double-built the same files with contradictory shapes. Canonical order:
 | 4 Dock IDE shell           | §3 projection (existing seam only; independent of 2–3, may land in parallel after 1)             |
 | 5 Retire snapshot          | §2/§4 never-regress rule — evidence gate (G1–G8), no new interface                               |
 | 6 test-fixer template      | §5 folder schema + §6 harness channels + agentId(slug) → turn registry → trailers                |
-
-Implementation detail per step: `02-phase-1-specs.md`.
 
 ## 8. Contract changelog
 
@@ -1438,10 +1438,9 @@ Implementation detail per step: `02-phase-1-specs.md`.
   spread over 20 fresh-thread firings vs a trip at batch 3 within one firing;
   aggregate trip at exactly firing N+1 with every per-thread count at 1) are
   asserted and tabled in the header of
-  tests/main/services/agent-breaker-loop-traffic.test.ts — the canonical record
-  until the 06-phase-3-specs.md step-5 DONE block lands in the close-out pass
-  and copies that table. The stale 04-phase-2-specs.md
-  max-$ line corrected in this commit (stale-claim ledger discharged). §6: no new
+  tests/main/services/agent-breaker-loop-traffic.test.ts — the canonical record.
+  A stale max-$ claim in the phase-2 specs (since removed; git history) was
+  corrected in this commit (stale-claim ledger discharged). §6: no new
   IPC.
 - **v1.3.3 (2026-07-15, Phase 3 step 4 landed)** — unattended turn substrate. §4
   gains the "Transcript persistence authority + unattended dispatch" subsection:
@@ -1472,7 +1471,7 @@ Implementation detail per step: `02-phase-1-specs.md`.
   time via its specced reversal** (`thread:append-system`, main-owned serialized
   append): dispatch-refusal / start-status system messages persist to disk, so no
   unratified transcript regression lands; Casey ratifies the direction post-hoc
-  (HANDOFF open item). Review hardening in the same landing: per-thread dispatch
+  (open item recorded in the since-removed handoff doc; git history). Review hardening in the same landing: per-thread dispatch
   serialization, unconditional readiness wait (explicit-spawn and
   concurrent-dispatch paths gated too), disk-derived `thread:save` authority,
   quit-time `drainThreadWrites` (closes residual r5), durable
@@ -1949,8 +1948,8 @@ false`) and the `HARNESS_PROTECTED_GLOBS` auto-reject can never see it.
   `commitPreAgentSnapshot` retired (spawn-site + per-turn call sites removed from
   `CliThreadSpawner`, function deleted from `git-service.ts`) after the G1–G8 evidence
   gate passed on fresh runs at the landing HEAD — see
-  `03-snapshot-retirement-evidence.md` (gate checklist + parity ledger: non-repo,
-  gitignored paths, out-of-root, agent-runs-git). Deliberate deviation recorded: the
+  the snapshot-retirement evidence doc (removed; git history — gate checklist +
+  parity ledger: non-repo, gitignored paths, out-of-root, agent-runs-git). Deliberate deviation recorded: the
   `<TE_DIR>/no-auto-commit` opt-out and `isAutoCommitOptedOut` are retired with the
   snapshot (it was scoped to automatic commits only, and none remain);
   commitApproved/revertAgent/discard were always explicit user actions and are

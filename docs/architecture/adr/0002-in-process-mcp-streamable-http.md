@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-06-10
-- Plan item: production-grade plan 2.3
+- Plan item: production-grade plan 2.3 (a superseded 2026-06 plan, removed 2026-07-21; see git history — plan of record is now `docs/PLAN.md`)
 
 ## Context
 
