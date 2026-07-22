@@ -27,6 +27,33 @@ other document; if you find a conflicting plan, stop and flag it.
 Trust files on disk over memory, older drafts, or stale line numbers. Use `rg` to
 re-locate symbols before editing.
 
+## Working protocol
+
+- **Single source per fact.** Every architecture fact lives in exactly one canonical
+  document; everything else points at it and never restates it. Canonical homes:
+  `docs/PLAN.md` (scope, sequence, gates), `docs/architecture/overview.md` (system map,
+  data flows, renderer shell, store/worker inventory),
+  `docs/architecture/safety-subsystem.md` (trust boundaries, gates, audit, MCP surface),
+  `docs/architecture/block-protocol.md` (wire format),
+  `docs/architecture/interface-contracts.md` (shipped interfaces),
+  `docs/architecture/adr/` (decisions). This file holds conventions and pointers only.
+- **The plan is canonical and stays untouched during execution.** `docs/PLAN.md` changes
+  only at a layer boundary (marking items complete, with date and evidence pointer) or
+  by an explicitly ratified amendment. Never restructure it mid-layer; on conflict, stop
+  and flag.
+- **Doc-reconciliation in the same commit.** A change that alters an architecture fact
+  updates that fact's canonical home in the same commit. A claim assertable in CI
+  (counts, invariants, contrast ratios) gets a test, not a sentence.
+- **Clean handoffs.** Work concludes only at a green checkpoint (`npm run check` plus
+  the item's verify gate). Conclude by overwriting `docs/HANDOFF.md` — a single file,
+  never appended, git history is the archive — with: position in the plan, what shipped
+  (commits + verification evidence), the exact next step, and landmines. A fresh agent
+  must be able to start from `docs/PLAN.md` + `docs/HANDOFF.md` + this file alone.
+- **Greppable gates define done.** No item is complete until its verify gate passes
+  in-tree; no checkbox without the gate.
+- **Lean docs.** Delete superseded content outright; no historical banners or
+  deprecation stubs — git history is the archive.
+
 ## Multi-agent workflow
 
 - When two or more workstreams are independent, dispatch them in one wave with explicit,

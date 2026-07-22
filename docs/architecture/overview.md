@@ -119,21 +119,37 @@ The embedded terminal converts raw PTY bytes into structured command blocks. She
 
 Full wire format, throttling, and degraded-mode behavior: [block-protocol.md](block-protocol.md).
 
+## Renderer shell
+
+`AgentShell.tsx` (`src/renderer/src/panels/agent-shell/`) composes the fixed shell: titlebar (drag region, breadcrumb, approvals tray, panel toggles) → left `ThreadSidebar` → fixed-width chat column (`ThreadPanel`) → center `SurfaceDock` (per-thread dock tabs, kinds `canvas|editor|graph|ghosts|health`, plus bottom `TerminalStrip`) → right `SideDockRibbon` icon rail → `Statusbar`. Floating: `CommandPalette`, `HarnessGallery`, dialogs. Dock tabs are keyed per thread (`dock-store.dockTabsByThreadId`).
+
+KeepAlive: panels mount once, then `display: none` on tab switch (preserves terminal state); heavy panels (Canvas, GraphView, Ghosts) load via `React.lazy`. The canvas is React DOM under a CSS-transform pan-zoom layer with 12 card types (`CanvasNodeType`, `src/shared/canvas-types.ts`); Pixi.js drives only the graph view. Tab rows render through the shared `TabBar` primitive; overlays through the shared `Modal`/`Overlay` primitive (`src/renderer/src/components/`).
+
 ## State management
 
 Renderer state lives in Zustand stores (`src/renderer/src/store/`), each owning one domain:
 
 | Store | Owns |
 |-------|------|
-| `vault-store` | Files, artifacts, graph, vault path/config |
-| `editor-store` | Active note, mode, dirty state, tabs, nav history |
-| `canvas-store` | Nodes, edges, viewport, selection, split editor |
-| `graph-view-store` | Graph viewport, hover/selection, force params |
-| `thread-store` | Agent threads, messages, streaming, dock layout |
+| `vault-store` | Files, artifacts, graph, vault path/config, fileToId map |
+| `editor-store` | Note identity for the singleton editor surface: active note, open note tabs, preview tab, mode, dirty, content, cursor, nav history |
+| `dock-store` | Per-thread dock tabs + active index + collapse, `openNoteInEditor` helper, dock-state seed/validate/flush |
+| `canvas-store` | Per-canvas factory (`createCanvasStore()`): nodes, edges, viewport, selection, split editor |
+| `graph-view-store` | Graph viewport, hover/selected node, force params |
+| `thread-store` | Threads, messages, streaming, chat layout, in-flight + runId per thread |
 | `block-store` | Per-session ordered terminal `Block` records |
-| `enrichment-run-store` | Graph enrichment run state |
-| `settings-store` | Accent, opacity, density, font sizes (localStorage) |
-| `ui-store`, `sidebar-*`, `vault-health-store`, `claude-status-store` | Per-note UI state, sidebar filter/selection, health, CLI status |
+| `ui-store` | Per-note UI state (backlink expansion), persisted via IPC |
+| `settings-store` | Accent, opacity, blur, font sizes, density/radii/backgroundTint/canvasGrid (localStorage; ADR 0005 schedules these axes for removal) |
+| `claude-status-store` | Claude CLI availability/status |
+| `sidebar-filter-store`, `sidebar-selection-store` | Sidebar file-tree filter and selection |
+| `vault-health-store` | Vault health monitor results |
+| `approvals-store` | Renderer mirror of main's ApprovalQueue: pending items, badge count, resolve |
+| `agent-breaker-store` | Circuit-breaker mirror: tripped threads + signal-source flag |
+| `agent-dispatch-store` | Thread start/dispatch status, harness launch guards |
+| `cli-session-store` | Which live PTY backs each CLI thread (single source of truth) |
+| `enrichment-run-store` | Graph enrichment run progress |
+| `harness-store` | Synchronous harness summaries for the command palette |
+| `terminal-strip-store` | Terminal strip sessions + active tab |
 
 `canvas-store` is the exception to the singleton pattern: `createCanvasStore()` (`canvas-store.ts`) is a factory, and each canvas gets its own store instance, which is what makes real multi-canvas work. Persistence flows through `vault-persist.ts` to `.machina/state.json` on a 1s debounce, and a coordinated two-phase quit flushes dirty documents and canvas state before the app exits.
 
