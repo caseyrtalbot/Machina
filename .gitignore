@@ -31,7 +31,6 @@ CLAUDE.md
 docs/working/
 docs/superpowers/
 docs/forge/
-docs/architecture/safety-subsystem.md
 
 # Ephemeral project state
 .machina-project-canvas.json

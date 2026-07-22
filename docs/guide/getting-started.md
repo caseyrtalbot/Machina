@@ -1,6 +1,6 @@
 # Getting Started
 
-Machina is a local-first thinking environment for macOS: your notes are plain markdown files on disk, arranged on an infinite canvas, connected in a knowledge graph, and searchable from one palette. Agents work inside the same vault; the in-app agent asks your approval on every write.
+Machina is a governed agent workbench for macOS: AI agents work over your local markdown vault, and every write is attributed, approvable, and revertable. Your notes stay plain markdown files on disk, connected in a knowledge graph, searchable from one palette, and arrangeable on a canvas. The in-app agent asks your approval on every write.
 
 This guide takes you from clone to a working session in about ten minutes.
 

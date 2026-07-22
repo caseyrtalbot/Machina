@@ -9,29 +9,29 @@
 ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
 </pre>
 
-**A local-first knowledge engine for spatial thinking**
+**The governed workbench for agents you don't own**
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-ebebeb?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-111111?style=flat-square)
 ![Electron](https://img.shields.io/badge/Electron-39-2b2e3b?style=flat-square)
 ![React](https://img.shields.io/badge/React-19-149eca?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-2800%2B%20passing-3fb950?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-4000%2B%20passing-3fb950?style=flat-square)
 
 </div>
 
-Arrange your markdown notes as cards on an infinite canvas, watch a knowledge graph assemble itself from your links and tags, and bring AI agents to the work without handing your notes to the cloud.
+Run AI agents (the built-in one, Claude Code, Codex, or any CLI) against your notes and files, and keep the ability to answer: which agent wrote this, what did it cost, and how do I undo all of it. Every agent write is attributed, gated through one approval queue, committed with provenance trailers, and revertable wholesale. Underneath sits a local-first knowledge engine: your notes stay plain `.md` files on disk, connected in a typed graph, searchable, and spatially arrangeable.
 
-Machina is a macOS desktop app. Your notes are plain `.md` files on your disk. The engine reads them, never owns them.
+Machina is a macOS desktop app. The engine reads your files, never owns them.
 
 ## Why Machina
 
-Most note apps store ideas in a list. Thinking is not a list. Machina treats your vault as a graph of typed relationships and gives you three ways to work with it at once: a freeform spatial canvas, a force-directed graph view, and a rich markdown editor, all backed by a single dependency-free engine kernel.
+Agent tools govern only the agents they own: an editor gates its own edits, a terminal gates its own built-in agent. Machina governs agents it does not own, including unmodified third-party CLIs and external MCP clients, with one accountability layer:
 
-- Local-first: notes stay on disk as portable markdown; the engine parses, it does not lock in.
-- Spatial: lay out cards on a pannable, zoomable surface and let related ideas cluster into labeled regions.
-- Connected: relationships are extracted automatically from wikilinks, frontmatter, tags, and co-occurrence.
-- Honest about gaps: unresolved `[[wikilinks]]` surface as "ghosts," ideas you have referenced but not yet written.
-- AI-ready: a built-in agent talks to the Anthropic API behind per-write approval and an audit log, third-party coding CLIs run inside the app's terminal, and a live MCP server exposes the vault to external clients.
+- Attributed: every turn's filesystem writes are matched to the agent that made them, and approved changes commit with `Machina-Agent` git trailers.
+- Governed: writes route into a fail-closed approval queue (approve to commit, reject to revert via git); the built-in agent adds per-write diff approval and a write-velocity limiter.
+- Revertable: one click discards a single change or undoes an agent's entire approved history.
+- Observable: shell sessions become structured, secret-masked blocks (command, output, exit code, working directory), attributable per turn.
+- Local-first: notes are portable markdown on disk; a dependency-free engine kernel builds the graph, search index, and ghost index that give agents context. No cloud sync, no telemetry.
 
 ## Spatial canvas
 
@@ -213,7 +213,7 @@ While a canvas is visible, Cmd+1 through Cmd+5 fires both the focus-frame jump a
 
 ## Architecture
 
-Machina is three Electron process bundles (main, context-isolated preload, renderer) plus a second preload for the isolated terminal webview. A dependency-free engine kernel under `src/shared/engine/` handles parsing, graph building, ghost indexing, ontology grouping, block detection, secret scanning, and search; both the main process and the renderer's Web Workers import it, and heavy work (vault parsing, graph physics, ontology, folder mapping) runs off the main thread in four workers. The whole repo is covered by roughly 2,800 unit and integration tests, gated by `npm run check`.
+Machina is three Electron process bundles (main, context-isolated preload, renderer) plus a second preload for the isolated terminal webview. A dependency-free engine kernel under `src/shared/engine/` handles parsing, graph building, ghost indexing, ontology grouping, block detection, secret scanning, and search; both the main process and the renderer's Web Workers import it, and heavy work (vault parsing, graph physics, ontology, folder mapping) runs off the main thread in four workers. The whole repo is covered by roughly 4,000 unit and integration tests, gated by `npm run check`.
 
 Read the full tour in the [architecture overview](docs/architecture/overview.md).
 

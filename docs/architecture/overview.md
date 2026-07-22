@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Machina is a local-first Electron app: a markdown vault on disk, an infinite canvas, a knowledge graph, an embedded terminal, and three agent surfaces, all built around one pure knowledge engine. This document is the end-to-end map for anyone evaluating or contributing to the codebase.
+Machina is a local-first Electron app: a governed agent workbench over a markdown vault on disk. Three agent surfaces converge on one attribution and approval layer, alongside a rich editor, knowledge graph, spatial canvas, and embedded terminal, all built around one pure knowledge engine. This document is the end-to-end map for anyone evaluating or contributing to the codebase.
 
 ## Process model
 
@@ -139,7 +139,7 @@ Renderer state lives in Zustand stores (`src/renderer/src/store/`), each owning 
 
 ## Testing
 
-- ~2,800 unit and integration tests (vitest + happy-dom), in `tests/` mirroring `src/` for pure logic and `src/**/__tests__/` for colocated component tests
+- ~4,000 unit and integration tests (vitest + happy-dom), in `tests/` mirroring `src/` for pure logic and `src/**/__tests__/` for colocated component tests
 - Tests needing real Node APIs opt in with `// @vitest-environment node`
 - `npm run check` is the quality gate: lint + dual typecheck (node and web tsconfigs) + full test run, expected to pass clean
 - Playwright e2e (`npm run test:e2e`) runs serially against a fixture vault in `e2e/fixtures/test-vault/`

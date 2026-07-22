@@ -1,7 +1,7 @@
 {
   "name": "machina",
   "version": "1.0.0",
-  "description": "Local-first knowledge engine for spatial thinking",
+  "description": "Governed agent workbench: attributed, approvable, revertable AI agents over your local markdown vault",
   "main": "./out/main/index.js",
   "author": "Casey Talbot",
   "homepage": "https://github.com/caseyrtalbot/Machina",

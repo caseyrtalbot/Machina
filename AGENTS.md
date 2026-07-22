@@ -9,9 +9,16 @@ no-op guard so the scoped instructions cannot be overwritten accidentally.
 
 ## Plan of record
 
-The only active plan is `docs/PLAN.md` (UI refactor + merged loops track). The identity
-decision — the canvas is a document type; there is no supervisor lens — is
-`docs/architecture/adr/0003-canvas-becomes-a-document-type.md`.
+The only active plan is `docs/PLAN.md` (layered track: Integrity → Foundations → Signal
+→ Engine → Face; the track's exit bar is Loop Runner v0, decision D6). The identity —
+Machina is the governed workbench for agents you don't own — is recorded across
+`docs/architecture/adr/0003-canvas-becomes-a-document-type.md` (canvas is a document
+type; no supervisor lens),
+`docs/architecture/adr/0004-spatial-authoring-descoped-canvas-becomes-projection.md`
+(spatial authoring descoped; the canvas's future is a system-arranged projection
+surface), and
+`docs/architecture/adr/0005-design-constitution-constants-over-configuration.md`
+(appearance is ratified constants, not preferences).
 `docs/architecture/interface-contracts.md` is the contract reference for shipped
 subsystems ("contracts §N / vX.Y" in code comments points there); all other build-track
 records were removed 2026-07-21 and live in git history only. Do not take scope from any
@@ -103,7 +110,7 @@ files fold to one at the dock-store seed boundary (paths harvested into
 `editor-store.restoreTabs`). Agent-driven editor opens carry the note as
 `DockAction.notePath`, not on the tab.
 
-## Workstation safety invariants
+## Agent safety invariants
 
 - CLI-agent containment is post-persistence, not write prevention. Writes are already on
   disk when reviewed; Approve commits them and Reject reverts them through git. UI and
