@@ -147,7 +147,7 @@ describe('EditorPanel source↔rich mode-switch round-trip', () => {
     await waitFor(() => expect(tiptap.setContentCalls).toContainEqual({ __md: BODY }))
 
     // rich → source: seeded from raw frontmatter + serialized Tiptap doc
-    fireEvent.click(screen.getByRole('tab', { name: 'Source' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Source' }))
     expect(useEditorStore.getState().content).toBe(ORIGINAL)
 
     // Edit in source mode: routes through DocumentManager (doc.update)
@@ -156,7 +156,7 @@ describe('EditorPanel source↔rich mode-switch round-trip', () => {
     expect(useEditorStore.getState().isDirty).toBe(true)
 
     // source → rich: the edited text (not stale doc content) lands in Tiptap
-    fireEvent.click(screen.getByRole('tab', { name: 'Rich' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rich' }))
     expect(tiptap.setContentCalls.at(-1)).toEqual({ __md: EDITED_BODY })
 
     // The Tiptap sync effect must not re-apply the original content over the
@@ -171,11 +171,11 @@ describe('EditorPanel source↔rich mode-switch round-trip', () => {
     render(<EditorPanel onNavigate={() => {}} />)
     await waitFor(() => expect(tiptap.setContentCalls).toContainEqual({ __md: BODY }))
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Source' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Source' }))
     expect(useEditorStore.getState().isDirty).toBe(false)
     expect(useEditorStore.getState().content).toBe(ORIGINAL)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Rich' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rich' }))
     expect(useEditorStore.getState().isDirty).toBe(false)
 
     // No phantom writes: a pure toggle pushes nothing to DocumentManager,

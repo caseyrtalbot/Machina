@@ -505,11 +505,12 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
             →
           </button>
         </div>
-        <div role="tablist" aria-label="Editor mode" className="flex items-center">
+        {/* Mode switch, not a tab bar: aria-pressed buttons (role="tab" lives
+            only in the TabBar primitive). */}
+        <div role="group" aria-label="Editor mode" className="flex items-center">
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === 'rich'}
+            aria-pressed={mode === 'rich'}
             className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
             onClick={() => handleModeChange('rich')}
           >
@@ -517,8 +518,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === 'source'}
+            aria-pressed={mode === 'source'}
             className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
             onClick={() => handleModeChange('source')}
           >

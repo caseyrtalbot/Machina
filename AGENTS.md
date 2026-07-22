@@ -85,6 +85,12 @@ New IPC behavior follows the existing four-site pattern:
 Main owns workspace roots and security-relevant decisions. Do not trust renderer-supplied
 roots, harness identities, or approval state when main can resolve them authoritatively.
 
+**Shared TabBar primitive** (`components/tabbar/TabBar.tsx`): every real tab row (dock
+surface tabs, editor note tabs, terminal strip sessions) renders through it — skins via
+`variant` (`underline|chrome|pill`), behavior via optional props. `role="tab"`/`tablist`
+and the `te-tab*` CSS vocabulary exist only there; new tab UIs must use it, and mode
+switches/segmented controls use `aria-pressed`, not `role="tab"`.
+
 **Singleton editor surface**: the dock holds at most ONE editor tab (`{ kind: 'editor' }`,
 kind-keyed like graph/ghosts/health — no path). Note identity lives only in editor-store
 (`openTabs`/`activeNotePath`); the editor surface's internal note-tab bar is the

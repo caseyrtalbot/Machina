@@ -1379,99 +1379,59 @@ body {
 }
 
 /* Tab bar: slightly darker than content so active tab punches through */
-.editor-tab-bar {
+/* ─── TabBar primitive (components/tabbar/TabBar.tsx) ───
+   One tab vocabulary, three skins via [data-variant]:
+   underline (dock surfaces), chrome (editor note tabs), pill (terminal strip).
+   State rides bare data attributes: data-active / data-preview / data-dirty /
+   data-dragging / data-drop-target. */
+
+.te-tabbar {
   display: flex;
-  align-items: center;
-  gap: 2px;
+  align-items: stretch;
   flex-shrink: 0;
-  height: var(--window-top-chrome-height);
-  padding: 0 8px 0 6px;
-  overflow-x: auto;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--chrome-panel-bg-strong) 94%, transparent),
-    color-mix(in srgb, var(--chrome-panel-bg) 92%, transparent)
-  );
   position: relative;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 5%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, white 2%, transparent);
-  -webkit-app-region: drag;
 }
 
-/* Bottom border breaks under the active tab (active tab z-index sits above) */
-.editor-tab-bar::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--chrome-panel-border);
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* Hide scrollbar but allow scroll */
-.editor-tab-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.editor-file-tab {
-  position: relative;
+.te-tabbar__list {
   display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.te-tabbar__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.te-tab {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: calc(var(--window-top-chrome-height) - 4px);
-  padding: 0 16px;
-  border-right: none;
   cursor: pointer;
   flex-shrink: 0;
-  z-index: 1;
-  -webkit-app-region: no-drag;
-  transition:
-    background-color 120ms ease-out,
-    box-shadow 120ms ease-out;
+  outline: none;
 }
 
-.editor-file-tab:hover:not([data-active='true']) {
-  background: rgba(255, 255, 255, 0.04);
+.te-tab[data-dragging] {
+  opacity: 0.5;
 }
 
-/* Active tab: matches content bg, sits above bottom border to break it.
-   Console treatment: accent underline + subtle inset highlight, no rounded chrome. */
-.editor-file-tab[data-active='true'] {
-  background: var(--color-bg-base);
-  z-index: 2;
-  box-shadow:
-    inset 0 -1.5px 0 var(--color-accent-default),
-    inset 0 1px 0 color-mix(in srgb, white 6%, transparent),
-    0 1px 0 var(--color-bg-base);
-}
-
-.editor-file-tab__title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.02em;
+.te-tab__title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
-  color: var(--color-text-muted);
-  transition: color 120ms ease-out;
 }
 
-.editor-file-tab[data-active='true'] .editor-file-tab__title {
-  color: var(--color-text-primary);
+.te-tab[data-preview] .te-tab__title {
+  font-style: italic;
 }
 
-.editor-file-tab:hover .editor-file-tab__title {
-  color: var(--color-text-secondary);
-}
-
-/* Indicator slot: holds the dirty dot and close button in the same 16px cell
-   so they swap without layout shift. */
-.editor-file-tab__indicator {
+/* Indicator slot: holds the dirty dot and close button in the same cell so
+   they swap without layout shift. */
+.te-tab__indicator {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -1481,7 +1441,7 @@ body {
   flex-shrink: 0;
 }
 
-.editor-file-tab__dirty-dot {
+.te-tab__dirty-dot {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1492,7 +1452,7 @@ body {
   transition: opacity 120ms ease-out;
 }
 
-.editor-file-tab__dirty-dot::before {
+.te-tab__dirty-dot::before {
   content: '';
   width: 6px;
   height: 6px;
@@ -1500,16 +1460,16 @@ body {
   background: var(--color-accent-default);
 }
 
-.editor-file-tab[data-dirty='true'] .editor-file-tab__dirty-dot {
+.te-tab[data-dirty] .te-tab__dirty-dot {
   opacity: 1;
 }
 
-.editor-file-tab[data-dirty='true']:hover .editor-file-tab__dirty-dot,
-.editor-file-tab[data-dirty='true']:focus-within .editor-file-tab__dirty-dot {
+.te-tab[data-dirty]:hover .te-tab__dirty-dot,
+.te-tab[data-dirty]:focus-within .te-tab__dirty-dot {
   opacity: 0;
 }
 
-.editor-file-tab__close {
+.te-tab__close {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1518,60 +1478,29 @@ body {
   border: none;
   background: transparent;
   color: var(--color-text-muted);
-  border-radius: var(--r-tool);
+  border-radius: var(--r-inline);
   cursor: pointer;
   padding: 0;
   opacity: 0;
+  pointer-events: none;
   z-index: 4;
   transition: opacity 120ms ease-out;
   -webkit-app-region: no-drag;
 }
 
-.editor-file-tab:hover .editor-file-tab__close,
-.editor-file-tab:focus-within .editor-file-tab__close {
+.te-tab:hover .te-tab__close,
+.te-tab:focus-within .te-tab__close {
   opacity: 1;
+  pointer-events: auto;
 }
 
-.editor-file-tab__close:hover {
+.te-tab__close:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--color-text-secondary);
 }
 
-/* Add button: inline after last tab, vertically centered */
-.editor-tab-bar__add {
-  flex-shrink: 0;
-  margin-left: 2px;
-  align-self: center;
-}
-
-.editor-tab-bar__drag-spacer {
-  flex: 1 0 32px;
-  align-self: stretch;
-  min-width: 24px;
-}
-
-/* Close-all button pinned to right of tab bar */
-.editor-tab-bar__actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 2px 0 8px;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 3;
-  -webkit-app-region: no-drag;
-}
-
-.editor-tab-bar__actions::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 -18px;
-  width: 18px;
-  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.12));
-  pointer-events: none;
-}
-
-.editor-tab-bar__btn {
+/* Bar chrome shared by consumers via trailing/actions slots. */
+.te-tabbar__btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1589,14 +1518,30 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.editor-tab-bar__btn:hover {
+.te-tabbar__btn:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-text-secondary);
 }
 
-/* Close-all: text-first affordance to disambiguate from the macOS
+/* Add button: inline after last tab, vertically centered */
+.te-tabbar__add {
+  flex-shrink: 0;
+  margin-left: 2px;
+  align-self: center;
+}
+
+.te-tabbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+/* Text-first affordance (e.g. Close all) to disambiguate from the macOS
    window-close control (F-editor-04). */
-.editor-tab-bar__close-all {
+.te-tabbar__text-btn {
   display: inline-flex;
   align-items: center;
   height: 22px;
@@ -1616,9 +1561,208 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.editor-tab-bar__close-all:hover {
+.te-tabbar__text-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-text-secondary);
+}
+
+/* Enter/exit motion (applied only when the consumer opts into `animated`). */
+.te-tab-enter {
+  animation: te-tab-enter 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
+}
+
+.te-tab-exiting {
+  animation: te-tab-exit 140ms cubic-bezier(0.4, 0, 1, 1) both;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── underline: dock surface tabs ── */
+
+.te-tabbar[data-variant='underline'] {
+  height: 28px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.te-tabbar[data-variant='underline'] .te-tab {
+  gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  background: transparent;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition:
+    background 100ms ease-out,
+    color 100ms ease-out,
+    opacity 100ms ease-out;
+}
+
+.te-tabbar[data-variant='underline'] .te-tab:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+
+.te-tabbar[data-variant='underline'] .te-tab[data-active] {
+  background: var(--color-bg-elevated);
+  border-bottom: 1.5px solid var(--color-accent-default);
+  color: var(--color-text-primary);
+}
+
+.te-tabbar[data-variant='underline'] .te-tab[data-drop-target] {
+  border-left-color: var(--color-accent-default);
+}
+
+.te-tabbar[data-variant='underline'] .te-tab__title {
+  max-width: 180px;
+}
+
+.te-tabbar[data-variant='underline'] .te-tab[data-active] .te-tab__close {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── chrome: editor note tabs (window-chrome bar, draggable) ── */
+
+.te-tabbar[data-variant='chrome'] {
+  align-items: center;
+  gap: 2px;
+  height: var(--window-top-chrome-height);
+  padding: 0 8px 0 6px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--chrome-panel-bg-strong) 94%, transparent),
+    color-mix(in srgb, var(--chrome-panel-bg) 92%, transparent)
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 5%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, white 2%, transparent);
+  -webkit-app-region: drag;
+}
+
+/* Bottom border breaks under the active tab (active tab z-index sits above) */
+.te-tabbar[data-variant='chrome']::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--chrome-panel-border);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.te-tabbar[data-variant='chrome'] .te-tabbar__list {
+  align-items: center;
+  gap: 2px;
+  scrollbar-width: none;
+}
+
+/* Hide scrollbar but allow scroll */
+.te-tabbar[data-variant='chrome'] .te-tabbar__list::-webkit-scrollbar {
+  display: none;
+}
+
+.te-tabbar[data-variant='chrome'] .te-tab {
+  gap: 4px;
+  height: calc(var(--window-top-chrome-height) - 4px);
+  padding: 0 16px;
+  z-index: 1;
+  -webkit-app-region: no-drag;
+  transition:
+    background-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.te-tabbar[data-variant='chrome'] .te-tab:hover:not([data-active]) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Active tab: matches content bg, sits above bottom border to break it.
+   Console treatment: accent underline + subtle inset highlight, no rounded chrome. */
+.te-tabbar[data-variant='chrome'] .te-tab[data-active] {
+  background: var(--color-bg-base);
+  z-index: 2;
+  box-shadow:
+    inset 0 -1.5px 0 var(--color-accent-default),
+    inset 0 1px 0 color-mix(in srgb, white 6%, transparent),
+    0 1px 0 var(--color-bg-base);
+}
+
+.te-tabbar[data-variant='chrome'] .te-tab__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  max-width: 200px;
+  color: var(--color-text-muted);
+  transition: color 120ms ease-out;
+}
+
+.te-tabbar[data-variant='chrome'] .te-tab[data-active] .te-tab__title {
+  color: var(--color-text-primary);
+}
+
+.te-tabbar[data-variant='chrome'] .te-tab:hover .te-tab__title {
+  color: var(--color-text-secondary);
+}
+
+.te-tabbar[data-variant='chrome'] .te-tabbar__spacer {
+  flex: 1 0 32px;
+  align-self: stretch;
+  min-width: 24px;
+}
+
+.te-tabbar[data-variant='chrome'] .te-tabbar__actions {
+  padding: 0 2px 0 8px;
+  z-index: 3;
+}
+
+.te-tabbar[data-variant='chrome'] .te-tabbar__actions::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -18px;
+  width: 18px;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.12));
+  pointer-events: none;
+}
+
+/* ── pill: terminal strip session tabs ── */
+
+.te-tabbar[data-variant='pill'] {
+  height: 30px;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.te-tabbar[data-variant='pill'] .te-tabbar__list {
+  align-items: center;
+  gap: 2px;
+}
+
+.te-tabbar[data-variant='pill'] .te-tab {
+  gap: 6px;
+  max-width: 180px;
+  padding: 3px 6px 3px 8px;
+  border-radius: var(--r-inline);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.te-tabbar[data-variant='pill'] .te-tab[data-active] {
+  background: var(--bg-tint-text);
+  color: var(--color-text-primary);
+}
+
+.te-tabbar[data-variant='pill'] .te-tab__close {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .editor-tab-content {
@@ -1722,8 +1866,8 @@ body {
   .te-card-enter,
   .te-popover-enter,
   .te-tool-card-pending::after,
-  .dock-tab-enter,
-  .dock-tab-exiting,
+  .te-tab-enter,
+  .te-tab-exiting,
   [class*='te-pulse'],
   [class*='te-shimmer'],
   [class*='te-slide'],
@@ -2959,7 +3103,7 @@ body {
   border-radius: inherit;
 }
 
-/* ─── Dock Tab Open / Close Motion ─── */
+/* ─── Tab Open / Close Motion (classes live in the TabBar primitive section) ─── */
 @keyframes te-tab-enter {
   from {
     opacity: 0;
@@ -2983,15 +3127,6 @@ body {
     max-width: 0;
     transform: translateY(2px);
   }
-}
-.dock-tab-enter {
-  animation: te-tab-enter 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  overflow: hidden;
-}
-.dock-tab-exiting {
-  animation: te-tab-exit 140ms cubic-bezier(0.4, 0, 1, 1) both;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 /* ─── Popover / Palette Entrance ─── */

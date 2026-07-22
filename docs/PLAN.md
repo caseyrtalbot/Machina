@@ -59,7 +59,10 @@ consumers in the same slice so nothing ships unused:
    OnboardingOverlay. (complete 2026-07-21, commit 638e2ef — plus the canvas
    ShortcutOverlay, a ninth consumer the survey missed)
 2. `TabBar` — extract from `DockTabBar.tsx` (most complete: drag/reorder, context menu,
-   animated close); adopt in editor note-tabs and terminal strip.
+   animated close); adopt in editor note-tabs and terminal strip. (complete 2026-07-22 —
+   `components/tabbar/TabBar.tsx`, variants `underline|chrome|pill`; invariant gates:
+   zero `colors.tab` tokens, `role="tab"` only inside TabBar, old `editor-file-tab`/
+   `dock-tab-*` vocabulary deleted)
 3. `PanelHeader` — one header/toolbar pattern for Ghosts, Graph, Editor, and canvas
    toolbar chrome.
 4. `EmptyState` — collapse `CanvasEmptyStates.tsx`, `EmptyDockState`, and per-panel

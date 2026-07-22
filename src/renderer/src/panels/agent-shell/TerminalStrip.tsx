@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
-import { borderRadius, colors, typography } from '../../design/tokens'
-import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
+import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { borderRadius, colors } from '../../design/tokens'
+import { TabBar, type TabBarItem } from '../../components/tabbar/TabBar'
+import type { ContextMenuEntry } from '../../components/ContextMenu'
 import { useThreadStore } from '../../store/thread-store'
 import { useFocusedCanvasId } from '../../store/dock-store'
 import { useTerminalStripStore } from '../../store/terminal-strip-store'
 import type { TerminalStripSession } from '@shared/dock-types'
 import { TerminalDockAdapter } from './dock-adapters/TerminalDockAdapter'
 import { openStripTerminal, openStripTerminalInFolder, stripToCanvas } from './terminal-migration'
-
-const TAB_ROW_HEIGHT = 30
 
 function basename(cwd: string): string {
   return cwd.split('/').filter(Boolean).pop() ?? '/'
@@ -34,7 +33,6 @@ export function TerminalStrip() {
   const resolvePendingKill = useTerminalStripStore((s) => s.resolvePendingKill)
   const discardPendingKill = useTerminalStripStore((s) => s.discardPendingKill)
 
-  const [menu, setMenu] = useState<{ position: ContextMenuPosition; tabId: string } | null>(null)
   const focusedCanvasId = useFocusedCanvasId()
 
   // Closed-while-unbound sessions of the ACTIVE thread stay rendered (hidden,
@@ -97,7 +95,70 @@ export function TerminalStrip() {
   // mounted (so those webview instances survive in place) but hide it.
   const hasVisibleSessions = sessions.length > 0
   const collapsed = strip.collapsed
-  const menuSession = menu ? sessions.find((s) => s.tabId === menu.tabId) : undefined
+
+  const items: TabBarItem[] = sessions.map((session) => ({
+    id: session.tabId,
+    label: basename(session.cwd),
+    tooltip: session.cwd,
+    closeLabel: `Close terminal ${basename(session.cwd)}`,
+    testId: `terminal-strip-tab-${session.tabId}`
+  }))
+
+  const contextMenuForTab = (
+    item: TabBarItem,
+    closeTabs: (ids: readonly string[]) => void
+  ): ContextMenuEntry[] => {
+    const session = sessions.find((s) => s.tabId === item.id)
+    return [
+      {
+        id: 'move-to-canvas',
+        label: 'Move to canvas',
+        // Targets the FOCUSED canvas only — no last-seen fallback.
+        disabled: !session || session.sessionId === '' || focusedCanvasId === null,
+        onSelect: () => stripToCanvas(threadId, item.id)
+      },
+      {
+        id: 'new-terminal-in-folder',
+        label: 'New terminal in folder…',
+        onSelect: () => void openStripTerminalInFolder()
+      },
+      { kind: 'separator', id: 'sep' },
+      {
+        id: 'close',
+        label: 'Close terminal',
+        destructive: true,
+        onSelect: () => closeTabs([item.id])
+      }
+    ]
+  }
+
+  const newTerminalButton = (
+    <button
+      type="button"
+      data-testid="terminal-strip-new"
+      title="New terminal at workspace root (right-click a tab for more)"
+      onClick={() => openStripTerminal()}
+      style={iconButtonStyle}
+    >
+      <Plus size={13} strokeWidth={1.75} aria-hidden />
+    </button>
+  )
+
+  const collapseButton = (
+    <button
+      type="button"
+      data-testid="terminal-strip-collapse"
+      title={collapsed ? 'Expand terminal strip' : 'Collapse terminal strip'}
+      onClick={() => toggleCollapsed(threadId)}
+      style={iconButtonStyle}
+    >
+      {collapsed ? (
+        <ChevronUp size={13} strokeWidth={1.75} aria-hidden />
+      ) : (
+        <ChevronDown size={13} strokeWidth={1.75} aria-hidden />
+      )}
+    </button>
+  )
 
   return (
     <div
@@ -106,7 +167,7 @@ export function TerminalStrip() {
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
-        borderTop: hasVisibleSessions ? `1px solid ${colors.tab.border}` : 'none',
+        borderTop: hasVisibleSessions ? `1px solid ${colors.border.default}` : 'none',
         background: colors.bg.rail
       }}
     >
@@ -119,55 +180,27 @@ export function TerminalStrip() {
           style={{ height: 4, marginBottom: -4, cursor: 'row-resize', zIndex: 1 }}
         />
       )}
-      <div
-        data-testid="terminal-strip-tabs"
-        style={{
-          height: TAB_ROW_HEIGHT,
-          flexShrink: 0,
-          display: hasVisibleSessions ? 'flex' : 'none',
-          alignItems: 'center',
-          gap: 2,
-          padding: '0 6px',
-          overflowX: 'auto'
-        }}
-      >
-        {sessions.map((session) => (
-          <StripTab
-            key={session.tabId}
-            session={session}
-            active={session.tabId === activeTabId}
-            onActivate={() => {
-              setActive(threadId, session.tabId)
-              if (collapsed) toggleCollapsed(threadId)
-            }}
-            onClose={() => close(threadId, session.tabId)}
-            onContextMenu={(position) => setMenu({ position, tabId: session.tabId })}
-          />
-        ))}
-        <button
-          type="button"
-          data-testid="terminal-strip-new"
-          title="New terminal at workspace root (right-click a tab for more)"
-          onClick={() => openStripTerminal()}
-          style={iconButtonStyle}
-        >
-          <Plus size={13} strokeWidth={1.75} aria-hidden />
-        </button>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="terminal-strip-collapse"
-          title={collapsed ? 'Expand terminal strip' : 'Collapse terminal strip'}
-          onClick={() => toggleCollapsed(threadId)}
-          style={iconButtonStyle}
-        >
-          {collapsed ? (
-            <ChevronUp size={13} strokeWidth={1.75} aria-hidden />
-          ) : (
-            <ChevronDown size={13} strokeWidth={1.75} aria-hidden />
-          )}
-        </button>
-      </div>
+      {hasVisibleSessions && (
+        <TabBar
+          variant="pill"
+          items={items}
+          activeId={activeTabId}
+          ariaLabel="Terminal sessions"
+          testId="terminal-strip-tabs"
+          onActivate={(id) => {
+            setActive(threadId, id)
+            if (collapsed) toggleCollapsed(threadId)
+          }}
+          onClose={(ids) => {
+            for (const id of ids) close(threadId, id)
+          }}
+          contextMenu={contextMenuForTab}
+          contextMenuUpward
+          contextMenuTestId="terminal-strip-menu"
+          trailing={newTerminalButton}
+          actions={collapseButton}
+        />
+      )}
       <div
         style={{
           height: collapsed || !hasVisibleSessions ? 0 : strip.height,
@@ -204,35 +237,6 @@ export function TerminalStrip() {
           )
         })}
       </div>
-      {menu && menuSession && (
-        <ContextMenu
-          testId="terminal-strip-menu"
-          position={menu.position}
-          openUpward
-          onClose={() => setMenu(null)}
-          items={[
-            {
-              id: 'move-to-canvas',
-              label: 'Move to canvas',
-              // Targets the FOCUSED canvas only — no last-seen fallback.
-              disabled: menuSession.sessionId === '' || focusedCanvasId === null,
-              onSelect: () => stripToCanvas(threadId, menuSession.tabId)
-            },
-            {
-              id: 'new-terminal-in-folder',
-              label: 'New terminal in folder…',
-              onSelect: () => void openStripTerminalInFolder()
-            },
-            { kind: 'separator', id: 'sep' },
-            {
-              id: 'close',
-              label: 'Close terminal',
-              destructive: true,
-              onSelect: () => close(threadId, menuSession.tabId)
-            }
-          ]}
-        />
-      )}
     </div>
   )
 }
@@ -275,64 +279,4 @@ const iconButtonStyle: React.CSSProperties = {
   color: colors.text.muted,
   cursor: 'pointer',
   flexShrink: 0
-}
-
-function StripTab({
-  session,
-  active,
-  onActivate,
-  onClose,
-  onContextMenu
-}: {
-  readonly session: TerminalStripSession
-  readonly active: boolean
-  readonly onActivate: () => void
-  readonly onClose: () => void
-  readonly onContextMenu: (position: ContextMenuPosition) => void
-}) {
-  return (
-    <div
-      data-testid={`terminal-strip-tab-${session.tabId}`}
-      role="tab"
-      aria-selected={active}
-      onClick={onActivate}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu({ x: e.clientX, y: e.clientY })
-      }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        maxWidth: 180,
-        padding: '3px 6px 3px 8px',
-        borderRadius: borderRadius.inline,
-        background: active ? 'var(--bg-tint-text)' : 'transparent',
-        color: active ? colors.text.primary : colors.text.secondary,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.metadata.size,
-        letterSpacing: typography.metadata.letterSpacing,
-        cursor: 'pointer',
-        flexShrink: 0
-      }}
-    >
-      <span
-        style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-        title={session.cwd}
-      >
-        {basename(session.cwd)}
-      </span>
-      <button
-        type="button"
-        aria-label={`Close terminal ${basename(session.cwd)}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          onClose()
-        }}
-        style={{ ...iconButtonStyle, width: 16, height: 16 }}
-      >
-        <X size={11} strokeWidth={1.75} aria-hidden />
-      </button>
-    </div>
-  )
 }

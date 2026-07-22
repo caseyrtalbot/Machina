@@ -241,7 +241,9 @@ test.describe.serial('Window Chrome', () => {
 
     // Keep-alive surfaces can mount more than one tab bar; assert both files
     // opened rather than pinning the total mounted-tab count.
-    expect(await page.locator('.editor-file-tab').count()).toBeGreaterThanOrEqual(2)
+    expect(
+      await page.locator('[data-testid="editor-tab-bar"] .te-tab').count()
+    ).toBeGreaterThanOrEqual(2)
     // Keep-alive can mount a second, hidden tab bar — target the visible spacer.
     const dragSpacer = page.locator('[data-testid="editor-tab-bar-drag-spacer"]:visible').first()
     await expect(dragSpacer).toBeVisible()
