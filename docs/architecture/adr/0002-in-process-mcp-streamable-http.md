@@ -58,18 +58,17 @@ Mechanics:
   and `VaultQueryFacade.writeFile`/`createFile` refresh the index inline so agents read
   their own writes before the watcher echo lands.
 
-External client setup: `claude mcp add --transport http machina http://127.0.0.1:41627/mcp`
-(URL shown with a copy button in Settings → MCP Server).
+External client setup: `claude mcp add --transport http --header "Authorization: Bearer <token>" machina http://127.0.0.1:41627/mcp`
+(Settings → MCP Server copies the full command, token included).
 
 ## Consequences
 
 - External MCP clients gain live search/graph/ghost reads and human-gated writes
   against the open vault. Approval dialogs appear in the running app; an unattended
   app auto-denies after 30s (TimeoutHitlGate).
-- The endpoint is unauthenticated but loopback-only with a Host allowlist. Any local
-  process can connect — acceptable for a local-first, single-user app where local
-  processes already have direct filesystem access to the vault; writes still require
-  the user to click Allow. Revisit with a bearer token if that posture changes.
+- The endpoint shipped unauthenticated (loopback bind + Host allowlist only); a
+  per-launch bearer token was added 2026-07-22 (`docs/PLAN.md` Layer 0). Current
+  admission posture is canonical in `docs/architecture/safety-subsystem.md`.
 - `mcp-cli.ts` stays as-is for headless/subprocess use; it remains read-only.
 - The HTTP listener keeps running across vault switches; status reports the current
   vault root.

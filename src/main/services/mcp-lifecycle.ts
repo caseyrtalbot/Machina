@@ -12,7 +12,7 @@
 import { createServer, type IncomingMessage, type Server as HttpServer } from 'node:http'
 import type { ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -47,6 +47,7 @@ export interface McpStatus {
   readonly running: boolean
   readonly toolCount: number
   readonly url: string | null
+  readonly token: string | null
   readonly vaultRoot: string | null
 }
 
@@ -65,6 +66,13 @@ function writeJsonRpcError(
 function isLocalHost(hostHeader: string): boolean {
   const hostname = hostHeader.replace(/:\d+$/, '')
   return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '[::1]'
+}
+
+/** Constant-time bearer comparison; hashing first equalizes lengths. */
+function tokenMatches(provided: string, expected: string): boolean {
+  const a = createHash('sha256').update(provided).digest()
+  const b = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(a, b)
 }
 
 /**
@@ -106,6 +114,14 @@ export class McpLifecycle {
   private httpServer: HttpServer | null = null
   private port: number | null = null
   private readonly sessions = new Map<string, StreamableHTTPServerTransport>()
+  /**
+   * Per-launch bearer token: every request must carry
+   * `Authorization: Bearer <token>`. Generated fresh each app launch, never
+   * persisted; clients get it from the mcp:status surface (Settings copies a
+   * connect command that includes it). Closes the gap where any local
+   * process could invoke the 7 ungated read tools on the loopback port.
+   */
+  private readonly bearerToken = randomBytes(32).toString('hex')
 
   /** Whether the local Streamable HTTP endpoint is up and accepting clients. */
   isRunning(): boolean {
@@ -124,6 +140,7 @@ export class McpLifecycle {
       running,
       toolCount: this.toolCount(),
       url: running && this.port !== null ? `http://127.0.0.1:${this.port}${MCP_PATH}` : null,
+      token: running ? this.bearerToken : null,
       vaultRoot: this.vaultRoot
     }
   }
@@ -232,6 +249,12 @@ export class McpLifecycle {
   private async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!isLocalHost(req.headers.host ?? '')) {
       writeJsonRpcError(res, 403, -32000, 'Forbidden: localhost only')
+      return
+    }
+    const auth = req.headers.authorization ?? ''
+    const provided = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : ''
+    if (provided === '' || !tokenMatches(provided, this.bearerToken)) {
+      writeJsonRpcError(res, 401, -32000, 'Unauthorized: missing or invalid bearer token')
       return
     }
     const pathname = (req.url ?? '').split('?')[0]

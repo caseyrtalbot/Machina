@@ -386,9 +386,11 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       .catch(() => setMcpStatus(null))
   }, [isOpen])
 
-  const copyMcpUrl = async (): Promise<void> => {
-    if (!mcpStatus?.url) return
-    await navigator.clipboard.writeText(mcpStatus.url)
+  const copyMcpConnectCommand = async (): Promise<void> => {
+    if (!mcpStatus?.url || !mcpStatus.token) return
+    await navigator.clipboard.writeText(
+      `claude mcp add --transport http --header "Authorization: Bearer ${mcpStatus.token}" machina ${mcpStatus.url}`
+    )
     setMcpUrlCopied(true)
   }
 
@@ -821,11 +823,11 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                 </span>
                 <button
                   type="button"
-                  onClick={() => void copyMcpUrl()}
+                  onClick={() => void copyMcpConnectCommand()}
                   className="settings-button transition-colors flex-shrink-0"
                   style={{ color: colors.text.secondary }}
                 >
-                  {mcpUrlCopied ? 'Copied' : 'Copy URL'}
+                  {mcpUrlCopied ? 'Copied' : 'Copy connect command'}
                 </button>
               </div>
             ) : null}
@@ -838,7 +840,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
               }}
             >
               {mcpStatus?.running
-                ? 'Connect external agents: claude mcp add --transport http machina <URL>. Writes require in-app approval.'
+                ? 'Connect external agents with the copied command; it includes a bearer token that rotates each launch. Writes require in-app approval.'
                 : 'Starts when a vault is open. Serves vault search, graph, and gated writes to external MCP clients.'}
             </span>
           </div>

@@ -46,7 +46,7 @@ These hold today inside the MCP boundary. Any change to the MCP surface that vio
 Two non-invariants worth naming:
 
 - **Rate limiting is advisory, not enforcing.** `WriteRateLimiter` flags write bursts (default >10/min in the trailing 60s) in the gate description for extra user scrutiny. It does not auto-deny.
-- **The transport is live; admission is Host-header only.** Since ADR 0002, `src/main/index.ts` calls `mcpLifecycle.startTransport()` on every vault open, serving all 12 registered tool names over Streamable HTTP on `127.0.0.1:41627`. Admission control is a DNS-rebinding Host check; there is no auth token yet, so any local process can invoke the ungated read tools. A per-launch bearer token is scheduled (`docs/PLAN.md`, Layer 0). The headless `mcp-cli.ts` remains reads-only by design (no gate available in stdio mode).
+- **The transport is live; admission is Host check + per-launch bearer token.** Since ADR 0002, `src/main/index.ts` calls `mcpLifecycle.startTransport()` on every vault open, serving all 12 registered tool names over Streamable HTTP on `127.0.0.1:41627`. Admission control is a DNS-rebinding Host check plus a required `Authorization: Bearer` token, generated fresh each launch and never persisted (`McpLifecycle.bearerToken`; constant-time comparison; tokenless or wrong-token requests get 401). Clients obtain it from the `mcp:status` surface — Settings → MCP Server copies a connect command that includes it. The headless `mcp-cli.ts` remains reads-only by design (no gate available in stdio mode).
 
 ## What is not covered
 
@@ -128,9 +128,8 @@ Tracked here so the doc and the code stay honest with each other.
 
 1. **Audit coverage**: `canvas.apply_plan`, `project.map_folder`, `canvas.get_snapshot`, and search/graph reads do not log. Closing this means routing canvas ops through a logging path and adding read audits to facade methods.
 2. **PathGuard coverage**: `project.map_folder` and `canvas.get_snapshot` use raw `node:fs/promises` and bypass PathGuard. `project.map_folder` is the largest hole because it does a recursive directory walk.
-3. **Endpoint auth**: the live localhost endpoint has no auth token; any local process that passes the Host check can call the read tools. Per-launch bearer token scheduled (`docs/PLAN.md`, Layer 0).
-4. **Native-agent Spotlighting**: the native agent's tool results return vault content unwrapped — the path that holds write tools and an autoAccept mode. Convergence onto the MCP tool surface (Spotlighting for free) is scheduled (`docs/PLAN.md`, Layer 1).
-5. **Validator drift**: `mcp-server.ts:validateCanvasOp` and `src/main/ipc/canvas.ts:validateOp` are independent implementations of the same logic. Consolidate into one.
+3. **Native-agent Spotlighting**: the native agent's tool results return vault content unwrapped — the path that holds write tools and an autoAccept mode. Convergence onto the MCP tool surface (Spotlighting for free) is scheduled (`docs/PLAN.md`, Layer 1).
+4. **Validator drift**: `mcp-server.ts:validateCanvasOp` and `src/main/ipc/canvas.ts:validateOp` are independent implementations of the same logic. Consolidate into one.
 
 ## Adding a new agent capability
 

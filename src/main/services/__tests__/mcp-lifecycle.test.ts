@@ -35,6 +35,39 @@ function createTestVault(): string {
   return realpathSync(base)
 }
 
+/** HTTP client transport carrying the lifecycle's per-launch bearer token. */
+function authedTransport(lifecycle: McpLifecycle): StreamableHTTPClientTransport {
+  const { url, token } = lifecycle.status()
+  return new StreamableHTTPClientTransport(new URL(url as string), {
+    requestInit: { headers: { Authorization: `Bearer ${token}` } }
+  })
+}
+
+/** Raw POST to the endpoint with explicit headers; returns the HTTP status. */
+function rawPost(url: URL, headers: Record<string, string>): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const req = request(
+      {
+        host: '127.0.0.1',
+        port: url.port,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          ...headers
+        }
+      },
+      (res) => {
+        res.resume()
+        resolve(res.statusCode ?? 0)
+      }
+    )
+    req.on('error', reject)
+    req.end(JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }))
+  })
+}
+
 describe('McpLifecycle', () => {
   let vaultRoot: string
   let lifecycle: McpLifecycle
@@ -58,6 +91,7 @@ describe('McpLifecycle', () => {
       running: false,
       toolCount: 0,
       url: null,
+      token: null,
       vaultRoot
     })
   })
@@ -75,12 +109,14 @@ describe('McpLifecycle', () => {
     const status = lifecycle.status()
     expect(status.running).toBe(true)
     expect(status.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/)
+    expect(status.token).toMatch(/^[0-9a-f]{64}$/)
     expect(status.vaultRoot).toBe(vaultRoot)
 
     await lifecycle.stop()
     expect(lifecycle.isRunning()).toBe(false)
     expect(lifecycle.toolCount()).toBe(0)
     expect(lifecycle.status().url).toBeNull()
+    expect(lifecycle.status().token).toBeNull()
   })
 
   it('an external HTTP client can connect, list all gated tools, and query the vault', async () => {
@@ -95,8 +131,7 @@ describe('McpLifecycle', () => {
     expect(url).not.toBeNull()
 
     const client = new Client({ name: 'test-client', version: '1.0.0' })
-    const transport = new StreamableHTTPClientTransport(new URL(url as string))
-    await client.connect(transport)
+    await client.connect(authedTransport(lifecycle))
 
     // Guards the MCP_TOOL_COUNT constant against going stale.
     const tools = await client.listTools()
@@ -127,9 +162,7 @@ describe('McpLifecycle', () => {
     await lifecycle.startTransport({ port: 0 })
 
     const client = new Client({ name: 'test-client', version: '1.0.0' })
-    await client.connect(
-      new StreamableHTTPClientTransport(new URL(lifecycle.status().url as string))
-    )
+    await client.connect(authedTransport(lifecycle))
 
     const before = await client.callTool({
       name: 'search.query',
@@ -156,28 +189,23 @@ describe('McpLifecycle', () => {
 
     // fetch/undici strips a custom Host header, so use raw http.request.
     const url = new URL(lifecycle.status().url as string)
-    const status = await new Promise<number>((resolve, reject) => {
-      const req = request(
-        {
-          host: '127.0.0.1',
-          port: url.port,
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            Host: 'evil.example.com',
-            'Content-Type': 'application/json',
-            Accept: 'application/json, text/event-stream'
-          }
-        },
-        (res) => {
-          res.resume()
-          resolve(res.statusCode ?? 0)
-        }
-      )
-      req.on('error', reject)
-      req.end(JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }))
-    })
-    expect(status).toBe(403)
+    expect(await rawPost(url, { Host: 'evil.example.com' })).toBe(403)
+  })
+
+  it('rejects a tokenless request', async () => {
+    lifecycle.createForVault(vaultRoot, buildVaultDeps([]))
+    await lifecycle.startTransport({ port: 0 })
+
+    const url = new URL(lifecycle.status().url as string)
+    expect(await rawPost(url, {})).toBe(401)
+  })
+
+  it('rejects a request with a wrong bearer token', async () => {
+    lifecycle.createForVault(vaultRoot, buildVaultDeps([]))
+    await lifecycle.startTransport({ port: 0 })
+
+    const url = new URL(lifecycle.status().url as string)
+    expect(await rawPost(url, { Authorization: `Bearer ${'0'.repeat(64)}` })).toBe(401)
   })
 
   describe('MCP data flow with buildVaultDeps (in-memory transport via buildServer)', () => {

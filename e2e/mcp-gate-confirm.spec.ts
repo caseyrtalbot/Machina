@@ -73,18 +73,24 @@ async function launchWithWorkspace(
   return { app, page }
 }
 
-/** Poll the renderer bridge until the MCP endpoint reports a URL. */
-async function mcpUrl(page: Page): Promise<string> {
+/** Poll the renderer bridge until the MCP endpoint reports a URL + token. */
+async function mcpEndpoint(page: Page): Promise<{ url: string; token: string }> {
   for (let i = 0; i < 30; i++) {
     const status = await page.evaluate(() => {
       const api = (
         window as unknown as {
-          api: { mcp: { status: () => Promise<{ running: boolean; url: string | null }> } }
+          api: {
+            mcp: {
+              status: () => Promise<{ running: boolean; url: string | null; token: string | null }>
+            }
+          }
         }
       ).api
       return api.mcp.status()
     })
-    if (status.running && status.url !== null) return status.url
+    if (status.running && status.url !== null && status.token !== null) {
+      return { url: status.url, token: status.token }
+    }
     await page.waitForTimeout(500)
   }
   throw new Error('MCP endpoint never came up')
@@ -99,9 +105,13 @@ test('an MCP write confirm appears as a tray gate-confirm row and fails closed a
     app = launched.app
     const page = launched.page
 
-    const url = await mcpUrl(page)
+    const { url, token } = await mcpEndpoint(page)
     client = new Client({ name: 'gate-probe', version: '1.0.0' })
-    await client.connect(new StreamableHTTPClientTransport(new URL(url)))
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(url), {
+        requestInit: { headers: { Authorization: `Bearer ${token}` } }
+      })
+    )
 
     // Fire the gated write WITHOUT awaiting it — it blocks on the confirm.
     // vault.write_file requires an EXISTING file and takes an absolute path

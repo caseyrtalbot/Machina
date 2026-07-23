@@ -163,13 +163,15 @@ export interface IpcChannels {
 
   // --- MCP server ---
   // Status of the in-process MCP endpoint (Streamable HTTP on localhost).
-  // url is the address external clients connect to; null while not running.
+  // url is the address external clients connect to; token is the per-launch
+  // bearer token requests must carry; both null while not running.
   'mcp:status': {
     request: void
     response: {
       running: boolean
       toolCount: number
       url: string | null
+      token: string | null
       vaultRoot: string | null
     }
   }
