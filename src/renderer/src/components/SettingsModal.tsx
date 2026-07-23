@@ -3,7 +3,6 @@ import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
 import { colors, borderRadius, typography, transitions, floatingPanel } from '../design/tokens'
-import { ACCENT_PRESETS, type AccentId } from '../design/accent-presets'
 import { EMBEDDING_MODEL_DOWNLOAD_MB } from '@shared/engine/embeddings'
 import { FontPicker } from './FontPicker'
 import { Modal } from './overlay/Modal'
@@ -153,136 +152,6 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   return <h3 className="settings-section-heading">{children}</h3>
 }
 
-interface SegmentedOption<T extends string> {
-  readonly value: T
-  readonly label: string
-}
-
-interface SegmentedControlProps<T extends string> {
-  readonly value: T
-  readonly options: ReadonlyArray<SegmentedOption<T>>
-  readonly onChange: (value: T) => void
-  readonly ariaLabel: string
-}
-
-/** Hairline-square segmented switch for density / radii / background tint.
- * Mirrors the design's Tweaks panel chip strip — flat, monospace label,
- * accent under-line on the active segment. */
-function SegmentedControl<T extends string>({
-  value,
-  options,
-  onChange,
-  ariaLabel
-}: SegmentedControlProps<T>) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={ariaLabel}
-      style={{
-        display: 'inline-flex',
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: 'var(--r-inline)',
-        background: 'var(--bg-card)',
-        overflow: 'hidden'
-      }}
-    >
-      {options.map((opt, i) => {
-        const active = opt.value === value
-        return (
-          <button
-            key={opt.value}
-            role="radio"
-            aria-checked={active}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            style={{
-              padding: '4px 10px',
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: 'uppercase',
-              color: active ? 'var(--color-accent-default)' : colors.text.secondary,
-              background: active ? 'var(--bg-tint-accent)' : 'transparent',
-              border: 'none',
-              borderLeft: i === 0 ? 'none' : `1px solid ${colors.border.subtle}`,
-              cursor: 'pointer',
-              transition: `color ${transitions.fast}, background ${transitions.fast}`
-            }}
-          >
-            {opt.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-interface AccentPreviewRowProps {
-  readonly accentId: AccentId
-  readonly customHex: string
-  readonly onPick: (id: AccentId) => void
-}
-
-function AccentPreviewRow({ accentId, customHex, onPick }: AccentPreviewRowProps) {
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(8, 24px)',
-        gap: 6,
-        padding: '4px 0 14px'
-      }}
-    >
-      {ACCENT_PRESETS.map((p) => {
-        const active = accentId === p.id
-        return (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onPick(p.id)}
-            title={`${p.label} · ${p.hex}`}
-            aria-label={p.label}
-            style={{
-              width: 24,
-              height: 24,
-              padding: 0,
-              borderRadius: borderRadius.inline,
-              background: p.hex,
-              border: `1px solid ${active ? colors.text.primary : colors.border.default}`,
-              cursor: 'pointer',
-              transition: `border-color ${transitions.fast}`
-            }}
-          />
-        )
-      })}
-      <button
-        type="button"
-        onClick={() => onPick('custom')}
-        title="Custom hex"
-        aria-label="Custom"
-        style={{
-          width: 24,
-          height: 24,
-          padding: 0,
-          borderRadius: borderRadius.inline,
-          background: accentId === 'custom' ? customHex : 'transparent',
-          border:
-            accentId === 'custom'
-              ? `1px solid ${colors.text.primary}`
-              : `0.5px dashed ${colors.border.default}`,
-          color: colors.text.muted,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 11,
-          lineHeight: '20px',
-          cursor: 'pointer'
-        }}
-      >
-        {accentId === 'custom' ? '' : '+'}
-      </button>
-    </div>
-  )
-}
-
 export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -292,13 +161,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   const setDisplayFont = useSettingsStore((s) => s.setDisplayFont)
   const setBodyFont = useSettingsStore((s) => s.setBodyFont)
   const setMonoFont = useSettingsStore((s) => s.setMonoFont)
-  const env = useSettingsStore((s) => s.env)
-  const setEnv = useSettingsStore((s) => s.setEnv)
-  const resetEnv = useSettingsStore((s) => s.resetEnv)
-  const accentId = useSettingsStore((s) => s.accentId)
-  const customAccentHex = useSettingsStore((s) => s.customAccentHex)
-  const setAccentId = useSettingsStore((s) => s.setAccentId)
-  const setCustomAccentHex = useSettingsStore((s) => s.setCustomAccentHex)
   const defaultEditorMode = useSettingsStore((s) => s.defaultEditorMode)
   const autosaveInterval = useSettingsStore((s) => s.autosaveInterval)
   const spellCheck = useSettingsStore((s) => s.spellCheck)
@@ -472,69 +334,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
       {/* Single scrollable content */}
       <div className="settings-content flex-1 overflow-y-auto">
-        {/* ── Appearance ── */}
-        <SectionHeading>Appearance</SectionHeading>
-        <AccentPreviewRow accentId={accentId} customHex={customAccentHex} onPick={setAccentId} />
-        {accentId === 'custom' && (
-          <div style={{ padding: '0 0 14px' }}>
-            <input
-              type="text"
-              value={customAccentHex}
-              onChange={(e) => setCustomAccentHex(e.target.value)}
-              spellCheck={false}
-              aria-label="Custom accent hex"
-              placeholder="#ffb454"
-              className="settings-input text-xs"
-              style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
-            />
-          </div>
-        )}
-
-        {/* ── Tweaks ── */}
-        <SectionHeading>Tweaks</SectionHeading>
-        <SettingRow label="Density">
-          <SegmentedControl
-            ariaLabel="Density"
-            value={env.density}
-            options={[
-              { value: 'compact', label: 'Compact' },
-              { value: 'default', label: 'Default' },
-              { value: 'comfy', label: 'Comfy' }
-            ]}
-            onChange={(v) => setEnv('density', v)}
-          />
-        </SettingRow>
-        <SettingRow label="Corners">
-          <SegmentedControl
-            ariaLabel="Corner radii"
-            value={env.radii}
-            options={[
-              { value: 'square', label: 'Square' },
-              { value: 'soft', label: 'Soft' }
-            ]}
-            onChange={(v) => setEnv('radii', v)}
-          />
-        </SettingRow>
-        <SettingRow label="Background">
-          <SegmentedControl
-            ariaLabel="Background tint"
-            value={env.backgroundTint}
-            options={[
-              { value: 'pure', label: 'Pure' },
-              { value: 'near-black', label: 'Near' },
-              { value: 'warm', label: 'Warm' }
-            ]}
-            onChange={(v) => setEnv('backgroundTint', v)}
-          />
-        </SettingRow>
-        <SettingRow label="Canvas Grid">
-          <Toggle
-            value={env.canvasGrid}
-            onChange={(v) => setEnv('canvasGrid', v)}
-            ariaLabel="Show canvas dot grid"
-          />
-        </SettingRow>
-
         {/* ── Typography ── */}
         <SectionHeading>Typography</SectionHeading>
         <SettingRow label="Font">
@@ -542,36 +341,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         </SettingRow>
         <SettingRow label="Code Font">
           <FontPicker value={monoFont} onChange={setMonoFont} categoryFilter="monospace" />
-        </SettingRow>
-        <SettingRow label="Card Titles">
-          <SliderInput
-            value={env.cardTitleFontSize}
-            min={10}
-            max={15}
-            step={1}
-            unit="px"
-            onChange={(v) => setEnv('cardTitleFontSize', v)}
-          />
-        </SettingRow>
-        <SettingRow label="Card Text">
-          <SliderInput
-            value={env.cardBodyFontSize}
-            min={10}
-            max={20}
-            step={1}
-            unit="px"
-            onChange={(v) => setEnv('cardBodyFontSize', v)}
-          />
-        </SettingRow>
-        <SettingRow label="File Tree">
-          <SliderInput
-            value={env.sidebarFontSize}
-            min={11}
-            max={16}
-            step={1}
-            unit="px"
-            onChange={(v) => setEnv('sidebarFontSize', v)}
-          />
         </SettingRow>
 
         {/* ── Editor ── */}
@@ -866,14 +635,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             style={{ color: colors.text.muted }}
           >
             Reveal Logs
-          </button>
-          <button
-            type="button"
-            onClick={resetEnv}
-            className="settings-button transition-colors"
-            style={{ color: colors.text.muted }}
-          >
-            Reset to Defaults
           </button>
         </div>
       </div>

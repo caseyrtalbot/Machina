@@ -1,60 +1,38 @@
-import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from 'react'
+import { createContext, useLayoutEffect, type ReactNode } from 'react'
 import { spacing, typography, transitions, floatingPanel } from './tokens'
 import {
   STRUCTURAL_COLORS,
   CHROME_BG_HEX,
-  ENV_DEFAULTS,
   LINE_ALPHAS,
   SIGNAL_COLORS,
-  DENSITY_VARS,
-  RADII_VARS,
-  BACKGROUND_VARIANTS,
-  type EnvironmentSettings
+  BACKGROUND,
+  DENSITY_DEFAULT_VARS,
+  RADII_SQUARE_VARS,
+  CARD_BLUR_PX,
+  CARD_TITLE_FONT_SIZE_PX,
+  CARD_BODY_FONT_SIZE_PX,
+  SIDEBAR_FONT_SIZE_PX,
+  CARD_OPACITY,
+  CARD_HEADER_DARKNESS
 } from './themes'
 import { applyAccentCssVars } from './apply-accent'
-import { ACCENT_PRESETS, type AccentId } from './accent-presets'
-import { useSettingsStore } from '../store/settings-store'
-
-function resolveAccentHex(accentId: AccentId, customHex: string): string {
-  if (accentId === 'custom') return customHex
-  const preset = ACCENT_PRESETS.find((p) => p.id === accentId)
-  return preset?.hex ?? customHex
-}
-
-interface EnvContext {
-  readonly cardBlur: number
-  readonly gridDotVisibility: number
-  readonly cardTitleFontSize: number
-  readonly sidebarFontSize: number
-  readonly canvasGrid: boolean
-}
 
 interface ThemeContextType {
   spacing: typeof spacing
   typography: typeof typography
   transitions: typeof transitions
-  env: EnvContext
 }
 
-const ThemeContext = createContext<ThemeContextType>({
-  spacing,
-  typography,
-  transitions,
-  env: {
-    cardBlur: ENV_DEFAULTS.cardBlur,
-    gridDotVisibility: ENV_DEFAULTS.gridDotVisibility,
-    cardTitleFontSize: ENV_DEFAULTS.cardTitleFontSize,
-    sidebarFontSize: ENV_DEFAULTS.sidebarFontSize,
-    canvasGrid: ENV_DEFAULTS.canvasGrid
-  }
-})
+const THEME_CONTEXT_VALUE: ThemeContextType = { spacing, typography, transitions }
 
-function applyEnvCssVars(env: EnvironmentSettings): void {
+const ThemeContext = createContext<ThemeContextType>(THEME_CONTEXT_VALUE)
+
+function applyDesignConstants(): void {
   const root = document.documentElement
   const structural = STRUCTURAL_COLORS
-  const bg = BACKGROUND_VARIANTS[env.backgroundTint] ?? BACKGROUND_VARIANTS.pure
+  const bg = BACKGROUND
 
-  // ── Background ramp (per tint variant) ──
+  // ── Background ramp (fixed pure-black constants) ──
   const parseHex = (hex: string): [number, number, number] => [
     parseInt(hex.slice(1, 3), 16),
     parseInt(hex.slice(3, 5), 16),
@@ -63,10 +41,10 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   const [r, g, b] = parseHex(bg.base)
   root.style.setProperty('--canvas-surface-bg', `rgb(${r}, ${g}, ${b})`)
 
-  const cardOp = env.cardOpacity / 100
+  const cardOp = CARD_OPACITY / 100
   const [cr, cg, cb] = parseHex(bg.card)
   root.style.setProperty('--canvas-card-bg', `rgba(${cr}, ${cg}, ${cb}, ${cardOp})`)
-  root.style.setProperty('--canvas-card-title-bg', `rgba(0, 0, 0, ${env.cardHeaderDarkness / 100})`)
+  root.style.setProperty('--canvas-card-title-bg', `rgba(0, 0, 0, ${CARD_HEADER_DARKNESS / 100})`)
 
   root.style.setProperty('--color-bg-base', bg.base)
   root.style.setProperty('--color-bg-surface', bg.surface)
@@ -122,34 +100,31 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
   root.style.setProperty('--signal-danger', SIGNAL_COLORS.danger)
   root.style.setProperty('--signal-info', SIGNAL_COLORS.info)
 
-  // ── Density / radii (live-tweakable) ──
-  root.dataset.density = env.density
-  root.dataset.radii = env.radii
-  root.dataset.bg = env.backgroundTint
-  for (const [key, value] of Object.entries(DENSITY_VARS[env.density])) {
+  // ── Density / radii (fixed constants) ──
+  for (const [key, value] of Object.entries(DENSITY_DEFAULT_VARS)) {
     root.style.setProperty(key, value)
   }
-  for (const [key, value] of Object.entries(RADII_VARS[env.radii])) {
+  for (const [key, value] of Object.entries(RADII_SQUARE_VARS)) {
     root.style.setProperty(key, value)
   }
   root.style.setProperty('--r-pill', '999px')
 
-  // ── Env-driven font sizes (already user-tweakable) ──
-  root.style.setProperty('--env-card-blur', `${env.cardBlur}px`)
-  root.style.setProperty('--env-card-title-font-size', `${env.cardTitleFontSize}px`)
-  root.style.setProperty('--env-card-body-font-size', `${env.cardBodyFontSize}px`)
+  // ── Fixed font sizes / blur ──
+  root.style.setProperty('--env-card-blur', `${CARD_BLUR_PX}px`)
+  root.style.setProperty('--env-card-title-font-size', `${CARD_TITLE_FONT_SIZE_PX}px`)
+  root.style.setProperty('--env-card-body-font-size', `${CARD_BODY_FONT_SIZE_PX}px`)
   root.style.setProperty(
     '--env-card-code-font-size',
-    `${Math.max(Math.round(env.cardBodyFontSize * 0.75), 10)}px`
+    `${Math.max(Math.round(CARD_BODY_FONT_SIZE_PX * 0.75), 10)}px`
   )
-  root.style.setProperty('--env-sidebar-font-size', `${env.sidebarFontSize}px`)
+  root.style.setProperty('--env-sidebar-font-size', `${SIDEBAR_FONT_SIZE_PX}px`)
   root.style.setProperty(
     '--env-sidebar-secondary-font-size',
-    `${Math.max(env.sidebarFontSize - 1, 11)}px`
+    `${Math.max(SIDEBAR_FONT_SIZE_PX - 1, 11)}px`
   )
   root.style.setProperty(
     '--env-sidebar-tertiary-font-size',
-    `${Math.max(env.sidebarFontSize - 3, 10)}px`
+    `${Math.max(SIDEBAR_FONT_SIZE_PX - 3, 10)}px`
   )
 
   // ── Motion + elevation catalog (static; from tokens) ──
@@ -164,38 +139,10 @@ function applyEnvCssVars(env: EnvironmentSettings): void {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const env = useSettingsStore((s) => s.env)
-  const accentId = useSettingsStore((s) => s.accentId)
-  const customAccentHex = useSettingsStore((s) => s.customAccentHex)
-
   useLayoutEffect(() => {
-    applyEnvCssVars(env)
-  }, [env])
+    applyDesignConstants()
+    applyAccentCssVars()
+  }, [])
 
-  useLayoutEffect(() => {
-    applyAccentCssVars(resolveAccentHex(accentId, customAccentHex))
-  }, [accentId, customAccentHex])
-
-  const ctx = useMemo<ThemeContextType>(
-    () => ({
-      spacing,
-      typography,
-      transitions,
-      env: {
-        cardBlur: env.cardBlur,
-        gridDotVisibility: env.gridDotVisibility,
-        cardTitleFontSize: env.cardTitleFontSize,
-        sidebarFontSize: env.sidebarFontSize,
-        canvasGrid: env.canvasGrid
-      }
-    }),
-    [env]
-  )
-
-  return <ThemeContext.Provider value={ctx}>{children}</ThemeContext.Provider>
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useEnv(): EnvContext {
-  return useContext(ThemeContext).env
+  return <ThemeContext.Provider value={THEME_CONTEXT_VALUE}>{children}</ThemeContext.Provider>
 }

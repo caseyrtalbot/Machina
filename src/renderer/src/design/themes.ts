@@ -1,8 +1,7 @@
 // src/renderer/src/design/themes.ts
 
-/** Default accent. "Ember" coral from the Console direction palette.
- * Overridable at runtime via `applyAccentCssVars(hex)`; settings will
- * eventually persist a chosen preset (see `accent-presets.ts`). */
+/** The accent. "Ember" coral from the Console direction palette — a ratified
+ * constant (ADR 0005), applied at runtime via `applyAccentCssVars()`. */
 export const ACCENT_HEX = '#ff8c5a'
 
 /** OS-chrome layer (titlebar, status bar, deepest rail). Pulled from
@@ -10,45 +9,43 @@ export const ACCENT_HEX = '#ff8c5a'
  * reads as a recessed frame around the surface. */
 export const CHROME_BG_HEX = '#050508'
 
-/** Density of the row-grid: compact (22px), default (26px), comfy (32px).
- * Drives `--row-h`, `--ui-fs`, `--ui-fs-sm`, and panel padding. */
-export type Density = 'compact' | 'default' | 'comfy'
+/** Fixed background ramp (ADR 0005). Pure-black base with near-black lifts
+ * for surface / elevated / card layers. */
+export const BACKGROUND = {
+  base: '#000000',
+  surface: '#050507',
+  elevated: '#0a0a0d',
+  chrome: '#050508',
+  rail: '#030305',
+  card: '#0a0a0d',
+  cardHover: '#0e0e12'
+} as const
 
-/** Card / button / pill corner radii. `square` is the Console knife-edge
- * default (all 0px); `soft` rounds everything off (6px / 4px / 8px). */
-export type Radii = 'square' | 'soft'
-
-/** Background tint variant. `pure` is true #000; `near-black` is a cool
- * navy-tinted near-black; `warm` is a warm coffee-tinted near-black. */
-export type BackgroundTint = 'pure' | 'near-black' | 'warm'
-
-export interface EnvironmentSettings {
-  readonly cardOpacity: number
-  readonly cardHeaderDarkness: number
-  readonly cardBlur: number
-  readonly gridDotVisibility: number
-  readonly cardTitleFontSize: number
-  readonly cardBodyFontSize: number
-  readonly sidebarFontSize: number
-  readonly density: Density
-  readonly radii: Radii
-  readonly backgroundTint: BackgroundTint
-  readonly canvasGrid: boolean
+/** Fixed density vars: row height, UI font sizes, panel padding. */
+export const DENSITY_DEFAULT_VARS: Record<string, string> = {
+  '--row-h': '26px',
+  '--ui-fs': '13px',
+  '--ui-fs-sm': '12px',
+  '--pad-panel-x': '16px',
+  '--pad-panel-y': '12px'
 }
 
-export const ENV_DEFAULTS: EnvironmentSettings = {
-  cardOpacity: 94,
-  cardHeaderDarkness: 45,
-  cardBlur: 9,
-  gridDotVisibility: 7,
-  cardTitleFontSize: 13,
-  cardBodyFontSize: 16,
-  sidebarFontSize: 13,
-  density: 'default',
-  radii: 'square',
-  backgroundTint: 'pure',
-  canvasGrid: true
+/** Fixed knife-edge radii: every corner square (0px). */
+export const RADII_SQUARE_VARS: Record<string, string> = {
+  '--r-card': '0px',
+  '--r-inline': '0px',
+  '--r-tool': '0px'
 }
+
+// Fixed canvas / chrome constants (former appearance settings, now ratified).
+export const CARD_BLUR_PX = 9
+export const CARD_TITLE_FONT_SIZE_PX = 13
+export const CARD_BODY_FONT_SIZE_PX = 16
+export const SIDEBAR_FONT_SIZE_PX = 13
+export const GRID_DOT_VISIBILITY = 7
+export const CANVAS_GRID_ENABLED = true
+export const CARD_OPACITY = 94
+export const CARD_HEADER_DARKNESS = 45
 
 interface StructuralColors {
   readonly border: {
@@ -111,89 +108,6 @@ export const SIGNAL_COLORS = {
   danger: '#ff847d',
   info: '#6dafff'
 } as const
-
-/** Density → row height + UI font sizes + panel padding. Mirrors the
- * `[data-density="compact|default|comfy"]` blocks in `tokens.css`. */
-export const DENSITY_VARS: Record<Density, Record<string, string>> = {
-  compact: {
-    '--row-h': '22px',
-    '--ui-fs': '12px',
-    '--ui-fs-sm': '11px',
-    '--pad-panel-x': '12px',
-    '--pad-panel-y': '8px'
-  },
-  default: {
-    '--row-h': '26px',
-    '--ui-fs': '13px',
-    '--ui-fs-sm': '12px',
-    '--pad-panel-x': '16px',
-    '--pad-panel-y': '12px'
-  },
-  comfy: {
-    '--row-h': '32px',
-    '--ui-fs': '14px',
-    '--ui-fs-sm': '13px',
-    '--pad-panel-x': '20px',
-    '--pad-panel-y': '16px'
-  }
-}
-
-/** Radii presets. `square` is the knife-edge direction (all 0px); `soft`
- * is the rounded-corner alternate. */
-export const RADII_VARS: Record<Radii, Record<string, string>> = {
-  square: {
-    '--r-card': '0px',
-    '--r-inline': '0px',
-    '--r-tool': '0px'
-  },
-  soft: {
-    '--r-card': '6px',
-    '--r-inline': '4px',
-    '--r-tool': '8px'
-  }
-}
-
-interface BgVariant {
-  readonly base: string
-  readonly surface: string
-  readonly elevated: string
-  readonly chrome: string
-  readonly rail: string
-  readonly card: string
-  readonly cardHover: string
-}
-
-/** Background tint variants. `pure` is true #000 (the default canvas);
- * `near-black` adds a cool navy lift; `warm` adds a coffee-brown lift. */
-export const BACKGROUND_VARIANTS: Record<BackgroundTint, BgVariant> = {
-  pure: {
-    base: '#000000',
-    surface: '#050507',
-    elevated: '#0a0a0d',
-    chrome: '#050508',
-    rail: '#030305',
-    card: '#0a0a0d',
-    cardHover: '#0e0e12'
-  },
-  'near-black': {
-    base: '#07080a',
-    surface: '#0a0c0f',
-    elevated: '#11141a',
-    chrome: '#07080a',
-    rail: '#04060a',
-    card: '#11141a',
-    cardHover: '#161a21'
-  },
-  warm: {
-    base: '#0d0c0b',
-    surface: '#131210',
-    elevated: '#1a1816',
-    chrome: '#0d0c0b',
-    rail: '#08070605',
-    card: '#1a1816',
-    cardHover: '#211f1c'
-  }
-}
 
 function parseHex(hex: string): [number, number, number] {
   return [

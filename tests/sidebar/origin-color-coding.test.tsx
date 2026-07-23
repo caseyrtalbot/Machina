@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { FileTree } from '../../src/renderer/src/panels/sidebar/FileTree'
 import {
@@ -6,7 +6,6 @@ import {
   getFolderOriginColor,
   type ArtifactOrigin
 } from '../../src/renderer/src/panels/sidebar/origin-utils'
-import { useSettingsStore } from '../../src/renderer/src/store/settings-store'
 import { SIGNAL_COLORS } from '../../src/renderer/src/design/themes'
 import type { FlatTreeNode } from '../../src/renderer/src/panels/sidebar/buildFileTree'
 
@@ -142,12 +141,6 @@ describe('getFolderOriginColor', () => {
 })
 
 describe('FileTree origin color coding', () => {
-  beforeEach(() => {
-    useSettingsStore.setState((state) => ({
-      env: { ...state.env, sidebarFontSize: 13 }
-    }))
-  })
-
   it('renders file icon with agent color when origin is agent', () => {
     const nodes = [
       makeNode({

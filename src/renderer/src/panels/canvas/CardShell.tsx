@@ -11,7 +11,7 @@ import {
   transitions,
   typography
 } from '../../design/tokens'
-import { useEnv } from '../../design/Theme'
+import { CARD_BLUR_PX, CARD_TITLE_FONT_SIZE_PX } from '../../design/themes'
 import {
   startConnectionDrag,
   endConnectionDrag,
@@ -123,7 +123,8 @@ export function CardShell({
   const setFocusedCard = useCanvas((s) => s.setFocusedCard)
   const lockCard = useCanvas((s) => s.lockCard)
   const unlockCard = useCanvas((s) => s.unlockCard)
-  const { cardBlur, cardTitleFontSize } = useEnv()
+  const cardBlur = CARD_BLUR_PX
+  const cardTitleFontSize = CARD_TITLE_FONT_SIZE_PX
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
   const [hovered, setHovered] = useState(false)

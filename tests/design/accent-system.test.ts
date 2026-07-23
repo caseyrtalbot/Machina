@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { applyAccentCssVars, isValidAccentHex } from '../../src/renderer/src/design/apply-accent'
 import { ACCENT_HEX, computeAccentVariants } from '../../src/renderer/src/design/themes'
-import {
-  ACCENT_PRESETS,
-  DEFAULT_ACCENT_ID,
-  isAccentId
-} from '../../src/renderer/src/design/accent-presets'
 
 const ACCENT_VARS = [
   '--color-accent-default',
@@ -110,34 +105,10 @@ describe('applyAccentCssVars', () => {
     )
   })
 
-  it('applies cleanly for every preset in ACCENT_PRESETS', () => {
-    for (const preset of ACCENT_PRESETS) {
-      applyAccentCssVars(preset.hex)
-      const def = document.documentElement.style.getPropertyValue('--color-accent-default')
-      expect(def).toBe(preset.hex)
-      const focus = document.documentElement.style.getPropertyValue('--color-accent-focus')
-      expect(focus).not.toContain('NaN')
-    }
-  })
-})
-
-describe('isAccentId', () => {
-  it('accepts every preset id and "custom"', () => {
-    for (const preset of ACCENT_PRESETS) {
-      expect(isAccentId(preset.id)).toBe(true)
-    }
-    expect(isAccentId('custom')).toBe(true)
-  })
-
-  it('rejects unknown strings, empty values, and non-strings', () => {
-    expect(isAccentId('not-a-preset')).toBe(false)
-    expect(isAccentId('')).toBe(false)
-    expect(isAccentId(null)).toBe(false)
-    expect(isAccentId(undefined)).toBe(false)
-    expect(isAccentId(42)).toBe(false)
-  })
-
-  it('matches DEFAULT_ACCENT_ID', () => {
-    expect(isAccentId(DEFAULT_ACCENT_ID)).toBe(true)
+  it('defaults to the fixed ACCENT_HEX when called with no argument', () => {
+    applyAccentCssVars()
+    expect(document.documentElement.style.getPropertyValue('--color-accent-default')).toBe(
+      ACCENT_HEX
+    )
   })
 })

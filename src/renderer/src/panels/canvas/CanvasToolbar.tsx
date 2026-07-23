@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Import,
   LayoutDashboard,
@@ -6,7 +6,6 @@ import {
   Minus,
   Plus,
   Redo2,
-  SlidersHorizontal,
   Spline,
   Trash2,
   Undo2,
@@ -16,10 +15,9 @@ import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu
 import { useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
 import type { CanvasStoreApi } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
-import { useSettingsStore } from '../../store/settings-store'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { getCommandStack, layoutCommand } from './canvas-commands'
-import { colors, zIndex } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -53,62 +51,6 @@ function Tip({
 
 function ToolIcon({ icon: Icon }: { readonly icon: LucideIcon }): React.ReactElement {
   return <Icon size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />
-}
-
-interface EnvSliderProps {
-  readonly label: string
-  readonly value: number
-  readonly min: number
-  readonly max: number
-  readonly step: number
-  readonly unit: string
-  readonly onChange: (value: number) => void
-}
-
-function EnvSlider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  onChange
-}: EnvSliderProps): React.ReactElement {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between">
-        <span
-          style={{
-            fontSize: 10,
-            color: colors.text.muted,
-            letterSpacing: 'var(--label-tracking)',
-            textTransform: 'uppercase',
-            fontFamily: 'var(--font-mono)'
-          }}
-        >
-          {label}
-        </span>
-        <span
-          className="tabular-nums"
-          style={{ fontSize: 10, color: colors.text.secondary, fontFamily: 'var(--font-mono)' }}
-        >
-          {value}
-          {unit}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="graph-slider w-full"
-        style={{ accentColor: 'var(--color-text-primary)' }}
-        aria-label={label}
-      />
-    </div>
-  )
 }
 
 /** Compute the canvas-space point at the center of the visible surface. */
@@ -190,16 +132,9 @@ export function CanvasToolbar({
   const hasNodes = nodes.length > 0
   const showAllEdges = useCanvas((s) => s.showAllEdges)
   const toggleShowAllEdges = useCanvas((s) => s.toggleShowAllEdges)
-  const gridDotVisibility = useSettingsStore((s) => s.env.gridDotVisibility)
-  const cardBlur = useSettingsStore((s) => s.env.cardBlur)
-  const cardOpacity = useSettingsStore((s) => s.env.cardOpacity)
-  const cardHeaderDarkness = useSettingsStore((s) => s.env.cardHeaderDarkness)
-  const setEnv = useSettingsStore((s) => s.setEnv)
   const [tileMenuAnchor, setTileMenuAnchor] = useState<DOMRect | null>(null)
-  const [envMenuOpen, setEnvMenuOpen] = useState(false)
   const [zoomMenuAnchor, setZoomMenuAnchor] = useState<DOMRect | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
-  const envMenuRef = useRef<HTMLDivElement>(null)
 
   const hasSelection = selectedNodeIds.size > 0
   const clearEnabled = hasNodes
@@ -210,31 +145,6 @@ export function CanvasToolbar({
     const timer = setTimeout(() => setConfirmClear(false), 3000)
     return () => clearTimeout(timer)
   }, [confirmClear])
-
-  // Zoom/tile menus dismiss via the ContextMenu primitive; only the env
-  // slider popover (not a menu) manages its own outside-click/Escape here.
-  useEffect(() => {
-    if (!envMenuOpen) return
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (envMenuRef.current && !envMenuRef.current.contains(event.target as Node)) {
-        setEnvMenuOpen(false)
-      }
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setEnvMenuOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [envMenuOpen])
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -392,71 +302,6 @@ export function CanvasToolbar({
         </button>
         <Tip label={showAllEdges ? 'Hide edges' : 'Show edges'} />
       </div>
-      <div ref={envMenuRef} style={{ position: 'relative' }}>
-        <div className="canvas-toolbtn-wrap">
-          <button
-            onClick={() => setEnvMenuOpen((prev) => !prev)}
-            className="canvas-toolbtn"
-            data-testid="canvas-env-settings"
-            aria-label="Environment settings"
-            aria-haspopup="dialog"
-            aria-expanded={envMenuOpen}
-          >
-            <ToolIcon icon={SlidersHorizontal} />
-          </button>
-          <Tip label="Environment" />
-        </div>
-        {envMenuOpen && (
-          <div
-            className="sidebar-popover absolute flex flex-col gap-3 p-3"
-            style={{
-              top: 0,
-              left: '100%',
-              marginLeft: 6,
-              minWidth: 200,
-              zIndex: zIndex.surfacePopover
-            }}
-          >
-            <EnvSlider
-              label="Card opacity"
-              value={cardOpacity}
-              min={50}
-              max={100}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('cardOpacity', v)}
-            />
-            <EnvSlider
-              label="Card header"
-              value={cardHeaderDarkness}
-              min={0}
-              max={60}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('cardHeaderDarkness', v)}
-            />
-            <EnvSlider
-              label="Card blur"
-              value={cardBlur}
-              min={0}
-              max={32}
-              step={1}
-              unit="px"
-              onChange={(v) => setEnv('cardBlur', v)}
-            />
-            <EnvSlider
-              label="Grid dots"
-              value={gridDotVisibility}
-              min={0}
-              max={100}
-              step={1}
-              unit="%"
-              onChange={(v) => setEnv('gridDotVisibility', v)}
-            />
-          </div>
-        )}
-      </div>
-
       <div className="canvas-toolrail__divider" />
 
       {/* HISTORY: take it back */}

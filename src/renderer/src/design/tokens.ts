@@ -234,11 +234,10 @@ export const transitions = {
   commandPalette: '150ms ease-out'
 } as const
 
-// Console-direction radii. Emit the `--r-*` CSS vars (set per Soft/Square
-// preset via RADII_VARS in themes.ts) so every inline consumer tracks the
-// settings toggle. Knife-edge `square` resolves them all to 0; `soft` rounds
-// (6px / 4px / 8px). Only `pill` (toggle tracks) and `round` (dots / knobs /
-// avatars) stay curved in both presets.
+// Console-direction radii. Emit the `--r-*` CSS vars (set to the fixed
+// square-radii constants in themes.ts) so every inline consumer resolves the
+// same knife-edge 0px corners. Only `pill` (toggle tracks) and `round`
+// (dots / knobs / avatars) stay curved.
 export const borderRadius = {
   container: 'var(--r-card)',
   inline: 'var(--r-inline)',

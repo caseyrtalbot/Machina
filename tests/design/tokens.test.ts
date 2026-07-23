@@ -36,14 +36,14 @@ describe('design tokens', () => {
 })
 
 describe('extended design tokens', () => {
-  it('emits border-radius as --r-* CSS vars so consumers track the Soft/Square toggle', () => {
-    // Radii resolve through RADII_VARS in themes.ts (square → 0, soft → 6/4/8px).
+  it('emits border-radius as --r-* CSS vars resolved by the fixed design constants', () => {
+    // Radii resolve through the fixed square-radii constants in themes.ts (all 0px).
     expect(borderRadius.container).toBe('var(--r-card)')
     expect(borderRadius.inline).toBe('var(--r-inline)')
     expect(borderRadius.tool).toBe('var(--r-tool)')
     expect(borderRadius.card).toBe('var(--r-card)')
     expect(borderRadius.pill).toBe('var(--r-pill)')
-    // Dots / knobs / avatars stay round in both presets.
+    // Dots / knobs / avatars stay round.
     expect(borderRadius.round).toBe('50%')
   })
 

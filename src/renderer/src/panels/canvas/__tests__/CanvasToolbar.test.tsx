@@ -15,16 +15,6 @@ vi.mock('../../../store/vault-store', () => ({
   )
 }))
 
-vi.mock('../../../store/settings-store', () => ({
-  useSettingsStore: vi.fn((selector) => {
-    const state = {
-      env: { gridDotVisibility: 50, cardBlur: 8 },
-      setEnv: vi.fn()
-    }
-    return selector(state)
-  })
-}))
-
 vi.mock('../../../design/tokens', () => ({
   colors: {
     text: { primary: '#fff', secondary: '#aaa', muted: '#555', disabled: '#333' },

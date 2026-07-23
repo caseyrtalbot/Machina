@@ -7,8 +7,7 @@ import {
   type DragMoveData
 } from '../canvas/file-drop-utils'
 import { ARTIFACT_COLORS, borderRadius, colors, transitions, typography } from '../../design/tokens'
-import { SIGNAL_COLORS } from '../../design/themes'
-import { useSettingsStore } from '../../store/settings-store'
+import { SIDEBAR_FONT_SIZE_PX, SIGNAL_COLORS } from '../../design/themes'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { RenameInput } from './RenameInput'
 import type { ArtifactType } from '@shared/types'
@@ -301,7 +300,7 @@ export const FileTree = memo(function FileTree({
     [nodes, collapsedPaths, dirIndex]
   )
 
-  const settingsFontSize = useSettingsStore((s) => s.env.sidebarFontSize)
+  const settingsFontSize = SIDEBAR_FONT_SIZE_PX
   const resolvedFont = 'var(--font-body)'
   const showDateHeaders = sortMode === 'modified' || sortMode === 'modified-asc'
 

@@ -4,7 +4,7 @@ import { useCanvasViewport } from './use-canvas-viewport'
 import { useCanvasSelection } from './use-canvas-selection'
 import { colors, canvasTokens, transitions } from '../../design/tokens'
 import { TE_FILE_MIME, inferCardType } from './file-drop-utils'
-import { useEnv } from '../../design/Theme'
+import { CANVAS_GRID_ENABLED, GRID_DOT_VISIBILITY } from '../../design/themes'
 
 const DOT_SPACING = 24
 const CELLS_PER_SQUARE = 5
@@ -86,7 +86,6 @@ export function CanvasSurface({
   onFileDrop
 }: CanvasSurfaceProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { gridDotVisibility, canvasGrid } = useEnv()
   const viewport = useCanvas((s) => s.viewport)
   const { onWheel, onPointerDown } = useCanvasViewport(containerRef)
   const { rect, onSelectionStart, wasSelectionDrag } = useCanvasSelection()
@@ -191,7 +190,7 @@ export function CanvasSurface({
   // Grid dots scale smoothly with zoom: faint when zoomed out, prominent when zoomed in.
   // Setting the user-facing `Canvas Grid` toggle off zeroes both layers so the canvas
   // reads as a clean void without rebuilding the SVG pipeline.
-  const dynamicMinorOpacity = canvasGrid ? gridDotVisibility / 100 : 0
+  const dynamicMinorOpacity = CANVAS_GRID_ENABLED ? GRID_DOT_VISIBILITY / 100 : 0
   const svgDataUri = useMemo(() => {
     const params = computeGridParams(viewport.zoom, dynamicMinorOpacity)
     const svg = buildGridSvg(params)

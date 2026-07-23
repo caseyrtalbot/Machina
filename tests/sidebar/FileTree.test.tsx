@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FileTree } from '../../src/renderer/src/panels/sidebar/FileTree'
-import { useSettingsStore } from '../../src/renderer/src/store/settings-store'
 import type { FlatTreeNode } from '../../src/renderer/src/panels/sidebar/buildFileTree'
 
 function makeNode(overrides: Partial<FlatTreeNode> = {}): FlatTreeNode {
@@ -17,15 +16,6 @@ function makeNode(overrides: Partial<FlatTreeNode> = {}): FlatTreeNode {
 }
 
 describe('FileTree', () => {
-  beforeEach(() => {
-    useSettingsStore.setState((state) => ({
-      env: {
-        ...state.env,
-        sidebarFontSize: 13
-      }
-    }))
-  })
-
   it('renders directory and file nodes', () => {
     const nodes: FlatTreeNode[] = [
       makeNode({
@@ -160,14 +150,7 @@ describe('FileTree', () => {
     expect(onToggleDirectory).toHaveBeenCalledWith('/vault/folder')
   })
 
-  it('uses the sidebar env font size with body typography for file rows', () => {
-    useSettingsStore.setState((state) => ({
-      env: {
-        ...state.env,
-        sidebarFontSize: 16
-      }
-    }))
-
+  it('uses the fixed sidebar font size with body typography for file rows', () => {
     const nodes: FlatTreeNode[] = [
       makeNode({
         name: 'styled.md',
@@ -190,6 +173,6 @@ describe('FileTree', () => {
 
     const row = screen.getByText('styled').closest('.file-row-hover') as HTMLElement
     expect(row.style.fontFamily).toBe('var(--font-body)')
-    expect(row.style.fontSize).toBe('16px')
+    expect(row.style.fontSize).toBe('13px')
   })
 })

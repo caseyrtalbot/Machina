@@ -40,13 +40,6 @@ vi.mock('../use-canvas-drag', () => ({
   useNodeResize: () => ({ onResizeStart: vi.fn() })
 }))
 
-vi.mock('../../design/Theme', () => ({
-  useEnv: () => ({
-    cardBlur: 0,
-    cardTitleFontSize: 11
-  })
-}))
-
 vi.mock('../ConnectionDragOverlay', () => ({
   startConnectionDrag: vi.fn(),
   endConnectionDrag: vi.fn(),
