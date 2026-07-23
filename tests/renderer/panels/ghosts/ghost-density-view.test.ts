@@ -84,8 +84,9 @@ describe('GhostPanel density view structure', () => {
     expect(source).not.toContain('window.api.fs.fileExists')
   })
 
-  it('has EmptyState component', () => {
-    expect(source).toContain('function EmptyState(')
+  it('has an all-resolved empty state on the shared primitive', () => {
+    expect(source).toContain('function AllResolvedState(')
+    expect(source).toContain("from '../../components/emptystate/EmptyState'")
     expect(source).toContain('All references resolved')
   })
 

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
+import { CheckCircleIcon, EmptyState } from '../../components/emptystate/EmptyState'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useVaultStore } from '../../store/vault-store'
 import { openNoteInEditor } from '../../store/dock-store'
@@ -25,16 +26,8 @@ function formatTimeAgo(ts: number): string {
 
 function CenteredMessage({ children }: { readonly children: React.ReactNode }) {
   return (
-    <div
-      className="h-full flex items-center justify-center"
-      style={{
-        color: colors.text.muted,
-        backgroundColor: colors.bg.base,
-        fontFamily: typography.fontFamily.body,
-        fontSize: 14
-      }}
-    >
-      {children}
+    <div className="h-full" style={{ backgroundColor: colors.bg.base }}>
+      <EmptyState body={children} />
     </div>
   )
 }
@@ -117,38 +110,12 @@ function RefreshButton() {
 
 function GreenState({ totalRuns }: { readonly totalRuns: number }) {
   return (
-    <div
-      className="flex flex-col items-center justify-center gap-2"
-      style={{ padding: '4rem 2rem', textAlign: 'center' }}
-    >
-      <svg
-        width={32}
-        height={32}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={colors.claude.ready}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ opacity: 0.7 }}
-      >
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-        <polyline points="22 4 12 14.01 9 11.01" />
-      </svg>
-      <div
-        style={{
-          fontSize: 15,
-          fontWeight: 400,
-          color: colors.text.primary,
-          marginTop: 4
-        }}
-      >
-        Vault healthy
-      </div>
-      <div style={{ fontSize: 12, color: colors.text.muted }}>
-        {totalRuns}/{totalRuns} checks passing
-      </div>
-    </div>
+    <EmptyState
+      height="content"
+      icon={<CheckCircleIcon stroke={colors.claude.ready} opacity={0.7} />}
+      title="Vault healthy"
+      body={`${totalRuns}/${totalRuns} checks passing`}
+    />
   )
 }
 

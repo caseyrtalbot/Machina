@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { Spinner } from './components/emptystate/Spinner'
 import { logError, notifyError, setErrorNotifier } from './utils/error-logger'
 import { withTimeout } from './utils/ipc-timeout'
 import { perfMark, perfMeasure } from './utils/perf-marks'
@@ -101,10 +102,7 @@ function LoadingSkeleton() {
       style={{ backgroundColor: colors.bg.base }}
     >
       <div className="text-center">
-        <div
-          className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
-          style={{ borderColor: colors.accent.default, borderTopColor: 'transparent' }}
-        />
+        <Spinner size={32} style={{ color: colors.accent.default, margin: '0 auto 16px' }} />
         <p className="text-sm" style={{ color: colors.text.muted }}>
           Loading vault...
         </p>

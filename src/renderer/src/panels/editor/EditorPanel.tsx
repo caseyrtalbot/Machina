@@ -26,6 +26,7 @@ import DragHandle from '@tiptap/extension-drag-handle'
 import { MachinaTableKit } from './extensions/table-kit'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { ContextMenu, type ContextMenuItem } from '../../components/ContextMenu'
+import { EmptyState } from '../../components/emptystate/EmptyState'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import { useDocument } from '../../hooks/useDocument'
 import { resolveWikilinkTarget, parseWikilinkTarget } from '@shared/engine/wikilink-resolver'
@@ -395,14 +396,11 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
 
   if (!activeNotePath) {
     return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ color: colors.text.muted, ...insetStyle }}
-      >
-        <div className="text-center">
-          <p className="text-lg mb-2">No file selected</p>
-          <p className="text-sm">Select a file from the sidebar or press Cmd+N to create one</p>
-        </div>
+      <div className="h-full" style={insetStyle}>
+        <EmptyState
+          title="No file selected"
+          body="Select a file from the sidebar or press Cmd+N to create one"
+        />
       </div>
     )
   }

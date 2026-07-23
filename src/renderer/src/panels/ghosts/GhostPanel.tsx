@@ -7,6 +7,8 @@ import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import type { GhostEntry } from '../../engine/ghost-index'
 import { colors, transitions, typography, borderRadius, floatingPanel } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
+import { CheckCircleIcon, EmptyState } from '../../components/emptystate/EmptyState'
+import { Spinner } from '../../components/emptystate/Spinner'
 import { groupByFrequency } from './ghost-sections'
 
 // ---------------------------------------------------------------------------
@@ -63,31 +65,6 @@ function IconThinking() {
       <circle cx="6.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
       <circle cx="9.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
       <path d="M6 9.5c.5.8 1.2 1.2 2 1.2s1.5-.4 2-1.2" />
-    </svg>
-  )
-}
-
-function IconSpinner() {
-  return (
-    <svg
-      width={14}
-      height={14}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    >
-      <path d="M8 2.5 A5.5 5.5 0 0 1 13.5 8">
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 8 8"
-          to="360 8 8"
-          dur="0.8s"
-          repeatCount="indefinite"
-        />
-      </path>
     </svg>
   )
 }
@@ -386,7 +363,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
         }}
       >
         <ActionIcon label={isEmerging ? 'Creating…' : 'Create note'} onClick={handleCreate}>
-          {isEmerging ? <IconSpinner /> : <IconPlus />}
+          {isEmerging ? <Spinner size={14} /> : <IconPlus />}
         </ActionIcon>
         <ActionIcon label="Show in graph" onClick={handleShowGraph}>
           <IconGraph />
@@ -434,31 +411,20 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 // Empty State
 // ---------------------------------------------------------------------------
 
-function EmptyState() {
+function AllResolvedState() {
   return (
-    <div
-      className="h-full flex flex-col items-center justify-center gap-3"
-      style={{ color: colors.text.muted, backgroundColor: colors.bg.base }}
-    >
-      <svg
-        width={32}
-        height={32}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ opacity: 0.5 }}
-      >
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-        <polyline points="22 4 12 14.01 9 11.01" />
-      </svg>
-      <div className="text-sm text-center" style={{ maxWidth: 200 }}>
-        All references resolved.
-        <br />
-        Your vault is fully connected.
-      </div>
+    <div className="h-full" style={{ color: colors.text.muted, backgroundColor: colors.bg.base }}>
+      <EmptyState
+        icon={<CheckCircleIcon />}
+        maxWidth={200}
+        body={
+          <span style={{ color: colors.text.muted }}>
+            All references resolved.
+            <br />
+            Your vault is fully connected.
+          </span>
+        }
+      />
     </div>
   )
 }
@@ -488,7 +454,7 @@ export function GhostPanel() {
   const maxCount = visibleGhosts[0]?.referenceCount ?? 1
 
   if (visibleGhosts.length === 0 && dismissedEntries.length === 0) {
-    return <EmptyState />
+    return <AllResolvedState />
   }
 
   return (

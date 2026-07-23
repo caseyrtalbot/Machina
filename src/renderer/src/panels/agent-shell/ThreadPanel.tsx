@@ -10,6 +10,7 @@ import { WatcherHealthChip, WatcherHealthNotice } from './WatcherHealthChip'
 import { HarnessIdentityChip } from './HarnessIdentityChip'
 import { AgentKillSwitch } from './agent-breaker-kill-switch'
 import { ThinkingIndicator } from './ThinkingIndicator'
+import { EmptyState } from '../../components/emptystate/EmptyState'
 import { TerminalDockAdapter } from './dock-adapters/TerminalDockAdapter'
 
 /** The two projections of one CLI agent session (contracts §3, Phase 2 step 4). */
@@ -176,7 +177,7 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
               style={{ height: '100%', overflowY: 'auto' }}
             >
               {t.messages.length === 0 && !streaming && !pendingTools?.length && !inFlight ? (
-                <EmptyState />
+                <EmptyThreadState />
               ) : (
                 <>
                   {t.messages.map((m, i) => {
@@ -327,74 +328,45 @@ function RawProjectionView({ threadId }: { readonly threadId: string }) {
   return <TerminalDockAdapter sessionId={entry.sessionId} projection="agent" />
 }
 
-function EmptyState() {
+function EmptyThreadState() {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        justifyContent: 'flex-start',
-        height: '100%',
-        padding: '18% 32px 0',
-        gap: 12,
-        boxSizing: 'border-box'
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          width: 18,
-          height: 1,
-          background: colors.accent.line,
-          marginBottom: 2,
-          opacity: 0.9
-        }}
-      />
-      <h2
-        style={{
-          margin: 0,
-          fontFamily: typography.fontFamily.display,
-          fontWeight: 400,
-          fontSize: 22,
-          lineHeight: 1.2,
-          letterSpacing: '-0.01em',
-          color: colors.text.primary
-        }}
-      >
-        Ask anything about your vault.
-      </h2>
-      <p
-        style={{
-          margin: 0,
-          maxWidth: 420,
-          fontFamily: typography.fontFamily.body,
-          fontSize: 13,
-          lineHeight: 1.6,
-          color: colors.text.muted
-        }}
-      >
-        Cite notes, trace ideas across the graph, or ask the agent to draft from what you already
-        wrote.
-      </p>
-      <div
-        style={{
-          marginTop: 6,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.disabled
-        }}
-      >
-        <span>type</span>
-        <span style={{ color: colors.text.muted }}>/</span>
-        <span>to switch agent</span>
-      </div>
-    </div>
+    <EmptyState
+      align="start"
+      icon={
+        <span
+          aria-hidden
+          style={{
+            display: 'block',
+            width: 18,
+            height: 1,
+            background: colors.accent.line,
+            opacity: 0.9
+          }}
+        />
+      }
+      title="Ask anything about your vault."
+      body={
+        <span style={{ display: 'inline-block', maxWidth: 420 }}>
+          Cite notes, trace ideas across the graph, or ask the agent to draft from what you already
+          wrote.
+        </span>
+      }
+      hint={
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            textTransform: typography.metadata.textTransform,
+            color: colors.text.disabled
+          }}
+        >
+          <span>type</span>
+          <span style={{ color: colors.text.muted }}>/</span>
+          <span>to switch agent</span>
+        </span>
+      }
+    />
   )
 }
 

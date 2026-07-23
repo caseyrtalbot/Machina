@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
+import { LoadingState } from '../../components/emptystate/LoadingState'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import matter from 'gray-matter'
@@ -291,13 +292,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
       >
         {/* Code content area */}
         <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-          {loading && (
-            <div style={{ padding: 28 }}>
-              <span className="text-sm" style={{ color: colors.text.muted }}>
-                Loading...
-              </span>
-            </div>
-          )}
+          {loading && <LoadingState />}
           {!loading && error && (
             <div style={{ padding: 28 }}>
               <span className="text-sm" style={{ color: 'var(--signal-danger)' }}>

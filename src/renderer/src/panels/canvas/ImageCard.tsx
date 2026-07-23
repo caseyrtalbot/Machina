@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, memo } from 'react'
+import { Spinner } from '../../components/emptystate/Spinner'
 import { useCanvas } from './canvas-store-context'
 import { logError } from '../../utils/error-logger'
 import { CardShell } from './CardShell'
@@ -117,10 +118,7 @@ function ImageContent({
   if (loading) {
     return (
       <div className="text-center" style={{ color: colors.text.muted }}>
-        <div
-          className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-1"
-          style={{ borderColor: colors.accent.default, borderTopColor: 'transparent' }}
-        />
+        <Spinner size={20} style={{ color: colors.accent.default, margin: '0 auto 4px' }} />
         <span className="text-xs">Loading...</span>
       </div>
     )

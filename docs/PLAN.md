@@ -75,6 +75,15 @@ is green. Layer 4 items may start once their stated dependencies exist.
      toolbar chrome.
    - `EmptyState` — collapse `CanvasEmptyStates.tsx`, `EmptyDockState`, and per-panel
      bespokes; unify the three loading patterns while there.
+     (Completed 2026-07-22: `components/emptystate/` ships EmptyState (card/plain,
+     overlay, align, height), Spinner (`.te-spinner`), and LoadingState; migrated
+     canvas welcome/empty-vault, dock, thread, ghosts, graph, editor, and health
+     empty states plus the App/ImageCard/PdfCard spinner rings and the
+     NoteCard/FileViewCard/mermaid/DockTabContent loading texts; skeleton
+     (CardShellSkeleton) and tool-card shimmer stay as the single implementations
+     of their patterns. Invariant gates, all grep-clean: `animate-spin` and the
+     `border-t-transparent` ring recipe return nothing; the check-circle path is
+     declared only in CheckCircleIcon.)
    - Consolidate every menu on `components/ContextMenu.tsx`; retire the canvas,
      editor, and sidebar variants.
      (Completed 2026-07-22: wrapper components CanvasContextMenu, CardContextMenu,

@@ -3,7 +3,8 @@ import { useThreadStore } from '../../store/thread-store'
 import { useDockStore } from '../../store/dock-store'
 import { DockTabBar } from './DockTabBar'
 import { DockTabContent } from './DockTabContent'
-import { colors, typography } from '../../design/tokens'
+import { colors } from '../../design/tokens'
+import { EmptyState } from '../../components/emptystate/EmptyState'
 import { type DockTab } from '@shared/dock-types'
 import { TerminalStrip } from './TerminalStrip'
 
@@ -120,42 +121,16 @@ export function SurfaceDock() {
 
 function EmptyDockState() {
   return (
-    <div
-      data-testid="dock-empty-state"
-      style={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24
-      }}
-    >
-      <div style={{ textAlign: 'center', maxWidth: 280 }}>
-        <div
-          style={{
-            color: colors.text.secondary,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform
-          }}
-        >
-          no surface open
-        </div>
-        <div
-          style={{
-            marginTop: 8,
-            color: colors.text.muted,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            lineHeight: 1.8
-          }}
-        >
+    <EmptyState
+      testId="dock-empty-state"
+      maxWidth={280}
+      eyebrow="no surface open"
+      hint={
+        <span style={{ lineHeight: 1.8 }}>
           use the ribbon on the right edge to open the editor, canvas, graph, ghosts, or health, or
           press ⌘K for the command palette
-        </div>
-      </div>
-    </div>
+        </span>
+      }
+    />
   )
 }

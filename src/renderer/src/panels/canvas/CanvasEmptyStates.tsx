@@ -1,10 +1,9 @@
-import { useCallback, useState } from 'react'
-import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { useCallback } from 'react'
+import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
+import { EmptyState } from '../../components/emptystate/EmptyState'
 import { Overlay } from '../../components/overlay/Overlay'
 
 export function CanvasWelcomeCard() {
-  const [isHovered, setIsHovered] = useState(false)
-
   const handleOpenFolder = useCallback(async () => {
     const path = await window.api.fs.selectVault()
     if (path) {
@@ -13,83 +12,14 @@ export function CanvasWelcomeCard() {
   }, [])
 
   return (
-    <div
-      className="absolute inset-0 flex items-center justify-center z-[1]"
-      style={{ marginTop: -40 }}
-    >
-      <div
-        style={{
-          width: 360,
-          padding: '32px 28px',
-          borderRadius: borderRadius.card,
-          backgroundColor: 'var(--canvas-card-bg)',
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          border: '1px solid var(--canvas-card-border)',
-          boxShadow: floatingPanel.shadow
-        }}
-      >
-        <div
-          style={{
-            fontSize: typography.metadata.size,
-            fontFamily: typography.fontFamily.mono,
-            color: colors.text.muted,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: 'uppercase',
-            marginBottom: 12
-          }}
-        >
-          Machina
-        </div>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 500,
-            fontFamily: typography.fontFamily.display,
-            color: colors.text.primary,
-            lineHeight: 1.4,
-            marginBottom: 8
-          }}
-        >
-          Open a folder to get started.
-        </h2>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            fontFamily: typography.fontFamily.body,
-            color: colors.text.secondary,
-            lineHeight: 1.6,
-            marginBottom: 24
-          }}
-        >
-          Point Machina at any folder of markdown files. Your notes become an explorable knowledge
-          graph with connections, clusters, and tensions.
-        </p>
-        <button
-          type="button"
-          onClick={handleOpenFolder}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          style={{
-            padding: '8px 20px',
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: typography.fontFamily.body,
-            color: 'var(--color-accent-fg, #1a0f08)',
-            backgroundColor: isHovered ? colors.accent.hover : colors.accent.default,
-            border: 'none',
-            borderRadius: borderRadius.tool,
-            cursor: 'pointer',
-            transition: `background-color ${transitions.default}`,
-            lineHeight: 1.5
-          }}
-        >
-          Open Folder
-        </button>
-      </div>
-    </div>
+    <EmptyState
+      variant="card"
+      overlay
+      eyebrow="Machina"
+      title="Open a folder to get started."
+      body="Point Machina at any folder of markdown files. Your notes become an explorable knowledge graph with connections, clusters, and tensions."
+      actions={[{ label: 'Open Folder', onClick: handleOpenFolder }]}
+    />
   )
 }
 
@@ -103,123 +33,20 @@ interface CanvasEmptyVaultCardProps {
  * fastest paths to a first card — create a note, import (⌘G), or drag files.
  */
 export function CanvasEmptyVaultCard({ onCreateNote, onOpenImport }: CanvasEmptyVaultCardProps) {
-  const [hovered, setHovered] = useState<'note' | 'import' | null>(null)
-
   return (
-    <div
-      data-testid="canvas-empty-vault"
-      className="absolute inset-0 flex items-center justify-center z-[1] pointer-events-none"
-      style={{ marginTop: -40 }}
-    >
-      <div
-        className="pointer-events-auto"
-        style={{
-          width: 360,
-          padding: '28px',
-          borderRadius: borderRadius.card,
-          backgroundColor: 'var(--canvas-card-bg)',
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          border: '1px solid var(--canvas-card-border)',
-          boxShadow: floatingPanel.shadow
-        }}
-      >
-        <div
-          style={{
-            fontSize: typography.metadata.size,
-            fontFamily: typography.fontFamily.mono,
-            color: colors.text.muted,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: 'uppercase',
-            marginBottom: 12
-          }}
-        >
-          Empty Vault
-        </div>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 500,
-            fontFamily: typography.fontFamily.display,
-            color: colors.text.primary,
-            lineHeight: 1.4,
-            marginBottom: 8
-          }}
-        >
-          Put your first thought on the canvas.
-        </h2>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            fontFamily: typography.fontFamily.body,
-            color: colors.text.secondary,
-            lineHeight: 1.6,
-            marginBottom: 20
-          }}
-        >
-          Create a note, import from your vault with ⌘G, or drag markdown, images, and PDFs from
-          Finder straight onto the canvas.
-        </p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            onClick={onCreateNote}
-            onMouseEnter={() => setHovered('note')}
-            onMouseLeave={() => setHovered(null)}
-            style={{
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: typography.fontFamily.body,
-              color: 'var(--color-accent-fg)',
-              backgroundColor: hovered === 'note' ? colors.accent.hover : colors.accent.default,
-              border: 'none',
-              borderRadius: borderRadius.tool,
-              cursor: 'pointer',
-              transition: `background-color ${transitions.default}`,
-              lineHeight: 1.5
-            }}
-          >
-            New Note
-          </button>
-          <button
-            type="button"
-            onClick={onOpenImport}
-            onMouseEnter={() => setHovered('import')}
-            onMouseLeave={() => setHovered(null)}
-            style={{
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: typography.fontFamily.body,
-              color: hovered === 'import' ? colors.text.primary : colors.text.secondary,
-              backgroundColor: 'transparent',
-              border: `1px solid ${colors.border.subtle}`,
-              borderRadius: borderRadius.tool,
-              cursor: 'pointer',
-              transition: `color ${transitions.default}`,
-              lineHeight: 1.5
-            }}
-          >
-            Import ⌘G
-          </button>
-        </div>
-        <p
-          style={{
-            margin: 0,
-            marginTop: 16,
-            fontSize: typography.metadata.size,
-            fontFamily: typography.fontFamily.mono,
-            color: colors.text.muted,
-            letterSpacing: typography.metadata.letterSpacing
-          }}
-        >
-          Press ? for keyboard shortcuts
-        </p>
-      </div>
-    </div>
+    <EmptyState
+      variant="card"
+      overlay
+      testId="canvas-empty-vault"
+      eyebrow="Empty Vault"
+      title="Put your first thought on the canvas."
+      body="Create a note, import from your vault with ⌘G, or drag markdown, images, and PDFs from Finder straight onto the canvas."
+      actions={[
+        { label: 'New Note', onClick: onCreateNote },
+        { label: 'Import ⌘G', onClick: onOpenImport, kind: 'secondary' }
+      ]}
+      hint="Press ? for keyboard shortcuts"
+    />
   )
 }
 

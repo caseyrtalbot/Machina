@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LoadingState } from '../../../components/emptystate/LoadingState'
 import CodeBlock from '@tiptap/extension-code-block'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react'
@@ -101,7 +102,7 @@ function MermaidDiagram({ code }: { code: string }): React.ReactElement {
   if (loading || !svgHtml) {
     return (
       <div className="mermaid-diagram">
-        <div style={{ padding: '12px', opacity: 0.4, fontSize: '12px' }}>Loading diagram…</div>
+        <LoadingState label="Loading diagram…" padding={12} />
       </div>
     )
   }

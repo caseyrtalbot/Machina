@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
+import { LoadingState } from '../../components/emptystate/LoadingState'
 import { logError } from '../../utils/error-logger'
 import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
@@ -224,11 +225,7 @@ export function NoteCard({ node }: NoteCardProps) {
         style={{ minHeight: 0 }}
       >
         {loading ? (
-          <div style={{ padding: 28 }}>
-            <span className="text-sm" style={{ color: colors.text.muted }}>
-              Loading...
-            </span>
-          </div>
+          <LoadingState />
         ) : !body ? (
           <div style={{ padding: 28 }}>
             <span className="text-sm" style={{ color: colors.text.muted }}>

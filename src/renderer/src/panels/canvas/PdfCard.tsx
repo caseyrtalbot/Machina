@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
+import { Spinner } from '../../components/emptystate/Spinner'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { pdfjs } from './pdf-worker-setup'
 import './pdf-text-layer.css'
@@ -282,10 +283,7 @@ function PdfStatus({
         <span className="text-xs">No PDF source</span>
       ) : loading ? (
         <div>
-          <div
-            className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-1"
-            style={{ borderColor: colors.accent.default, borderTopColor: 'transparent' }}
-          />
+          <Spinner size={20} style={{ color: colors.accent.default, margin: '0 auto 4px' }} />
           <span className="text-xs">Loading PDF...</span>
         </div>
       ) : (

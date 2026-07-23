@@ -80,6 +80,20 @@ h6 {
   }
 }
 
+/* The one ring spinner (components/emptystate/Spinner.tsx). currentColor ring. */
+.te-spinner {
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: te-spin 0.8s linear infinite;
+}
+
+@keyframes te-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .te-caret {
   display: inline-block;
   width: 8px;

@@ -1,3 +1,4 @@
+import { EmptyState } from '../../components/emptystate/EmptyState'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useVaultStore } from '@renderer/store/vault-store'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
@@ -11,7 +12,7 @@ import { EnrichmentPill } from './EnrichmentPill'
 import { selectEnrichmentTargets } from './enrichment-targets'
 import { getGraphLod } from './graph-lod'
 import { resolveFocusIdx } from './graph-focus'
-import { colors, floatingPanel, typography } from '@renderer/design/tokens'
+import { colors, floatingPanel } from '@renderer/design/tokens'
 import { useReducedMotion } from '@renderer/hooks/useReducedMotion'
 import { openArtifactInEditor } from '@renderer/system-artifacts/system-artifact-runtime'
 import type { SimNode, PhysicsCommand, PhysicsResult, ForceParams } from './graph-types'
@@ -121,32 +122,7 @@ function GraphEmptyState({
         ? `${rawFileCount} file${rawFileCount === 1 ? ' has' : 's have'} no metadata or discovered connections yet. Add tags or [[wikilinks]], or ask the agent in a thread to connect them.`
         : 'Add links, tags, tensions, or generated metadata so the graph has nodes to render.'
 
-  return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center p-6 pointer-events-none">
-      <div
-        className="max-w-md px-5 py-4 text-center"
-        style={{
-          backgroundColor: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          border: '1px solid var(--color-border-default)',
-          boxShadow: floatingPanel.shadow
-        }}
-      >
-        <div
-          className="text-[10px] uppercase tracking-[0.18em] mb-2"
-          style={{ color: 'var(--color-text-muted)', fontFamily: typography.fontFamily.mono }}
-        >
-          Graph View
-        </div>
-        <h2 className="text-base font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
-          {title}
-        </h2>
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-          {description}
-        </p>
-      </div>
-    </div>
-  )
+  return <EmptyState variant="card" overlay eyebrow="Graph View" title={title} body={description} />
 }
 
 function GraphStatusRail({
