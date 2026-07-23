@@ -8,8 +8,9 @@ import {
   type CanvasNode,
   type CanvasNodeType
 } from '@shared/canvas-types'
-import { CanvasContextMenu } from './CanvasContextMenu'
-import { CardContextMenu } from './CardContextMenu'
+import { ContextMenu } from '../../components/ContextMenu'
+import { canvasAddCardEntries } from './canvas-menu-entries'
+import { cardMenuEntries } from './card-menu-entries'
 import { computeShowConnections } from './show-connections'
 import { computeImportViewport } from './import-logic'
 import { useVaultStore } from '../../store/vault-store'
@@ -627,11 +628,12 @@ function CanvasViewInner(): React.ReactElement {
           />
 
           {contextMenu && (
-            <CanvasContextMenu
-              x={contextMenu.x}
-              y={contextMenu.y}
-              onAddCard={handleAddCard}
+            <ContextMenu
+              position={{ x: contextMenu.x, y: contextMenu.y }}
+              items={canvasAddCardEntries(handleAddCard)}
               onClose={() => setContextMenu(null)}
+              minWidth={220}
+              testId="canvas-context-menu"
             />
           )}
 
@@ -643,69 +645,68 @@ function CanvasViewInner(): React.ReactElement {
               const menuFilePath = isNote ? menuNode.content : undefined
               const { graph, fileToId, artifacts } = useVaultStore.getState()
               return (
-                <CardContextMenu
-                  x={cardContextMenu.x}
-                  y={cardContextMenu.y}
-                  onShowConnections={() => {
-                    const { newNodes, newEdges } = computeShowConnections(
-                      menuNode,
-                      nodes,
-                      graph,
-                      fileToId,
-                      artifacts
-                    )
-                    if (newNodes.length > 0 || newEdges.length > 0) {
-                      commandStack.current.execute({
-                        execute: () => addNodesAndEdges(newNodes, newEdges),
-                        undo: () => {
-                          const store = canvas.getState()
-                          const nodeIds = new Set(newNodes.map((n) => n.id))
-                          const edgeIds = new Set(newEdges.map((e) => e.id))
-                          canvas.setState({
-                            nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
-                            edges: store.edges.filter((e) => !edgeIds.has(e.id)),
-                            isDirty: true
-                          })
-                        }
-                      })
-                      // Fit viewport to all cards including new connections
-                      const allNodes = [...canvas.getState().nodes]
-                      const vp = computeImportViewport(
-                        allNodes,
-                        containerSize.width,
-                        containerSize.height
+                <ContextMenu
+                  position={{ x: cardContextMenu.x, y: cardContextMenu.y }}
+                  minWidth={180}
+                  testId="card-context-menu"
+                  items={cardMenuEntries({
+                    onShowConnections: () => {
+                      const { newNodes, newEdges } = computeShowConnections(
+                        menuNode,
+                        nodes,
+                        graph,
+                        fileToId,
+                        artifacts
                       )
-                      setViewport(vp)
-                    }
-                    setCardContextMenu(null)
-                  }}
-                  onOpenInEditor={
-                    isNote
+                      if (newNodes.length > 0 || newEdges.length > 0) {
+                        commandStack.current.execute({
+                          execute: () => addNodesAndEdges(newNodes, newEdges),
+                          undo: () => {
+                            const store = canvas.getState()
+                            const nodeIds = new Set(newNodes.map((n) => n.id))
+                            const edgeIds = new Set(newEdges.map((e) => e.id))
+                            canvas.setState({
+                              nodes: store.nodes.filter((n) => !nodeIds.has(n.id)),
+                              edges: store.edges.filter((e) => !edgeIds.has(e.id)),
+                              isDirty: true
+                            })
+                          }
+                        })
+                        // Fit viewport to all cards including new connections
+                        const allNodes = [...canvas.getState().nodes]
+                        const vp = computeImportViewport(
+                          allNodes,
+                          containerSize.width,
+                          containerSize.height
+                        )
+                        setViewport(vp)
+                      }
+                      setCardContextMenu(null)
+                    },
+                    onOpenInEditor: isNote
                       ? () => {
                           canvas.getState().openSplit(menuFilePath!)
                           setCardContextMenu(null)
                         }
-                      : undefined
-                  }
-                  onCopyPath={() => {
-                    navigator.clipboard.writeText(menuNode.content)
-                    setCardContextMenu(null)
-                  }}
+                      : undefined,
+                    onCopyPath: () => {
+                      navigator.clipboard.writeText(menuNode.content)
+                      setCardContextMenu(null)
+                    },
+                    onQuickSaveText:
+                      menuNode.type === 'text'
+                        ? async () => {
+                            await saveQuick(menuNode.id)
+                          }
+                        : undefined,
+                    onSaveTextAs:
+                      menuNode.type === 'text'
+                        ? () => {
+                            void openSaveDialog(menuNode.id)
+                          }
+                        : undefined
+                  })}
                   onClose={() => setCardContextMenu(null)}
-                  onQuickSaveText={
-                    menuNode.type === 'text'
-                      ? async () => {
-                          await saveQuick(menuNode.id)
-                        }
-                      : undefined
-                  }
-                  onSaveTextAs={
-                    menuNode.type === 'text'
-                      ? () => {
-                          void openSaveDialog(menuNode.id)
-                        }
-                      : undefined
-                  }
                 />
               )
             })()}

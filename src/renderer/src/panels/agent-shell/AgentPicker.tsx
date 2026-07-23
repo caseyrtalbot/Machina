@@ -55,7 +55,7 @@ export function AgentPicker({
   return (
     <div
       ref={ref}
-      role="menu"
+      role="listbox"
       style={{
         background: colors.bg.elevated,
         border: `1px solid ${colors.border.default}`,
@@ -68,7 +68,7 @@ export function AgentPicker({
         return (
           <div
             key={a}
-            role="menuitem"
+            role="option"
             aria-selected={isActive}
             onMouseEnter={() => setActive(i)}
             onClick={() => onPick(a)}
@@ -91,7 +91,8 @@ export function AgentPicker({
         )
       })}
       <div
-        role="menuitem"
+        role="option"
+        aria-selected={false}
         onClick={onCancel}
         style={{
           padding: '6px 10px',

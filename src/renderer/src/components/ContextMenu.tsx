@@ -39,6 +39,8 @@ interface ContextMenuProps {
   readonly onClose: () => void
   /** Anchor the menu's bottom edge at the cursor so it grows upward. */
   readonly openUpward?: boolean
+  /** Treat position.x as the menu's right edge (for button-anchored menus). */
+  readonly alignRight?: boolean
   readonly minWidth?: number
   readonly testId?: string
 }
@@ -59,6 +61,7 @@ export function ContextMenu({
   items,
   onClose,
   openUpward = false,
+  alignRight = false,
   minWidth = 160,
   testId
 }: ContextMenuProps) {
@@ -72,14 +75,15 @@ export function ContextMenu({
     const el = ref.current
     if (!el) return
     const rect = el.getBoundingClientRect()
+    const rawX = alignRight ? position.x - rect.width : position.x
     const rawY = openUpward ? position.y - rect.height : position.y
     const maxX = window.innerWidth - rect.width - VIEWPORT_MARGIN
     const maxY = window.innerHeight - rect.height - VIEWPORT_MARGIN
     setCoords({
-      x: Math.max(VIEWPORT_MARGIN, Math.min(position.x, maxX)),
+      x: Math.max(VIEWPORT_MARGIN, Math.min(rawX, maxX)),
       y: Math.max(VIEWPORT_MARGIN, Math.min(rawY, maxY))
     })
-  }, [position.x, position.y, openUpward, items.length])
+  }, [position.x, position.y, openUpward, alignRight, items.length])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

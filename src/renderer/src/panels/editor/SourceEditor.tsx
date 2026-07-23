@@ -5,7 +5,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { machinaCodeTheme } from '../canvas/shared/code-theme'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
-import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
+import { ContextMenu, type ContextMenuItem } from '../../components/ContextMenu'
 import { colors } from '../../design/tokens'
 
 interface SourceEditorProps {
@@ -21,7 +21,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
-    actions: ContextMenuAction[]
+    items: ContextMenuItem[]
   } | null>(null)
 
   useEffect(() => {
@@ -45,11 +45,12 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
     const surrounding = view.state.sliceDoc(beforeStart, afterEnd)
     const isConceptNode = surrounding.includes(`<node>${selectedText}</node>`)
 
-    const actions: ContextMenuAction[] = isConceptNode
+    const items: ContextMenuItem[] = isConceptNode
       ? [
           {
+            id: 'unlink-concept',
             label: 'Unlink concept',
-            onClick: () => {
+            onSelect: () => {
               const v = viewRef.current
               if (!v) return
               // Find and remove surrounding <node>...</node> tags
@@ -64,8 +65,9 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
         ]
       : [
           {
+            id: 'link-concept',
             label: 'Link as concept',
-            onClick: () => {
+            onSelect: () => {
               const v = viewRef.current
               if (!v) return
               v.dispatch({
@@ -75,7 +77,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
           }
         ]
 
-    setContextMenu({ x: e.clientX, y: e.clientY, actions })
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
   }, [])
 
   useEffect(() => {
@@ -138,10 +140,9 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
         style={{ backgroundColor: colors.bg.base }}
       />
       {contextMenu && (
-        <EditorContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          actions={contextMenu.actions}
+        <ContextMenu
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          items={contextMenu.items}
           onClose={() => setContextMenu(null)}
         />
       )}

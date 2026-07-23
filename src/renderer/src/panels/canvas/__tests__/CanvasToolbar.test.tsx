@@ -35,10 +35,17 @@ vi.mock('../../../design/tokens', () => ({
       soft: 'rgba(124,58,237,0.14)',
       line: 'rgba(124,58,237,0.45)'
     },
-    claude: { warning: '#f00' },
+    border: { default: '#333', subtle: '#222' },
+    claude: { warning: '#f00', error: '#f33' },
     semantic: { tension: '#ecaa0b' }
   },
   borderRadius: { container: 4, inline: 2, tool: 4, card: 0, round: '50%' },
+  floatingPanel: {
+    glass: { popoverBg: '#111', popoverBlur: 'blur(8px)' },
+    shadowCompact: 'none'
+  },
+  iconSize: { sm: 14 },
+  iconStroke: 1.75,
   typography: {
     fontFamily: { display: 'system-ui', body: 'system-ui', mono: 'monospace' },
     metadata: { size: '10px', letterSpacing: '0.14em', textTransform: 'uppercase' as const }
@@ -87,6 +94,28 @@ function renderToolbar(props: typeof baseProps) {
     </CanvasStoreProvider>
   )
 }
+
+describe('CanvasToolbar menus', () => {
+  afterEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
+
+  // Regression: reading e.currentTarget inside the setState updater crashed the
+  // panel — currentTarget is nulled once the handler returns.
+  it('opens the zoom menu on badge click', () => {
+    renderToolbar(baseProps)
+    fireEvent.click(screen.getByTestId('canvas-zoom-menu'))
+    expect(screen.getByRole('menuitem', { name: 'Zoom to 100%' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Fit all' })).toBeTruthy()
+  })
+
+  it('opens the tile menu on tile-button click', () => {
+    renderToolbar(baseProps)
+    fireEvent.click(screen.getByTestId('canvas-tile'))
+    expect(screen.getByRole('menuitem', { name: 'Organize by topic' })).toBeTruthy()
+  })
+})
 
 describe('CanvasToolbar clear button', () => {
   afterEach(() => {

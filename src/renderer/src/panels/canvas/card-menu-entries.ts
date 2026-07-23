@@ -1,27 +1,22 @@
-import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
+import type { ContextMenuEntry } from '../../components/ContextMenu'
 
-interface CardContextMenuProps {
-  readonly x: number
-  readonly y: number
+export interface CardMenuHandlers {
   readonly onShowConnections: () => void
   readonly onOpenInEditor?: () => void
   readonly onCopyPath: () => void
-  readonly onClose: () => void
   readonly onQuickSaveText?: () => void
   readonly onSaveTextAs?: () => void
 }
 
-export function CardContextMenu({
-  x,
-  y,
+/** Right-click menu for a canvas card; optional handlers gate their items. */
+export function cardMenuEntries({
   onShowConnections,
   onOpenInEditor,
   onCopyPath,
-  onClose,
   onQuickSaveText,
   onSaveTextAs
-}: CardContextMenuProps) {
-  const entries: readonly ContextMenuEntry[] = [
+}: CardMenuHandlers): readonly ContextMenuEntry[] {
+  return [
     ...(onQuickSaveText
       ? [{ id: 'quick-save', label: 'Save as new note', onSelect: onQuickSaveText }]
       : []),
@@ -34,14 +29,4 @@ export function CardContextMenu({
     { kind: 'separator', id: 'sep-copy' } as const,
     { id: 'copy-path', label: 'Copy Path', onSelect: onCopyPath }
   ]
-
-  return (
-    <ContextMenu
-      position={{ x, y }}
-      items={entries}
-      onClose={onClose}
-      minWidth={180}
-      testId="card-context-menu"
-    />
-  )
 }

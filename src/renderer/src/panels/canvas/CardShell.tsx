@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
@@ -53,104 +53,6 @@ export const VALID_CONVERSIONS: Record<CanvasNodeType, readonly CanvasNodeType[]
   'project-folder': [],
   'terminal-block': []
 } as const
-
-function ConvertMenu({
-  nodeId,
-  nodeType,
-  anchorRect,
-  onClose
-}: {
-  readonly nodeId: string
-  readonly nodeType: CanvasNodeType
-  readonly anchorRect: DOMRect
-  readonly onClose: () => void
-}) {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const canvas = useCanvasApi()
-  const canvasId = useCanvasId()
-  const targets = VALID_CONVERSIONS[nodeType]
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handler)
-    }, 0)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('mousedown', handler)
-    }
-  }, [onClose])
-
-  // Anchor rect is captured on open; close on scroll/resize rather than re-measuring.
-  useEffect(() => {
-    window.addEventListener('scroll', onClose, true)
-    window.addEventListener('resize', onClose)
-    return () => {
-      window.removeEventListener('scroll', onClose, true)
-      window.removeEventListener('resize', onClose)
-    }
-  }, [onClose])
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed flex flex-col py-1"
-      style={{
-        top: anchorRect.bottom + 2,
-        right: window.innerWidth - anchorRect.right,
-        minWidth: 120,
-        backgroundColor: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: canvasTokens.cardRadius,
-        zIndex: 50,
-        boxShadow: floatingPanel.shadowCompact
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {targets.map((target) => {
-        const info = CARD_TYPE_INFO[target]
-        return (
-          <button
-            key={target}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:opacity-80"
-            style={{
-              color: colors.text.secondary,
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              const cmd = convertNodeTypeCommand(canvas, nodeId, target)
-              if (cmd) {
-                const stack = getCommandStack(canvasId)
-                if (stack) stack.execute(cmd)
-                else void cmd.execute()
-              }
-              onClose()
-            }}
-          >
-            <span
-              style={{
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                width: 20
-              }}
-            >
-              {info.icon}
-            </span>
-            {info.label}
-          </button>
-        )
-      })}
-    </div>,
-    document.body
-  )
-}
 
 function nearestSide(clientX: number, clientY: number, rect: DOMRect): CanvasSide {
   const relX = (clientX - rect.left) / rect.width - 0.5
@@ -227,6 +129,33 @@ export function CardShell({
   const [hovered, setHovered] = useState(false)
   const [convertAnchor, setConvertAnchor] = useState<DOMRect | null>(null)
   const convertButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Anchor rect is captured on open; close on scroll/resize rather than re-measuring.
+  useEffect(() => {
+    if (!convertAnchor) return
+    const close = () => setConvertAnchor(null)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [convertAnchor])
+
+  const convertEntries: readonly ContextMenuEntry[] = VALID_CONVERSIONS[node.type].map(
+    (target) => ({
+      id: target,
+      label: CARD_TYPE_INFO[target].label,
+      onSelect: () => {
+        const cmd = convertNodeTypeCommand(canvas, node.id, target)
+        if (cmd) {
+          const stack = getCommandStack(canvasId)
+          if (stack) stack.execute(cmd)
+          else void cmd.execute()
+        }
+      }
+    })
+  )
 
   const isActive = node.metadata?.isActive === true
   const isTerminalCard = node.type === 'terminal'
@@ -505,11 +434,12 @@ export function CardShell({
             </TitleBarButton>
           )}
           {convertAnchor && (
-            <ConvertMenu
-              nodeId={node.id}
-              nodeType={node.type}
-              anchorRect={convertAnchor}
+            <ContextMenu
+              position={{ x: convertAnchor.right, y: convertAnchor.bottom + 2 }}
+              alignRight
+              items={convertEntries}
               onClose={() => setConvertAnchor(null)}
+              minWidth={120}
             />
           )}
           {headerActions}

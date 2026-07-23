@@ -142,6 +142,21 @@ describe('ContextMenu', () => {
     expect(screen.getByTestId('item-icon')).toBeTruthy()
   })
 
+  it('alignRight positions the menu so position.x is its right edge', () => {
+    render(
+      <ContextMenu
+        position={{ x: 400, y: 10 }}
+        onClose={() => {}}
+        alignRight
+        testId="aligned-menu"
+        items={[{ id: 'a', label: 'Run', onSelect: () => {} }]}
+      />
+    )
+    const menu = screen.getByTestId('aligned-menu')
+    const width = menu.getBoundingClientRect().width
+    expect(parseFloat(menu.style.left)).toBeCloseTo(400 - width, 0)
+  })
+
   it('applies the testId to the menu container', () => {
     render(
       <ContextMenu

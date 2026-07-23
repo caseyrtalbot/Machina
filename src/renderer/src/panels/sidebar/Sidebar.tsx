@@ -11,7 +11,8 @@ import {
   transitions,
   typography
 } from '../../design/tokens'
-import { FileContextMenu } from './FileContextMenu'
+import { ContextMenu } from '../../components/ContextMenu'
+import { fileMenuEntries } from './file-menu-entries'
 import { FileTree } from './FileTree'
 import { SearchBar } from './SearchBar'
 import { VaultSelector } from './VaultSelector'
@@ -20,13 +21,19 @@ import type { ArtifactType } from '@shared/types'
 import type { ArtifactOrigin } from './origin-utils'
 import type { SystemArtifactKind } from '@shared/system-artifacts'
 import type { FlatTreeNode } from './buildFileTree'
-import type { FileContextMenuState } from './FileContextMenu'
 import { useUiStore } from '../../store/ui-store'
 import { TagBrowser } from './TagBrowser'
 import { DailyNoteSection } from './DailyNoteSection'
 import { BookmarksList } from './BookmarksList'
 
 type SortMode = 'modified' | 'modified-asc' | 'name' | 'name-desc' | 'type'
+
+interface FileMenuState {
+  readonly x: number
+  readonly y: number
+  readonly path: string
+  readonly isDirectory: boolean
+}
 
 interface FileAction {
   readonly actionId: string
@@ -391,11 +398,16 @@ export function Sidebar({
   onOpenSettings,
   onOpenDailyNote
 }: SidebarProps) {
-  const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null)
+  const [contextMenu, setContextMenu] = useState<FileMenuState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [filesCollapsed, setFilesCollapsed] = useState(false)
   const fileCount = nodes.filter((node) => !node.isDirectory).length
   const actionedPaths = useSidebarSelectionStore((s) => s.actionedPaths)
+  const agentModifiedPaths = useSidebarSelectionStore((s) => s.agentModifiedPaths)
+  const storeSelectedPaths = useSidebarSelectionStore((s) => s.selectedPaths)
+  const isMenuPathBookmarked = useUiStore((s) =>
+    contextMenu ? s.bookmarkedPaths.includes(contextMenu.path) : false
+  )
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, path: string, isDirectory: boolean) => {
@@ -406,7 +418,7 @@ export function Sidebar({
     []
   )
 
-  const handleContextMenuAction = useCallback(
+  const handleFileMenuAction = useCallback(
     (actionId: string, path: string) => {
       if (actionId === 'rename') {
         setRenamingPath(path)
@@ -552,11 +564,26 @@ export function Sidebar({
         </>
       )}
 
-      <FileContextMenu
-        state={contextMenu}
-        onClose={() => setContextMenu(null)}
-        onAction={handleContextMenuAction}
-      />
+      {contextMenu && (
+        <ContextMenu
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          items={fileMenuEntries({
+            path: contextMenu.path,
+            isDirectory: contextMenu.isDirectory,
+            isBookmarked: isMenuPathBookmarked,
+            isMultiSelect:
+              !contextMenu.isDirectory &&
+              storeSelectedPaths.size >= 2 &&
+              storeSelectedPaths.has(contextMenu.path),
+            selectionCount: storeSelectedPaths.size,
+            isAgentModified: agentModifiedPaths.has(contextMenu.path),
+            onAction: handleFileMenuAction
+          })}
+          onClose={() => setContextMenu(null)}
+          openUpward
+          minWidth={180}
+        />
+      )}
     </div>
   )
 }

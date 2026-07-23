@@ -12,6 +12,7 @@ import {
   Undo2,
   type LucideIcon
 } from 'lucide-react'
+import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
 import type { CanvasStoreApi } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -194,13 +195,11 @@ export function CanvasToolbar({
   const cardOpacity = useSettingsStore((s) => s.env.cardOpacity)
   const cardHeaderDarkness = useSettingsStore((s) => s.env.cardHeaderDarkness)
   const setEnv = useSettingsStore((s) => s.setEnv)
-  const [tileMenuOpen, setTileMenuOpen] = useState(false)
+  const [tileMenuAnchor, setTileMenuAnchor] = useState<DOMRect | null>(null)
   const [envMenuOpen, setEnvMenuOpen] = useState(false)
-  const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
+  const [zoomMenuAnchor, setZoomMenuAnchor] = useState<DOMRect | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
-  const tileMenuRef = useRef<HTMLDivElement>(null)
   const envMenuRef = useRef<HTMLDivElement>(null)
-  const zoomMenuRef = useRef<HTMLDivElement>(null)
 
   const hasSelection = selectedNodeIds.size > 0
   const clearEnabled = hasNodes
@@ -212,26 +211,20 @@ export function CanvasToolbar({
     return () => clearTimeout(timer)
   }, [confirmClear])
 
+  // Zoom/tile menus dismiss via the ContextMenu primitive; only the env
+  // slider popover (not a menu) manages its own outside-click/Escape here.
   useEffect(() => {
-    if (!tileMenuOpen && !envMenuOpen && !zoomMenuOpen) return
+    if (!envMenuOpen) return
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (tileMenuRef.current && !tileMenuRef.current.contains(event.target as Node)) {
-        setTileMenuOpen(false)
-      }
       if (envMenuRef.current && !envMenuRef.current.contains(event.target as Node)) {
         setEnvMenuOpen(false)
-      }
-      if (zoomMenuRef.current && !zoomMenuRef.current.contains(event.target as Node)) {
-        setZoomMenuOpen(false)
       }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setTileMenuOpen(false)
         setEnvMenuOpen(false)
-        setZoomMenuOpen(false)
       }
     }
 
@@ -241,7 +234,7 @@ export function CanvasToolbar({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [tileMenuOpen, envMenuOpen, zoomMenuOpen])
+  }, [envMenuOpen])
 
   const zoomIn = () => setViewport({ ...viewport, zoom: Math.min(3.0, viewport.zoom * 1.2) })
   const zoomOut = () => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })
@@ -272,6 +265,55 @@ export function CanvasToolbar({
   }
 
   const zoomPercent = Math.round(viewport.zoom * 100)
+
+  const runLayout = (buildLayout: () => void) => {
+    const cmd = layoutCommand(canvas, buildLayout)
+    if (cmd) {
+      const stack = getCommandStack(canvasId)
+      if (stack) stack.execute(cmd)
+      else void cmd.execute()
+    }
+  }
+
+  const zoomEntries: readonly ContextMenuEntry[] = [
+    { id: 'zoom-100', label: 'Zoom to 100%', onSelect: zoomToActualSize },
+    { id: 'fit-all', label: 'Fit all', disabled: !hasNodes, onSelect: fitAll },
+    {
+      id: 'zoom-selection',
+      label: 'Zoom to selection',
+      disabled: !hasSelection,
+      onSelect: fitSelection
+    },
+    { kind: 'separator', id: 'sep-reset' },
+    { id: 'reset-view', label: 'Reset view', onSelect: resetView }
+  ]
+
+  const tileEntries: readonly ContextMenuEntry[] = [
+    {
+      id: 'organize-topic',
+      label: 'Organize by topic',
+      onSelect: () => {
+        const center = getViewportCenter(canvas)
+        const { artifacts, graph, fileToId } = useVaultStore.getState()
+        const fileToIdMap = new Map(Object.entries(fileToId))
+        const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
+        runLayout(() =>
+          canvas.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
+        )
+      }
+    },
+    { kind: 'separator', id: 'sep-patterns' },
+    ...TILE_PATTERNS.map(
+      (p): ContextMenuEntry => ({
+        id: p.id,
+        label: p.label,
+        onSelect: () =>
+          runLayout(() =>
+            canvas.getState().applyTileLayout(p.id as TilePattern, getViewportCenter(canvas))
+          )
+      })
+    )
+  ]
 
   return (
     <div className="canvas-toolrail absolute top-3 left-3 z-30">
@@ -307,92 +349,32 @@ export function CanvasToolbar({
         </button>
         <Tip label="Zoom in" />
       </div>
-      <div ref={zoomMenuRef} style={{ position: 'relative' }}>
-        <div className="canvas-toolbtn-wrap">
-          <button
-            onClick={() => setZoomMenuOpen((prev) => !prev)}
-            className="canvas-toolbtn canvas-zoom-badge"
-            data-testid="canvas-zoom-menu"
-            aria-label={`Zoom ${zoomPercent}%`}
-            aria-haspopup="menu"
-            aria-expanded={zoomMenuOpen}
-          >
-            {zoomPercent}%
-          </button>
-          <Tip label="Zoom" />
-        </div>
-        {zoomMenuOpen && (
-          <div
-            className="sidebar-popover absolute flex flex-col py-1"
-            role="menu"
-            style={{
-              top: 0,
-              left: '100%',
-              marginLeft: 6,
-              minWidth: 170,
-              zIndex: zIndex.surfacePopover
-            }}
-          >
-            <button
-              type="button"
-              role="menuitem"
-              className="sidebar-popover-item"
-              style={{ color: colors.text.primary }}
-              onClick={() => {
-                zoomToActualSize()
-                setZoomMenuOpen(false)
-              }}
-            >
-              Zoom to 100%
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="sidebar-popover-item"
-              style={{
-                color: hasNodes ? colors.text.primary : colors.text.muted,
-                cursor: hasNodes ? 'pointer' : 'not-allowed'
-              }}
-              disabled={!hasNodes}
-              onClick={() => {
-                fitAll()
-                setZoomMenuOpen(false)
-              }}
-            >
-              Fit all
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="sidebar-popover-item"
-              style={{
-                color: hasSelection ? colors.text.primary : colors.text.muted,
-                cursor: hasSelection ? 'pointer' : 'not-allowed'
-              }}
-              disabled={!hasSelection}
-              onClick={() => {
-                fitSelection()
-                setZoomMenuOpen(false)
-              }}
-            >
-              Zoom to selection
-            </button>
-            <div className="sidebar-popover-divider mx-3 my-1" />
-            <button
-              type="button"
-              role="menuitem"
-              className="sidebar-popover-item"
-              style={{ color: colors.text.secondary }}
-              onClick={() => {
-                resetView()
-                setZoomMenuOpen(false)
-              }}
-            >
-              Reset view
-            </button>
-          </div>
-        )}
+      <div className="canvas-toolbtn-wrap">
+        <button
+          onClick={(e) => {
+            // Read the rect before setState: currentTarget is nulled once the
+            // handler returns, and the updater runs after that.
+            const rect = e.currentTarget.getBoundingClientRect()
+            setZoomMenuAnchor((prev) => (prev ? null : rect))
+          }}
+          className="canvas-toolbtn canvas-zoom-badge"
+          data-testid="canvas-zoom-menu"
+          aria-label={`Zoom ${zoomPercent}%`}
+          aria-haspopup="menu"
+          aria-expanded={zoomMenuAnchor !== null}
+        >
+          {zoomPercent}%
+        </button>
+        <Tip label="Zoom" />
       </div>
+      {zoomMenuAnchor && (
+        <ContextMenu
+          position={{ x: zoomMenuAnchor.right + 6, y: zoomMenuAnchor.top }}
+          items={zoomEntries}
+          onClose={() => setZoomMenuAnchor(null)}
+          minWidth={170}
+        />
+      )}
       <div className="canvas-toolbtn-wrap">
         <button onClick={zoomOut} className="canvas-toolbtn" aria-label="Zoom out">
           <ToolIcon icon={Minus} />
@@ -417,7 +399,7 @@ export function CanvasToolbar({
             className="canvas-toolbtn"
             data-testid="canvas-env-settings"
             aria-label="Environment settings"
-            aria-haspopup="menu"
+            aria-haspopup="dialog"
             aria-expanded={envMenuOpen}
           >
             <ToolIcon icon={SlidersHorizontal} />
@@ -506,78 +488,30 @@ export function CanvasToolbar({
       <div className="canvas-toolrail__divider" />
 
       {/* ARRANGE: move things around */}
-      <div ref={tileMenuRef} style={{ position: 'relative' }}>
-        <div className="canvas-toolbtn-wrap">
-          <button
-            onClick={() => setTileMenuOpen((prev) => !prev)}
-            className="canvas-toolbtn"
-            data-testid="canvas-tile"
-            aria-label="Tile layout"
-            aria-haspopup="menu"
-            aria-expanded={tileMenuOpen}
-          >
-            <ToolIcon icon={LayoutGrid} />
-          </button>
-          <Tip label="Tile layout" shortcut="⌘L" />
-        </div>
-        {tileMenuOpen && (
-          <div
-            className="sidebar-popover absolute flex flex-col py-1"
-            style={{
-              top: 0,
-              left: '100%',
-              marginLeft: 6,
-              minWidth: 150,
-              zIndex: zIndex.surfacePopover
-            }}
-          >
-            <button
-              className="sidebar-popover-item"
-              style={{ color: colors.text.primary }}
-              onClick={() => {
-                const center = getViewportCenter(canvas)
-                const { artifacts, graph, fileToId } = useVaultStore.getState()
-                const fileToIdMap = new Map(Object.entries(fileToId))
-                const artMap = new Map(artifacts.map((a) => [a.id, { id: a.id, tags: a.tags }]))
-                const cmd = layoutCommand(canvas, () =>
-                  canvas.getState().applySemanticLayout(center, fileToIdMap, artMap, graph.edges)
-                )
-                if (cmd) {
-                  const stack = getCommandStack(canvasId)
-                  if (stack) stack.execute(cmd)
-                  else void cmd.execute()
-                }
-                setTileMenuOpen(false)
-              }}
-            >
-              Organize by topic
-            </button>
-            <div className="sidebar-popover-divider mx-3 my-1" />
-            {TILE_PATTERNS.map((p) => (
-              <button
-                key={p.id}
-                className="sidebar-popover-item"
-                style={{ color: colors.text.secondary }}
-                onClick={() => {
-                  const cmd = layoutCommand(canvas, () =>
-                    canvas
-                      .getState()
-                      .applyTileLayout(p.id as TilePattern, getViewportCenter(canvas))
-                  )
-                  if (cmd) {
-                    const stack = getCommandStack(canvasId)
-                    if (stack) stack.execute(cmd)
-                    else void cmd.execute()
-                  }
-                  setTileMenuOpen(false)
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="canvas-toolbtn-wrap">
+        <button
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setTileMenuAnchor((prev) => (prev ? null : rect))
+          }}
+          className="canvas-toolbtn"
+          data-testid="canvas-tile"
+          aria-label="Tile layout"
+          aria-haspopup="menu"
+          aria-expanded={tileMenuAnchor !== null}
+        >
+          <ToolIcon icon={LayoutGrid} />
+        </button>
+        <Tip label="Tile layout" shortcut="⌘L" />
       </div>
+      {tileMenuAnchor && (
+        <ContextMenu
+          position={{ x: tileMenuAnchor.right + 6, y: tileMenuAnchor.top }}
+          items={tileEntries}
+          onClose={() => setTileMenuAnchor(null)}
+          minWidth={150}
+        />
+      )}
       <div className="canvas-toolbtn-wrap">
         <button
           onClick={onOrganize}

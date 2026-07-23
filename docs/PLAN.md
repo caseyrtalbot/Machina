@@ -77,6 +77,12 @@ is green. Layer 4 items may start once their stated dependencies exist.
      bespokes; unify the three loading patterns while there.
    - Consolidate every menu on `components/ContextMenu.tsx`; retire the canvas,
      editor, and sidebar variants.
+     (Completed 2026-07-22: wrapper components CanvasContextMenu, CardContextMenu,
+     EditorContextMenu, FileContextMenu retired to `ContextMenuEntry[]` builders;
+     CardShell ConvertMenu and the CanvasToolbar zoom/tile popovers folded onto the
+     primitive; AgentPicker corrected to `role="listbox"`. Invariant gates, all
+     grep-clean: retired component names return nothing; `role="menu"`/`menuitem`
+     exist only in ContextMenu.tsx; no parallel item-model type survives.)
    (Slices 1–2 — Modal/Overlay and TabBar — completed 2026-07-21/22, commits
    638e2ef and c04ffc1, with greppable invariant gates that continue to hold.)
 2. Design constitution lands (ADR 0005): delete the eight appearance-settings axes

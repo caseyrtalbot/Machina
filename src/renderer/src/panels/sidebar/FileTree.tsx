@@ -10,7 +10,7 @@ import { ARTIFACT_COLORS, borderRadius, colors, transitions, typography } from '
 import { SIGNAL_COLORS } from '../../design/themes'
 import { useSettingsStore } from '../../store/settings-store'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
-import { RenameInput } from './FileContextMenu'
+import { RenameInput } from './RenameInput'
 import type { ArtifactType } from '@shared/types'
 import type { FlatTreeNode, TreeSortMode } from './buildFileTree'
 import {

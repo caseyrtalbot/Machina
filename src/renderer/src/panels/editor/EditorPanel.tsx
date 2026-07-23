@@ -25,7 +25,7 @@ import { VaultImage, resolveVaultImageUrl } from './extensions/vault-image'
 import DragHandle from '@tiptap/extension-drag-handle'
 import { MachinaTableKit } from './extensions/table-kit'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
-import { EditorContextMenu, type ContextMenuAction } from './EditorContextMenu'
+import { ContextMenu, type ContextMenuItem } from '../../components/ContextMenu'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import { useDocument } from '../../hooks/useDocument'
 import { resolveWikilinkTarget, parseWikilinkTarget } from '@shared/engine/wikilink-resolver'
@@ -86,7 +86,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
-    actions: ContextMenuAction[]
+    items: ContextMenuItem[]
   } | null>(null)
 
   // Find-in-note bar (rich mode). Counter instead of boolean so a repeat
@@ -217,21 +217,23 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       view.state.schema.marks.conceptNode
     )
 
-    const actions: ContextMenuAction[] = hasConceptMark
+    const items: ContextMenuItem[] = hasConceptMark
       ? [
           {
+            id: 'unlink-concept',
             label: 'Unlink concept',
-            onClick: () => editorRef.current?.commands.unsetConceptNode()
+            onSelect: () => editorRef.current?.commands.unsetConceptNode()
           }
         ]
       : [
           {
+            id: 'link-concept',
             label: 'Link as concept',
-            onClick: () => editorRef.current?.commands.setConceptNode()
+            onSelect: () => editorRef.current?.commands.setConceptNode()
           }
         ]
 
-    setContextMenu({ x: event.clientX, y: event.clientY, actions })
+    setContextMenu({ x: event.clientX, y: event.clientY, items })
     return true
   }, [])
 
@@ -589,10 +591,9 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
       />
 
       {contextMenu && (
-        <EditorContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          actions={contextMenu.actions}
+        <ContextMenu
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          items={contextMenu.items}
           onClose={() => setContextMenu(null)}
         />
       )}
