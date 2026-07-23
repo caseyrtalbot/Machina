@@ -101,6 +101,7 @@ Single test: `npx vitest run path/to/file.test.ts`
 - No features, refactors, or abstractions beyond what the task requires. Do the simplest thing that works well — no designing for hypothetical futures, no premature abstraction, no half-finished implementations.
 - No error handling, fallbacks, or validation for scenarios that cannot happen. Trust internal code and framework guarantees; validate only at system boundaries (user input, external APIs). No feature flags or backwards-compatibility shims when you can just change the code.
 - Delegate independent subtasks to subagents and keep working while they run; intervene when a subagent drifts or is missing relevant context.
+- Agent capability routing: Sonnet or Opus for rudimentary/mechanical tasks; Fable for anything complex or requiring sophistication. Bias toward the more capable, especially when unsure.
 
 ## Final summaries
 
