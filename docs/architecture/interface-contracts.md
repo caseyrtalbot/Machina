@@ -12,9 +12,10 @@ lines.
 
 ## 1. Workspace service (main process)
 
-Replaces the module-level singleton in `src/main/ipc/filesystem.ts:34-36`
-(`activePathGuard` / `activeVaultRoot` / `onVaultReady`). Like-for-like: Phase 1 keeps
-exactly one active workspace; multi-workspace is not in contract.
+**Status: LANDED** (`src/main/services/workspace-service.ts`, singleton via
+`getWorkspaceService()`). Replaced the module-level singleton formerly in
+`ipc/filesystem.ts` (`activePathGuard` / `activeVaultRoot` / `onVaultReady` — all gone).
+Like-for-like: exactly one active workspace; multi-workspace is not in contract.
 
 ```ts
 // src/shared/workspace-types.ts
@@ -31,7 +32,7 @@ export interface Workspace {
 
 ```ts
 // src/main/services/workspace-service.ts
-export interface WorkspaceService {
+export class WorkspaceService {
   /** Canonicalize, detect capabilities, build PathGuard, fire ready callbacks. */
   open(path: string): Promise<Workspace>
   current(): Workspace | null
@@ -190,17 +191,12 @@ Machina-Session: th_9f2c41aa
 Trailers survive rebase, trailer enumeration finds one agent's commits for `revertAgent`,
 and the tag/branch namespaces stay clean. Trailer attribution is review bookkeeping, **not
 tamper-proof**: the CLI child is a full shell and can forge, strip, or self-commit — see
-§4's security-boundary statement. `commitPreAgentSnapshot` (vault-git.ts:32) is unchanged
-and remains wired at spawn until Phase 1 step 5 retires it. Interim hardening: also call
-it per turn in `CliThreadSpawner.input()` — **not** `sendUserMessage`, which has no cwd
-(adversarial correction) — to close the PTY-lifetime granularity gap found in audit §3.
+§4's security-boundary statement.
 
-**Status 2026-07-06 (step 5, v1.1.4):** `commitPreAgentSnapshot` is RETIRED — both call
-sites (spawn + per-turn) removed after the G1–G8 evidence gate passed on fresh runs
-(evidence doc removed; git history). The `<TE_DIR>/no-auto-commit` opt-out retired with
-it: no automatic commits remain, so the paragraph above about its scope is historical.
-`isAutoCommitOptedOut` is deleted from `git-service.ts`; `isGitRepo` and the §2 substrate
-are unchanged.
+**Status 2026-07-06 (step 5, v1.1.4):** `commitPreAgentSnapshot` and the
+`<TE_DIR>/no-auto-commit` opt-out are RETIRED — no automatic commits remain
+(`isAutoCommitOptedOut` deleted from `git-service.ts`; `isGitRepo` and the §2 substrate
+unchanged).
 
 ## 3. Session, adapter, projection (shared types)
 
@@ -297,7 +293,7 @@ export interface SessionProjection {
 ```
 
 Migration = `session-router.unregister` → new surface mounts → `terminal:reconnect`
-(ipc-channels.ts:115) replays the ring buffer → `session-router.register` with the new
+(ipc-channels.ts:130) replays the ring buffer → `session-router.register` with the new
 webContentsId. All three pieces exist (audit §4); Phase 1 only adds the renderer
 affordance.
 
@@ -377,6 +373,7 @@ export interface PendingChangeFlags {
   readonly concurrentTurns: boolean // >1 turn window matched — ambiguous attribution
   readonly degradedAttribution: boolean // shell hooks absent; PTY-alive fallback window
   readonly gateDegraded: boolean //  turn opened while watcher state ∉ {watching} (v1.2.1)
+  readonly attributionSuspect: boolean // agentId failed main-side binding validation (v1.2.2)
   readonly forbidden: boolean //     touched a HARNESS_PROTECTED_GLOBS path
 }
 export interface PendingChange {

@@ -1,7 +1,7 @@
 # Block Protocol
 
 > Wire format for prompt/command/output boundaries between the user's shell
-> and thought-engine's terminal substrate. Concept-borrowed from Warp's
+> and Machina's terminal substrate. Concept-borrowed from Warp's
 > DProtoHook; uses the iTerm2 OSC namespace for portability.
 
 ## Goals
@@ -110,6 +110,6 @@ to `~/.zshrc`).
 
 ## Reserved namespace
 
-All future thought-engine markers MUST be prefixed `te-`. The reserved
+All future Machina markers MUST be prefixed `te-`. The reserved
 prefix range is `te-`, `te2-`, `te-canvas-`, `te-agent-`. Anything else
 inside `OSC 1337;` belongs to iTerm2 or other tools.

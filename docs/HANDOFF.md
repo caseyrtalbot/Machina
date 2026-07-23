@@ -94,10 +94,31 @@ code), shell + statusbar render, settings modal opens via the `te:open-settings`
 event with exact legacy computed values (button `rgb(161,161,170)`, toggle track
 ember `accent.soft`), Typography section gone; screenshot eyeballed clean.
 
+## Hygiene sweep (2026-07-23, after slice 3)
+
+Four-inspector sweep (docs drift, doc duplication + twin check, stale files, dead
+modules) executed its high-confidence tier: deleted dead modules
+(`hooks/use-agent-states.ts`, `shared/engine/id-generator.ts`, their tests), the dead
+`.activity-btn` test in `e2e/live.spec.ts` plus the orphaned `.activity-btn`/
+`.workspace-activity-rail` CSS, Finder/`playwright-report`/`test-results`/root-`.machina`
+strays; corrected proven doc drift in overview.md (settings-store row),
+safety-subsystem.md (assertReadable closed the map_folder/get_snapshot/apply_plan
+PathGuard+audit gaps; validator consolidated into shared `validateCanvasMutationOps`),
+README (MCP bearer-token command), ADR 0001 (MAX_TOKENS 64_000), ADR 0002 (tool count
+12), block-protocol (Machina naming), shortcuts.md (Ctrl+` row),
+interface-contracts.md (§1 LANDED, historical banner removed, stale pins). Judgment-tier
+findings (.forge/, .codex/hooks, resources/icon.png, AGENTS.md "subset" preamble,
+PLAN.md:178 stale parenthetical, IPC-pattern duplication ×4 sites) were reported to
+Casey, then all approved and executed in the same checkpoint: `.forge/`, `.codex/`,
+`.conductor/`, `.vscode/`, and `resources/icon.png` removed (with the matching
+`.gitignore` and `electron-builder.yml` cleanup; packaging smoke-tested after the icon
+removal). Remaining open findings: AGENTS.md "curated subset" preamble is actually a
+superset; PLAN.md:178 stale parenthetical (gated doc, needs ratified amendment);
+IPC-pattern restated at 4 sites; README restates MCP/agent facts (Layer 4 README
+rewrite already planned).
+
 ## Landmines
 
-- **`e2e/live.spec.ts` is stale**: targets `.activity-btn`, which no longer exists.
-  Pre-existing failure, unrelated to slices 2–3. Fix or delete when convenient.
 - **npm audit has 9 pre-existing vulnerabilities** (3 high, all inherited via
   sharp/libvips, GHSA-f88m-g3jw-g9cj). No dependency changed in slice 3; needs a
   separate deps pass.

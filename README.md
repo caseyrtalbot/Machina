@@ -128,8 +128,10 @@ Machina ships a live MCP server so external clients (Claude Code, Claude Desktop
 - In-process Streamable HTTP server bound to `127.0.0.1:41627` at `/mcp` (port overridable via `MACHINA_MCP_PORT`, with an ephemeral-port fallback). Connect with:
 
   ```bash
-  claude mcp add --transport http machina http://127.0.0.1:41627/mcp
+  claude mcp add --transport http --header "Authorization: Bearer <token>" machina http://127.0.0.1:41627/mcp
   ```
+
+  The endpoint requires a per-launch bearer token; Settings → MCP Server copies the full command, token included.
 
 - **9 tools**: six reads (`vault.read_file`, `search.query`, `graph.get_neighbors`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`) and three writes (`vault.write_file`, `vault.create_file`, `canvas.apply_plan`).
 - Writes are gated by human-in-the-loop approval in the app, failing closed with an auto-deny after 30 seconds, plus write-rate limiting and the audit log.
@@ -186,7 +188,7 @@ npm run build:mac    # typecheck + electron-vite build + DMG
 npm run mcp-server   # headless read-only MCP stdio server
 ```
 
-For a fuller walkthrough (vault setup, API key, shell hooks, MCP clients), see the [getting started guide](docs/guide/getting-started.md).
+For a fuller walkthrough (vault setup, API key, shell hooks), see the [getting started guide](docs/guide/getting-started.md).
 
 ## Keyboard shortcuts
 

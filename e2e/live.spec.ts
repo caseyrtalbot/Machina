@@ -55,10 +55,6 @@ test.describe('Live App Health', () => {
 })
 
 test.describe('Live UI State', () => {
-  test('activity bar exposes a selected view', async () => {
-    await expect(page.locator('.activity-btn[aria-pressed="true"]')).toHaveCount(1)
-  })
-
   test('sidebar is visible', async () => {
     const fileTree = page.locator('[data-testid="file-tree"]')
     const isVisible = await fileTree.isVisible()

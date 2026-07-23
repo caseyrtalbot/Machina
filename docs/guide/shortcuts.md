@@ -14,6 +14,7 @@ Ground truth lives in `src/renderer/src/panels/agent-shell/keybindings.ts` and `
 | Cmd+1 .. Cmd+9 | Select thread 1 through 9 |
 | Cmd+W | Close active dock tab |
 | Cmd+. | Cancel the active agent run (works even inside text inputs) |
+| Ctrl+` | Toggle the terminal strip (Ctrl only — Cmd+` is macOS window cycling) |
 | Escape | Close the command palette |
 
 Most Cmd shortcuts are suppressed while typing in a text input, so Cmd+W in the message composer never closes a tab. Cmd+. is the deliberate exception.

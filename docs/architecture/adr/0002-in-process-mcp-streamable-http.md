@@ -53,7 +53,8 @@ Mechanics:
   of the loopback bind).
 - `mcp:status` is re-exposed (channel + preload + Settings surface) reporting
   `{ running, toolCount, url, vaultRoot }`; the stale `_toolCount` is replaced by
-  `MCP_TOOL_COUNT = 9`, guarded by a lifecycle test that lists tools over the transport.
+  `MCP_TOOL_COUNT = 12` (9 tools + 3 `workspace.*` aliases), guarded by a lifecycle test
+  that lists tools over the transport.
 - Index freshness: watcher batches feed `createLiveIndexUpdater` (vault-indexing.ts),
   and `VaultQueryFacade.writeFile`/`createFile` refresh the index inline so agents read
   their own writes before the watcher echo lands.

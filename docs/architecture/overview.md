@@ -139,7 +139,7 @@ Renderer state lives in Zustand stores (`src/renderer/src/store/`), each owning 
 | `thread-store` | Threads, messages, streaming, chat layout, in-flight + runId per thread |
 | `block-store` | Per-session ordered terminal `Block` records |
 | `ui-store` | Per-note UI state (backlink expansion), persisted via IPC |
-| `settings-store` | Accent, opacity, blur, font sizes, density/radii/backgroundTint/canvasGrid (localStorage; ADR 0005 schedules these axes for removal) |
+| `settings-store` | Editor mode, autosave interval, spell check, graph edge/node brightness, template + daily-note + canvas-save folders, semantic-search opt-in (localStorage, persist v15; all appearance axes deleted per ADR 0005) |
 | `claude-status-store` | Claude CLI availability/status |
 | `sidebar-filter-store`, `sidebar-selection-store` | Sidebar file-tree filter and selection |
 | `vault-health-store` | Vault health monitor results |

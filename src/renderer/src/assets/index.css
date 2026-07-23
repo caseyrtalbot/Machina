@@ -485,7 +485,7 @@ h6 {
   opacity: 0.5;
 }
 
-/* ─── Activity Bar ─── */
+/* ─── Workspace shell ─── */
 
 .workspace-shell {
   isolation: isolate;
@@ -495,56 +495,6 @@ h6 {
   position: relative;
   display: flex;
   color: var(--color-text-primary);
-}
-
-.workspace-activity-rail {
-  position: relative;
-  border-right: none;
-}
-
-.workspace-activity-rail::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1px;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    var(--chrome-panel-border) var(--window-top-chrome-height),
-    var(--chrome-panel-border)
-  );
-  pointer-events: none;
-}
-
-.activity-btn {
-  position: relative;
-  opacity: var(--base-opacity);
-  background-color: var(--base-bg);
-  border: 1px solid transparent;
-  box-shadow: inset 0 1px 0 transparent;
-  overflow: hidden;
-}
-
-.activity-btn::before,
-.activity-btn::after {
-  display: none;
-}
-
-.activity-btn:not([data-active]):hover {
-  opacity: 0.92;
-  background-color: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-  border-color: var(--chrome-panel-border);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 4%, transparent),
-    0 8px 16px rgba(0, 0, 0, 0.12);
-}
-
-.activity-btn[data-active] {
-  opacity: 1;
-  background: transparent;
-  border-color: var(--chrome-panel-border-strong);
 }
 
 /* ─── Animations ─── */

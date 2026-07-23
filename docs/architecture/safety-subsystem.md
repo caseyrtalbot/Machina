@@ -39,9 +39,9 @@ These hold today inside the MCP boundary. Any change to the MCP surface that vio
 
 3. **Every MCP tool that returns vault-derived content wraps it in Spotlighting.** Today: `vault.read_file`, `graph.get_ghosts`, `project.map_folder`, `canvas.get_snapshot`. The wrapper is a fixed boundary string (`SPOTLIGHT_BOUNDARY` in `mcp-server.ts`), and any occurrence of that boundary in the source content is stripped before wrapping so the envelope cannot be escaped from inside content. **Note:** the boundary is a constant in source, not per-call entropy; the security property comes from the strip-before-wrap, not from boundary unguessability. Tools that return structured JSON (`search.query`, `graph.get_neighbors`) are not Spotlighting-wrapped because the LLM ingests them as data, not as raw text content.
 
-4. **Every MCP vault-file operation is recorded.** `vault.read_file`, `vault.write_file`, `vault.create_file` go through `VaultQueryFacade`, which calls `AuditLogger`. Logs are append-only NDJSON with daily rotation, fire-and-forget (writes never block the operation), and write errors fall to stderr rather than crash the main process. **Audit coverage is currently narrower than "every gated op":** `canvas.apply_plan`, `canvas.get_snapshot`, `project.map_folder`, `search.query`, `graph.get_neighbors`, and `graph.get_ghosts` produce no audit entries. Closing those gaps is open work (see "Known gaps").
+4. **Every MCP vault-file operation is recorded.** `vault.read_file`, `vault.write_file`, `vault.create_file` go through `VaultQueryFacade`, which calls `AuditLogger`. Logs are append-only NDJSON with daily rotation, fire-and-forget (writes never block the operation), and write errors fall to stderr rather than crash the main process. `canvas.apply_plan`, `canvas.get_snapshot`, and `project.map_folder` audit at the path level through the facade's `assertReadable` chokepoint (allowed/denied entries). **Audit coverage is still narrower than "every op":** `search.query`, `graph.get_neighbors`, and `graph.get_ghosts` produce no audit entries (see "Known gaps").
 
-5. **PathGuard scopes vault file ops to the active vault root.** Vault read/write tools route through `VaultQueryFacade`, which uses `PathGuard` to reject paths that escape the configured vault root. Tools that bypass the facade (`canvas.get_snapshot`, `project.map_folder`) bypass PathGuard.
+5. **PathGuard scopes vault file ops to the active vault root.** Vault read/write tools route through `VaultQueryFacade`, which uses `PathGuard` to reject paths that escape the configured vault root. Tools that do their own filesystem I/O (`canvas.get_snapshot`, `project.map_folder`, `canvas.apply_plan`) resolve their paths through the facade's `assertReadable` chokepoint first, so they share the same PathGuard + audit boundary.
 
 Two non-invariants worth naming:
 
@@ -80,7 +80,7 @@ These paths can already touch user data and are **outside** the MCP safety bound
 - HITL: no.
 - Audit: no.
 
-`canvas:apply-plan` in `src/main/ipc/canvas.ts` is the renderer's structural-only twin of the MCP version. It re-implements `validateOp` independently of `mcp-server.ts` (drift risk).
+`canvas:apply-plan` in `src/main/ipc/canvas.ts` is the renderer's structural-only twin of the MCP version. Both sites validate through the shared `validateCanvasMutationOps` (`src/shared/canvas-mutation-validation.ts`) — one validator, no drift.
 
 ## Where the code lives
 
@@ -93,7 +93,8 @@ These paths can already touch user data and are **outside** the MCP safety bound
 | Audit log (append-only NDJSON, daily rotation) | `src/main/services/audit-logger.ts` | `AuditLogger` |
 | Vault file ops + audit dispatch | `src/main/services/vault-query-facade.ts` | `VaultQueryFacade` |
 | PathGuard (vault-root scoping) | `src/main/services/path-guard.ts` | `PathGuard` |
-| MCP server registration + tool dispatch | `src/main/services/mcp-server.ts` | `createMcpServer`, `validateCanvasOp` |
+| MCP server registration + tool dispatch | `src/main/services/mcp-server.ts` | `createMcpServer` |
+| Canvas mutation validator (shared by MCP + renderer IPC) | `src/shared/canvas-mutation-validation.ts` | `validateCanvasMutationOps` |
 | MCP lifecycle (in-process server + Streamable HTTP transport) | `src/main/services/mcp-lifecycle.ts` | `McpLifecycle` |
 | Headless stdio MCP server (reads only) | `src/main/mcp-cli.ts` | (entrypoint) |
 | CLI turn attribution (rollback via approvals) | `src/main/services/cli-turn-registry.ts` | `CliTurnRegistry` |
@@ -110,24 +111,22 @@ The three `vault.*` tools are also registered under `workspace.*` aliases (same 
 Reads (Spotlighting-wrapped where they return raw vault-derived content):
 - `vault.read_file` (wrapped, audited, PathGuard)
 - `graph.get_ghosts` (wrapped, no audit)
-- `project.map_folder` (wrapped, **no PathGuard, no audit** — open gap)
-- `canvas.get_snapshot` (wrapped, no PathGuard, no audit)
+- `project.map_folder` (wrapped, PathGuard + path-level audit via `assertReadable`)
+- `canvas.get_snapshot` (wrapped, PathGuard + path-level audit via `assertReadable`)
 - `search.query` (JSON, not wrapped, no audit)
 - `graph.get_neighbors` (JSON, not wrapped, no audit)
 
 Writes (HITL-gated):
 - `vault.write_file` (gated, audited, PathGuard)
 - `vault.create_file` (gated, audited, PathGuard)
-- `canvas.apply_plan` (gated, **no audit, no PathGuard** — open gap)
+- `canvas.apply_plan` (gated, PathGuard + path-level audit via `assertReadable`)
 
 ## Known gaps
 
 Tracked here so the doc and the code stay honest with each other.
 
-1. **Audit coverage**: `canvas.apply_plan`, `project.map_folder`, `canvas.get_snapshot`, and search/graph reads do not log. Closing this means routing canvas ops through a logging path and adding read audits to facade methods.
-2. **PathGuard coverage**: `project.map_folder` and `canvas.get_snapshot` use raw `node:fs/promises` and bypass PathGuard. `project.map_folder` is the largest hole because it does a recursive directory walk.
-3. **Native-agent Spotlighting**: the native agent's tool results return vault content unwrapped — the path that holds write tools and an autoAccept mode. Convergence onto the MCP tool surface (Spotlighting for free) is scheduled (`docs/PLAN.md`, Layer 1).
-4. **Validator drift**: `mcp-server.ts:validateCanvasOp` and `src/main/ipc/canvas.ts:validateOp` are independent implementations of the same logic. Consolidate into one.
+1. **Audit coverage**: `search.query`, `graph.get_neighbors`, and `graph.get_ghosts` do not log. Closing this means adding read audits to the facade's search/graph methods.
+2. **Native-agent Spotlighting**: the native agent's tool results return vault content unwrapped — the path that holds write tools and an autoAccept mode. Convergence onto the MCP tool surface (Spotlighting for free) is scheduled (`docs/PLAN.md`, Layer 1).
 
 ## Adding a new agent capability
 

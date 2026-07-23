@@ -41,16 +41,16 @@ the minimal, in-process, API-key-only path, and its whole reason to exist is the
 emit / dock / canvas bridges above. We own its tool loop, so the iteration and token caps and
 the error classification (`classifyError`) stay under our control.
 
-## Pinned facts (verified 2026-06-06 against `machina-native-agent.ts`)
+## Pinned facts (verified 2026-07-23 against `machina-native-agent.ts`)
 
 | Fact | Value | Source |
 |---|---|---|
 | SDK | `@anthropic-ai/sdk` `0.92.0` | `package.json` (`^0.92.0`), installed `0.92.0` |
-| API surface | `client.messages.stream(...)` (streaming) | `machina-native-agent.ts:220` |
-| Tool-loop cap | `MAX_TOOL_ITERATIONS = 8` | `machina-native-agent.ts:17` |
-| Output cap | `MAX_TOKENS = 4096` | `machina-native-agent.ts:16` |
-| Model | injected per run (`opts.model`), not hardcoded | `machina-native-agent.ts:22` |
-| Auth | API key only (`resolveAnthropicKey`) | `machina-native-agent.ts:4` |
+| API surface | `client.messages.stream(...)` (streaming) | `machina-native-agent.ts:186` |
+| Tool-loop cap | `MAX_TOOL_ITERATIONS = 8` | `machina-native-agent.ts:29` |
+| Output cap | `MAX_TOKENS = 64_000` | `machina-native-agent.ts:28` |
+| Model | injected per run (`opts.model`), not hardcoded | `machina-native-agent.ts:188` |
+| Auth | API key only (`resolveAnthropicKey`) | `machina-native-agent.ts:5` |
 
 ## Consequences
 

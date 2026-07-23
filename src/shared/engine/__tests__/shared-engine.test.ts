@@ -10,7 +10,6 @@ import { buildGraph } from '@shared/engine/graph-builder'
 import { VaultIndex } from '@shared/engine/indexer'
 import { SearchEngine } from '@shared/engine/search-engine'
 import { buildTagIndex, filterArtifactsByTags } from '@shared/engine/tag-index'
-import { generateId, deriveCounters } from '@shared/engine/id-generator'
 import { rewriteWikilinks } from '@shared/engine/rename-links'
 import { extractConceptNodes } from '@shared/engine/concept-extractor'
 
@@ -211,20 +210,6 @@ describe('shared engine: buildTagIndex', () => {
 
     const filtered = filterArtifactsByTags([r1.value, r2.value], ['shared/engine'], 'or')
     expect(filtered).toHaveLength(1)
-  })
-})
-
-describe('shared engine: id-generator', () => {
-  it('generates typed IDs with prefix', () => {
-    const { id, updatedCounters } = generateId('note', {})
-    expect(id).toBe('n1')
-    expect(updatedCounters.note).toBe(1)
-  })
-
-  it('derives counters from existing IDs', () => {
-    const counters = deriveCounters(['n1', 'n2', 'n3', 'c1'])
-    expect(counters.note).toBe(3)
-    expect(counters.constraint).toBe(1)
   })
 })
 
