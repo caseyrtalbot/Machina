@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import {
   Activity,
@@ -17,7 +16,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { DockTab } from '@shared/dock-types'
-import { borderRadius, colors, transitions } from '../../design/tokens'
+import { borderRadius, colors } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { openNoteInEditor, useDockStore } from '../../store/dock-store'
 import { useEditorStore } from '../../store/editor-store'
@@ -205,24 +204,8 @@ function RibbonAction({
   readonly pressed?: boolean
   readonly tone?: 'default' | 'active' | 'danger'
 }) {
-  const [hovered, setHovered] = useState(false)
   const interactive = !disabled
   const isActive = pressed === true || tone === 'active'
-  const color = disabled
-    ? colors.text.disabled
-    : tone === 'danger'
-      ? colors.claude.error
-      : isActive
-        ? colors.accent.default
-        : hovered
-          ? colors.text.primary
-          : colors.text.secondary
-  const background =
-    interactive && hovered
-      ? tone === 'danger'
-        ? 'color-mix(in srgb, var(--signal-danger) 10%, transparent)'
-        : 'var(--bg-tint-text)'
-      : 'transparent'
 
   const style: CSSProperties = {
     width: ACTION_WIDTH,
@@ -231,15 +214,12 @@ function RibbonAction({
     boxSizing: 'border-box',
     border: 'none',
     borderRadius: borderRadius.inline,
-    background,
-    color,
     cursor: interactive ? 'pointer' : 'not-allowed',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    position: 'relative',
-    transition: `background ${transitions.fast}, color ${transitions.fast}`
+    position: 'relative'
   }
 
   return (
@@ -250,10 +230,9 @@ function RibbonAction({
       title={label}
       aria-pressed={pressed}
       data-active={isActive ? 'true' : undefined}
+      data-tone={tone === 'danger' ? 'danger' : undefined}
       disabled={disabled}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={style}
     >
       {isActive ? (

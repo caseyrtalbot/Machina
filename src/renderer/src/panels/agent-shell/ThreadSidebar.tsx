@@ -272,7 +272,6 @@ function ArchivedRow({
   readonly agent: AgentIdentity
   readonly onContextMenu: (x: number, y: number) => void
 }) {
-  const [hovered, setHovered] = useState(false)
   const kebabRef = useRef<HTMLButtonElement | null>(null)
 
   function handleKebab(e: React.MouseEvent<HTMLButtonElement>) {
@@ -286,21 +285,16 @@ function ArchivedRow({
     <li
       data-testid="archived-thread-row"
       data-thread-id={id}
+      className="thread-row"
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu(e.clientX, e.clientY)
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         padding: '6px 12px',
-        background: hovered
-          ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
-          : 'transparent',
         display: 'flex',
         flexDirection: 'column',
-        gap: 4,
-        transition: `background ${transitions.focusRing}`
+        gap: 4
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -321,6 +315,7 @@ function ArchivedRow({
         <button
           ref={kebabRef}
           type="button"
+          className="thread-row__kebab"
           aria-label="Archived thread actions"
           title="More"
           onClick={handleKebab}
@@ -333,8 +328,6 @@ function ArchivedRow({
             background: 'transparent',
             color: colors.text.muted,
             cursor: 'pointer',
-            opacity: hovered ? 1 : 0,
-            transition: `opacity ${transitions.micro}`,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -359,14 +352,12 @@ function VaultSwitcher({
   readonly fullPath: string | null
   readonly onClick?: () => void
 }) {
-  const [hovered, setHovered] = useState(false)
   const disabled = !onClick
   return (
     <button
       type="button"
+      className="vault-switcher"
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       disabled={disabled}
       title={fullPath ? `${fullPath}\nClick to switch vault` : 'Open a vault'}
       aria-label={fullPath ? `Vault: ${name}. Click to switch.` : 'Open a vault'}
@@ -376,17 +367,12 @@ function VaultSwitcher({
         alignItems: 'center',
         gap: 8,
         padding: '0 14px',
-        background:
-          hovered && !disabled
-            ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
-            : 'transparent',
         border: 'none',
         borderRadius: 0,
         color: disabled ? colors.text.muted : colors.text.primary,
         cursor: disabled ? 'default' : 'pointer',
         textAlign: 'left',
-        minWidth: 0,
-        transition: `background ${transitions.focusRing}`
+        minWidth: 0
       }}
     >
       <svg
@@ -420,6 +406,7 @@ function VaultSwitcher({
       </span>
       {!disabled && (
         <svg
+          className="vault-switcher__chevron"
           width={9}
           height={9}
           viewBox="0 0 12 12"
@@ -431,9 +418,7 @@ function VaultSwitcher({
           aria-hidden
           style={{
             flexShrink: 0,
-            color: colors.text.muted,
-            opacity: hovered ? 1 : 0.7,
-            transition: `opacity ${transitions.focusRing}`
+            color: colors.text.muted
           }}
         >
           <path d="M3.5 5l2.5 2.5L8.5 5" />
@@ -466,7 +451,6 @@ function ThreadRow({
   onCommitRename,
   onCancelRename
 }: ThreadRowProps) {
-  const [hovered, setHovered] = useState(false)
   const kebabRef = useRef<HTMLButtonElement | null>(null)
 
   function handleKebab(e: React.MouseEvent<HTMLButtonElement>) {
@@ -476,34 +460,27 @@ function ThreadRow({
     else onContextMenu(e.clientX, e.clientY)
   }
 
-  const rowBg =
-    hovered && !isActive
-      ? 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)'
-      : 'transparent'
-
   return (
     <li
       data-testid="thread-row"
       data-thread-id={id}
+      data-active={isActive ? 'true' : undefined}
+      className="thread-row"
       onClick={isRenaming ? undefined : onSelect}
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu(e.clientX, e.clientY)
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         padding: '8px 12px',
         cursor: isRenaming ? 'text' : 'pointer',
-        background: rowBg,
         boxShadow: isActive
           ? `inset 0 0 0 1px color-mix(in srgb, ${colors.text.primary} 55%, transparent)`
           : 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: 6,
-        position: 'relative',
-        transition: `background ${transitions.focusRing}`
+        position: 'relative'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -530,6 +507,7 @@ function ThreadRow({
           <button
             ref={kebabRef}
             type="button"
+            className="thread-row__kebab"
             aria-label="Thread actions"
             title="More"
             onClick={handleKebab}
@@ -542,8 +520,6 @@ function ThreadRow({
               background: 'transparent',
               color: colors.text.muted,
               cursor: 'pointer',
-              opacity: hovered || isActive ? 1 : 0,
-              transition: `opacity ${transitions.micro}`,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',

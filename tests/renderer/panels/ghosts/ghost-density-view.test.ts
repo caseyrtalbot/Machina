@@ -92,7 +92,10 @@ describe('GhostPanel density view structure', () => {
 
   it('shows count per row that hides on hover', () => {
     expect(source).toContain('ghost.referenceCount')
-    // Count opacity toggles on hover
-    expect(source).toMatch(/opacity.*hovered/)
+    // Hover reveal is CSS-driven (no useState hover): the count carries the
+    // ghost-row__count class and index.css hides it on .ghost-row:hover.
+    expect(source).toContain('ghost-row__count')
+    const css = readSource('assets/index.css')
+    expect(css).toMatch(/\.ghost-row:hover \.ghost-row__count \{\s*opacity: 0;/)
   })
 })

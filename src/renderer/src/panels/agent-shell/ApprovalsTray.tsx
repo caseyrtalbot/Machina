@@ -35,7 +35,6 @@ export function ApprovalsTray() {
   const refreshWatcherHealth = useApprovalsStore((s) => s.refreshWatcherHealth)
 
   const [open, setOpen] = useState(false)
-  const [hovered, setHovered] = useState(false)
   // Palette-routed revert request (step 5): arms RevertAgentSection's confirm.
   const [revertRequest, setRevertRequest] = useState<string | null>(null)
   const unhealthy = isWatcherUnhealthy(watcherHealth)
@@ -109,8 +108,8 @@ export function ApprovalsTray() {
         // net effect a reopen instead of a close. Stopping propagation keeps
         // the trigger the sole source of truth for its own open state.
         onMouseDown={(event) => event.stopPropagation()}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        className="titlebar-toggle"
+        data-open={open ? 'true' : undefined}
         aria-label={`Agent approvals: ${pending} pending${
           unhealthy && watcherHealth !== null ? `; write containment ${watcherHealth.state}` : ''
         }`}
@@ -123,26 +122,10 @@ export function ApprovalsTray() {
           boxSizing: 'border-box',
           position: 'relative',
           borderRadius: borderRadius.inline,
-          border: `1px solid ${
-            open ? colors.accent.line : hovered ? colors.border.default : 'transparent'
-          }`,
-          background: open
-            ? 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
-            : hovered
-              ? 'var(--bg-tint-text)'
-              : 'transparent',
-          color: open
-            ? colors.accent.default
-            : hovered
-              ? colors.text.primary
-              : colors.text.secondary,
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: 'pointer',
-          transition: `background ${transitions.focusRing}, color ${transitions.focusRing}, border-color ${transitions.focusRing}`,
-          // @ts-expect-error -- Electron-only CSS property
-          WebkitAppRegion: 'no-drag'
+          cursor: 'pointer'
         }}
       >
         <Inbox size={15} strokeWidth={1.75} aria-hidden />

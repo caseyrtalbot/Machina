@@ -212,16 +212,13 @@ interface ActionIconProps {
 }
 
 function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
-  const [hovered, setHovered] = useState(false)
-
   return (
     <button
       ref={buttonRef}
       type="button"
+      className="ghost-action-icon"
       aria-label={label}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         width: 22,
         height: 22,
@@ -230,16 +227,14 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
         justifyContent: 'center',
         borderRadius: borderRadius.tool,
         border: 'none',
-        background: hovered ? 'var(--bg-tint-text)' : 'transparent',
-        color: hovered ? colors.text.primary : colors.text.secondary,
         cursor: 'pointer',
-        transition: `background ${transitions.focusRing}, color ${transitions.focusRing}`,
         position: 'relative',
         padding: 0
       }}
     >
       {children}
       <span
+        className="ghost-action-icon__tip"
         style={{
           position: 'absolute',
           bottom: 'calc(100% + 6px)',
@@ -253,8 +248,6 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
           borderRadius: borderRadius.tool,
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
-          opacity: hovered ? 1 : 0,
-          transition: `opacity ${transitions.focusRing}`,
           backdropFilter: 'blur(12px)',
           zIndex: 50
         }}
@@ -276,7 +269,6 @@ interface GhostRowProps {
 }
 
 function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
-  const [hovered, setHovered] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
   const contextBtnRef = useRef<HTMLButtonElement>(null)
   const { emerge, isEmerging } = useGhostEmerge()
@@ -299,8 +291,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="ghost-row"
       onClick={() => setContextOpen((prev) => !prev)}
       style={{
         display: 'flex',
@@ -335,15 +326,14 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 
       {/* Name */}
       <span
+        className="ghost-row__name"
         style={{
           flex: 1,
           fontSize: 13,
-          color: hovered ? colors.text.primary : colors.text.secondary,
           fontWeight: 400,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          transition: `color ${transitions.fast}`
+          textOverflow: 'ellipsis'
         }}
       >
         {ghost.id}
@@ -351,12 +341,11 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 
       {/* Actions (hover-reveal). Clicks stop here so they don't toggle the row popup. */}
       <div
+        className="ghost-row__actions"
         onClick={(e) => e.stopPropagation()}
         style={{
           display: 'flex',
           gap: 4,
-          opacity: hovered ? 1 : 0,
-          transition: `opacity ${transitions.focusRing}`,
           position: 'absolute',
           right: 0,
           background: 'linear-gradient(90deg, transparent, var(--color-bg-base) 12px)',
@@ -383,14 +372,13 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 
       {/* Count (hidden on hover) */}
       <span
+        className="ghost-row__count"
         style={{
           fontSize: 11,
           color: colors.text.muted,
           fontVariantNumeric: 'tabular-nums',
           minWidth: 18,
-          textAlign: 'right' as const,
-          opacity: hovered ? 0 : 1,
-          transition: `opacity ${transitions.focusRing}`
+          textAlign: 'right' as const
         }}
       >
         {ghost.referenceCount}

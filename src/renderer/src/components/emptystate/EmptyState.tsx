@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
 
 interface EmptyStateAction {
   readonly label: string
@@ -44,14 +43,13 @@ const hintStyle: React.CSSProperties = {
 }
 
 function ActionButton({ action }: { readonly action: EmptyStateAction }) {
-  const [hovered, setHovered] = useState(false)
   const primary = action.kind !== 'secondary'
   return (
     <button
       type="button"
+      className="te-empty-action"
+      data-kind={primary ? 'primary' : 'secondary'}
       onClick={action.onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         padding: '8px 16px',
         fontSize: 13,
@@ -59,20 +57,7 @@ function ActionButton({ action }: { readonly action: EmptyStateAction }) {
         fontFamily: typography.fontFamily.body,
         lineHeight: 1.5,
         borderRadius: borderRadius.tool,
-        cursor: 'pointer',
-        ...(primary
-          ? {
-              color: 'var(--color-accent-fg)',
-              backgroundColor: hovered ? colors.accent.hover : colors.accent.default,
-              border: 'none',
-              transition: `background-color ${transitions.default}`
-            }
-          : {
-              color: hovered ? colors.text.primary : colors.text.secondary,
-              backgroundColor: 'transparent',
-              border: `1px solid ${colors.border.subtle}`,
-              transition: `color ${transitions.default}`
-            })
+        cursor: 'pointer'
       }}
     >
       {action.label}

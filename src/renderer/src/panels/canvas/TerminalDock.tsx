@@ -3,10 +3,8 @@ import { useCanvas } from './canvas-store-context'
 import { useTerminalStatus, type TerminalStatus } from './useTerminalStatus'
 import {
   colors,
-  floatingPanel,
   spacing,
   borderRadius,
-  transitions,
   typography
 } from '../../design/tokens'
 
@@ -72,8 +70,6 @@ function TerminalPill({
   }
   readonly onNavigate: (status: TerminalStatus) => void
 }) {
-  const [hovered, setHovered] = useState(false)
-
   const isError = status.status === 'error'
 
   const pillStyle: React.CSSProperties = {
@@ -81,15 +77,9 @@ function TerminalPill({
     alignItems: 'center',
     gap: spacing.unit,
     padding: '4px 8px',
-    backgroundColor: isError
-      ? 'color-mix(in srgb, var(--signal-danger) 10%, transparent)'
-      : hovered
-        ? floatingPanel.glass.inputBgFocus
-        : floatingPanel.glass.inputBg,
     border: `1px solid ${isError ? 'color-mix(in srgb, var(--signal-danger) 30%, transparent)' : colors.border.subtle}`,
     borderRadius: borderRadius.inline,
     cursor: 'pointer',
-    transition: `background ${transitions.hover}`,
     flexShrink: 0
   }
 
@@ -102,10 +92,9 @@ function TerminalPill({
     <div
       data-testid="terminal-pill"
       className="terminal-pill"
+      data-error={isError ? 'true' : undefined}
       style={pillStyle}
       title={fullCwd || status.label}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={() => onNavigate(status)}
     >
       <div data-testid="status-dot" style={dotStyle(status.status)} />

@@ -137,7 +137,6 @@ function LeftEdgeResizeHandle({
   onCommit
 }: LeftEdgeResizeHandleProps) {
   const [active, setActive] = useState(false)
-  const [hovered, setHovered] = useState(false)
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
@@ -170,15 +169,14 @@ function LeftEdgeResizeHandle({
     window.addEventListener('pointerup', onUp)
   }
 
-  const showAccent = active || hovered
   return (
     <div
       data-testid="resize-handle-files-panel"
+      className="resize-handle resize-handle--ghost"
+      data-active={active ? 'true' : undefined}
       role="separator"
       aria-orientation="vertical"
       onPointerDown={handlePointerDown}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         position: 'absolute',
         top: 0,
@@ -191,6 +189,7 @@ function LeftEdgeResizeHandle({
       }}
     >
       <div
+        className="resize-handle__line"
         aria-hidden
         style={{
           position: 'absolute',
@@ -198,9 +197,7 @@ function LeftEdgeResizeHandle({
           bottom: 0,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 0.5,
-          background: showAccent ? colors.accent.muted : 'transparent',
-          transition: `background ${transitions.fast}`
+          width: 0.5
         }}
       />
     </div>

@@ -1,6 +1,6 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useCanvas, useCanvasApi } from './canvas-store-context'
-import { EDGE_KIND_COLORS, transitions } from '../../design/tokens'
+import { EDGE_KIND_COLORS } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 const DOT_SIZE = 8
@@ -41,8 +41,6 @@ export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
   const nodes = useCanvas((s) => s.nodes)
   const edges = useCanvas((s) => s.edges)
   const viewport = useCanvas((s) => s.viewport)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
-
   const dots = useMemo(() => {
     if (edges.length === 0 || nodes.length === 0) return []
 
@@ -112,31 +110,23 @@ export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 5 }}>
-      {dots.map((dot) => {
-        const isHovered = hoveredId === dot.targetNodeId
-        return (
-          <div
-            key={dot.targetNodeId}
-            className="absolute pointer-events-auto"
-            style={{
-              left: dot.x - DOT_SIZE / 2,
-              top: dot.y - DOT_SIZE / 2,
-              width: DOT_SIZE,
-              height: DOT_SIZE,
-              borderRadius: '50%',
-              backgroundColor: dot.color,
-              cursor: 'pointer',
-              opacity: isHovered ? 1 : 0.7,
-              transform: isHovered ? 'scale(1.3)' : 'scale(1)',
-              transition: `opacity ${transitions.slow}, transform ${transitions.slow}`
-            }}
-            onClick={() => handleClick(dot.targetNodeId)}
-            onMouseEnter={() => setHoveredId(dot.targetNodeId)}
-            onMouseLeave={() => setHoveredId(null)}
-            title={dot.title}
-          />
-        )
-      })}
+      {dots.map((dot) => (
+        <div
+          key={dot.targetNodeId}
+          className="absolute pointer-events-auto edge-dot"
+          style={{
+            left: dot.x - DOT_SIZE / 2,
+            top: dot.y - DOT_SIZE / 2,
+            width: DOT_SIZE,
+            height: DOT_SIZE,
+            borderRadius: '50%',
+            backgroundColor: dot.color,
+            cursor: 'pointer'
+          }}
+          onClick={() => handleClick(dot.targetNodeId)}
+          title={dot.title}
+        />
+      ))}
     </div>
   )
 }

@@ -4,7 +4,6 @@ import {
   borderRadius,
   colors,
   getArtifactColor,
-  transitions,
   typography
 } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
@@ -240,7 +239,6 @@ function PropertyRow({
   onTypeChange,
   isFirst
 }: PropertyRowProps) {
-  const [hovered, setHovered] = useState(false)
   const pType = inferPropertyType(propKey, value)
 
   const renderInput = () => {
@@ -274,6 +272,7 @@ function PropertyRow({
 
   return (
     <div
+      className="fm-property-row"
       style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(110px, 150px) minmax(0, 1fr)',
@@ -281,20 +280,17 @@ function PropertyRow({
         alignItems: 'center',
         paddingTop: isFirst ? 0 : '0.1rem'
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       <div style={rowLabelStyle}>
         {editable && (
           <button
             type="button"
             onClick={onDelete}
-            className="transition-opacity"
+            className="fm-property-row__delete"
             style={{
               color: colors.text.muted,
               fontSize: '9px',
               lineHeight: 1,
-              opacity: hovered ? 0.7 : 0,
               cursor: 'pointer',
               background: 'none',
               border: 'none',
@@ -310,7 +306,6 @@ function PropertyRow({
         {editable && (
           <TypeBadge
             type={pType}
-            visible={hovered}
             onTypeChange={(newType) => {
               const converted = convertValue(value, newType)
               onTypeChange(newType)
@@ -697,52 +692,35 @@ interface ConnectionPillProps {
 }
 
 function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
-
   return (
     <span
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="fm-connection-pill"
+      data-nav={onNavigate ? 'true' : undefined}
       style={{
         ...pillStyle,
+        border: undefined,
         position: 'relative',
         cursor: onNavigate ? 'pointer' : 'default',
         color: colors.text.secondary,
-        paddingRight: onRemove ? '22px' : undefined,
-        transition: `border-color ${transitions.fast}, color ${transitions.fast}`
+        paddingRight: onRemove ? '22px' : undefined
       }}
     >
       <span
+        className="fm-connection-pill__label"
         onClick={() => onNavigate?.(id)}
-        style={{
-          display: 'inline-block',
-          transition: `color ${transitions.fast}`
-        }}
-        onMouseEnter={(e) => {
-          if (!onNavigate) return
-          const parent = e.currentTarget.parentElement
-          if (parent) parent.style.borderColor = colors.accent.default
-          e.currentTarget.style.color = colors.text.primary
-        }}
-        onMouseLeave={(e) => {
-          const parent = e.currentTarget.parentElement
-          if (parent) parent.style.borderColor = colors.border.default
-          e.currentTarget.style.color = colors.text.secondary
-        }}
+        style={{ display: 'inline-block' }}
       >
         {id}
       </span>
       {onRemove && (
         <button
           type="button"
+          className="fm-connection-pill__remove"
           aria-label={`Remove connection ${id}`}
           onClick={(e) => {
             e.stopPropagation()
             onRemove()
           }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           style={{
             position: 'absolute',
             right: 6,
@@ -755,15 +733,7 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
             lineHeight: 1,
             cursor: 'pointer',
             color: colors.text.muted,
-            fontSize: '10px',
-            opacity: focused ? 1 : hovered ? 0.7 : 0,
-            transition: `opacity ${transitions.fast}`
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '1'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = focused ? '1' : hovered ? '0.7' : '0'
+            fontSize: '10px'
           }}
         >
           {'\u00D7'}

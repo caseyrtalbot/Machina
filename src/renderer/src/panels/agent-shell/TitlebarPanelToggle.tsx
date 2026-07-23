@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { borderRadius, colors, transitions } from '../../design/tokens'
+import { borderRadius } from '../../design/tokens'
 
 const TRIGGER_BUTTON_SIZE = 26
 
@@ -30,38 +29,24 @@ export function TitlebarPanelToggle({
   controlsId,
   children
 }: TitlebarPanelToggleProps) {
-  const [hovered, setHovered] = useState(false)
-
   const style: CSSProperties = {
     width: TRIGGER_BUTTON_SIZE,
     height: TRIGGER_BUTTON_SIZE,
     padding: 0,
     boxSizing: 'border-box',
     borderRadius: borderRadius.inline,
-    border: `1px solid ${
-      open ? colors.accent.line : hovered ? colors.border.default : 'transparent'
-    }`,
-    background: open
-      ? 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
-      : hovered
-        ? 'var(--bg-tint-text)'
-        : 'transparent',
-    color: open ? colors.accent.default : hovered ? colors.text.primary : colors.text.secondary,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer',
-    transition: `background ${transitions.focusRing}, color ${transitions.focusRing}, border-color ${transitions.focusRing}`,
-    // @ts-expect-error -- Electron-only CSS property
-    WebkitAppRegion: 'no-drag'
+    cursor: 'pointer'
   }
 
   return (
     <button
       type="button"
+      className="titlebar-toggle"
+      data-open={open ? 'true' : undefined}
       onClick={onToggle}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       aria-label={open ? collapseLabel : expandLabel}
       title={open ? collapseLabel : (title ?? expandLabel)}
       aria-expanded={open}

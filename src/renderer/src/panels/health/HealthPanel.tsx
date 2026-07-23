@@ -164,8 +164,6 @@ function groupIssuesBySeverity(issues: readonly HealthIssue[]): readonly IssueGr
 }
 
 function IssueRow({ issue }: { readonly issue: HealthIssue }) {
-  const [hovered, setHovered] = useState(false)
-
   const handleFileClick = useCallback(() => {
     if (!issue.filePath) return
     openNoteInEditor(issue.filePath)
@@ -174,15 +172,7 @@ function IssueRow({ issue }: { readonly issue: HealthIssue }) {
   const fileName = issue.filePath?.split('/').pop() ?? null
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '8px 0',
-        transition: `background ${transitions.focusRing}`,
-        background: hovered ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
-      }}
-    >
+    <div className="health-issue-row" style={{ padding: '8px 0' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span
           style={{

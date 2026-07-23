@@ -8,7 +8,6 @@ import {
   colors,
   canvasTokens,
   floatingPanel,
-  transitions,
   typography
 } from '../../design/tokens'
 import { CARD_BLUR_PX, CARD_TITLE_FONT_SIZE_PX } from '../../design/themes'
@@ -127,7 +126,6 @@ export function CardShell({
   const cardTitleFontSize = CARD_TITLE_FONT_SIZE_PX
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
-  const [hovered, setHovered] = useState(false)
   const [convertAnchor, setConvertAnchor] = useState<DOMRect | null>(null)
   const convertButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -287,14 +285,8 @@ export function CardShell({
       onDoubleClick={handleDoubleClick}
       onContextMenu={onContextMenu}
       onPointerUp={handlePointerUp}
-      onMouseEnter={() => {
-        setHovered(true)
-        setHoveredNode(node.id)
-      }}
-      onMouseLeave={() => {
-        setHovered(false)
-        setHoveredNode(null)
-      }}
+      onMouseEnter={() => setHoveredNode(node.id)}
+      onMouseLeave={() => setHoveredNode(null)}
     >
       {/* Title bar — Console card header band: lighter than body, hairline border. */}
       <div
@@ -361,12 +353,7 @@ export function CardShell({
             PROJECT
           </span>
         )}
-        <div
-          className="canvas-card__actions flex items-center gap-0.5 ml-2 shrink-0 relative"
-          style={{
-            opacity: hovered || isFocused || isLocked ? 1 : undefined
-          }}
-        >
+        <div className="canvas-card__actions flex items-center gap-0.5 ml-2 shrink-0 relative">
           <TitleBarButton
             onClick={(e) => {
               e.stopPropagation()
@@ -515,60 +502,57 @@ export function CardShell({
         />
       )}
 
-      {/* Resize handle — only visible on hover */}
-      {hovered && (
-        <div
-          className="absolute bottom-0 right-0 cursor-nwse-resize"
-          style={{ width: 16, height: 16, zIndex: 5 }}
-          onPointerDown={onResizeStart}
-        >
-          <svg width={16} height={16} viewBox="0 0 16 16" style={{ color: colors.text.muted }}>
-            <path d="M14 2L2 14M14 8L8 14" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-          </svg>
-        </div>
-      )}
+      {/* Resize handle — revealed on card hover via .canvas-card__resize */}
+      <div
+        className="canvas-card__resize absolute bottom-0 right-0 cursor-nwse-resize"
+        style={{ width: 16, height: 16, zIndex: 5 }}
+        onPointerDown={onResizeStart}
+      >
+        <svg width={16} height={16} viewBox="0 0 16 16" style={{ color: colors.text.muted }}>
+          <path d="M14 2L2 14M14 8L8 14" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+        </svg>
+      </div>
 
-      {/* Anchor dots for edge creation */}
-      {hovered &&
-        (['top', 'right', 'bottom', 'left'] as CanvasSide[]).map((side) => {
-          const style: React.CSSProperties = {
-            position: 'absolute',
-            width: 8,
-            height: 8,
-            borderRadius: 0,
-            backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 74%, white 26%)',
-            boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)',
-            cursor: 'crosshair',
-            zIndex: 10,
-            transition: `opacity ${transitions.slow}`,
-            ...(side === 'top' && { top: -4, left: '50%', marginLeft: -4 }),
-            ...(side === 'bottom' && { bottom: -4, left: '50%', marginLeft: -4 }),
-            ...(side === 'left' && { left: -4, top: '50%', marginTop: -4 }),
-            ...(side === 'right' && { right: -4, top: '50%', marginTop: -4 })
-          }
-          return (
-            <div
-              key={side}
-              style={style}
-              onPointerDown={(e) => {
-                e.stopPropagation()
-                startConnectionDrag(
-                  canvas,
-                  canvasId,
-                  node.id,
-                  side,
-                  e.clientX,
-                  e.clientY,
-                  e.nativeEvent
-                )
-              }}
-              onPointerUp={(e) => {
-                e.stopPropagation()
-                endConnectionDrag(node.id, side)
-              }}
-            />
-          )
-        })}
+      {/* Anchor dots for edge creation — revealed on card hover */}
+      {(['top', 'right', 'bottom', 'left'] as CanvasSide[]).map((side) => {
+        const style: React.CSSProperties = {
+          position: 'absolute',
+          width: 8,
+          height: 8,
+          borderRadius: 0,
+          backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 74%, white 26%)',
+          boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)',
+          cursor: 'crosshair',
+          zIndex: 10,
+          ...(side === 'top' && { top: -4, left: '50%', marginLeft: -4 }),
+          ...(side === 'bottom' && { bottom: -4, left: '50%', marginLeft: -4 }),
+          ...(side === 'left' && { left: -4, top: '50%', marginTop: -4 }),
+          ...(side === 'right' && { right: -4, top: '50%', marginTop: -4 })
+        }
+        return (
+          <div
+            key={side}
+            className="canvas-card__anchor"
+            style={style}
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              startConnectionDrag(
+                canvas,
+                canvasId,
+                node.id,
+                side,
+                e.clientX,
+                e.clientY,
+                e.nativeEvent
+              )
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation()
+              endConnectionDrag(node.id, side)
+            }}
+          />
+        )
+      })}
     </div>
   )
 }

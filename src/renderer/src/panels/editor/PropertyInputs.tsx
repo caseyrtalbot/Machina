@@ -385,12 +385,10 @@ const ALL_TYPES: PropertyType[] = ['text', 'number', 'boolean', 'date', 'list']
 interface TypeBadgeProps {
   type: PropertyType
   onTypeChange: (type: PropertyType) => void
-  visible?: boolean
 }
 
-export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps) {
+export function TypeBadge({ type, onTypeChange }: TypeBadgeProps) {
   const [open, setOpen] = useState(false)
-  const triggerVisible = visible || open
 
   return (
     <span className="relative" style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -402,19 +400,15 @@ export function TypeBadge({ type, onTypeChange, visible = true }: TypeBadgeProps
           fontSize: typography.microLabel.size,
           letterSpacing: typography.microLabel.letterSpacing,
           color: colors.text.muted,
-          opacity: triggerVisible ? 0.5 : 0,
-          pointerEvents: triggerVisible ? 'auto' : 'none',
           textTransform: typography.microLabel.textTransform,
           background: 'none',
           border: 'none',
           cursor: 'pointer',
-          padding: '0 2px',
-          transition: `opacity ${transitions.fast}`
+          padding: '0 2px'
         }}
-        className="hover:opacity-100"
+        className="fm-type-badge"
+        data-open={open ? 'true' : undefined}
         aria-label={`Property type: ${type}. Click to change.`}
-        aria-hidden={!triggerVisible}
-        tabIndex={triggerVisible ? 0 : -1}
       >
         {TYPE_LABELS[type]}
       </button>
