@@ -24,6 +24,8 @@ subsystems ("contracts §N / vX.Y" in code comments points there); all other bui
 records were removed 2026-07-21 and live in git history only. Do not take scope from any
 other document; if you find a conflicting plan, stop and flag it.
 
+Current position and next step: `docs/HANDOFF.md`.
+
 Trust files on disk over memory, older drafts, or stale line numbers. Use `rg` to
 re-locate symbols before editing.
 
@@ -69,73 +71,96 @@ re-locate symbols before editing.
 ## Commands
 
 ```bash
-npm run dev                 # Electron app with HMR
-npm run dev:debug           # Dev app with CDP on port 9222
-npm run check               # lint + node/web typecheck + Vitest
-npm run build               # typecheck + production build
-npm run test:e2e            # build + sequential Playwright e2e
-npm run test:live           # CDP checks against a running dev app
-npx vitest run <test-file>  # focused test
-npm audit --omit=dev        # production dependency audit
+npm run dev          # Start Electron app with HMR
+npm run dev:debug    # Dev with CDP debugging port (REMOTE_DEBUGGING_PORT=9222)
+npm run build        # Typecheck + build all (main, preload, renderer)
+npm run build:mac    # Build + package for macOS
+npm test             # Run all tests (vitest)
+npm run test:e2e     # Build + run Playwright e2e tests
+npm run test:live    # CDP health checks against running dev app
+npm run check        # lint + typecheck + test (quality gate)
+npm run package:install  # Package + copy to /Applications
+npm run mcp-server   # Build + run headless MCP CLI server
 ```
 
-For installs, use `--cache /tmp/npm-cache-te` because the normal npm cache may contain
-root-owned files.
+Single test: `npx vitest run path/to/file.test.ts`
 
-## Git and change discipline
+**npm workaround**: Cache has root-owned files. Use `--cache /tmp/npm-cache-te` for installs.
 
-- Start with `git status --short --branch` and inspect the relevant diff. Preserve all
-  unrelated dirty and untracked work.
-- Tasks land directly on `main`, one completed step per commit, when committing is in
-  scope. Do not introduce feature branches merely for ceremony.
-- Before any commit or completion claim, run fresh verification appropriate to risk. The
-  repository gate is `npm run check`, `npm run build`, dependency audit, relevant e2e or
-  built-app probe, and user-visible visual verification for UI work.
-- Some tracked files may have `skip-worktree`; inspect with `git ls-files -v | rg '^S'`
-  if an edit is missing from the diff.
+## Git workflow
+
+- Commit directly to `main` per completed task. This explicitly overrides the global branch-before-commit rule (solo-dev decision by Casey; branches add ceremony without payoff here).
+- Mandatory pre-commit gate before every commit: full `npm run check` + build + dependency audit + visual verification. No shortcuts.
+- **Skip-worktree gotcha**: some files may be flagged skip-worktree, so Write/Edit changes are silently ignored by git. Check with `git ls-files -v | grep ^S` and clear with `git update-index --no-skip-worktree <file>`.
 - E2E can dirty `e2e/fixtures/test-vault/.machina/state.json`; never include that runtime
   mutation in a product change.
 - Never weaken or bypass a red gate. Record exact failures and root causes.
 
-## Architecture boundaries
+## Working discipline
 
-Machina has four code boundaries:
+- No features, refactors, or abstractions beyond what the task requires. Do the simplest thing that works well — no designing for hypothetical futures, no premature abstraction, no half-finished implementations.
+- No error handling, fallbacks, or validation for scenarios that cannot happen. Trust internal code and framework guarantees; validate only at system boundaries (user input, external APIs). No feature flags or backwards-compatibility shims when you can just change the code.
+- Delegate independent subtasks to subagents and keep working while they run; intervene when a subagent drifts or is missing relevant context.
 
-- Main/Node: `src/main/` — services, filesystem, PTYs, IPC authority.
-- Preload: `src/preload/` — typed `window.api` bridge.
-- Renderer/React: `src/renderer/src/` — panels, hooks, stores, visual state.
-- Shared: `src/shared/` — types, IPC contracts, pure engine code.
+## Final summaries
 
-`src/shared/engine/` must remain free of Electron and React dependencies. Renderer-only
-code may use `@renderer/*`; cross-process contracts belong under `@shared/*`.
+- Terse shorthand between tool calls is fine (that's thinking out loud); the final summary is for a reader who saw none of it.
+- After a long unattended stretch, write the final message as a re-grounding, not a continuation: outcome first in one sentence, then supporting detail, then the one or two things needed from Casey, each explained as if new.
+- Drop working shorthand: complete sentences, spelled-out terms, no arrow chains, no labels invented mid-session. Choose clear over short.
 
-New IPC behavior follows the existing four-site pattern:
+## Architecture
 
-1. Declare the channel/event in `src/shared/ipc-channels.ts`.
-2. Register a typed handler in `src/main/ipc/`.
-3. Expose it through `src/preload/index.ts`.
-4. Consume it through `window.api` in the renderer.
+| Process | Entry | Source |
+|---------|-------|--------|
+| Main (Node.js) | `src/main/index.ts` | IPC handlers (`ipc/`), services (`services/`) |
+| Preload (Bridge) | `src/preload/index.ts` | Exposes `window.api` with typed namespaces |
+| Renderer (Browser) | `src/renderer/src/main.tsx` | React app: `panels/`, `hooks/`, `store/`, `design/` |
+| Shared | (imported by all) | `src/shared/` — types, IPC contracts, pure engine kernel |
+
+**Engine kernel** (`src/shared/engine/`): pure TypeScript — zero Electron/React/Node imports; consumed by main, renderer Web Workers, and the headless CLI. `src/renderer/src/engine/` re-exports it. Must stay dependency-free.
+
+**Dev/prod isolation**: `TE_DIR` (`src/shared/constants.ts`) resolves to `.machina-dev` in dev, `.machina` in production/tests. Never hardcode `.machina`.
+
+### Path aliases
+
+| Alias | Resolves to | Available in |
+|---|---|---|
+| `@shared/*` | `src/shared/*` | main, preload, renderer |
+| `@renderer/*` | `src/renderer/src/*` | renderer only |
+| `@engine/*` | `src/renderer/src/engine/*` | renderer only |
+
+### IPC pattern
+
+`typedHandle('channel', handler)` in main → `typedInvoke('channel', args)` in preload → `window.api.namespace.method()` in renderer. Adding a channel is a 4-step, compile-checked change:
+
+1. Declare in `IpcChannels` or `IpcEvents` in `src/shared/ipc-channels.ts`
+2. Register `typedHandle(...)` in the appropriate `src/main/ipc/*.ts` file
+3. Expose in `src/preload/index.ts` under the right namespace
+4. Call via `window.api.namespace.method()` in renderer
+
+Wrap critical renderer→main calls with `withTimeout(call, ms, label)`.
 
 Main owns workspace roots and security-relevant decisions. Do not trust renderer-supplied
 roots, harness identities, or approval state when main can resolve them authoritatively.
 
-**Shared TabBar primitive** (`components/tabbar/TabBar.tsx`): every real tab row (dock
-surface tabs, editor note tabs, terminal strip sessions) renders through it — skins via
-`variant` (`underline|chrome|pill`), behavior via optional props. `role="tab"`/`tablist`
-and the `te-tab*` CSS vocabulary exist only there; new tab UIs must use it, and mode
-switches/segmented controls use `aria-pressed`, not `role="tab"`.
+### Canonical detail docs
 
-**Singleton editor surface**: the dock holds at most ONE editor tab (`{ kind: 'editor' }`,
-kind-keyed like graph/ghosts/health — no path). Note identity lives only in editor-store
-(`openTabs`/`activeNotePath`); the editor surface's internal note-tab bar is the
-multi-note UX. Open notes via `openNoteInEditor(path, { preview?, title? })` from
-dock-store — never by constructing an editor DockTab with a path (the type forbids it)
-and never by pairing `setActiveNote` with a manual dock open. Rationale: per-path editor
-dock tabs co-mounted N editor surfaces under KeepAlive that all read the single global
-`activeNotePath` and corrupted each other. Legacy per-path editor tabs in old thread
-files fold to one at the dock-store seed boundary (paths harvested into
-`editor-store.restoreTabs`). Agent-driven editor opens carry the note as
-`DockAction.notePath`, not on the tab.
+Read before working in an area; never restate their content here:
+
+- System map, data flows, workers, renderer shell, store inventory: `docs/architecture/overview.md`
+- Agent trust boundaries, gates, audit, Spotlighting, MCP surface (live Streamable HTTP endpoint on 127.0.0.1:41627): `docs/architecture/safety-subsystem.md`
+- Terminal Block Protocol wire format and degraded mode: `docs/architecture/block-protocol.md`
+- Shipped subsystem interfaces: `docs/architecture/interface-contracts.md`
+
+### Standing invariants
+
+- All agent-originated note writes route through `writeStampedNote` (`src/main/utils/note-write.ts`); all agent-originated PTY input through the spawner's `writeAgentInput` — never raw PTY writes.
+- Safety posture only moves toward parity: approvals gate, audit, PathGuard, and Spotlighting behavior never regress.
+- **Shared TabBar primitive** (`components/tabbar/TabBar.tsx`): every real tab row renders through it — skins via `variant` (`underline|chrome|pill`), behavior via optional props. `role="tab"`/`tablist` and the `te-tab*` CSS vocabulary exist only there; new tab UIs must use it; mode switches/segmented controls use `aria-pressed`, not `role="tab"`.
+- **Singleton editor surface**: the dock holds at most ONE editor tab (`{ kind: 'editor' }`, kind-keyed, no path). Note identity lives only in editor-store; open notes via `openNoteInEditor(path, { preview?, title? })` from dock-store — never by constructing an editor DockTab with a path and never by pairing `setActiveNote` with a manual dock open. Agent-driven editor opens carry the note as `DockAction.notePath`, not on the tab.
+- Stores own one domain each (inventory in overview.md). Extend existing stores, IPC maps, adapters, and dock patterns; never create a parallel implementation.
+- Design: dark-only; import from `design/tokens.ts`, never hardcode hex or px; accent applied at runtime via `applyAccentCssVars`. Target state is ADR 0005 (constants over configuration; lands in PLAN Layer 1). Non-CSS consumers (Pixi, mermaid) read resolved values via `getComputedStyle`.
+- Editor: Tiptap 3 with markdown round-trip; only ship block types with clean round-trip. Content pushes happen in user-action callbacks, never via `useEffect`.
 
 ## Agent safety invariants
 
@@ -146,8 +171,8 @@ files fold to one at the dock-store seed boundary (paths harvested into
   or weaken watcher/queue/revert coverage without an equivalent evidence gate.
 - `AgentWriteWatcher` has its own ignore policy. Reusing vault-watcher ignores would blind
   dotfiles, `.env`, and harness verification files.
-- Use `TE_DIR`; never hardcode `.machina`. Development uses `.machina-dev`. The deliberate
-  exception is `HARNESS_PROTECTED_GLOBS`, which covers both variants.
+- The deliberate hardcoded-path exception is `HARNESS_PROTECTED_GLOBS`, which covers both
+  `.machina` and `.machina-dev`.
 - Harness creation is refuse-before-write. Calls with `overrides` constructively union
   mandatory protected globs before validation; template-only calls must instead refuse a
   defective template that omits them. In both paths, validate scope, lint, and prove the
@@ -179,28 +204,20 @@ files fold to one at the dock-store seed boundary (paths harvested into
   until main-originated completion/refusal settles it. Thread deletion/close must tombstone
   late work; workspace switches fence stale dispatch state without auto-killing
   old-workspace PTYs unless OQ8 is separately ratified.
-- Extend existing stores, IPC maps, adapters, and dock patterns rather than creating a
-  parallel implementation.
+## Type conventions
 
-## Implementation conventions
+- **`Result<T>`**: `{ ok: true; value: T } | { ok: false; error: string }` — engine returns these instead of throwing (`src/shared/engine/types.ts`)
+- **Branded types**: `SessionId = string & { readonly __brand: 'SessionId' }` with constructor `sessionId(id)`.
+- **Enum-like constants**: `as const` arrays + derived union type + `satisfies Record<...>` for exhaustiveness.
 
-- TypeScript strict mode; Prettier uses single quotes, no semicolons, 100-column width.
-- Prefer immutable updates. Zustand tests reset with
-  `store.setState(store.getInitialState())` in `beforeEach`.
-- Keep files below 800 lines. `thread-store.ts` is already over the threshold; do not grow
-  it.
-- Use `Result<T>` for expected engine failures and branded ids where established.
-- Critical renderer-to-main calls use `withTimeout(call, ms, label)`.
-- User-edit content pushes happen in user-action callbacks, never a syncing `useEffect`.
-- UI uses `design/tokens.ts`, theme CSS variables, and existing components. Do not hardcode
-  hex colors or arbitrary pixel values. Machina is dark-only with runtime accent changes.
-- Preserve terminal/block behavior and latency; PTY migration reprojects a live session
-  and must not silently kill or duplicate it.
+## Testing
 
-## Testing and UI evidence
-
-- Unit tests use Vitest/happy-dom; Node integrations declare
-  `// @vitest-environment node`; e2e is serial Playwright.
+- **Unit**: Vitest with happy-dom. `tests/` mirrors `src/` for pure logic; `src/**/__tests__/` for colocated component tests.
+- **Integration**: `// @vitest-environment node` at file top for tests needing real Node APIs.
+- **Store tests**: Reset via `store.setState(store.getInitialState())` in `beforeEach`.
+- **E2E**: Playwright with `workers:1`, `test.describe.serial`. Test vault at `e2e/fixtures/test-vault/`.
+- **Quality gate**: `npm run check` must pass clean (zero lint errors, zero type errors).
+- **Claude drives DevTools**: Casey is unfamiliar with this project's DevTools/localStorage/CDP workflows. Never hand him "open DevTools, run X" steps. Prefer code paths over runtime toggles; drive the `npm run dev:debug` CDP target directly. Frame visual-verify asks in user-visible terms ("click the thread sidebar's +"), not inspector terms.
 - Test contracts and failure behavior, not only successful rendering. Security-relevant
   input paths need negative tests that prove nothing was written.
 - Built-app probes should wait for boot/reload to settle before `page.evaluate`; locator
@@ -210,8 +227,24 @@ files fold to one at the dock-store seed boundary (paths harvested into
 - Drive CDP/Playwright checks directly. Ask Casey only for genuinely visual acceptance,
   phrased as user-visible actions rather than DevTools or localStorage instructions.
 
-## Compaction priorities
+## Code style
 
-Preserve the active plan and step, verification evidence, agent findings, corrected root
-causes, and architecture decisions. Deprioritize dead-end searches and raw outputs that
-have already been summarized.
+- **Prettier**: single quotes, no semicolons, 100 char width
+- **TypeScript**: Strict mode. `_`-prefixed names exempt from unused-vars lint.
+- **Tailwind v4**: via Vite plugin — scheduled for removal (ADR 0005); converge on tokens + `te-` classes.
+- **Immutable data**: return new copies, never mutate in-place.
+- **Files under 800 lines**, organized by feature/domain.
+- **Buffer shim**: `main.tsx` shims `globalThis.Buffer` before gray-matter import — required for frontmatter parsing in browser context.
+- `thread-store.ts` is already over the file-size threshold; do not grow it.
+- Preserve terminal/block behavior and latency; PTY migration reprojects a live session
+  and must not silently kill or duplicate it.
+
+## Compact instructions
+
+Always preserve across context compaction:
+- IPC channel contracts and process ownership (main vs renderer vs preload)
+- Active plan file paths, current layer/item, and completion status
+- Process boundary and data flow decisions
+- Verification evidence (test output, build results, type-check results)
+- Error corrections and root causes, especially IPC or Electron-specific
+- Design system token values and theme decisions
