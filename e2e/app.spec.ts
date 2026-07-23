@@ -320,7 +320,10 @@ test.describe.serial('Canvas', () => {
 
   test('right-click opens canvas context menu', async () => {
     const surface = page.locator('[data-canvas-surface]')
-    await surface.click({ button: 'right', position: { x: 300, y: 300 } })
+    // y is kept above the vertically-centered empty-vault card: whether
+    // (x, 300) lands on that pointer-events-auto card depends on panel widths
+    // persisted by earlier tests, which made this click intercept-flaky.
+    await surface.click({ button: 'right', position: { x: 300, y: 80 } })
 
     const contextMenu = page.locator('[data-testid="canvas-context-menu"]')
     await expect(contextMenu).toBeVisible({ timeout: 3000 })
