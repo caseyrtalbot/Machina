@@ -4,73 +4,81 @@ Single-file handoff: **overwritten** at every clean checkpoint, never appended �
 history is the archive. A fresh agent starts here after reading `docs/PLAN.md` (the
 canonical plan; do not restructure it) and `AGENTS.md` (conventions + working protocol).
 
-**Position:** Layer 0 (Integrity) complete 2026-07-22. Next: Layer 1 (Foundations).
+**Position:** Layer 1 (Foundations) item 1 — Phase 2 primitives — COMPLETE 2026-07-22.
+Next: Layer 1 item 2 (design constitution, ADR 0005).
 
 ## What shipped last
 
-- `be71003` — Layer 0 item 2: per-launch bearer token on the MCP endpoint. Admission
-  on 127.0.0.1:41627 is now Host check + required `Authorization: Bearer <token>`
-  (fresh each launch, never persisted, constant-time compare, 401 on missing/wrong).
-  `mcp:status` exposes the token; Settings → MCP Server copies a full
-  `claude mcp add` connect command including it. Tool registration untouched
-  (`MCP_TOOL_COUNT` 12).
-- `0be971a` — Layer 0 item 3: dead-code deletions. `vendor/tmux` +
-  `resources/tmux.conf` gone (plus an inert `tmux-service` mock in
-  `tests/main/shell-ipc.test.ts`); `ElectronHitlGate` and `TimeoutHitlGate` deleted
-  from `hitl-gate.ts` (TimeoutHitlGate verified test-only first, per the prior
-  handoff's decision point); `ClusterDraftSchema`/`ClusterDraft` + test deleted;
-  librarian/curator renderer residue removed (FilesDockAdapter agent detection,
-  FileTree action colors, tokens.ts librarian color).
-- Item 1 (false MCP transport claims) had shipped in `debe976`; its residual-claim
-  grep was re-run clean after items 2–3, and all three items are now marked complete
-  in PLAN.md.
-- Verification: `npm run check` green (331 files, 4063 tests), production build green,
-  deleted-name greps clean across src/tests/e2e + living docs, knip strictly improved
-  vs its pre-deletion baseline, `npm audit --omit=dev` reviewed (pre-existing findings
-  only, see landmines), built-app e2e `mcp-gate-confirm.spec.ts` green with the token,
-  and a built-app visual probe confirmed the Settings MCP section and sidebar render.
+- `46bcfc8` — AGENTS.md resynced from CLAUDE.md (shared sections word-identical).
+- `6fbbfbc` — slice 3, menu consolidation: every menu popup renders through
+  `components/ContextMenu.tsx`. Wrapper components (CanvasContextMenu,
+  CardContextMenu, EditorContextMenu, FileContextMenu) retired to pure
+  `ContextMenuEntry[]` builders (`*-menu-entries.ts`); CardShell's ConvertMenu and
+  the CanvasToolbar zoom/tile popovers folded onto the primitive (gaining keyboard
+  nav + viewport clamping); the primitive gained `alignRight`; AgentPicker corrected
+  to `role="listbox"`; RenameInput moved to `sidebar/RenameInput.tsx`.
+- `9151bfb` — e2e flake fix: the canvas right-click spec now clicks (300, 80); the
+  old (300, 300) intermittently landed on the pointer-events-auto empty-vault card
+  ("subtree intercepts pointer events", confirmed from the Playwright trace).
+- `1552ffe` — slice 4, empty/loading states: `components/emptystate/` ships
+  EmptyState (card/plain, overlay, align, height), Spinner (`.te-spinner`, the one
+  ring), LoadingState (the one text block), CheckCircleIcon. Migrated 14 call sites
+  (canvas welcome/empty-vault, dock, thread, ghosts, graph, editor, health empties;
+  App/ImageCard/PdfCard rings; NoteCard/FileViewCard/mermaid/DockTabContent loading
+  text). CardShellSkeleton and the tool-card shimmer stay as their patterns' single
+  implementations.
+- `8d9aa24` — slice 5, PanelHeader: `components/panelheader/PanelHeader.tsx`
+  un-orphans the `te-panel-header` CSS as bar/masthead variants (thread panel,
+  thread sidebar, files sidebar action bar, editor mode bar; ghosts + health
+  mastheads); graph chips/buttons and the canvas toolrail take chrome from the new
+  `.te-float-chip` recipe.
+- Verification per slice (recorded in each commit body): `npm run check` green
+  (final suite 333 files incl. new primitive tests, all passing), production build
+  exit 0, Playwright e2e 30 passed / 1 skipped from clean fixture state, knip diff
+  vs pre-slice baseline empty each time, `npm audit --omit=dev` pre-existing only,
+  CDP visual probes against the dev app with screenshots reviewed (menus, empty
+  states, headers), spotcheck-verifier SHIP on slices 3–4.
+- PLAN.md item 1 is marked complete with per-slice invariant-gate notes;
+  AGENTS.md/CLAUDE.md gained three identical standing-invariant bullets (one menu
+  primitive, one empty/loading vocabulary, one panel header pattern).
 
-## Next step: PLAN.md Layer 1 (Foundations)
+## Next step: PLAN.md Layer 1 item 2
 
-Start with item 1 (remaining Phase 2 primitive slices: `PanelHeader`, `EmptyState`,
-ContextMenu consolidation — same migrate-all-consumers-per-slice method as the
-completed Modal/Overlay and TabBar slices). Do not re-derive scope here; execute the
-items as written in the plan.
+Design constitution lands (ADR 0005): delete the eight appearance-settings axes from
+settings UI and settings-store; remove Tailwind and converge on tokens + `te-`
+classes; stand up enforcement (contrast unit tests, dev-only component gallery
+route, Playwright visual regression). Execute as written in the plan.
 
 ## Landmines
 
-- **PLAN factual error (needs Casey's eyes, not a silent fix):** Layer 0 item 3 called
-  `section-rewriter`/`section-rematch`/`section-projection` "consumers with no
-  producer". They are live: `FileViewCard.tsx` (registered canvas card `'file-view'`,
-  created in `CanvasView.tsx`) imports all three. Only `ClusterDraftSchema` was dead.
-  Deletion was scoped accordingly; the item's completion note in PLAN.md records the
-  exception.
-- **Librarian/curator follow-up (unratified, deliberately not done):** the removed
-  FilesDockAdapter detection was the ONLY writer of `sidebar-selection-store`'s
-  `agentActive`/`activeAgentLabel`, which gate the sole `markAgentModified` caller
-  (App.tsx) feeding the file-tree "agent modified" badging pipeline
-  (FileTree/FileContextMenu/Sidebar). That whole pipeline is now dormant — no action
-  registry produces any of its labels (challenge/emerge/organize/tidy/compile either).
-  Ripping it out is a coherent follow-up but exceeds Layer 0's "confirmed-dead"
-  mandate; ratify before executing.
-- **eslint uses `--cache`:** it masked a pre-existing `react-hooks/set-state-in-effect`
-  error in FilesDockAdapter that only surfaced when the file changed. Full
-  `npx eslint --no-cache .` is clean as of `0be971a`; if an "unrelated" lint error
-  appears after editing a long-untouched file, suspect the cache, not your edit.
-- The prior handoff claimed knip was "currently clean" — it wasn't (≈70 findings:
-  unused exports/types/deps, all pre-existing). Baseline discipline: deletions must
-  not add findings. `ClusterSectionSchema` is knip-flagged (pre-existing) but its
-  inferred `ClusterSection` type is consumed by live section code.
-- `npm audit --omit=dev` has pre-existing advisories: `@hono/node-server` (moderate,
-  via `@modelcontextprotocol/sdk`; fix requires SDK major bump), `adm-zip` (high, via
-  `onnxruntime-node`/`@huggingface/transformers`, no fix), `body-parser` (fixable).
-  None introduced by Layer 0; triage separately.
-- MCP clients now NEED the bearer token: a bare URL connect gets 401. E2E/probes must
-  read `token` from `mcp:status` and send `Authorization: Bearer` (see
-  `e2e/mcp-gate-confirm.spec.ts` for the pattern). The token rotates every launch, so
-  externally configured clients (e.g. `claude mcp add`) must be re-added after each
-  app restart — a known UX cost; revisit only with an explicit decision.
-- `CLAUDE.md` is gitignored (local operator doc). `AGENTS.md` is its tracked twin;
-  where they cover the same ground the wording must stay identical.
+- **Slice 5 spotcheck report is outstanding.** The spotcheck-verifier agent for the
+  PanelHeader slice stalled twice without returning its report; all mechanical
+  gates (typecheck, no-cache lint, full suite, build, e2e, knip, gate greps) were
+  green and the visual probe was reviewed, so it was committed. If paranoid, re-run
+  a spotcheck of `8d9aa24` against its commit message.
+- **Ghost masthead not visually verified with live data**: the dev vault had zero
+  unresolved references, so only the all-resolved empty state rendered. The
+  masthead is unit-tested; eyeball it next time a vault has ghosts (subtitle color
+  normalized primary → muted).
+- **Intentional visual normalizations** shipped across slices (all listed in the
+  commit bodies): 13px body text on ghost/health/editor empties, mono styling
+  dropped from DockTabContent's suspense fallback, 44px hairline bars on sidebar
+  action bar + editor mode bar, graph chips lost backdrop blur, thread empty title
+  22 → 18px. If Casey flags a look, check the relevant commit body first — it was
+  probably deliberate.
+- **e2e runs rewrite `e2e/fixtures/test-vault/.machina/state.json` at runtime**
+  (dock/panel state, plus Casey's real home path in `lastOpenNote`).
+  `git restore` it before every commit; never commit it — it would reintroduce the
+  personal-path leak scrubbed for release. The intercept flake fixed in `9151bfb`
+  was caused by this same runtime state shifting panel widths mid-suite.
+- **React gotcha caught by the visual gate** (regression-tested in
+  CanvasToolbar.test.tsx): never read `e.currentTarget` inside a setState updater —
+  it is nulled when the handler returns; the zoom-menu click crashed the whole
+  AgentShell error boundary. Capture rects before setState.
+- MCP clients still need the per-launch bearer token from `mcp:status`
+  (rotates every launch; see `e2e/mcp-gate-confirm.spec.ts`).
+- eslint uses `--cache`; run `npx eslint --no-cache` when a stale-file lint result
+  looks suspicious. npm installs need `--cache /tmp/npm-cache-te`.
+- `CLAUDE.md` is gitignored; `AGENTS.md` is its tracked twin — keep shared wording
+  identical (resynced in `46bcfc8`, updated in every slice commit since).
 - Skip-worktree gotcha: `git ls-files -v | grep ^S` before assuming an edit landed.
-- npm installs need `--cache /tmp/npm-cache-te` (root-owned cache files).
