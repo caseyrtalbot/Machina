@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ArtifactType } from '@shared/types'
 import { isSystemArtifactKind } from '@shared/system-artifacts'
 import { Sidebar } from '../../sidebar/Sidebar'
@@ -13,7 +13,6 @@ import { useSidebarSelectionStore } from '../../../store/sidebar-selection-store
 import { filterSidebarFiles } from './sidebar-filtering'
 import { useUiStore } from '../../../store/ui-store'
 import { useCanvasFilePaths, useCanvasConnectionCounts } from '../../../hooks/useCanvasAwareness'
-import { useAgentStates } from '../../../hooks/use-agent-states'
 import { openArtifactInEditor } from '../../../system-artifacts/system-artifact-runtime'
 import { createOrOpenDailyNote } from '../../../utils/daily-notes'
 import { logError } from '../../../utils/error-logger'
@@ -101,15 +100,15 @@ export function FilesDockAdapter({ onOpenSettings }: FilesDockAdapterProps = {})
 
   // Stabilize file ordering for non-mtime sorts so the tree does not jerk
   // during normal navigation. Same approach as legacy ConnectedSidebar.
+  // Render-phase adjustment (React's "adjusting state when props change"
+  // pattern) instead of an effect.
   const [stableFiles, setStableFiles] = useState(files)
-  const prevPathSetRef = useRef('')
-  useEffect(() => {
-    const pathKey = files.map((f) => f.path).join('\n')
-    if (pathKey !== prevPathSetRef.current || sortMode !== 'modified') {
-      prevPathSetRef.current = pathKey
-      setStableFiles(files)
-    }
-  }, [files, sortMode])
+  const [prevPathKey, setPrevPathKey] = useState('')
+  const pathKey = files.map((f) => f.path).join('\n')
+  if (pathKey !== prevPathKey) setPrevPathKey(pathKey)
+  if ((pathKey !== prevPathKey || sortMode !== 'modified') && stableFiles !== files) {
+    setStableFiles(files)
+  }
 
   // Workspace + tag filters narrow the file list before the tree is built.
   const selectedTags = useSidebarFilterStore((s) => s.selectedTags)
@@ -204,28 +203,6 @@ export function FilesDockAdapter({ onOpenSettings }: FilesDockAdapterProps = {})
         item.status?.toLowerCase().includes(query)
     )
   }, [artifactPathById, artifacts, searchQuery])
-
-  // Track the active vault agent (librarian/curator) for selection-store badging.
-  const allAgentStates = useAgentStates()
-  const vaultAgentAlive = useMemo(
-    () =>
-      allAgentStates.some(
-        (s) => (s.label === 'librarian' || s.label === 'curator') && s.status === 'alive'
-      ),
-    [allAgentStates]
-  )
-  const activeVaultAgent = useMemo(
-    () =>
-      allAgentStates.find(
-        (s) => (s.label === 'librarian' || s.label === 'curator') && s.status === 'alive'
-      ),
-    [allAgentStates]
-  )
-  const prevAgentRef = useRef<string | null>(null)
-  if ((activeVaultAgent?.label ?? null) !== prevAgentRef.current) {
-    prevAgentRef.current = activeVaultAgent?.label ?? null
-    useSidebarSelectionStore.getState().setAgentActive(!!activeVaultAgent, activeVaultAgent?.label)
-  }
 
   const handleFileSelect = useCallback(
     (path: string, e?: React.MouseEvent) => {
@@ -439,7 +416,6 @@ export function FilesDockAdapter({ onOpenSettings }: FilesDockAdapterProps = {})
       onCanvasPaths={onCanvasPaths}
       canvasConnectionCounts={canvasConnectionCounts}
       selectedPaths={selectedPaths}
-      agentActive={vaultAgentAlive}
       sortMode={sortMode}
       vaultName={vaultName}
       workspaceHistory={workspaceHistory}

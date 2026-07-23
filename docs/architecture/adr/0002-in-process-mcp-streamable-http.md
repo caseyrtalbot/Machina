@@ -64,8 +64,9 @@ External client setup: `claude mcp add --transport http --header "Authorization:
 ## Consequences
 
 - External MCP clients gain live search/graph/ghost reads and human-gated writes
-  against the open vault. Approval dialogs appear in the running app; an unattended
-  app auto-denies after 30s (TimeoutHitlGate).
+  against the open vault. Write confirms surface in the running app; an unattended
+  app auto-denies after 30s (today via `QueueHitlGate`; the original dialog-based
+  gates were deleted 2026-07-22, Layer 0).
 - The endpoint shipped unauthenticated (loopback bind + Host allowlist only); a
   per-launch bearer token was added 2026-07-22 (`docs/PLAN.md` Layer 0). Current
   admission posture is canonical in `docs/architecture/safety-subsystem.md`.

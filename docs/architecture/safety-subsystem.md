@@ -88,8 +88,6 @@ These paths can already touch user data and are **outside** the MCP safety bound
 |---|---|---|
 | HITL gate interface | `src/main/services/hitl-gate.ts` | `HitlGate`, `HitlDecision` |
 | Production MCP write gate (approval queue, 30s fail-closed) | `src/main/services/queue-hitl-gate.ts` | `QueueHitlGate` |
-| Legacy dialog gate (production-orphaned on the MCP path since Phase 3 step 2) | `src/main/services/hitl-gate.ts` | `ElectronHitlGate` |
-| Legacy timeout wrapper (production-orphaned on the MCP path since Phase 3 step 2) | `src/main/services/hitl-gate.ts` | `TimeoutHitlGate` |
 | Write rate limiter (advisory) | `src/main/services/hitl-gate.ts` | `WriteRateLimiter` |
 | Spotlighting envelope | `src/main/services/mcp-server.ts` | `wrapSpotlighting`, `SPOTLIGHT_BOUNDARY` |
 | Audit log (append-only NDJSON, daily rotation) | `src/main/services/audit-logger.ts` | `AuditLogger` |

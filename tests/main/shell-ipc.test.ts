@@ -25,13 +25,6 @@ vi.mock('node-pty', () => ({
   spawn: vi.fn(() => mockPty)
 }))
 
-// ---------------------------------------------------------------------------
-// Mock tmux-service (no tmux for these tests)
-// ---------------------------------------------------------------------------
-vi.mock('../../src/main/services/tmux-service', () => ({
-  TmuxService: { tryCreate: () => null }
-}))
-
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: true } }))
 
 // ---------------------------------------------------------------------------

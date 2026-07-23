@@ -9,7 +9,8 @@
  * item (a stale confirm must never catch a late click).
  *
  * As of workstation Phase 3 step 2 this IS the production MCP write gate,
- * replacing the standalone TimeoutHitlGate on that path (OQ-B: 30s fail-closed).
+ * replacing the retired standalone timeout gate on that path (OQ-B: 30s
+ * fail-closed).
  */
 import { GATE_CONFIRM_TIMEOUT_MS } from './approval-queue'
 import type { HitlConfirmOpts, HitlDecision, HitlGate } from './hitl-gate'

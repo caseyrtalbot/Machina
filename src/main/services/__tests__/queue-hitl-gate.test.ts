@@ -122,7 +122,7 @@ describe('QueueHitlGate', () => {
 
   // ── MCP gate swap (Phase 3 step 2, contracts §4 v1.3.1) ──────────────────
   // The production MCP path is QueueHitlGate over the ApprovalQueue
-  // (mcp-lifecycle buildGate) — no TimeoutHitlGate wrapper: the queue's own
+  // (mcp-lifecycle buildGate) — no timeout wrapper: the queue's own
   // remove-on-timeout is the 30s fail-closed posture (OQ-B, decided).
 
   it('pins the OQ-B posture: the default timeout is 30s, fail-closed', async () => {

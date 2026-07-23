@@ -543,7 +543,8 @@ approval surfaces onto the queue — ONE review surface.
   resolve THROUGH the queue; neither owns a divergent modal surface:
   - MCP: `mcp-lifecycle` builds `QueueHitlGate` over the queue via the late-bound
     `setMcpApprovalQueueProvider` seam (wired in `registerGitIpc`, the
-    setGateHealthProbe pattern), replacing `TimeoutHitlGate(ElectronHitlGate)`. The
+    setGateHealthProbe pattern), replacing the retired dialog-based gates
+    (deleted 2026-07-22, Layer 0). The
     gate keeps the 30s fail-closed remove-on-timeout (OQ-B, decided) — the queue owns
     the timeout, no wrapper. Fail-closed floor: an unwired provider DENIES (pinned
     test) — broken wiring degrades to denial, never to a divergent dialog.

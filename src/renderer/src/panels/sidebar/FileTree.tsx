@@ -6,14 +6,7 @@ import {
   type DragFileData,
   type DragMoveData
 } from '../canvas/file-drop-utils'
-import {
-  ARTIFACT_COLORS,
-  borderRadius,
-  colors,
-  getArtifactColor,
-  transitions,
-  typography
-} from '../../design/tokens'
+import { ARTIFACT_COLORS, borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { SIGNAL_COLORS } from '../../design/themes'
 import { useSettingsStore } from '../../store/settings-store'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
@@ -637,9 +630,7 @@ const ACTION_ICON_COLORS: Record<string, string> = {
   emerge: ARTIFACT_COLORS.research, // purple — synthesis
   organize: ARTIFACT_COLORS.index, // sky — grouping
   tidy: ARTIFACT_COLORS.session, // green — cleanup
-  compile: ARTIFACT_COLORS.pattern, // amber — compilation
-  librarian: getArtifactColor('librarian'), // cyan — indexing
-  curator: ARTIFACT_COLORS.session // green — curation
+  compile: ARTIFACT_COLORS.pattern // amber — compilation
 }
 
 function getActionColor(actionName: string | undefined): string | undefined {

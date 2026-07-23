@@ -78,8 +78,8 @@ function tokenMatches(provided: string, expected: string): boolean {
 /**
  * Late-bound approval-queue provider (Phase 3 step 2, contracts §4 v1.3.1;
  * the setGateHealthProbe pattern). MCP write confirms resolve through the
- * queue — QueueHitlGate over the ApprovalQueue, replacing the
- * TimeoutHitlGate(ElectronHitlGate) dialog. ipc/git.ts owns the queue
+ * queue — QueueHitlGate over the ApprovalQueue, replacing the retired
+ * dialog-based gates. ipc/git.ts owns the queue
  * singleton and wires this at registerGitIpc(), before any workspace
  * onReady can reach createForVault; a direct import from here would drag
  * the whole approvals IPC graph into every lifecycle consumer and test.
@@ -104,7 +104,7 @@ function buildGate(): HitlGate {
     }
   }
   // QueueHitlGate owns its timeout (30s auto-deny + remove, OQ-B fail-closed
-  // posture) — no TimeoutHitlGate wrapper on this path.
+  // posture) — no timeout wrapper on this path.
   return new QueueHitlGate(provider())
 }
 
