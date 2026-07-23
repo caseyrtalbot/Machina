@@ -42,21 +42,30 @@ Ratified decisions:
 Layers ship in order; a layer is done when its verify gates pass and `npm run check`
 is green. Layer 4 items may start once their stated dependencies exist.
 
-### Layer 0 — Integrity (docs tell the truth; dead code deleted)
+### Layer 0 — Integrity (docs tell the truth; dead code deleted) — COMPLETE 2026-07-22
 
 1. Fix the false MCP transport claims: `docs/architecture/safety-subsystem.md` states
    the transport is never connected in production and `CLAUDE.md` repeats it, but
    `src/main/index.ts` starts Streamable HTTP on every vault open (ADR 0002).
    → verify: docs match code; grep finds no stale claim.
+   (Completed 2026-07-22, commit debe976; residual-claim grep re-run clean after
+   items 2–3 landed.)
 2. Per-launch bearer token on the MCP endpoint (currently Host-header check only on
    127.0.0.1:41627, including 7 ungated read tools).
    → verify: a transport test rejects a tokenless request.
+   (Completed 2026-07-22, commit be71003; tokenless and wrong-token transport tests
+   pass; `MCP_TOOL_COUNT` unchanged at 12.)
 3. Delete confirmed-dead code: `vendor/tmux` + `resources/tmux.conf` (retired
    librarian v1); section/cluster synthesis (`section-rewriter`, `section-rematch`,
    `section-projection`, `ClusterDraftSchema` — consumers with no producer);
    `ElectronHitlGate` (superseded by QueueHitlGate); librarian/curator renderer
    residue (`FilesDockAdapter` label filters, `activeVaultAgent`, their token colors).
    → verify: knip stays clean; greps for the deleted names return nothing.
+   (Completed 2026-07-22, commit 0be971a, with one evidence-forced exception: the
+   three section modules are LIVE via the File View canvas card, so only
+   `ClusterDraftSchema` of that group was dead and deleted — see HANDOFF. Deleted-name
+   greps clean; knip strictly improved over its pre-deletion baseline;
+   `TimeoutHitlGate` verified test-only and deleted alongside `ElectronHitlGate`.)
 
 ### Layer 1 — Foundations (one spine each: primitives, styling, writes, tools, truth)
 
