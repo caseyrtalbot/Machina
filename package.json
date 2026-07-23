@@ -7,7 +7,6 @@
   "homepage": "https://github.com/caseyrtalbot/Machina",
   "scripts": {
     "format": "prettier --write .",
-    "sync:agents": "echo 'AGENTS.md is Codex-curated from CLAUDE.md; no sync performed'",
     "lint": "eslint --cache .",
     "check": "npm run lint && npm run typecheck && npm test",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",

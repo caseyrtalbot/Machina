@@ -219,6 +219,6 @@ cards, dock↔canvas migration, and the supervisor lens (old steps 8–9) remain
   tray, or statusbar) before it is built, or it is not built. Generalizes ADR 0003's
   regression clause; the April 2026 build-and-delete arc is the precedent.
 - **Constitution gates are permanent once landed** (ADR 0005 enforcement list).
-- Doc-reconciliation on every architecture change: this file, `CLAUDE.md`/`AGENTS.md`,
+- Doc-reconciliation on every architecture change: this file, `CLAUDE.md`,
   and `docs/architecture/overview.md` stay consistent with the tree in the same
   commit.

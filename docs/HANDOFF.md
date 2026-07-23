@@ -2,7 +2,7 @@
 
 Single-file handoff: **overwritten** at every clean checkpoint, never appended — git
 history is the archive. A fresh agent starts here after reading `docs/PLAN.md` (the
-canonical plan; do not restructure it) and `AGENTS.md` (conventions + working protocol).
+canonical plan; do not restructure it) and `CLAUDE.md` (conventions + working protocol).
 
 **Position:** Layer 1 (Foundations) item 2 — design constitution (ADR 0005) — IN
 PROGRESS. **Slices 1–3 of 7 COMPLETE** (slice 1: `87da027` 2026-07-22; slice 2:
@@ -48,7 +48,7 @@ multi-line declarations).
 5–6. **canvas+graph/, editor+sidebar+ghosts+health/** — remaining areas, then flip the
    Tailwind engine off (vite plugin, `@import`, two deps) as the final act of slice 6.
 7. **Enforcement machinery** — the four tests/routes above; PLAN.md item 2 marked
-   complete; invariants added to CLAUDE.md/AGENTS.md (identical wording).
+   complete; invariants added to CLAUDE.md.
 
 ## What shipped last (slice 3)
 
@@ -107,15 +107,16 @@ PathGuard+audit gaps; validator consolidated into shared `validateCanvasMutation
 README (MCP bearer-token command), ADR 0001 (MAX_TOKENS 64_000), ADR 0002 (tool count
 12), block-protocol (Machina naming), shortcuts.md (Ctrl+` row),
 interface-contracts.md (§1 LANDED, historical banner removed, stale pins). Judgment-tier
-findings (.forge/, .codex/hooks, resources/icon.png, AGENTS.md "subset" preamble,
+findings (.forge/, .codex/hooks, resources/icon.png,
 PLAN.md:178 stale parenthetical, IPC-pattern duplication ×4 sites) were reported to
 Casey, then all approved and executed in the same checkpoint: `.forge/`, `.codex/`,
 `.conductor/`, `.vscode/`, and `resources/icon.png` removed (with the matching
 `.gitignore` and `electron-builder.yml` cleanup; packaging smoke-tested after the icon
-removal). Remaining open findings: AGENTS.md "curated subset" preamble is actually a
-superset; PLAN.md:178 stale parenthetical (gated doc, needs ratified amendment);
-IPC-pattern restated at 4 sites; README restates MCP/agent facts (Layer 4 README
-rewrite already planned).
+removal). AGENTS.md itself was removed 2026-07-23 on Casey's instruction (CLAUDE.md is
+now the sole operator doc; the sync:agents script and the SessionStart staleness hook
+went with it). Remaining open findings: PLAN.md:178 stale parenthetical (gated doc,
+needs ratified amendment); IPC-pattern restated at 4 sites; README restates MCP/agent
+facts (Layer 4 README rewrite already planned).
 
 ## Landmines
 
@@ -144,6 +145,6 @@ rewrite already planned).
   `npm run test:e2e` does. Slice 3 ran neither, fixture is clean.)
 - eslint uses `--cache`; run `npx eslint --no-cache` when a stale result looks
   suspicious. npm installs need `--cache /tmp/npm-cache-te`.
-- `CLAUDE.md` is gitignored; `AGENTS.md` is its tracked twin — keep shared wording
-  identical. Item-2 completion invariants get added to BOTH in slice 7, not before.
+- `CLAUDE.md` is gitignored and is the sole operator doc (AGENTS.md removed
+  2026-07-23). Item-2 completion invariants get added to it in slice 7, not before.
 - Skip-worktree gotcha: `git ls-files -v | grep ^S` before assuming an edit landed.

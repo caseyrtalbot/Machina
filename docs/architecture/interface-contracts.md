@@ -7,7 +7,7 @@
 > 2026-07-21; such citations, including in the §8 changelog, refer to git history.
 
 House conventions apply throughout: branded ids (`@shared/types`), `Result`-style
-structured errors over throws, the 4-step IPC pattern (`AGENTS.md`), files under 800
+structured errors over throws, the 4-step IPC pattern (`docs/architecture/overview.md`), files under 800
 lines.
 
 ## 1. Workspace service (main process)
