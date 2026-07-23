@@ -16,21 +16,18 @@ output/
 .worktrees/
 .claude/
 .codex/
-.forge/
 .superpowers/
 .collaborator/
 CLAUDE.md
 
 # Ad-hoc screenshots
 *.png
-!resources/icon.png
 !build/icon.png
 !docs/assets/*.png
 
 # Working documents (specs, plans, research)
 docs/working/
 docs/superpowers/
-docs/forge/
 
 # Ephemeral project state
 .machina-project-canvas.json
