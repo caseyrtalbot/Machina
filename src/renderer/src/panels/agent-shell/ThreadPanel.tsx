@@ -11,6 +11,7 @@ import { HarnessIdentityChip } from './HarnessIdentityChip'
 import { AgentKillSwitch } from './agent-breaker-kill-switch'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { EmptyState } from '../../components/emptystate/EmptyState'
+import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { TerminalDockAdapter } from './dock-adapters/TerminalDockAdapter'
 
 /** The two projections of one CLI agent session (contracts §3, Phase 2 step 4). */
@@ -105,67 +106,34 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
         background: colors.bg.base
       }}
     >
-      <header
-        style={{
-          height: 44,
-          padding: '0 20px',
-          flexShrink: 0,
-          boxSizing: 'border-box',
-          borderBottom: `1px solid ${colors.border.subtle}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            minWidth: 0,
-            flex: 1
-          }}
-        >
-          {streaming !== null && <LiveDot />}
-          <span
-            style={{
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              color: colors.text.muted,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {t.title}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {t.agent !== 'machina-native' && (
-            <ProjectionToggle
-              mode={projection.mode}
-              onChange={(mode) => setProjection({ id: activeId, mode })}
-            />
-          )}
-          {t.agent !== 'machina-native' && (
-            <HarnessIdentityChip threadId={t.id} agentId={t.agentId} />
-          )}
-          {/* Kill switch + breaker-tripped chip (Phase 2 step 6): the hard
+      <PanelHeader
+        leading={streaming !== null ? <LiveDot /> : undefined}
+        title={t.title}
+        trailing={
+          <>
+            {t.agent !== 'machina-native' && (
+              <ProjectionToggle
+                mode={projection.mode}
+                onChange={(mode) => setProjection({ id: activeId, mode })}
+              />
+            )}
+            {t.agent !== 'machina-native' && (
+              <HarnessIdentityChip threadId={t.id} agentId={t.agentId} />
+            )}
+            {/* Kill switch + breaker-tripped chip (Phase 2 step 6): the hard
               kill (cli-thread:close), distinct from the input bar's Stop. */}
-          {t.agent !== 'machina-native' && <AgentKillSwitch threadId={t.id} />}
-          {t.agent !== 'machina-native' && <WatcherHealthChip />}
-          {t.agent === 'machina-native' && (
-            <AutoAcceptToggle
-              on={t.autoAcceptSession === true}
-              onClick={() => void toggleAutoAccept(t.id)}
-            />
-          )}
-          <AgentBadge agent={t.agent} />
-        </div>
-      </header>
+            {t.agent !== 'machina-native' && <AgentKillSwitch threadId={t.id} />}
+            {t.agent !== 'machina-native' && <WatcherHealthChip />}
+            {t.agent === 'machina-native' && (
+              <AutoAcceptToggle
+                on={t.autoAcceptSession === true}
+                onClick={() => void toggleAutoAccept(t.id)}
+              />
+            )}
+            <AgentBadge agent={t.agent} />
+          </>
+        }
+      />
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         {projection.mode === 'raw' && t.agent !== 'machina-native' ? (
           <RawProjectionView threadId={t.id} />

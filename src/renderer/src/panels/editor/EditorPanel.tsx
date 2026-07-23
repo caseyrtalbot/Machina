@@ -27,6 +27,7 @@ import { MachinaTableKit } from './extensions/table-kit'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { ContextMenu, type ContextMenuItem } from '../../components/ContextMenu'
 import { EmptyState } from '../../components/emptystate/EmptyState'
+import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { borderRadius, colors, typography } from '../../design/tokens'
 import { useDocument } from '../../hooks/useDocument'
 import { resolveWikilinkTarget, parseWikilinkTarget } from '@shared/engine/wikilink-resolver'
@@ -478,64 +479,70 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           </span>
         </div>
       )}
-      <div className="editor-mode-bar">
-        {/* Back/forward chrome: the history stack already exists in
-            editor-store; this is the visible way out of a wikilink rabbit-hole. */}
-        <div className="flex items-center" style={{ marginRight: 'auto' }}>
-          <button
-            type="button"
-            className="editor-mode-toggle__btn"
-            onClick={goBack}
-            disabled={!canGoBack}
-            aria-label="Back"
-            title="Back (⌘⌥←)"
-            style={!canGoBack ? { opacity: 0.35, cursor: 'default' } : undefined}
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            className="editor-mode-toggle__btn"
-            onClick={goForward}
-            disabled={!canGoForward}
-            aria-label="Forward"
-            title="Forward (⌘⌥→)"
-            style={!canGoForward ? { opacity: 0.35, cursor: 'default' } : undefined}
-          >
-            →
-          </button>
-        </div>
-        {/* Mode switch, not a tab bar: aria-pressed buttons (role="tab" lives
+      <PanelHeader
+        leading={
+          /* Back/forward chrome: the history stack already exists in
+             editor-store; this is the visible way out of a wikilink rabbit-hole. */
+          <div className="flex items-center">
+            <button
+              type="button"
+              className="editor-mode-toggle__btn"
+              onClick={goBack}
+              disabled={!canGoBack}
+              aria-label="Back"
+              title="Back (⌘⌥←)"
+              style={!canGoBack ? { opacity: 0.35, cursor: 'default' } : undefined}
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="editor-mode-toggle__btn"
+              onClick={goForward}
+              disabled={!canGoForward}
+              aria-label="Forward"
+              title="Forward (⌘⌥→)"
+              style={!canGoForward ? { opacity: 0.35, cursor: 'default' } : undefined}
+            >
+              →
+            </button>
+          </div>
+        }
+        trailing={
+          <>
+            {/* Mode switch, not a tab bar: aria-pressed buttons (role="tab" lives
             only in the TabBar primitive). */}
-        <div role="group" aria-label="Editor mode" className="flex items-center">
-          <button
-            type="button"
-            aria-pressed={mode === 'rich'}
-            className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
-            onClick={() => handleModeChange('rich')}
-          >
-            Rich
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'source'}
-            className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
-            onClick={() => handleModeChange('source')}
-          >
-            Source
-          </button>
-        </div>
-        <button
-          type="button"
-          className={`editor-mode-toggle__btn${outlineVisible ? ' editor-mode-toggle__btn--active' : ''}`}
-          aria-pressed={outlineVisible}
-          onClick={toggleOutline}
-          title="Toggle outline (⌘⇧O)"
-          style={{ marginLeft: 8 }}
-        >
-          Outline
-        </button>
-      </div>
+            <div role="group" aria-label="Editor mode" className="flex items-center">
+              <button
+                type="button"
+                aria-pressed={mode === 'rich'}
+                className={`editor-mode-toggle__btn${mode === 'rich' ? ' editor-mode-toggle__btn--active' : ''}`}
+                onClick={() => handleModeChange('rich')}
+              >
+                Rich
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === 'source'}
+                className={`editor-mode-toggle__btn${mode === 'source' ? ' editor-mode-toggle__btn--active' : ''}`}
+                onClick={() => handleModeChange('source')}
+              >
+                Source
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`editor-mode-toggle__btn${outlineVisible ? ' editor-mode-toggle__btn--active' : ''}`}
+              aria-pressed={outlineVisible}
+              onClick={toggleOutline}
+              title="Toggle outline (⌘⇧O)"
+              style={{ marginLeft: 8 }}
+            >
+              Outline
+            </button>
+          </>
+        }
+      />
       <div className="flex-1 flex min-h-0 min-w-0 relative">
         {mode === 'rich' && editor && findSignal > 0 && (
           <FindBar editor={editor} focusSignal={findSignal} onClose={closeFindBar} />

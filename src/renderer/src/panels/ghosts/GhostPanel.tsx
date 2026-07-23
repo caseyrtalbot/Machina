@@ -8,6 +8,7 @@ import type { GhostEntry } from '../../engine/ghost-index'
 import { colors, transitions, typography, borderRadius, floatingPanel } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { CheckCircleIcon, EmptyState } from '../../components/emptystate/EmptyState'
+import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { Spinner } from '../../components/emptystate/Spinner'
 import { groupByFrequency } from './ghost-sections'
 
@@ -472,28 +473,12 @@ export function GhostPanel() {
           padding: '2rem 2rem 3rem'
         }}
       >
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{ fontSize: 13, fontWeight: 300, color: colors.text.primary, marginBottom: 2 }}
-          >
-            Unresolved References
-          </div>
-          <div
-            style={{
-              fontSize: 48,
-              fontWeight: 200,
-              color: colors.text.primary,
-              letterSpacing: '-0.03em',
-              lineHeight: 1.1
-            }}
-          >
-            {totalCount}
-          </div>
-          <div style={{ fontSize: 12, color: colors.text.primary }}>
-            ghost{totalCount !== 1 ? 's' : ''} across your vault
-          </div>
-        </div>
+        <PanelHeader
+          variant="masthead"
+          title="Unresolved References"
+          display={totalCount}
+          subtitle={`ghost${totalCount !== 1 ? 's' : ''} across your vault`}
+        />
 
         {/* Sections */}
         {sections.map((section) => (

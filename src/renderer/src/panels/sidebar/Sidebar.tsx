@@ -12,6 +12,7 @@ import {
   typography
 } from '../../design/tokens'
 import { ContextMenu } from '../../components/ContextMenu'
+import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { fileMenuEntries } from './file-menu-entries'
 import { FileTree } from './FileTree'
 import { SearchBar } from './SearchBar'
@@ -134,9 +135,9 @@ function ActionBar({
   }
 
   return (
-    <div className="sidebar-action-bar">
-      <div className="sidebar-section-bar">
-        <div className="sidebar-section-bar-left">
+    <PanelHeader
+      leading={
+        <>
           {vaultName && onSelectVault && onOpenVaultPicker ? (
             <VaultSelector
               currentName={vaultName}
@@ -199,7 +200,9 @@ function ActionBar({
               </span>
             </span>
           </button>
-        </div>
+        </>
+      }
+      trailing={
         <div className="flex items-center gap-0.5">
           <button
             onClick={onNewFile}
@@ -252,8 +255,8 @@ function ActionBar({
             </svg>
           </button>
         </div>
-      </div>
-    </div>
+      }
+    />
   )
 }
 

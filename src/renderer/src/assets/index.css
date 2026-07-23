@@ -352,31 +352,82 @@ h6 {
   color: var(--color-text-primary);
 }
 
-/* Panel headers — 40px, hairline-bottom, label-left, action-right.
- * Used by editor / ghosts / inbox / diff-review surfaces; lives here so
- * each panel doesn't redefine the same chrome from scratch. */
+/* Panel headers (components/panelheader/PanelHeader.tsx) — the one
+ * header/toolbar pattern. bar: 44px hairline-bottom, label-left,
+ * action-right. masthead: content-flow panel heading. */
 .te-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 40px;
+}
+.te-panel-header[data-variant='bar'] {
+  height: 44px;
   padding: 0 16px;
   flex-shrink: 0;
+  box-sizing: border-box;
   background: var(--color-bg-base);
   border-bottom: 1px solid var(--line-subtle);
+}
+.te-panel-header[data-variant='bar'][data-flush] {
+  padding: 0;
+  align-items: stretch;
+}
+.te-panel-header[data-variant='masthead'] {
+  margin-bottom: 24px;
 }
 .te-panel-header__left {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.te-panel-header[data-variant='masthead'] .te-panel-header__left {
+  display: block;
+  overflow: visible;
 }
 .te-panel-header__right {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+.te-panel-header__title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.te-panel-header__m-title {
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+.te-panel-header__display {
+  font-size: 48px;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+}
+.te-panel-header__subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Floating panel chrome chip — the one recipe for detached toolbar/status
+ * chrome floating over a surface (canvas toolrail, graph chips/buttons). */
+.te-float-chip {
+  background: var(--color-bg-rail);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-tool);
 }
 
 /* Buttons — minimal, hairline, square. Primary is filled with accent and
@@ -937,32 +988,6 @@ body {
 .sidebar-popover-item[data-current='true'] {
   color: var(--color-text-primary);
   background: rgba(255, 255, 255, 0.07);
-}
-
-.sidebar-action-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 12px 10px;
-}
-
-.sidebar-section-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-
-.sidebar-section-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1 1 auto;
-  /* Backstop: at minimum panel width the vault name truncates; anything that
-     still doesn't fit clips instead of painting over the icon cluster. */
-  overflow: hidden;
 }
 
 .sidebar-section-bar-divider {
@@ -1784,17 +1809,6 @@ body {
   overflow: hidden;
 }
 
-.editor-mode-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0;
-  flex-shrink: 0;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--color-bg-base);
-}
-
 .editor-mode-toggle__btn {
   padding: 4px 10px;
   font-family: var(--font-mono);
@@ -2268,6 +2282,7 @@ body {
 
 /* ─── Canvas HUD ─── */
 
+/* Layout only — chrome (bg/border/radius) comes from .te-float-chip. */
 .canvas-toolrail {
   display: flex;
   flex-direction: column;
@@ -2277,9 +2292,6 @@ body {
   min-width: 35px;
   padding: 4px 2px 8px 3px;
   box-sizing: border-box;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-tool);
-  background: var(--color-bg-rail);
   overflow: visible;
   font-family: var(--font-mono);
 }

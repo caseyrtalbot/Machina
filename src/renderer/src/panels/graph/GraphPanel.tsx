@@ -12,7 +12,7 @@ import { EnrichmentPill } from './EnrichmentPill'
 import { selectEnrichmentTargets } from './enrichment-targets'
 import { getGraphLod } from './graph-lod'
 import { resolveFocusIdx } from './graph-focus'
-import { colors, floatingPanel } from '@renderer/design/tokens'
+import { colors } from '@renderer/design/tokens'
 import { useReducedMotion } from '@renderer/hooks/useReducedMotion'
 import { openArtifactInEditor } from '@renderer/system-artifacts/system-artifact-runtime'
 import type { SimNode, PhysicsCommand, PhysicsResult, ForceParams } from './graph-types'
@@ -138,13 +138,8 @@ function GraphStatusRail({
   return (
     <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none">
       <div
-        className="px-3 py-1.5 text-xs font-mono"
-        style={{
-          backgroundColor: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          border: '1px solid var(--line-subtle)',
-          color: colors.text.secondary
-        }}
+        className="te-float-chip px-3 py-1.5 text-xs font-mono"
+        style={{ color: colors.text.secondary }}
       >
         {nodeCount} nodes
         <span style={{ opacity: 0.3, margin: '0 8px' }}>|</span>
@@ -152,13 +147,8 @@ function GraphStatusRail({
       </div>
       {!tutorialDismissed && (
         <div
-          className="flex items-center gap-2 px-3 py-1.5 text-xs pointer-events-auto"
-          style={{
-            backgroundColor: floatingPanel.glass.bg,
-            backdropFilter: floatingPanel.glass.blur,
-            border: '1px solid var(--line-faint)',
-            color: colors.text.muted
-          }}
+          className="te-float-chip flex items-center gap-2 px-3 py-1.5 text-xs pointer-events-auto"
+          style={{ color: colors.text.muted }}
         >
           Hover to isolate neighborhoods. Drag to compare clusters.
           <button
@@ -552,15 +542,12 @@ export function GraphPanel() {
       <button
         type="button"
         onClick={() => setShowSettings((prev) => !prev)}
-        className="absolute top-3 right-3 z-20 flex items-center justify-center transition-all"
+        className="te-float-chip absolute top-3 right-3 z-20 flex items-center justify-center transition-all"
         style={{
           width: 32,
           height: 32,
-          backgroundColor: showSettings ? 'var(--color-accent-default)' : floatingPanel.glass.bg,
-          border: '1px solid var(--line-subtle)',
-          color: showSettings ? 'var(--color-accent-fg)' : 'var(--color-text-secondary)',
-          backdropFilter: floatingPanel.glass.blur,
-          boxShadow: floatingPanel.shadowCompact
+          backgroundColor: showSettings ? 'var(--color-accent-default)' : undefined,
+          color: showSettings ? 'var(--color-accent-fg)' : 'var(--color-text-secondary)'
         }}
         title="Graph settings"
         aria-label="Graph settings"
@@ -592,13 +579,8 @@ export function GraphPanel() {
           <button
             type="button"
             onClick={handleFitAll}
-            className="text-xs px-3 py-1.5 transition-all cursor-pointer"
-            style={{
-              backgroundColor: floatingPanel.glass.bg,
-              backdropFilter: floatingPanel.glass.blur,
-              border: '1px solid var(--line-subtle)',
-              color: 'var(--color-text-secondary)'
-            }}
+            className="te-float-chip text-xs px-3 py-1.5 transition-all cursor-pointer"
+            style={{ color: 'var(--color-text-secondary)' }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = 'var(--color-accent-default)'
             }}
@@ -610,11 +592,8 @@ export function GraphPanel() {
             Fit All
           </button>
           <span
-            className="text-xs tabular-nums font-mono px-2 py-1.5"
+            className="te-float-chip text-xs tabular-nums font-mono px-2 py-1.5"
             style={{
-              backgroundColor: floatingPanel.glass.bg,
-              backdropFilter: floatingPanel.glass.blur,
-              border: '1px solid var(--line-subtle)',
               color: 'var(--color-text-muted)',
               fontSize: 10,
               minWidth: 44,

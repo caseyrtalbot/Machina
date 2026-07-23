@@ -1,3 +1,4 @@
+import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { useMemo, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -83,22 +84,13 @@ export function ThreadSidebar({
         height: '100%'
       }}
     >
-      <header
-        style={{
-          height: 44,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'stretch',
-          borderBottom: `1px solid ${colors.border.subtle}`,
-          boxSizing: 'border-box'
-        }}
-      >
+      <PanelHeader flush>
         <VaultSwitcher
           name={vaultPath ? vaultName : 'Open vault…'}
           fullPath={vaultPath ?? null}
           onClick={onChangeVault}
         />
-      </header>
+      </PanelHeader>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {sorted.map((t) => (

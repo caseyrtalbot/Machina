@@ -69,10 +69,20 @@ is green. Layer 4 items may start once their stated dependencies exist.
 
 ### Layer 1 — Foundations (one spine each: primitives, styling, writes, tools, truth)
 
-1. Phase 2 primitives, remaining slices (in flight; same method — migrate all
-   consumers in the same slice):
+1. Phase 2 primitives, remaining slices (same method — migrate all consumers in
+   the same slice). **Item complete 2026-07-22**: all three remaining slices
+   shipped with their gates green.
    - `PanelHeader` — one header/toolbar pattern for Ghosts, Graph, Editor, and canvas
      toolbar chrome.
+     (Completed 2026-07-22: `components/panelheader/PanelHeader.tsx` un-orphans the
+     `te-panel-header` CSS as `bar` (thread panel, thread sidebar, files sidebar
+     action bar, editor mode bar) and `masthead` (ghosts, health) variants; the
+     graph's floating chips/buttons and the canvas toolrail take their chrome from
+     the new `.te-float-chip` recipe instead of inline glass styles. Invariant
+     gates, all grep-clean: `te-panel-header` appears in TSX only inside the
+     primitive; `editor-mode-bar`, `sidebar-action-bar`, and
+     `sidebar-section-bar-left` return nothing; `floatingPanel.glass` is no longer
+     referenced in GraphPanel.tsx.)
    - `EmptyState` — collapse `CanvasEmptyStates.tsx`, `EmptyDockState`, and per-panel
      bespokes; unify the three loading patterns while there.
      (Completed 2026-07-22: `components/emptystate/` ships EmptyState (card/plain,

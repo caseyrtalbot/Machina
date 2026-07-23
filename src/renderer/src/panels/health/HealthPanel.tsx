@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
 import { CheckCircleIcon, EmptyState } from '../../components/emptystate/EmptyState'
+import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { useVaultHealthStore } from '../../store/vault-health-store'
 import { useVaultStore } from '../../store/vault-store'
 import { openNoteInEditor } from '../../store/dock-store'
@@ -279,38 +280,22 @@ export function HealthPanel() {
           padding: '2rem 2rem 3rem'
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 24
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 300,
-                color: colors.text.primary,
-                marginBottom: 2
-              }}
-            >
-              Vault Health
-            </div>
-            {lastChecked && (
-              <div style={{ fontSize: 11, color: colors.text.muted }}>
+        <PanelHeader
+          variant="masthead"
+          title="Vault Health"
+          subtitle={
+            lastChecked ? (
+              <>
                 {status === 'degraded'
                   ? `${issues.length} issue${issues.length !== 1 ? 's' : ''}`
                   : `${passingRuns}/${totalRuns} checks passing`}
                 {' \u00B7 last checked '}
                 {formatTimeAgo(lastChecked)}
-              </div>
-            )}
-          </div>
-          <RefreshButton />
-        </div>
+              </>
+            ) : undefined
+          }
+          trailing={<RefreshButton />}
+        />
 
         {/* Body */}
         {status === 'green' && <GreenState totalRuns={totalRuns} />}

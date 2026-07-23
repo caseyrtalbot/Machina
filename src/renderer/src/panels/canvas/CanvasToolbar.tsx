@@ -316,7 +316,7 @@ export function CanvasToolbar({
   ]
 
   return (
-    <div className="canvas-toolrail absolute top-3 left-3 z-30">
+    <div className="canvas-toolrail te-float-chip absolute top-3 left-3 z-30">
       {/* INPUT: get stuff onto the canvas */}
       <div className="canvas-toolbtn-wrap">
         <button
