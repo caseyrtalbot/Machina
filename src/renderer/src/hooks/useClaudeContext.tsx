@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { logError } from '../utils/error-logger'
 import { useCanvasApi } from '../panels/canvas/canvas-store-context'
 import { useVaultStore } from '../store/vault-store'
-import { colors, typography } from '../design/tokens'
+import { colors } from '../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import { TE_DIR } from '@shared/constants'
 
@@ -94,7 +94,7 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
 
   const contextBadge = isClaudeCard ? (
     <span
-      className="flex items-center gap-1 shrink-0 ml-2"
+      className="te-claude-context"
       title={
         contextError
           ? 'Context injection failed. Restart this Claude card to retry.'
@@ -102,22 +102,10 @@ export function useClaudeContext(node: CanvasNode, isClaudeCard: boolean): Claud
       }
     >
       <span
-        className="inline-block rounded-full shrink-0"
-        style={{
-          width: 6,
-          height: 6,
-          backgroundColor: contextError ? 'var(--signal-warn)' : colors.text.secondary
-        }}
+        className="te-claude-context__dot"
+        style={{ backgroundColor: contextError ? 'var(--signal-warn)' : colors.text.secondary }}
       />
-      <span
-        style={{
-          fontSize: 10,
-          color: colors.text.muted,
-          fontFamily: typography.fontFamily.mono
-        }}
-      >
-        {contextCardCount}
-      </span>
+      <span className="te-claude-context__count">{contextCardCount}</span>
     </span>
   ) : null
 

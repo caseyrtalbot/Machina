@@ -59,9 +59,9 @@ import {
 // codegen) is isolated via the 'pixi.js/unsafe-eval' shim imported by
 // graph-renderer.ts. js-yaml's and pdfjs's eval paths are feature-detected or
 // dead (gray-matter runs with JS types disabled).
-// Fonts: defaults are bundled woff2 (renderer assets/fonts), so style-src and
-// font-src stay local-only. User-chosen Google Fonts load via fetch() +
-// FontFace (design/google-fonts.ts), confined to connect-src.
+// Fonts: Manrope + Space Mono ship as bundled woff2 (renderer assets/fonts)
+// and are the only faces loaded (ADR 0005), so style-src, font-src, and
+// connect-src all stay local-only — no remote font network access.
 const PROD_CSP = [
   "default-src 'self'",
   "script-src 'self'",
@@ -69,7 +69,7 @@ const PROD_CSP = [
   "font-src 'self'",
   "img-src 'self' data: blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com"
+  "connect-src 'self'"
 ].join('; ')
 
 const APP_ID = 'com.machina.app'

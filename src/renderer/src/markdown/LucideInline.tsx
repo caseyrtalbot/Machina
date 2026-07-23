@@ -19,17 +19,5 @@ const ICONS = Lucide as unknown as Record<string, LucideIconComponent>
 export function LucideInline({ name }: { readonly name: string }) {
   const Icon = ICONS[name]
   if (!Icon) return null
-  return (
-    <Icon
-      aria-hidden
-      size="1em"
-      strokeWidth={1.6}
-      style={{
-        display: 'inline-block',
-        verticalAlign: '-0.16em',
-        marginInlineEnd: '0.18em',
-        flexShrink: 0
-      }}
-    />
-  )
+  return <Icon aria-hidden size="1em" strokeWidth={1.6} className="te-lucide-inline" />
 }

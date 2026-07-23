@@ -2,9 +2,6 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
 interface SettingsState {
-  readonly displayFont: string
-  readonly bodyFont: string
-  readonly monoFont: string
   readonly defaultEditorMode: 'rich' | 'source'
   readonly autosaveInterval: number
   readonly spellCheck: boolean
@@ -23,9 +20,6 @@ interface SettingsState {
 }
 
 interface SettingsActions {
-  setDisplayFont: (value: string) => void
-  setBodyFont: (value: string) => void
-  setMonoFont: (value: string) => void
   setDefaultEditorMode: (value: 'rich' | 'source') => void
   setAutosaveInterval: (value: number) => void
   setSpellCheck: (value: boolean) => void
@@ -43,9 +37,6 @@ type SettingsStore = SettingsState & SettingsActions
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      displayFont: 'Manrope',
-      bodyFont: 'Manrope',
-      monoFont: 'Space Mono',
       defaultEditorMode: 'rich',
       autosaveInterval: 1500,
       spellCheck: false,
@@ -57,9 +48,6 @@ export const useSettingsStore = create<SettingsStore>()(
       canvasTextSaveFolder: 'Inbox',
       semanticSearch: false,
 
-      setDisplayFont: (value) => set({ displayFont: value }),
-      setBodyFont: (value) => set({ bodyFont: value }),
-      setMonoFont: (value) => set({ monoFont: value }),
       setDefaultEditorMode: (value) => set({ defaultEditorMode: value }),
       setAutosaveInterval: (value) => set({ autosaveInterval: value }),
       setSpellCheck: (value) => set({ spellCheck: value }),
@@ -73,7 +61,7 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'machina-settings',
-      version: 14,
+      version: 15,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
@@ -102,6 +90,14 @@ export const useSettingsStore = create<SettingsStore>()(
           delete state.env
           delete state.accentId
           delete state.customAccentHex
+        }
+
+        if (version < 15) {
+          // v14 → v15: font pickers deleted (ADR 0005) — display/body/mono are
+          // now ratified constants in :root, not preferences. Drop the keys.
+          delete state.displayFont
+          delete state.bodyFont
+          delete state.monoFont
         }
 
         return state as unknown as SettingsState & SettingsActions

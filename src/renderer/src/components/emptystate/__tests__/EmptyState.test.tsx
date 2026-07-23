@@ -33,24 +33,26 @@ describe('EmptyState', () => {
     expect(onSecondary).toHaveBeenCalledOnce()
   })
 
-  it('card overlay renders a pointer-events-none wrapper with the testId', () => {
+  it('card overlay marks the wrapper as an overlay card', () => {
     render(<EmptyState variant="card" overlay testId="canvas-empty-vault" title="T" />)
     const wrapper = screen.getByTestId('canvas-empty-vault')
-    expect(wrapper.className).toContain('pointer-events-none')
-    expect(wrapper.className).toContain('absolute')
+    expect(wrapper.className).toContain('te-empty')
+    expect(wrapper.getAttribute('data-variant')).toBe('card')
+    expect(wrapper.getAttribute('data-overlay')).toBe('true')
   })
 
   it('plain variant fills and centers by default', () => {
     render(<EmptyState testId="dock-empty-state" eyebrow="no surface open" />)
     const el = screen.getByTestId('dock-empty-state')
-    expect(el.style.height).toBe('100%')
-    expect(el.style.alignItems).toBe('center')
+    expect(el.getAttribute('data-variant')).toBe('plain')
+    expect(el.getAttribute('data-align')).toBe('center')
+    expect(el.getAttribute('data-height')).toBe('fill')
   })
 
   it('align=start uses the top-left layout', () => {
     render(<EmptyState testId="thread-empty" align="start" title="Ask." />)
     const el = screen.getByTestId('thread-empty')
-    expect(el.style.alignItems).toBe('flex-start')
+    expect(el.getAttribute('data-align')).toBe('start')
   })
 })
 

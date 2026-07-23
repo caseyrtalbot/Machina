@@ -2,12 +2,13 @@
  * Bundled default fonts (plan 2.14: local-first typography).
  *
  * Manrope (variable wght 200-800) and Space Mono (400/700) ship as local
- * woff2 so the default UI never depends on Google Fonts at runtime.
+ * woff2 so the UI never depends on Google Fonts at runtime. These are the
+ * only faces the app loads (ADR 0005: appearance is ratified constants).
  * Latin + latin-ext subsets only; binaries from fonts.gstatic.com,
  * SIL Open Font License (see OFL-Manrope.txt / OFL-SpaceMono.txt).
  *
- * Non-default fonts chosen in Settings still load from Google Fonts via
- * loadRemoteFont() in design/google-fonts.ts.
+ * Imported at the top of assets/index.css; consumed via --font-display /
+ * --font-body / --font-mono declared in that file's :root block.
  */
 
 /* Manrope — latin */

@@ -1,5 +1,3 @@
-import { colors } from '../../design/tokens'
-
 /** The one plain-text loading block (cards, suspense fallbacks). */
 export function LoadingState({
   label = 'Loading...',
@@ -12,7 +10,7 @@ export function LoadingState({
 }) {
   return (
     <div data-testid={testId} style={{ padding }}>
-      <span style={{ fontSize: 13, color: colors.text.muted }}>{label}</span>
+      <span className="te-loading-state__label">{label}</span>
     </div>
   )
 }

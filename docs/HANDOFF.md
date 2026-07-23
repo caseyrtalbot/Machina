@@ -5,10 +5,11 @@ history is the archive. A fresh agent starts here after reading `docs/PLAN.md` (
 canonical plan; do not restructure it) and `AGENTS.md` (conventions + working protocol).
 
 **Position:** Layer 1 (Foundations) item 2 — design constitution (ADR 0005) — IN
-PROGRESS. **Slices 1 and 2 of 7 COMPLETE** (slice 1: `87da027` 2026-07-22; slice 2:
-2026-07-23, this checkpoint). Next: slices 3–6 (Tailwind + inline-style + hex
-convergence, sub-sliced by area). Item 2 is a large, multi-slice item; execute one
-slice per clean checkpoint.
+PROGRESS. **Slices 1–3 of 7 COMPLETE** (slice 1: `87da027` 2026-07-22; slice 2:
+`c7b2b89` 2026-07-23; slice 3: 2026-07-23, this checkpoint). Next: **slice 4 —
+`panels/agent-shell/`** (257 inline styles + `harness-styles.ts`, the Tailwind
+class-string module), then slices 5–6 for the remaining areas. One slice per clean
+checkpoint.
 
 ## Item 2 scope: the six greppable gates + enforcement machinery
 
@@ -19,121 +20,109 @@ item.** This item converges the *mechanism* (one styling path: tokens + `te-` cl
 Layer 4 later retunes the token *values* and it propagates because there is one
 mechanism. Do not pull Layer 4 work forward.
 
-Terrain map (recon 2026-07-22; updated for slices 1–2):
+Terrain map (recon 2026-07-22; updated for slices 1–3):
 
 | Gate | Status |
 |---|---|
-| Appearance axes in `settings-store` | **CLOSED in slice 1.** |
-| Zero Tailwind | OPEN. 428 className literals + 259 arbitrary-value tokens across 66 TSX files + `panels/agent-shell/harness-styles.ts` (Tailwind class-string module). Engine is Tailwind v4, config-less: `@tailwindcss/vite` in `electron.vite.config.ts` (lines 4, 53), single `@import 'tailwindcss'` in `assets/index.css:1`, deps `@tailwindcss/vite`+`tailwindcss` ^4.2.1. Flip the engine off LAST, only after all className literals are converted. |
-| Zero static inline `style={{}}` | OPEN. ~565 static at baseline (279 dynamic exempt); slice 2 removed a few dozen hover-ternary styles but the bulk remains, concentrated in ~12 files (OnboardingOverlay, ApprovalsTray, FrontmatterHeader, GraphDetailDrawer, BacklinksPanel, GhostPanel, ThreadSidebar, ThreadPanel, VaultSelector, EditNoteCard, CommandPalette). Many are design-token refs → cheap class extractions. |
-| Zero off-palette hex | OPEN. ~26 genuine production violations (mermaid-code-block fallbacks 6, index.css `var(--x,#hex)` fallbacks 5, cli-agents brandColor 4, TerminalApp 4, settings-store default-accent 2, apply-accent computed 2, graph-label-layer 1, CardShell `'#050607'` 1, main index.ts window bg 1). Plus 3 palette-source files that could fold into tokens (canvas-colors.ts, index.css :root, terminal-webview Catppuccin theme). Test-file hex is not a violation. |
-| Zero `useState` hover | **CLOSED in slice 2.** `grep -rn useState src/renderer/src --include='*.tsx' | grep -i hover` → 0. FontPicker (`onMouseEnter` font load) and GraphPanel (zustand `setHoveredNode`) remain by design (legit dynamic, not useState hover). |
-| Zero off-token `transition` | **CLOSED in slice 2.** All `index.css` transitions are `var(--t-*)`/`var(--transition-*)`. The recon's count of 12 was an undercount (its grep missed multi-line `transition:` declarations); the true set was ~32 declarations, all converted. New token `--t-reveal: 700ms cubic-bezier(0.22,1,0.36,1)` covers the new-thread shimmer. The reduced-motion `transition-duration: 0.01ms !important` override is an a11y kill switch, not a violation. `workbench-animations.css:13` off-token `animation` is outside this gate (noted for slice 7's scanner design). |
+| Appearance axes in `settings-store` | **CLOSED (slice 1 + slice 3).** Slice 1's sweep missed three font axes (`displayFont`/`bodyFont`/`monoFont` + FontPicker + GoogleFontLoader + runtime Google Fonts downloads); slice 3 deleted them (store persist v15 drops the keys). Fonts are frozen constants: bundled Manrope/Space Mono via `@import './fonts/fonts.css'` + static `--font-display/--font-body/--font-mono` in `:root` — value-identical to the old defaults. The system-stack/one-mono *retune* stays Layer 4. |
+| Zero Tailwind | OPEN. ~321 utility class-strings remain, all in `panels/`: canvas 148, sidebar 60, graph 59, editor 51, health 2, ghosts 1, plus `agent-shell/harness-styles.ts` (Tailwind class-string module, not counted above). `components/`, `App.tsx`, `hooks/`, `markdown/` are at zero. Engine still on: `@tailwindcss/vite` in `electron.vite.config.ts`, `@import 'tailwindcss'` at `index.css:1`, two deps. Flip the engine off LAST, after all class-strings are gone. |
+| Zero static inline `style={{}}` | OPEN. ~716 `style={{` remain repo-wide (incl. dynamic exemptions): agent-shell 257, canvas 189, editor 99, sidebar 79, graph 46, ghosts 23, health 12, components 10 (those 10 are all documented dynamic exemptions — prop/state-driven; see slice-3 commit message). |
+| Zero off-palette hex | OPEN. Unchanged from recon (~26 production violations; none were in slice-3 scope). |
+| Zero `useState` hover | **CLOSED in slice 2.** (FontPicker's `onMouseEnter` font-load, listed as a by-design survivor in the old note, is now deleted entirely.) |
+| Zero off-token `transition` | **CLOSED in slice 2.** All new slice-3 CSS draws from `--t-*`/`--transition-*` (spotchecked). |
 
-Enforcement machinery (all greenfield — none exists yet; lands in slice 7):
-- **Contrast unit test** → `tests/design/contrast.test.ts`, import raw hexes from
-  `design/themes.ts` (`STRUCTURAL_COLORS`, `SIGNAL_COLORS`, `ACCENT_HEX`, the fixed
-  `BACKGROUND`), local WCAG `contrastRatio()` (sRGB linearize → luminance; do NOT reuse
-  `apply-accent.ts`'s gamma-less Rec.709 math). Auto-rides `npm run check`.
-- **Dev-only gallery** → `src/renderer/src/design/Gallery.tsx`, mounted in `App.tsx` as
-  an `import.meta.env.DEV && new URLSearchParams(location.search).get('gallery')==='1'`
-  early-return before `renderContent()` (no router exists; do not add one). Enumerate
-  the `components/` primitives (TabBar, ContextMenu, PanelHeader, Overlay/Modal,
-  EmptyState/Spinner/LoadingState, Toast, Statusbar) AND bare `te-btn`/`te-pill`/`te-tab`
-  markup in every `data-variant`/`data-*`/state.
-- **Visual regression** → `e2e/visual.spec.ts` under existing `playwright.config.ts`
-  (workers:1). Launch via the `_electron.launch({ args: [MAIN_ENTRY] })` pattern from
-  `e2e/app.spec.ts`; navigate to `?gallery=1` and to the shell with the test-vault;
-  `expect(page).toHaveScreenshot()`. Baselines land in `e2e/visual.spec.ts-snapshots/`.
-  Runs only via `npm run test:e2e` (not in `check`).
-- **Greppable-gates test** (recommended 4th) → `tests/design/greppable-gates.test.ts`
-  that scans source and asserts all six gates as counts. Land it LAST; precedent:
-  `harness-lint.test.ts`. Its transition scanner must handle multi-line `transition:`
-  declarations (the recon grep missed them — see gate table).
+Enforcement machinery (all greenfield — lands in slice 7): unchanged plan — contrast
+unit test (`tests/design/contrast.test.ts`, local WCAG math, not `apply-accent.ts`'s),
+dev-only gallery (`design/Gallery.tsx` behind `?gallery=1` DEV check in `App.tsx`),
+Playwright visual regression (`e2e/visual.spec.ts`), and the strict
+`tests/design/greppable-gates.test.ts` landing last (its transition scanner must handle
+multi-line declarations).
 
 ## Slice plan (dependency-ordered)
 
-1. **Settings axes deletion — DONE** (commit `87da027`).
-2. **Hover + transitions — DONE** (this checkpoint).
-3–6. **Tailwind + inline-style + hex convergence** (NEXT) — the bulk. Sub-slice by area
-   (components/, agent-shell/ incl. harness-styles.ts, graph+canvas/, editor+sidebar+
-   ghosts+health/), converting Tailwind classNames + static inline styles → `te-`/token
-   classes and removing hex. **Flip the Tailwind engine off LAST** (remove the vite
-   plugin, the `@import`, the two deps) once all className literals are gone — that is
-   the gate for the Tailwind check. Delegate per-area to parallel agents; spotcheck
-   after each batch.
-7. **Enforcement machinery** — contrast test, gallery route, visual regression, and the
-   strict `greppable-gates.test.ts`. Lands last; the gates test passes only once every
-   conversion is done. This is also where PLAN.md item 2 gets marked complete and the
-   three-mechanism enforcement + standing invariants get added to CLAUDE.md/AGENTS.md.
+1. **Settings axes deletion — DONE** (`87da027`).
+2. **Hover + transitions — DONE** (`c7b2b89`).
+3. **components/ + stragglers + font-axis deletion — DONE** (this checkpoint).
+4. **agent-shell/** (NEXT) — 257 inline styles + `harness-styles.ts`. Zero Tailwind
+   in its TSX; the work is the class-string module + static-style conversion.
+5–6. **canvas+graph/, editor+sidebar+ghosts+health/** — remaining areas, then flip the
+   Tailwind engine off (vite plugin, `@import`, two deps) as the final act of slice 6.
+7. **Enforcement machinery** — the four tests/routes above; PLAN.md item 2 marked
+   complete; invariants added to CLAUDE.md/AGENTS.md (identical wording).
 
-## What shipped last (slice 2)
+## What shipped last (slice 3)
 
-Hover: all 17 `useState` hover declarations across 13 files deleted; hover styling is
-CSS-driven via component classes in `index.css` (new section "Hover states" at file
-end, plus `.canvas-card__resize`/`.canvas-card__anchor` in the Canvas Card section and
-`.terminal-pill` states in its existing rule). Recipes: self-hover tints
-(`.health-issue-row`, `.ghost-action-icon`, `.vault-switcher`, `.titlebar-toggle`,
-`.side-dock-ribbon-action`, `.terminal-pill`, `.edge-dot`, `.te-empty-action`),
-parent-hover child reveals (`.ghost-row__*`, `.thread-row__kebab`,
-`.vault-switcher__chevron`, `.resize-handle__line`, `.fm-property-row__delete`,
-`.fm-type-badge`, `.fm-connection-pill__remove`, canvas resize grip + anchor dots), and
-state attributes that out-cascade hover (`data-open`, `data-active`, `data-tone`,
-`data-error`, `:disabled`). CardShell's resize grip and anchor dots are now always
-mounted with `pointer-events` gating instead of `{hovered && …}` conditional mounts;
-its mouseenter/leave handlers survive only to feed zustand `setHoveredNode`. Shared
-`.titlebar-toggle` unified ApprovalsTray + TitlebarPanelToggle (identical styling,
-including `-webkit-app-region: no-drag`, so both `@ts-expect-error` inline hacks are
-gone). TypeBadge's `visible` prop was removed; the badge is always focusable and
-reveals on `:focus-visible` / row hover / open menu (small a11y improvement, only call
-site was PropertyRow). ConnectionPill's four DOM-mutation hover handlers became CSS
-(`:has()` for the label→border effect; Electron Chromium supports it).
+Scope: everything outside `panels/` — all of `components/`, plus `App.tsx`,
+`hooks/useClaudeContext.tsx`, `markdown/LucideInline.tsx`. Three parallel agents
+(settings+fonts / onboarding+first-run / misc chrome), spotchecked, orchestrator-fixed.
 
-Transitions: every off-token `transition` in `index.css` mapped to the nearest existing
-token — 150ms ease-out → `--transition-hover` (exact), 120ms → `--t-fast`, 100ms →
-`--transition-focus-ring`, 180/200/220ms → `--t-med`, plus new `--t-reveal` (700ms) for
-the new-thread shimmer. Values-identical where an exact token existed; small sanctioned
-timing drift elsewhere.
+- **Font appearance axes deleted** (ADR 0005 §1/§3): `FontPicker.tsx`,
+  `GoogleFontLoader.tsx`, `design/google-fonts.ts`, `tests/design/google-fonts.test.ts`
+  removed; settings-store fields/setters removed, persist v14→v15 migration drops the
+  persisted keys. Bundled fonts now load via `index.css:2` `@import './fonts/fonts.css'`;
+  the three font vars are static `:root` constants. CSP `connect-src` tightened to
+  `'self'` (fonts.googleapis.com/gstatic allowances were orphaned; posture moves toward
+  parity only).
+- **Conversions**: SettingsModal (Typography section removed; 39 classNames + 30 inline
+  styles → `.settings-*` classes; toggle is CSS-driven off `aria-checked`),
+  OnboardingOverlay + FirstRunScreen (→ `.onboarding__*`/`.first-run*`/`.te-onboarding-*`),
+  ContextMenu (→ `.te-ctx-menu*`), PanelErrorBoundary (→ `.te-panel-error*`), Toast,
+  CliAgentBadge, EmptyState/LoadingState (data-attribute variants; EmptyState.test.tsx
+  assertions rewritten to data-attrs, not weakened), App.tsx shell/loading
+  (→ `.te-workspace-shell__main`/`.te-vault-loading*`), useClaudeContext badge, LucideInline.
+  New CSS lives in three attributed sections at the end of `index.css` ("Settings
+  modal", "Onboarding + first run", "App chrome misc").
+- **Conversion conventions established** (reuse in slices 4–6): Tailwind utilities are
+  rem-based against the fixed 13px root (`--ui-fs`), so convert them to the same *rem*
+  values (`text-xs` → `0.75rem`, `gap-2` → `0.5rem`), NOT the 16px-root px equivalents;
+  explicit inline px numbers stay px. State styling via data-attributes
+  (`data-variant`/`data-active`/`aria-checked`), not class ternaries. Dynamic
+  (prop/state/measured) style values stay inline and get documented as exemptions.
+- **Two deliberate value-preserving deviations**: (1) `.settings-button:hover`'s dead
+  `color:` line deleted — every call site used to carry inline `color`, which beat the
+  hover rule, so keeping it would have *changed* hover behavior (verified against
+  pre-slice JSX). (2) ContextMenu shortcut `font-mono` (Tailwind generic stack) →
+  `var(--font-mono)` token — the one intentional computed-value shift.
 
-Verify: `npm run check` green (333 files / 4069 tests), build exit 0, `grep -i hover`
-over `useState` declarations → 0, off-token transition sweep (single- and multi-line) →
-0. Live CDP probe against `npm run dev:debug`: titlebar toggle, approvals tray, vault
-switcher, ribbon action, and resize-handle hairline all respond to real hover with the
-expected computed styles; active thread-row correctly suppresses tint and pins its
-kebab visible. One structural test updated (`ghost-density-view.test.ts` now asserts
-the CSS mechanism instead of `opacity.*hovered`).
+Verify: `npm run check` green (332 files / 4056 tests — exactly the 13 deleted
+google-fonts tests fewer than baseline), build exit 0 (re-run after the last CSS fix),
+spotcheck-verifier pass over the whole diff (its one real finding — a `gap-1` converted
+to `4px` instead of `0.25rem` — fixed; its `.settings-button:hover` "regression" claim
+refuted with pre-slice JSX evidence). Live CDP probe against `npm run dev:debug`:
+Manrope/Space Mono load from the bundle (`document.fonts.check` true, zero remote font
+code), shell + statusbar render, settings modal opens via the `te:open-settings` window
+event with exact legacy computed values (button `rgb(161,161,170)`, toggle track
+ember `accent.soft`), Typography section gone; screenshot eyeballed clean.
 
 ## Landmines
 
-- **`e2e/live.spec.ts` is stale**: its "activity bar exposes a selected view" check
-  targets `.activity-btn`, which no longer exists anywhere in source. Pre-existing
-  failure, unrelated to slice 2. Fix or delete the spec when convenient.
-- **Hover-reveal CSS uses deliberate specificity ordering** (state attributes declared
-  after `:hover` at equal specificity; reveal-boost selectors like
-  `.fm-property-row:hover .fm-type-badge:hover` at higher). Don't "simplify" selector
-  chains in the Hover states section without re-checking the cascade notes there.
-- **Legacy `--transition-*` aliases gained new uses** where they were value-exact
-  (`--transition-hover`, `--transition-focus-ring`). Intentional: value-identical beats
-  forward purity mid-convergence. Layer 4's retune decides the canonical motion set.
-- **Values are unchanged by construction** except sanctioned nearest-token timing drift
-  (e.g. 220ms→180ms). Any appearance retune belongs to Layer 4, not here.
-- **CardShell anchor dots under pointer capture**: edge-creation drag onto another
-  card's dots relies on the same hover semantics as before (CSS `:hover` vs the old
-  mouseenter — both suppressed identically during pointer capture), but eyeball an
-  edge-creation drag on the next dev run to be sure.
-- **CanvasToolbar React gotcha** (regression-tested in CanvasToolbar.test.tsx): never
-  read `e.currentTarget` inside a setState updater — nulled when the handler returns.
-  Capture rects before setState.
-- **Cursor's background git worker** (`gitWorker.js`) + GitLens/GitKraken `gk mcp` hold
-  `.git/index.lock` intermittently — a commit can fail with "index.lock exists" then
-  succeed on retry. Don't `rm` the lock without confirming no git process is
-  mid-operation.
-- **e2e runs rewrite `e2e/fixtures/test-vault/.machina/state.json`** (dock/panel state +
-  Casey's real home path in `lastOpenNote`). `git restore` it before every commit; never
-  commit it. (`npm run test:live` does not touch it; `npm run test:e2e` does.)
-- eslint uses `--cache`; run `npx eslint --no-cache` when a stale-file lint result looks
+- **`e2e/live.spec.ts` is stale**: targets `.activity-btn`, which no longer exists.
+  Pre-existing failure, unrelated to slices 2–3. Fix or delete when convenient.
+- **npm audit has 9 pre-existing vulnerabilities** (3 high, all inherited via
+  sharp/libvips, GHSA-f88m-g3jw-g9cj). No dependency changed in slice 3; needs a
+  separate deps pass.
+- **rem conversions assume the 13px root** (`--ui-fs`). If Layer 4 retunes the root
+  size, every rem value scales with it — that's the intended behavior, but don't
+  "normalize" rem→px in the meantime.
+- **Glass literals**: onboarding panel and `.te-ctx-menu` carry
+  `rgba(4,4,8,…)`/`blur(…) saturate(…)` literals that exactly mirror
+  `floatingPanel.glass.bg/popoverBg` in tokens.ts. Two sources for one fact — fold into
+  CSS vars in a later slice (candidate: slice 7 alongside the gates test).
+- **Hover-reveal CSS uses deliberate specificity ordering** (slice 2). Don't "simplify"
+  selector chains in the Hover states section without re-checking its cascade notes.
+- **Visual-verify trick**: settings modal opens headlessly via
+  `window.dispatchEvent(new Event('te:open-settings'))` on the CDP target — no UI
+  spelunking needed.
+- **CanvasToolbar React gotcha** (regression-tested): never read `e.currentTarget`
+  inside a setState updater — capture rects before setState.
+- **Cursor's background git worker + GitLens `gk mcp` hold `.git/index.lock`**
+  intermittently — a commit can fail then succeed on retry. Don't `rm` the lock without
+  confirming no git process is mid-operation.
+- **e2e runs rewrite `e2e/fixtures/test-vault/.machina/state.json`** — `git restore` it
+  before every commit; never commit it. (`npm run test:live` doesn't touch it;
+  `npm run test:e2e` does. Slice 3 ran neither, fixture is clean.)
+- eslint uses `--cache`; run `npx eslint --no-cache` when a stale result looks
   suspicious. npm installs need `--cache /tmp/npm-cache-te`.
 - `CLAUDE.md` is gitignored; `AGENTS.md` is its tracked twin — keep shared wording
-  identical. The item-2 completion invariants (one styling mechanism; no appearance
-  axes) get added to BOTH in slice 7, not before.
+  identical. Item-2 completion invariants get added to BOTH in slice 7, not before.
 - Skip-worktree gotcha: `git ls-files -v | grep ^S` before assuming an edit landed.

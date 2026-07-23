@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useClaudeStatus } from '../hooks/use-claude-status'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors, floatingPanel, typography } from '../design/tokens'
+import { colors } from '../design/tokens'
 import { Modal } from './overlay/Modal'
 
 const RECHECK_INTERVAL_MS = 5_000
@@ -18,8 +18,8 @@ const AUTO_DISMISS_MS = 2_000
 function StatusDot({ color, pulse }: { color: string; pulse?: boolean }) {
   return (
     <span
-      className={`inline-block rounded-full ${pulse ? 'animate-pulse' : ''}`}
-      style={{ width: 8, height: 8, backgroundColor: color, flexShrink: 0 }}
+      className={`onboarding__status-dot${pulse ? ' onboarding__status-dot--pulse' : ''}`}
+      style={{ backgroundColor: color }}
     />
   )
 }
@@ -30,22 +30,13 @@ function CodeSnippet({ code }: { code: string }) {
   }, [code])
 
   return (
-    <div
-      className="flex items-center justify-between px-3 py-2 mt-3"
-      style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
-        border: `1px solid ${colors.border.subtle}`,
-        fontFamily: 'var(--font-mono, monospace)',
-        fontSize: 13
-      }}
-    >
-      <code style={{ color: colors.text.primary }}>{code}</code>
+    <div className="onboarding__code">
+      <code className="onboarding__code-text">{code}</code>
       <button
         onClick={handleCopy}
-        className="ml-3 p-1 transition-colors te-onboarding-icon-btn"
+        className="te-onboarding-icon-btn"
         title="Copy to clipboard"
         aria-label="Copy to clipboard"
-        style={{ color: colors.text.muted }}
       >
         <Copy size={14} />
       </button>
@@ -59,26 +50,17 @@ function InstallStep() {
   }, [])
 
   return (
-    <div className="flex flex-col items-center text-center">
-      <Terminal size={24} style={{ color: colors.text.muted }} />
-      <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
-        Install Claude Code
-      </h2>
-      <p className="mt-1.5 text-xs leading-relaxed" style={{ color: colors.text.secondary }}>
+    <div className="onboarding__step">
+      <Terminal size={24} className="onboarding__icon" />
+      <h2 className="onboarding__title">Install Claude Code</h2>
+      <p className="onboarding__body">
         The CLI powers AI features. Install it to unlock the full experience.
       </p>
-      <button
-        onClick={handleOpenDocs}
-        className="mt-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors te-onboarding-cta"
-        style={{
-          border: `1px solid ${colors.border.subtle}`,
-          color: colors.text.primary
-        }}
-      >
+      <button onClick={handleOpenDocs} className="te-onboarding-cta">
         Open Install Guide
         <SquareArrowOutUpRight size={12} />
       </button>
-      <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: colors.text.muted }}>
+      <div className="onboarding__status">
         <StatusDot color={colors.text.muted} pulse />
         Waiting for installation…
       </div>
@@ -88,16 +70,12 @@ function InstallStep() {
 
 function AuthStep() {
   return (
-    <div className="flex flex-col items-center text-center">
-      <CircleUser size={24} style={{ color: colors.text.muted }} />
-      <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
-        Sign In to Claude
-      </h2>
-      <p className="mt-1.5 text-xs leading-relaxed" style={{ color: colors.text.secondary }}>
-        Run this command in your terminal to authenticate:
-      </p>
+    <div className="onboarding__step">
+      <CircleUser size={24} className="onboarding__icon" />
+      <h2 className="onboarding__title">Sign In to Claude</h2>
+      <p className="onboarding__body">Run this command in your terminal to authenticate:</p>
       <CodeSnippet code="claude auth login" />
-      <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: colors.text.muted }}>
+      <div className="onboarding__status">
         <StatusDot color={colors.text.muted} pulse />
         Waiting for authentication…
       </div>
@@ -113,15 +91,13 @@ function ReadyStep({
   subscriptionType: string | null
 }) {
   return (
-    <div className="flex flex-col items-center text-center">
-      <CircleCheck size={24} style={{ color: colors.claude.ready }} />
-      <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
-        Connected
-      </h2>
-      <p className="mt-1.5 text-xs leading-relaxed" style={{ color: colors.text.secondary }}>
+    <div className="onboarding__step">
+      <CircleCheck size={24} className="onboarding__icon--ready" />
+      <h2 className="onboarding__title">Connected</h2>
+      <p className="onboarding__body">
         AI features are ready.
         {email && (
-          <span style={{ color: colors.text.muted }}>
+          <span className="onboarding__body-muted">
             {' '}
             Signed in as {email}
             {subscriptionType ? ` (${subscriptionType})` : ''}.
@@ -166,18 +142,15 @@ function ApiKeyStep({ onSaved }: { onSaved: () => void }) {
 
   if (keyConfigured) {
     return (
-      <div className="flex flex-col items-center text-center">
-        <CircleCheck size={24} style={{ color: colors.claude.ready }} />
-        <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
-          API Key Configured
-        </h2>
-        <p className="mt-1.5 text-xs leading-relaxed" style={{ color: colors.text.secondary }}>
+      <div className="onboarding__step">
+        <CircleCheck size={24} className="onboarding__icon--ready" />
+        <h2 className="onboarding__title">API Key Configured</h2>
+        <p className="onboarding__body">
           The in-app agent is ready. Open a thread and start asking about your vault.
         </p>
         <button
           onClick={() => void clear()}
-          className="mt-4 px-3 py-1.5 text-xs font-medium transition-colors te-onboarding-cta"
-          style={{ border: `1px solid ${colors.border.subtle}`, color: colors.text.secondary }}
+          className="te-onboarding-cta te-onboarding-cta--secondary"
         >
           Clear Key
         </button>
@@ -186,12 +159,10 @@ function ApiKeyStep({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div className="flex flex-col items-center text-center">
-      <KeyRound size={24} style={{ color: colors.text.muted }} />
-      <h2 className="mt-3 text-sm font-medium" style={{ color: colors.text.primary }}>
-        Connect Your Anthropic API Key
-      </h2>
-      <p className="mt-1.5 text-xs leading-relaxed" style={{ color: colors.text.secondary }}>
+    <div className="onboarding__step">
+      <KeyRound size={24} className="onboarding__icon" />
+      <h2 className="onboarding__title">Connect Your Anthropic API Key</h2>
+      <p className="onboarding__body">
         Powers the in-app agent — the fastest way to start working with your vault.
       </p>
       <input
@@ -203,39 +174,21 @@ function ApiKeyStep({ onSaved }: { onSaved: () => void }) {
         }}
         placeholder="sk-ant-..."
         aria-label="Anthropic API key"
-        className="mt-4 px-3 py-2 w-full"
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.04)',
-          border: `1px solid ${colors.border.subtle}`,
-          color: colors.text.primary,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 12,
-          outline: 'none'
-        }}
+        className="onboarding__input"
       />
-      {error && (
-        <span
-          className="mt-2 text-xs"
-          style={{ color: colors.claude.error, fontFamily: typography.fontFamily.mono }}
-        >
-          {error}
-        </span>
-      )}
+      {error && <span className="onboarding__error">{error}</span>}
       <button
         onClick={() => void save()}
         disabled={!draft.trim()}
-        className="mt-3 px-3 py-1.5 text-xs font-medium transition-colors te-onboarding-cta"
+        className="te-onboarding-cta te-onboarding-cta--tight"
         style={{
-          border: `1px solid ${colors.border.subtle}`,
           color: draft.trim() ? colors.text.primary : colors.text.muted,
           opacity: draft.trim() ? 1 : 0.5
         }}
       >
         Save Key
       </button>
-      <p className="mt-3 text-xs" style={{ color: colors.text.muted }}>
-        Stored encrypted via Electron safeStorage.
-      </p>
+      <p className="onboarding__hint">Stored encrypted via Electron safeStorage.</p>
     </div>
   )
 }
@@ -287,20 +240,8 @@ export function OnboardingOverlay() {
   const isReady = status.installed && status.authenticated
 
   return (
-    <Modal
-      open={showOnboarding}
-      onClose={dismissOnboarding}
-      panelClassName="overflow-hidden"
-      panelStyle={{
-        width: 340,
-        backgroundColor: floatingPanel.glass.bg,
-        backdropFilter: floatingPanel.glass.blur,
-        WebkitBackdropFilter: floatingPanel.glass.blur,
-        border: `1px solid ${colors.border.subtle}`,
-        boxShadow: floatingPanel.shadow
-      }}
-    >
-      <div className="px-6 py-6">
+    <Modal open={showOnboarding} onClose={dismissOnboarding} panelClassName="onboarding__panel">
+      <div className="onboarding__content">
         {mode === 'api-key' && <ApiKeyStep onSaved={() => setJustSaved(true)} />}
         {mode === 'cli' && !status.installed && <InstallStep />}
         {mode === 'cli' && status.installed && !status.authenticated && <AuthStep />}
@@ -310,20 +251,14 @@ export function OnboardingOverlay() {
       </div>
 
       {!(mode === 'cli' && isReady) && (
-        <div
-          className="flex items-center justify-center gap-4 py-2.5 text-xs"
-          style={{
-            borderTop: `1px solid var(--line-faint)`,
-            color: colors.text.muted
-          }}
-        >
+        <div className="onboarding__footer">
           <button
             onClick={() => setMode(mode === 'api-key' ? 'cli' : 'api-key')}
-            className="transition-colors te-onboarding-skip"
+            className="te-onboarding-skip"
           >
             {mode === 'api-key' ? 'Install the Claude CLI instead' : 'Use an API key instead'}
           </button>
-          <button onClick={dismissOnboarding} className="transition-colors te-onboarding-skip">
+          <button onClick={dismissOnboarding} className="te-onboarding-skip">
             Skip for now
           </button>
         </div>

@@ -1,5 +1,4 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { colors, typography } from '../design/tokens'
 
 interface Props {
   name: string
@@ -30,46 +29,25 @@ export class PanelErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div
-          className="h-full flex items-center justify-center p-6"
-          style={{ backgroundColor: colors.bg.surface }}
-        >
-          <div className="text-center max-w-sm">
-            <p style={{ color: colors.text.primary }} className="text-sm font-medium mb-1">
-              Something went wrong
-            </p>
-            <p style={{ color: colors.text.muted }} className="text-xs mb-4">
+        <div className="te-panel-error">
+          <div className="te-panel-error__body">
+            <p className="te-panel-error__title">Something went wrong</p>
+            <p className="te-panel-error__desc">
               The {this.props.name} panel encountered an error.
             </p>
-            <button
-              onClick={this.handleRetry}
-              className="text-xs px-3 py-1.5 transition-colors"
-              style={{
-                backgroundColor: colors.accent.muted,
-                color: colors.accent.default,
-                border: `1px solid ${colors.border.default}`
-              }}
-            >
+            <button onClick={this.handleRetry} className="te-panel-error__retry">
               Retry
             </button>
             {this.state.error && (
               <button
                 onClick={() => this.setState((s) => ({ showDetails: !s.showDetails }))}
-                className="ml-2 text-xs px-3 py-1.5"
-                style={{ color: colors.text.muted }}
+                className="te-panel-error__details-toggle"
               >
                 {this.state.showDetails ? 'Hide details' : 'Show details'}
               </button>
             )}
             {this.state.showDetails && this.state.error && (
-              <pre
-                className="mt-3 text-left text-[11px] p-3 overflow-auto max-h-40"
-                style={{
-                  backgroundColor: colors.bg.base,
-                  color: colors.text.secondary,
-                  fontFamily: typography.fontFamily.mono
-                }}
-              >
+              <pre className="te-panel-error__stack">
                 {this.state.error.message}
                 {'\n'}
                 {this.state.error.stack}

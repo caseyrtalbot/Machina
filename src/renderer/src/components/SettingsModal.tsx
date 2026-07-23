@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../store/settings-store'
 import { useVaultStore } from '../store/vault-store'
 import { useClaudeStatusStore } from '../store/claude-status-store'
-import { colors, borderRadius, typography, transitions, floatingPanel } from '../design/tokens'
+import { colors } from '../design/tokens'
 import { EMBEDDING_MODEL_DOWNLOAD_MB } from '@shared/engine/embeddings'
-import { FontPicker } from './FontPicker'
 import { Modal } from './overlay/Modal'
 
 interface EmbeddingsStatus {
@@ -43,7 +42,7 @@ interface SettingRowProps {
 function SettingRow({ label, children }: SettingRowProps) {
   return (
     <div className="settings-row">
-      <span className="settings-label flex-shrink-0">{label}</span>
+      <span className="settings-label">{label}</span>
       <div className="settings-field">{children}</div>
     </div>
   )
@@ -60,7 +59,7 @@ interface SliderInputProps {
 
 function SliderInput({ value, min, max, step, onChange, unit }: SliderInputProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="settings-slider-row">
       <input
         type="range"
         min={min}
@@ -68,12 +67,9 @@ function SliderInput({ value, min, max, step, onChange, unit }: SliderInputProps
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="graph-slider w-28"
+        className="graph-slider settings-slider"
       />
-      <span
-        className="settings-value w-12 text-right tabular-nums"
-        style={{ color: colors.text.secondary }}
-      >
+      <span className="settings-value">
         {value}
         {unit ?? ''}
       </span>
@@ -95,28 +91,9 @@ function Toggle({ value, onChange, ariaLabel }: ToggleProps) {
       aria-checked={value}
       aria-label={ariaLabel}
       onClick={() => onChange(!value)}
-      className="settings-toggle relative transition-colors flex-shrink-0"
-      style={{
-        width: 36,
-        height: 20,
-        borderRadius: borderRadius.inline,
-        backgroundColor: value ? colors.accent.soft : 'transparent',
-        border: `1px solid ${value ? colors.accent.default : colors.border.default}`,
-        padding: 0
-      }}
+      className="settings-toggle"
     >
-      <span
-        className="absolute transition-transform"
-        style={{
-          top: 3,
-          width: 12,
-          height: 12,
-          borderRadius: borderRadius.inline,
-          backgroundColor: value ? colors.accent.default : colors.text.muted,
-          left: value ? 'calc(100% - 15px)' : 3,
-          transition: `left ${transitions.hover}, background-color ${transitions.hover}`
-        }}
-      />
+      <span className="settings-toggle__knob" />
     </button>
   )
 }
@@ -134,11 +111,7 @@ interface SelectInputProps {
 
 function SelectInput({ value, options, onChange }: SelectInputProps) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="settings-select text-xs"
-    >
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="settings-select">
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}
@@ -156,11 +129,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   const closeRef = useRef<HTMLButtonElement>(null)
 
   // Settings state
-  const bodyFont = useSettingsStore((s) => s.bodyFont)
-  const monoFont = useSettingsStore((s) => s.monoFont)
-  const setDisplayFont = useSettingsStore((s) => s.setDisplayFont)
-  const setBodyFont = useSettingsStore((s) => s.setBodyFont)
-  const setMonoFont = useSettingsStore((s) => s.setMonoFont)
   const defaultEditorMode = useSettingsStore((s) => s.defaultEditorMode)
   const autosaveInterval = useSettingsStore((s) => s.autosaveInterval)
   const spellCheck = useSettingsStore((s) => s.spellCheck)
@@ -196,11 +164,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
   const handleSemanticSearch = (value: boolean): void => {
     setSemanticSearch(value)
     void window.api.embeddings.setEnabled(value).catch(() => {})
-  }
-
-  const handleFontChange = (name: string) => {
-    setDisplayFont(name)
-    setBodyFont(name)
   }
 
   const vaultName = vaultPath?.split('/').pop() ?? null
@@ -263,49 +226,15 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       keepMounted
       ariaLabelledBy="settings-dialog-title"
       initialFocusRef={closeRef}
-      style={{ transition: `opacity ${transitions.modalFade}` }}
-      panelClassName="settings-shell relative flex flex-col"
-      panelStyle={{
-        width: 'min(560px, calc(100vw - 64px))',
-        maxHeight: 'min(720px, calc(100vh - 96px))',
-        backgroundColor: colors.bg.base,
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: borderRadius.container,
-        boxShadow: floatingPanel.shadow,
-        transform: isOpen ? 'scale(1)' : 'scale(0.98)',
-        transition: `transform ${transitions.surface}`
-      }}
+      className="settings-scrim"
+      panelClassName="settings-shell"
+      panelStyle={{ transform: isOpen ? 'scale(1)' : 'scale(0.98)' }}
     >
       {/* Header */}
-      <div
-        className="settings-header flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
-      >
-        <div className="flex flex-col gap-2">
-          <span
-            className="settings-kicker"
-            style={{
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              color: colors.text.muted
-            }}
-          >
-            Workspace
-          </span>
-          <span
-            id="settings-dialog-title"
-            className="settings-title"
-            style={{
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 12,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              color: colors.text.primary,
-              fontWeight: 500
-            }}
-          >
+      <div className="settings-header">
+        <div className="settings-header__titles">
+          <span className="settings-kicker">Workspace</span>
+          <span id="settings-dialog-title" className="settings-title">
             Settings
           </span>
         </div>
@@ -315,7 +244,6 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
           onClick={onClose}
           className="settings-close-btn"
           aria-label="Close settings"
-          style={{ borderRadius: borderRadius.inline }}
         >
           <svg
             width={12}
@@ -333,16 +261,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
       </div>
 
       {/* Single scrollable content */}
-      <div className="settings-content flex-1 overflow-y-auto">
-        {/* ── Typography ── */}
-        <SectionHeading>Typography</SectionHeading>
-        <SettingRow label="Font">
-          <FontPicker value={bodyFont} onChange={handleFontChange} />
-        </SettingRow>
-        <SettingRow label="Code Font">
-          <FontPicker value={monoFont} onChange={setMonoFont} categoryFilter="monospace" />
-        </SettingRow>
-
+      <div className="settings-content">
         {/* ── Editor ── */}
         <SectionHeading>Editor</SectionHeading>
         <SettingRow label="Default Mode">
@@ -378,15 +297,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
             ariaLabel="Semantic search"
           />
         </SettingRow>
-        <p
-          style={{
-            margin: '2px 0 10px',
-            color: colors.text.muted,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 10,
-            lineHeight: 1.5
-          }}
-        >
+        <p className="settings-note settings-note-block">
           Meaning-based results merged into search, computed fully on-device. First enable downloads
           a one-time ~{EMBEDDING_MODEL_DOWNLOAD_MB} MB model.
           {semanticSearch && embedStatus ? ` Status: ${describeEmbeddings(embedStatus)}.` : ''}
@@ -395,7 +306,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         {/* ── Vault ── */}
         <SectionHeading>Vault</SectionHeading>
         <div className="settings-vault-card">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="settings-vault-card__main">
             <svg
               width={14}
               height={14}
@@ -405,125 +316,57 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
               strokeWidth="1.3"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ color: colors.text.muted, flexShrink: 0 }}
+              className="settings-vault-icon"
             >
               <path d="M7 1L1.5 3.5v4L7 10l5.5-2.5v-4L7 1z" />
               <path d="M1.5 3.5L7 6l5.5-2.5" />
               <line x1="7" y1="6" x2="7" y2="10" />
             </svg>
-            <div className="flex flex-col min-w-0">
-              <span
-                className="truncate"
-                style={{
-                  color: colors.text.primary,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: 12
-                }}
-              >
-                {vaultName ?? 'No vault'}
-              </span>
-              <span
-                className="truncate"
-                title={vaultPath ?? ''}
-                style={{
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: 10
-                }}
-              >
+            <div className="settings-vault-card__text">
+              <span className="settings-vault-name">{vaultName ?? 'No vault'}</span>
+              <span className="settings-vault-path" title={vaultPath ?? ''}>
                 {vaultPath ?? 'Select a vault to get started'}
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onChangeVault}
-            className="settings-button transition-colors flex-shrink-0"
-            style={{ color: colors.text.secondary }}
-          >
+          <button type="button" onClick={onChangeVault} className="settings-button">
             {vaultPath ? 'Change' : 'Open'}
           </button>
         </div>
 
         {/* ── machina-native ── */}
         <SectionHeading>machina-native</SectionHeading>
-        <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
-          <div className="flex flex-col min-w-0 gap-2 w-full">
-            <span
-              style={{
-                color: colors.text.primary,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 12
-              }}
-            >
-              Anthropic API key
-            </span>
+        <div className="settings-vault-card settings-vault-card--top">
+          <div className="settings-card-body">
+            <span className="settings-field-title">Anthropic API key</span>
             {hasKey === null ? (
-              <span
-                style={{
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: 10
-                }}
-              >
-                checking...
-              </span>
+              <span className="settings-note">checking...</span>
             ) : hasKey ? (
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  style={{
-                    color: colors.text.muted,
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: typography.metadata.size,
-                    letterSpacing: typography.metadata.letterSpacing,
-                    textTransform: typography.metadata.textTransform
-                  }}
-                >
-                  Key configured
-                </span>
-                <button
-                  type="button"
-                  onClick={clearKey}
-                  className="settings-button transition-colors flex-shrink-0"
-                  style={{ color: colors.text.secondary }}
-                >
+              <div className="settings-row-inline">
+                <span className="settings-meta">Key configured</span>
+                <button type="button" onClick={clearKey} className="settings-button">
                   Clear
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="settings-stack">
                 <input
                   type="password"
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
                   placeholder="sk-ant-..."
-                  className="settings-select"
-                  style={{
-                    width: '100%',
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: 12
-                  }}
+                  className="settings-select settings-input-full"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void saveKey()
                   }}
                 />
-                <div className="flex items-center justify-between gap-2">
-                  {keyError && (
-                    <span
-                      style={{
-                        color: colors.claude.error,
-                        fontFamily: typography.fontFamily.mono,
-                        fontSize: 10
-                      }}
-                    >
-                      {keyError}
-                    </span>
-                  )}
+                <div className="settings-row-inline">
+                  {keyError && <span className="settings-error">{keyError}</span>}
                   <button
                     type="button"
                     onClick={() => void saveKey()}
                     disabled={!keyDraft.trim()}
-                    className="settings-primary-button transition-colors flex-shrink-0 ml-auto"
+                    className="settings-primary-button settings-save-btn"
                     style={{
                       color: keyDraft.trim() ? colors.text.primary : colors.text.muted,
                       opacity: keyDraft.trim() ? 1 : 0.5
@@ -534,14 +377,7 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
                 </div>
               </div>
             )}
-            <span
-              style={{
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 10,
-                lineHeight: 1.5
-              }}
-            >
+            <span className="settings-note">
               Stored encrypted via Electron safeStorage. Override with ANTHROPIC_API_KEY.
             </span>
           </div>
@@ -549,26 +385,13 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
 
         {/* ── MCP server ── */}
         <SectionHeading>MCP Server</SectionHeading>
-        <div className="settings-vault-card" style={{ alignItems: 'flex-start' }}>
-          <div className="flex flex-col min-w-0 gap-2 w-full">
-            <div className="flex items-center justify-between gap-2">
+        <div className="settings-vault-card settings-vault-card--top">
+          <div className="settings-card-body">
+            <div className="settings-row-inline">
+              <span className="settings-field-title">Local MCP endpoint</span>
               <span
-                style={{
-                  color: colors.text.primary,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: 12
-                }}
-              >
-                Local MCP endpoint
-              </span>
-              <span
-                style={{
-                  color: mcpStatus?.running ? colors.accent.default : colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: typography.metadata.size,
-                  letterSpacing: typography.metadata.letterSpacing,
-                  textTransform: typography.metadata.textTransform
-                }}
+                className="settings-meta"
+                style={{ color: mcpStatus?.running ? colors.accent.default : colors.text.muted }}
               >
                 {mcpStatus === null
                   ? 'checking...'
@@ -578,36 +401,20 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
               </span>
             </div>
             {mcpStatus?.running && mcpStatus.url ? (
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className="truncate"
-                  title={mcpStatus.url}
-                  style={{
-                    color: colors.text.secondary,
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: 11
-                  }}
-                >
+              <div className="settings-row-inline">
+                <span className="settings-mcp-url" title={mcpStatus.url}>
                   {mcpStatus.url}
                 </span>
                 <button
                   type="button"
                   onClick={() => void copyMcpConnectCommand()}
-                  className="settings-button transition-colors flex-shrink-0"
-                  style={{ color: colors.text.secondary }}
+                  className="settings-button"
                 >
                   {mcpUrlCopied ? 'Copied' : 'Copy connect command'}
                 </button>
               </div>
             ) : null}
-            <span
-              style={{
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 10,
-                lineHeight: 1.5
-              }}
-            >
+            <span className="settings-note">
               {mcpStatus?.running
                 ? 'Connect external agents with the copied command; it includes a bearer token that rotates each launch. Writes require in-app approval.'
                 : 'Starts when a vault is open. Serves vault search, graph, and gated writes to external MCP clients.'}
@@ -616,23 +423,21 @@ export function SettingsModal({ isOpen, onClose, onChangeVault }: SettingsModalP
         </div>
 
         {/* ── Reset ── */}
-        <div className="settings-footer gap-2">
+        <div className="settings-footer">
           <button
             type="button"
             onClick={() => {
               onClose()
               useClaudeStatusStore.getState().openOnboarding()
             }}
-            className="settings-button transition-colors"
-            style={{ color: colors.text.muted }}
+            className="settings-button settings-button--muted"
           >
             Run Setup
           </button>
           <button
             type="button"
             onClick={() => void window.api.app.revealLogs()}
-            className="settings-button transition-colors"
-            style={{ color: colors.text.muted }}
+            className="settings-button settings-button--muted"
           >
             Reveal Logs
           </button>

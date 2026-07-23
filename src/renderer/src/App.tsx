@@ -17,7 +17,6 @@ import { useSidebarSelectionStore } from './store/sidebar-selection-store'
 import { AgentShell } from './panels/agent-shell/AgentShell'
 import { useVaultStore } from './store/vault-store'
 import { useEditorStore, flushPendingSave } from './store/editor-store'
-import { colors } from './design/tokens'
 import { SettingsModal } from './components/SettingsModal'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
 import { PanelErrorBoundary } from './components/PanelErrorBoundary'
@@ -34,7 +33,6 @@ import {
 } from './store/vault-persist'
 import { rehydrateUiStore } from './store/ui-store'
 import { useAgentPlanListener } from './hooks/use-agent-plan-listener'
-import { GoogleFontLoader } from './components/GoogleFontLoader'
 import type { Artifact } from '@shared/types'
 
 function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promise<void> }) {
@@ -70,14 +68,8 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
   }, [])
 
   return (
-    <div
-      className="workspace-shell h-screen w-screen relative flex"
-      style={{
-        backgroundColor: 'transparent',
-        color: colors.text.primary
-      }}
-    >
-      <div className="flex-1 overflow-hidden">
+    <div className="workspace-shell">
+      <div className="te-workspace-shell__main">
         <PanelErrorBoundary name="AgentShell">
           <AgentShell
             onOpenSettings={() => setSettingsOpen(true)}
@@ -97,15 +89,10 @@ function WorkspaceShell({ onLoadVault }: { onLoadVault: (path: string) => Promis
 
 function LoadingSkeleton() {
   return (
-    <div
-      className="h-screen w-screen flex items-center justify-center"
-      style={{ backgroundColor: colors.bg.base }}
-    >
-      <div className="text-center">
-        <Spinner size={32} style={{ color: colors.accent.default, margin: '0 auto 16px' }} />
-        <p className="text-sm" style={{ color: colors.text.muted }}>
-          Loading vault...
-        </p>
+    <div className="te-vault-loading">
+      <div className="te-vault-loading__inner">
+        <Spinner size={32} />
+        <p className="te-vault-loading__label">Loading vault...</p>
       </div>
     </div>
   )
@@ -440,7 +427,6 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <GoogleFontLoader />
       {renderContent()}
       <ToastHost />
     </ThemeProvider>

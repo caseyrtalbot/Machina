@@ -1,5 +1,3 @@
-import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
-
 interface EmptyStateAction {
   readonly label: string
   readonly onClick: () => void
@@ -27,21 +25,6 @@ export interface EmptyStateProps {
   readonly testId?: string
 }
 
-const eyebrowStyle: React.CSSProperties = {
-  fontSize: typography.metadata.size,
-  fontFamily: typography.fontFamily.mono,
-  color: colors.text.muted,
-  letterSpacing: typography.metadata.letterSpacing,
-  textTransform: 'uppercase'
-}
-
-const hintStyle: React.CSSProperties = {
-  fontSize: typography.metadata.size,
-  fontFamily: typography.fontFamily.mono,
-  color: colors.text.muted,
-  letterSpacing: typography.metadata.letterSpacing
-}
-
 function ActionButton({ action }: { readonly action: EmptyStateAction }) {
   const primary = action.kind !== 'secondary'
   return (
@@ -50,15 +33,6 @@ function ActionButton({ action }: { readonly action: EmptyStateAction }) {
       className="te-empty-action"
       data-kind={primary ? 'primary' : 'secondary'}
       onClick={action.onClick}
-      style={{
-        padding: '8px 16px',
-        fontSize: 13,
-        fontWeight: 500,
-        fontFamily: typography.fontFamily.body,
-        lineHeight: 1.5,
-        borderRadius: borderRadius.tool,
-        cursor: 'pointer'
-      }}
     >
       {action.label}
     </button>
@@ -85,101 +59,57 @@ export function EmptyState({
 }: EmptyStateProps) {
   const content = (
     <>
-      {icon && <div style={{ marginBottom: 4 }}>{icon}</div>}
-      {eyebrow && <div style={{ ...eyebrowStyle, marginBottom: 12 }}>{eyebrow}</div>}
+      {icon && <div className="te-empty__icon">{icon}</div>}
+      {eyebrow && <div className="te-empty__eyebrow">{eyebrow}</div>}
       {title && (
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 500,
-            fontFamily: typography.fontFamily.display,
-            color: colors.text.primary,
-            lineHeight: 1.4,
-            marginBottom: body ? 8 : 0
-          }}
-        >
+        <h2 className="te-empty__title" data-has-body={Boolean(body) || undefined}>
           {title}
         </h2>
       )}
       {body && (
         <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            fontFamily: typography.fontFamily.body,
-            color: colors.text.secondary,
-            lineHeight: 1.6,
-            marginBottom: actions && actions.length > 0 ? 20 : 0
-          }}
+          className="te-empty__text"
+          data-has-actions={(actions && actions.length > 0) || undefined}
         >
           {body}
         </p>
       )}
       {actions && actions.length > 0 && (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="te-empty__actions">
           {actions.map((action) => (
             <ActionButton key={action.label} action={action} />
           ))}
         </div>
       )}
-      {hint && <div style={{ ...hintStyle, marginTop: 16 }}>{hint}</div>}
+      {hint && <div className="te-empty__hint">{hint}</div>}
     </>
   )
 
   if (variant === 'card') {
-    const card = (
-      <div
-        className={overlay ? 'pointer-events-auto' : undefined}
-        style={{
-          width: 360,
-          padding: 28,
-          borderRadius: borderRadius.card,
-          backgroundColor: 'var(--canvas-card-bg)',
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          border: '1px solid var(--canvas-card-border)',
-          boxShadow: floatingPanel.shadow
-        }}
-      >
-        {content}
-      </div>
-    )
     return (
       <div
         data-testid={testId}
-        className={
-          overlay
-            ? 'absolute inset-0 flex items-center justify-center z-[1] pointer-events-none'
-            : 'h-full flex items-center justify-center'
-        }
-        style={overlay ? { marginTop: -40 } : undefined}
+        className="te-empty"
+        data-variant="card"
+        data-overlay={overlay || undefined}
       >
-        {card}
+        <div className="te-empty__card">{content}</div>
       </div>
     )
   }
 
-  const start = align === 'start'
   return (
     <div
       data-testid={testId}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: start ? 'flex-start' : 'center',
-        justifyContent: start ? 'flex-start' : 'center',
-        ...(height === 'fill' ? { height: '100%' } : {}),
-        padding: start ? '18% 32px 0' : height === 'content' ? '4rem 2rem' : 24,
-        boxSizing: 'border-box'
-      }}
+      className="te-empty"
+      data-variant="plain"
+      data-align={align}
+      data-height={height}
     >
       <div
-        style={
-          start
-            ? { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }
-            : { textAlign: 'center', maxWidth }
-        }
+        className="te-empty__inner"
+        data-align={align}
+        style={align === 'center' ? { maxWidth } : undefined}
       >
         {content}
       </div>

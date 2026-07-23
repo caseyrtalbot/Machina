@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
-import { borderRadius, colors, floatingPanel, iconSize, iconStroke } from '../design/tokens'
+import { iconSize, iconStroke } from '../design/tokens'
 
 export interface ContextMenuItem {
   /** Omitted kind means 'item' — keeps plain action arrays terse. */
@@ -45,7 +45,6 @@ interface ContextMenuProps {
   readonly testId?: string
 }
 
-const MENU_PADDING = 4
 const VIEWPORT_MARGIN = 8
 
 function isItem(entry: ContextMenuEntry): entry is ContextMenuItem {
@@ -128,6 +127,7 @@ export function ContextMenu({
     <div
       ref={ref}
       role="menu"
+      className="te-ctx-menu"
       data-testid={testId}
       // Portaled menus still bubble React events to the tree that rendered
       // them (e.g. canvas cards) — keep menu interaction out of that tree.
@@ -137,43 +137,15 @@ export function ContextMenu({
         e.preventDefault()
         e.stopPropagation()
       }}
-      style={{
-        position: 'fixed',
-        top: coords.y,
-        left: coords.x,
-        minWidth,
-        padding: MENU_PADDING,
-        background: floatingPanel.glass.popoverBg,
-        backdropFilter: floatingPanel.glass.popoverBlur,
-        WebkitBackdropFilter: floatingPanel.glass.popoverBlur,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.container,
-        boxShadow: floatingPanel.shadowCompact,
-        zIndex: 1000,
-        fontSize: 12
-      }}
+      style={{ position: 'fixed', top: coords.y, left: coords.x, minWidth }}
     >
       {items.map((entry, i) => {
         if (entry.kind === 'separator') {
-          return (
-            <div
-              key={entry.id}
-              role="separator"
-              style={{ height: 1, background: colors.border.subtle, margin: '4px 6px' }}
-            />
-          )
+          return <div key={entry.id} role="separator" className="te-ctx-menu__sep" />
         }
         if (entry.kind === 'header') {
           return (
-            <div
-              key={entry.id}
-              style={{
-                padding: '4px 10px 2px',
-                color: colors.text.muted,
-                fontSize: 11,
-                fontWeight: 500
-              }}
-            >
+            <div key={entry.id} className="te-ctx-menu__header">
               {entry.label}
             </div>
           )
@@ -184,6 +156,9 @@ export function ContextMenu({
             key={entry.id}
             type="button"
             role="menuitem"
+            className="te-ctx-menu__item"
+            data-active={(active === i && !entry.disabled) || undefined}
+            data-destructive={entry.destructive || undefined}
             disabled={entry.disabled}
             onMouseEnter={() => !entry.disabled && setActive(i)}
             onClick={() => {
@@ -191,42 +166,16 @@ export function ContextMenu({
               entry.onSelect()
               onClose()
             }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              width: '100%',
-              textAlign: 'left',
-              padding: '6px 10px',
-              border: 'none',
-              background: active === i && !entry.disabled ? 'var(--bg-tint-text)' : 'transparent',
-              color: entry.disabled
-                ? colors.text.muted
-                : entry.destructive
-                  ? colors.claude.error
-                  : colors.text.primary,
-              cursor: entry.disabled ? 'not-allowed' : 'pointer',
-              borderRadius: borderRadius.inline,
-              fontFamily: 'inherit',
-              fontSize: 'inherit'
-            }}
           >
             {Icon && (
               <Icon
                 size={iconSize.sm}
                 strokeWidth={iconStroke}
-                style={{ color: colors.text.secondary, flexShrink: 0 }}
+                className="te-ctx-menu__item-icon"
               />
             )}
-            <span style={{ flex: 1, minWidth: 0 }}>{entry.label}</span>
-            {entry.shortcut && (
-              <span
-                className="font-mono"
-                style={{ color: colors.text.muted, fontSize: 10, letterSpacing: 0.3 }}
-              >
-                {entry.shortcut}
-              </span>
-            )}
+            <span className="te-ctx-menu__item-label">{entry.label}</span>
+            {entry.shortcut && <span className="te-ctx-menu__item-shortcut">{entry.shortcut}</span>}
           </button>
         )
       })}

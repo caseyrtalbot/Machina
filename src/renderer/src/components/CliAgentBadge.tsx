@@ -1,4 +1,4 @@
-import { borderRadius, colors, typography } from '../design/tokens'
+import { colors } from '../design/tokens'
 import type { CLIAgentPresence } from '../hooks/use-cli-agent-presence'
 
 /**
@@ -14,32 +14,16 @@ export function CliAgentBadge({ presence }: { readonly presence: CLIAgentPresenc
   const live = presence.status === 'in-progress'
   return (
     <span
+      className="te-cli-badge"
       data-testid="cli-agent-badge"
       title={`${presence.agentId} · ${presence.status}`}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '1px 6px',
-        flexShrink: 0,
-        borderRadius: borderRadius.pill,
-        border: `1px solid ${colors.border.default}`,
-        color: colors.text.secondary,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.microLabel.size,
-        letterSpacing: typography.microLabel.letterSpacing,
-        textTransform: typography.microLabel.textTransform
-      }}
     >
       {live ? (
-        <span className="te-live-dot" style={{ width: 5, height: 5 }} />
+        <span className="te-live-dot te-cli-badge__dot" />
       ) : (
         <span
+          className="te-cli-badge__dot"
           style={{
-            width: 5,
-            height: 5,
-            flexShrink: 0,
-            borderRadius: borderRadius.round,
             backgroundColor:
               presence.status === 'success' ? colors.claude.ready : colors.claude.warning
           }}

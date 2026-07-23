@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { colors, floatingPanel, zIndex } from '../design/tokens'
 
 interface ToastItem {
   readonly id: number
@@ -53,37 +52,14 @@ export function ToastHost() {
   if (toasts.length === 0) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 16,
-        right: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        zIndex: zIndex.tooltip,
-        maxWidth: 380
-      }}
-    >
+    <div className="te-toast-host">
       {toasts.map((t) => (
         <div
           key={t.id}
+          className="te-toast"
           role="alert"
           title="Dismiss"
           onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-          style={{
-            background: floatingPanel.glass.bg,
-            backdropFilter: floatingPanel.glass.blur,
-            border: `1px solid ${colors.border.subtle}`,
-            borderLeft: '2px solid var(--color-accent-default)',
-            boxShadow: floatingPanel.shadowCompact,
-            color: colors.text.primary,
-            fontSize: 12.5,
-            lineHeight: 1.45,
-            padding: '10px 14px',
-            cursor: 'pointer',
-            wordBreak: 'break-word'
-          }}
         >
           {t.message}
         </div>
