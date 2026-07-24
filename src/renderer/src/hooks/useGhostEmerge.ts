@@ -38,6 +38,17 @@ export function useGhostEmerge(): UseGhostEmergeResult {
           referencePaths,
           vaultPath
         )
+
+        // Denied at the approval gate: no note was written, so nothing to open.
+        if (result.status === 'denied') {
+          notifyError(
+            'ghost-emerge',
+            new Error('synthesis not approved'),
+            `Ghost synthesis for "${ghostTitle}" was not approved.`
+          )
+          return
+        }
+
         openArtifactInEditor(result.filePath, ghostTitle)
 
         // Surface the silent empty-body fallback (Claude CLI missing/timeout).

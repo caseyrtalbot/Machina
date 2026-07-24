@@ -21,11 +21,15 @@ import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { registerPdfIndexIpc, setPdfIndexSearchEngine } from './ipc/pdf-index'
 import {
+  getApprovalQueue,
   initApprovalsForRoot,
   markApprovalsWatcherDown,
   registerGitIpc,
   stopApprovals
 } from './ipc/git'
+import { callClaude } from './services/claude-cli'
+import { QueueHitlGate } from './services/queue-hitl-gate'
+import { AuditLogger } from './services/audit-logger'
 import { registerHarnessIpc } from './ipc/harness'
 import { registerEmbeddingsIpc, setEmbedderService } from './ipc/embeddings'
 import { EmbedderService } from './services/embedder-service'
@@ -455,7 +459,10 @@ app.whenReady().then(() => {
   registerDocumentIpc()
   registerAgentIpc() // Register once at startup, services update via setAgentServices
   registerCanvasIpc()
-  registerGhostEmergeIpc()
+  registerGhostEmergeIpc(callClaude, {
+    gate: new QueueHitlGate(getApprovalQueue()),
+    audit: new AuditLogger(join(app.getPath('userData'), 'audit'))
+  })
   registerHealthIpc()
   registerThreadIpc()
   registerAgentNativeIpc()

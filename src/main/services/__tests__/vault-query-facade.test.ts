@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import matter from 'gray-matter'
 import { VaultQueryFacade, MtimeConflictError, MissingIdError } from '../vault-query-facade'
 import { PathGuard } from '../path-guard'
 import { AuditLogger } from '../audit-logger'
@@ -303,6 +304,35 @@ describe('VaultQueryFacade', () => {
       expect(mockDocManager.registerExternalWrite).toHaveBeenCalledWith(
         join(vaultRoot, 'notes', 'created-note.md')
       )
+    })
+
+    it('preserves a body that itself starts with --- verbatim (round-trip bug)', async () => {
+      const filePath = join(vaultRoot, 'notes', 'break-body.md')
+      // The documented FAST-FOLLOW bug: matter.stringify re-parsed the body, so
+      // a body starting with '---' was shattered into a YAML char map. The
+      // hardened path must leave the real text intact.
+      const content = '---\nid: break-body\ntype: note\n---\n---\nreal text after a break\n'
+
+      await facade.createFile(filePath, content, { agentId: 'test-agent' })
+
+      const written = readFileSync(filePath, 'utf-8')
+      expect(written).toContain('created_by: test-agent')
+      expect(written).toContain('real text after a break')
+      const parsed = matter(written)
+      expect(parsed.data.id).toBe('break-body')
+      expect(parsed.content).toBe('---\nreal text after a break\n')
+    })
+
+    it('rejects an existing path (EEXIST) without overwriting', async () => {
+      const filePath = join(vaultRoot, 'notes', 'hello.md')
+      const before = readFileSync(filePath, 'utf-8')
+      const content = '---\nid: hello\ntitle: Clobbered\ntype: note\n---\n\n# Clobbered\n'
+
+      await expect(
+        facade.createFile(filePath, content, { agentId: 'test-agent' })
+      ).rejects.toMatchObject({ code: 'EEXIST' })
+
+      expect(readFileSync(filePath, 'utf-8')).toBe(before)
     })
   })
 })

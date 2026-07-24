@@ -37,6 +37,7 @@ describe('useGhostEmerge', () => {
 
     mockEmergeGhost.mockReset()
     mockEmergeGhost.mockResolvedValue({
+      status: 'created',
       filePath: '/test-vault/emerged-note.md',
       folderCreated: false,
       folderPath: '/test-vault'
@@ -118,6 +119,22 @@ describe('useGhostEmerge', () => {
     expect(notified[0]).toContain('empty note')
   })
 
+  it('does not open the editor when synthesis is denied at the gate', async () => {
+    mockEmergeGhost.mockResolvedValue({ status: 'denied', reason: 'Approval gate not wired' })
+    const { result } = renderHook(() => useGhostEmerge())
+
+    await act(async () => {
+      await result.current.emerge('ghost-123', 'My Ghost Note', ['/test-vault/ref1.md'])
+    })
+
+    // Denied: no note written, so no editor tab and no read-back.
+    expect(useEditorStore.getState().activeNotePath).toBeNull()
+    expect(mockReadFile).not.toHaveBeenCalled()
+    expect(notified).toHaveLength(1)
+    expect(notified[0]).toContain('My Ghost Note')
+    expect(notified[0]).toContain('not approved')
+  })
+
   it('notifies the user when emergence fails', async () => {
     mockEmergeGhost.mockRejectedValue(new Error('disk full'))
 
@@ -148,6 +165,7 @@ describe('useGhostEmerge', () => {
 
   it('sets isEmerging true during the IPC call', async () => {
     let resolveEmerge!: (value: {
+      status: 'created'
       filePath: string
       folderCreated: boolean
       folderPath: string
@@ -173,6 +191,7 @@ describe('useGhostEmerge', () => {
     // Resolve the IPC call
     await act(async () => {
       resolveEmerge({
+        status: 'created',
         filePath: '/test-vault/emerged-note.md',
         folderCreated: false,
         folderPath: '/test-vault'
@@ -186,6 +205,7 @@ describe('useGhostEmerge', () => {
 
   it('prevents concurrent emerge calls', async () => {
     let resolveFirst!: (value: {
+      status: 'created'
       filePath: string
       folderCreated: boolean
       folderPath: string
@@ -216,6 +236,7 @@ describe('useGhostEmerge', () => {
     // Complete the first call
     await act(async () => {
       resolveFirst({
+        status: 'created',
         filePath: '/test-vault/first.md',
         folderCreated: false,
         folderPath: '/test-vault'

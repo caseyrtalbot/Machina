@@ -1,5 +1,5 @@
 import { readFile } from 'fs/promises'
-import { existsSync, mkdirSync, openSync, writeSync, closeSync, constants } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { callClaude, extractJsonFromResponse } from '../services/claude-cli'
 import type { CallClaudeFn } from '../services/claude-cli'
@@ -7,9 +7,13 @@ import { serializeArtifact } from '@shared/engine/parser'
 import { inferFolder } from '@shared/engine/ghost-index'
 import { PathGuard } from '../services/path-guard'
 import { PathGuardError } from '@shared/agent-types'
+import type { AuditEntry } from '@shared/agent-types'
 import type { Artifact } from '@shared/types'
 import type { Result } from '@shared/engine/types'
+import type { IpcResponse } from '@shared/ipc-channels'
 import { typedHandle } from '../typed-ipc'
+import { createStampedNote } from '../utils/note-write'
+import type { HitlGate } from '../services/hitl-gate'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -185,83 +189,160 @@ function sanitizeFilename(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// IPC Registration
+// Approval-gate wiring
+// ---------------------------------------------------------------------------
+
+/** Audit sink shape (AuditLogger in production, a mock in tests). */
+interface AuditSink {
+  log(entry: AuditEntry): void
+}
+
+export interface GhostEmergeDeps {
+  readonly gate: HitlGate
+  readonly audit?: AuditSink
+}
+
+/**
+ * Fail-closed default gate: with no gate injected the synthesis is denied
+ * rather than written un-gated (mirrors buildGate in mcp-lifecycle.ts).
+ */
+const FAIL_CLOSED_GATE: HitlGate = {
+  confirm: async () => ({ allowed: false, reason: 'Approval gate not wired' })
+}
+
+// Content-preview cap for the approvals tray (native-mirror precedent, 4k chars).
+const PREVIEW_MAX_CHARS = 4_000
+
+interface EmergeArgs {
+  readonly ghostId: string
+  readonly ghostTitle: string
+  readonly referencePaths: readonly string[]
+  readonly vaultPath: string
+}
+
+// ---------------------------------------------------------------------------
+// Handler
 // ---------------------------------------------------------------------------
 
 let _emerging = false
 
-export function registerGhostEmergeIpc(callClaudeFn: CallClaudeFn = callClaude): void {
-  typedHandle('vault:emerge-ghost', async ({ ghostId, ghostTitle, referencePaths, vaultPath }) => {
-    // Concurrency guard (server-side)
-    if (_emerging) throw new Error('Ghost emergence already in progress')
-    _emerging = true
+/**
+ * Synthesize a ghost into a note, gated by the approval spine: no vault write
+ * happens until the user approves in the tray, and every decision is audited.
+ * Extracted from the IPC registration so the main-side flow is unit-testable.
+ */
+export async function handleEmergeGhost(
+  callClaudeFn: CallClaudeFn,
+  deps: GhostEmergeDeps,
+  { ghostId, ghostTitle, referencePaths, vaultPath }: EmergeArgs
+): Promise<IpcResponse<'vault:emerge-ghost'>> {
+  // Concurrency guard (server-side); intentionally spans the approval wait.
+  if (_emerging) throw new Error('Ghost emergence already in progress')
+  _emerging = true
 
-    try {
-      const guard = new PathGuard(vaultPath)
+  try {
+    const guard = new PathGuard(vaultPath)
 
-      // 1. Read reference files (validate paths, skip unreadable)
-      const refContents: Array<{ path: string; content: string }> = []
-      for (const refPath of referencePaths) {
-        try {
-          guard.assertWithinVault(refPath)
-          const content = await readFile(refPath, 'utf-8')
-          refContents.push({ path: refPath, content })
-        } catch (err) {
-          if (err instanceof PathGuardError) throw err
-          // Skip unreadable files (ENOENT, EACCES, etc.)
-        }
-      }
-
-      // 2. Quick-parse each for title, tags, body
-      const refs: ReferenceNote[] = refContents.map((rc) => quickParseRef(rc.content, rc.path))
-
-      // 3. Infer folder
-      const folderPath = inferFolder(ghostId, referencePaths, vaultPath)
-      guard.assertWithinVault(folderPath)
-
-      // 4. Build prompt
-      const prompt = buildEmergePrompt(ghostTitle, refs)
-
-      // 5-6. Call Claude CLI and parse response (with fallback)
-      let emergeResult: EmergeResult | null = null
+    // 1. Read reference files (validate paths, skip unreadable)
+    const refContents: Array<{ path: string; content: string }> = []
+    for (const refPath of referencePaths) {
       try {
-        const rawResponse = await callClaudeFn(prompt)
-        const parsed = parseEmergeResponse(rawResponse)
-        if (parsed.ok) {
-          emergeResult = parsed.value
-        }
+        guard.assertWithinVault(refPath)
+        const content = await readFile(refPath, 'utf-8')
+        refContents.push({ path: refPath, content })
       } catch (err) {
         if (err instanceof PathGuardError) throw err
-        // Fallback: empty note (Claude CLI not found, timeout, etc.)
+        // Skip unreadable files (ENOENT, EACCES, etc.)
       }
-
-      // 7. Build Artifact
-      const artifact = buildArtifact(ghostId, ghostTitle, referencePaths, emergeResult)
-
-      // 8. Serialize
-      const content = serializeArtifact(artifact)
-
-      // 9. Sanitize filename, ensure folder, validate write path
-      const safeFilename = sanitizeFilename(ghostTitle)
-      const filePath = join(folderPath, `${safeFilename}.md`)
-      guard.assertWithinVault(filePath)
-
-      const folderCreated = !existsSync(folderPath)
-      if (!existsSync(folderPath)) {
-        mkdirSync(folderPath, { recursive: true })
-      }
-
-      const fd = openSync(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY)
-      try {
-        writeSync(fd, content)
-      } finally {
-        closeSync(fd)
-      }
-
-      // 10. Return result
-      return { filePath, folderCreated, folderPath }
-    } finally {
-      _emerging = false
     }
-  })
+
+    // 2. Quick-parse each for title, tags, body
+    const refs: ReferenceNote[] = refContents.map((rc) => quickParseRef(rc.content, rc.path))
+
+    // 3. Infer folder
+    const folderPath = inferFolder(ghostId, referencePaths, vaultPath)
+    guard.assertWithinVault(folderPath)
+
+    // 4. Build prompt
+    const prompt = buildEmergePrompt(ghostTitle, refs)
+
+    // 5-6. Call Claude CLI and parse response (with fallback)
+    let emergeResult: EmergeResult | null = null
+    try {
+      const rawResponse = await callClaudeFn(prompt)
+      const parsed = parseEmergeResponse(rawResponse)
+      if (parsed.ok) {
+        emergeResult = parsed.value
+      }
+    } catch (err) {
+      if (err instanceof PathGuardError) throw err
+      // Fallback: empty note (Claude CLI not found, timeout, etc.)
+    }
+
+    // 7. Build Artifact
+    const artifact = buildArtifact(ghostId, ghostTitle, referencePaths, emergeResult)
+
+    // 8. Serialize
+    const content = serializeArtifact(artifact)
+
+    // 9. Sanitize filename, validate write path
+    const safeFilename = sanitizeFilename(ghostTitle)
+    const filePath = join(folderPath, `${safeFilename}.md`)
+    guard.assertWithinVault(filePath)
+
+    // 10. Gate on the approval spine before any folder creation or write.
+    const decision = await deps.gate.confirm({
+      tool: 'vault.emerge_ghost',
+      path: filePath,
+      description: `Create synthesized note "${ghostTitle}" from ${refs.length} references`,
+      contentPreview: content.slice(0, PREVIEW_MAX_CHARS)
+    })
+
+    if (!decision.allowed) {
+      deps.audit?.log({
+        ts: new Date().toISOString(),
+        tool: 'vault.emerge_ghost',
+        args: { path: filePath, agentId: 'ghost-emerge' },
+        affectedPaths: [filePath],
+        decision: 'denied',
+        error: decision.reason
+      })
+      return { status: 'denied', reason: decision.reason }
+    }
+
+    // 11. Approved: create the folder, then write through the stamped-note spine.
+    const folderCreated = !existsSync(folderPath)
+    if (folderCreated) {
+      mkdirSync(folderPath, { recursive: true })
+    }
+
+    // No registrar: a brand-new file cannot be an open document to echo-suppress.
+    await createStampedNote(filePath, content, 'ghost-emerge')
+
+    deps.audit?.log({
+      ts: new Date().toISOString(),
+      tool: 'vault.emerge_ghost',
+      args: { path: filePath, agentId: 'ghost-emerge' },
+      affectedPaths: [filePath],
+      decision: 'allowed'
+    })
+
+    return { status: 'created', filePath, folderCreated, folderPath }
+  } finally {
+    _emerging = false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// IPC Registration
+// ---------------------------------------------------------------------------
+
+export function registerGhostEmergeIpc(
+  callClaudeFn: CallClaudeFn = callClaude,
+  deps?: { gate?: HitlGate; audit?: AuditSink }
+): void {
+  const gate = deps?.gate ?? FAIL_CLOSED_GATE
+  typedHandle('vault:emerge-ghost', (args) =>
+    handleEmergeGhost(callClaudeFn, { gate, audit: deps?.audit }, args)
+  )
 }

@@ -65,11 +65,9 @@ export interface IpcChannels {
       referencePaths: readonly string[]
       vaultPath: string
     }
-    response: {
-      filePath: string
-      folderCreated: boolean
-      folderPath: string
-    }
+    response:
+      | { status: 'created'; filePath: string; folderCreated: boolean; folderPath: string }
+      | { status: 'denied'; reason: string }
   }
   'vault:watch-start': { request: { vaultPath: string }; response: void }
   'vault:watch-stop': { request: void; response: void }

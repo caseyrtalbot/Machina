@@ -122,6 +122,17 @@ is green. Layer 4 items may start once their stated dependencies exist.
    `claude-cli.ts`/`ghost-emerge.ts` path's ungated writes.
    → verify: no agent-originated vault write outside `note-write.ts` (grep); a ghost
    synthesis produces an approvals-tray diff.
+   (Completed 2026-07-24. Graph-enrichment was found already gated — it runs on the
+   native-agent lane (`EnrichmentPill` → native thread → `writeStampedNote` with HITL
+   + audit), so the change surface was ghost-emerge plus `VaultQueryFacade.createFile`.
+   Ghost-emerge's raw write replaced by `QueueHitlGate` over the global ApprovalQueue
+   (fail-closed, note content as tray diff) + new `createStampedNote` in
+   `note-write.ts` + audit (`vault.emerge_ghost`); `createFile` converged onto the
+   same helper, closing its documented round-trip bug. Verify gate held in CI by
+   `tests/main/write-spine.test.ts` (lane scan: no raw fs write primitives outside
+   `note-write.ts`); live check confirmed a synthesis raises a gate-confirm tray row
+   whose diff is the note, and deny writes nothing. `claude-cli.ts` remains as
+   synthesis transport only.)
 4. One tool surface: the native agent converges on the MCP tool surface; Spotlighting
    wraps all agent-facing vault reads (closing the asymmetry where the path holding
    write tools reads unwrapped content).

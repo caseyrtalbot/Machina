@@ -37,6 +37,7 @@ describe('vault:emerge-ghost IPC channel', () => {
     const { ipcRenderer } = await import('electron')
     const mockInvoke = vi.mocked(ipcRenderer.invoke)
     mockInvoke.mockResolvedValue({
+      status: 'created',
       filePath: '/vault/emergent-concept.md',
       folderCreated: false,
       folderPath: '/vault'

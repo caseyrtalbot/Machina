@@ -545,6 +545,10 @@ approval surfaces onto the queue — ONE review surface.
     gate keeps the 30s fail-closed remove-on-timeout (OQ-B, decided) — the queue owns
     the timeout, no wrapper. Fail-closed floor: an unwired provider DENIES (pinned
     test) — broken wiring degrades to denial, never to a divergent dialog.
+  - Ghost synthesis (2026-07-24, "one write spine", Layer 1 item 3): `vault:emerge-ghost`
+    confirms ride the same queue via `QueueHitlGate` (deps-injected at
+    `registerGhostEmergeIpc` in `index.ts`); same fail-closed floor — an unwired gate
+    denies (pinned test).
   - Native: `tool_pending_approval` holds mirror to gate-confirm rows
     (`enqueueGateHold` — NO auto-deny timer; the hold's own surface bounds its life,
     run abort included). **Single resolution authority:** the context.ts approvals

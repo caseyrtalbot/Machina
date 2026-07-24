@@ -4,10 +4,10 @@
  * Wraps PathGuard (boundary enforcement) and AuditLogger (security audit trail)
  * to provide query and write methods for the MCP server.
  */
-import { readFile, stat, open } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import matter from 'gray-matter'
 import { PathGuardError } from '@shared/agent-types'
-import { writeStampedNote } from '../utils/note-write'
+import { writeStampedNote, createStampedNote } from '../utils/note-write'
 import { applyFileToIndex } from './vault-indexing'
 import type { PathGuard } from './path-guard'
 import type { AuditLogger } from './audit-logger'
@@ -204,29 +204,10 @@ export class VaultQueryFacade {
       throw new MissingIdError(filePath)
     }
 
-    // Stamp creation provenance.
-    // FAST-FOLLOW: this matter.stringify re-parses parsed.content, so a body
-    // that itself starts with '---' (e.g. '---\nid: a\n---\n---\nbody\n') is
-    // shattered — the same class of bug fixed in note-write.stampProvenance.
-    // Lower risk here (create-only, requires a valid id: mapping, never
-    // overwrites). Converge createFile onto the hardened stampProvenance helper.
-    const data = {
-      ...parsed.data,
-      created_by: opts.agentId,
-      created_at: new Date().toISOString()
-    }
-    const stamped = matter.stringify(parsed.content, data)
-
-    // Register with DocumentManager to suppress vault watcher echo
-    this.documentManager?.registerExternalWrite(resolved)
-
-    // Exclusive create: fail if file already exists (prevents silent overwrite)
-    const fh = await open(resolved, 'wx')
-    try {
-      await fh.writeFile(stamped, 'utf-8')
-    } finally {
-      await fh.close()
-    }
+    // Stamp creation provenance, suppress watcher echo, and exclusive-create
+    // (EEXIST propagates). Shared with the native agent tools so both write
+    // paths use one hardened implementation; the body is preserved verbatim.
+    const stamped = await createStampedNote(resolved, content, opts.agentId, this.documentManager)
 
     // Read-your-writes: refresh the live index immediately so a follow-up
     // search/graph query sees this create before the watcher echo lands.
