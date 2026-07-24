@@ -20,6 +20,7 @@ import { registerThreadIpc } from './ipc/thread-ipc'
 import { registerAgentNativeIpc } from './ipc/agent-native-ipc'
 import { registerCliThreadIpc } from './ipc/cli-thread'
 import { registerPdfIndexIpc, setPdfIndexSearchEngine } from './ipc/pdf-index'
+import { registerVaultIndexIpc, setVaultIndexSnapshotDeps, emitIndexDelta } from './ipc/vault-index'
 import {
   getApprovalQueue,
   initApprovalsForRoot,
@@ -207,7 +208,10 @@ async function reconfigureForVault(vaultPath: string): Promise<void> {
 
   // Keep the index live: watcher batches re-parse changed .md files into the
   // same VaultIndex/SearchEngine the MCP facade queries (frozen-at-open bug).
-  setVaultBatchListener(createLiveIndexUpdater(deps))
+  // Each batch's parsed delta is emitted to the renderer (main is the sole
+  // parse authority); the snapshot handler is re-pointed at the fresh deps.
+  setVaultBatchListener(createLiveIndexUpdater(deps, emitIndexDelta))
+  setVaultIndexSnapshotDeps(deps)
 
   // PDF text indexed by the renderer (3.10a) lands in the same SearchEngine.
   setPdfIndexSearchEngine(deps.searchEngine)
@@ -474,6 +478,7 @@ app.whenReady().then(() => {
   registerAgentNativeIpc()
   registerCliThreadIpc()
   registerPdfIndexIpc()
+  registerVaultIndexIpc()
   registerEmbeddingsIpc()
   registerGitIpc()
   registerHarnessIpc()

@@ -4,101 +4,117 @@ Single-file handoff: **overwritten** at every clean checkpoint, never appended �
 history is the archive. A fresh agent starts here after reading `docs/PLAN.md` (the
 canonical plan; do not restructure it) and `CLAUDE.md` (conventions + working protocol).
 
-**Position:** Layer 1 (Foundations) **item 4 — one tool surface — COMPLETE**
-(2026-07-24; PLAN.md item 4 carries the completion note). **Next: Layer 1 item 5 —
-one index authority** (main-process VaultIndex is the single truth; renderer
-vault-worker becomes a diff-fed projection; `system-artifact-runtime`'s inline parse
-removed; verify gate: one parse+graph ingestion path, grep).
+**Position:** Layer 1 (Foundations) **item 5 — one index authority — COMPLETE**
+(2026-07-24; PLAN.md item 5 carries the completion note). **Next: Layer 1 item 6 —
+surface registry** (collapse the five-touchpoint surface enumeration — ribbon, palette
+sources, keybindings, `DockTabContent` switch, `dock-types.ts` — into one registry;
+execute D3, Health → status-bar popover, as the first registry change; verify gate:
+adding or removing a surface is a one-site change).
 
-## What shipped last (item 4 — one tool surface)
+## What shipped last (item 5 — one index authority)
 
-Two sequential implementers (note lane, then canvas lane) + orchestrator (docs,
-gates), double-spotcheck-verified. Uncommitted at handoff-write time; this
-checkpoint's commit is the whole diff (~19 files).
+Two sequential implementers (main lane, then renderer lane) + orchestrator (gate test,
+docs, spotcheck-driven fixes), spotcheck-verified. Uncommitted at handoff-write time;
+this checkpoint's commit is the whole diff (22 files: 19 modified + 3 new).
 
-**Scope finding:** "converges on the MCP tool surface" landed at the implementation
-layer, not the tool-name layer — the native agent keeps its 12 tool names/schemas
-(relative paths, `edit_note`, dock tools have no MCP twins), but every vault-touching
-implementation is now shared with the MCP lane.
+Before: main (`VaultIndex` for MCP/native) and the renderer vault-worker each read and
+parsed the ENTIRE vault independently with the same shared kernel — the renderer via
+one `fs:read-file` IPC round-trip per note — and `system-artifact-runtime.ts` ran a
+third, partial inline parse. After: main parses once; the renderer projects.
 
 **Changes:**
 
-- **`src/shared/spotlighting.ts` (new)** — `SPOTLIGHT_BOUNDARY` + `wrapSpotlighting`
-  moved verbatim from `mcp-server.ts`; new `unwrapSpotlighting` for display. Lives in
-  `@shared` (not main/services) because the renderer's tool cards display the same
-  output object the model receives, so they must unwrap — and only `@shared` serves
-  both processes with ONE definition site.
-- **Native reads wrapped + audited**: `read_note` wraps `content`; `search_vault`
-  output changed `{hits}` → `{results}` (hits JSON serialized and wrapped once);
-  `read_canvas` output changed to `{canvasId, snapshot}` (wrapped JSON of
-  version/viewport/cards/edges). `list_vault`/`list_canvases` stay unwrapped
-  (structured JSON — same exemption as MCP `search.query`). `read_note` and
-  `edit_note`'s pre-read audit via `facade.readFile`; `read_canvas` path-audits via
-  `facade.assertReadable`.
-- **One facade instance**: `ToolContext.facade` (REQUIRED) is the same
-  `VaultQueryFacade` the MCP server uses — `McpLifecycle` now exposes `getFacade()`;
-  `index.ts` wires `setNativeVaultFacadeProvider(() => mcpLifecycle.getFacade())`.
-  `write_note`/`edit_note` post-approval writes go through `facade.writeFile`
-  (`agentId: 'native-agent'` + native tool label via new optional `tool` audit-label
-  params, MCP defaults unchanged), gaining read-your-writes index refresh.
-  `ToolContext.documentManager` deleted (echo suppression now flows via the facade's
-  deps). Gate flow (emitPending/awaitApproval/autoAccept/rateLimiter) untouched.
-- **`src/main/services/canvas-apply.ts` (new)** — one main-side canvas applier:
-  `applyCanvasPlanToFile` (mtime precondition + `validateCanvasMutationOps` +
-  `applyPlanOps` inside `enqueueCanvasWrite`) and `writeCanvasViewport`. Native
-  `pin_to_canvas`/`unpin_from_canvas` became op builders over it (hand-rolled
-  mutations deleted); `focus_canvas`'s viewport write moved into it; MCP
-  `canvas.apply_plan` persists through it main-side — fixing the pre-existing bug
-  where an accepted plan was silently dropped if the canvas wasn't open in the
-  renderer (pinned by test). Native canvas tools stay UNGATED per ratified schema.
-- **Bonus bug fix**: native unpin's edge cascade filtered on `from`/`to` but real
-  edges use `fromNode`/`toNode` — it had never fired against real canvas files;
-  converging onto `applyPlanOps` fixed it (fixtures corrected to real edge shape).
-- **Renderer**: `ReadNoteCard`/`SearchVaultCard`/`ReadCanvasCard` unwrap for display.
-  No legacy `hits` fallback (by design): search cards in already-persisted dev
-  threads render 0 hits; new runs are correct.
-- **New CI gate:** `tests/main/tool-surface.test.ts` — Spotlighting defined only in
-  `src/shared/spotlighting.ts`; note-tools reads/writes via facade (no note-write
-  import, no direct `writeStampedNote`); canvas-tools has zero `fs.writeFile` and
-  imports the applier; mcp-server imports the applier. `write-spine.test.ts` Test2
-  evolved (note-tools dropped from must-import list; must-NOT-call check added).
-- **Docs (same commit):** `safety-subsystem.md` (invariant 3 wrapper location, native
-  section flipped — Spotlighting yes, reads audited, facade-level provenance, canvas
-  applier; Known Gap 2 deleted; Gap 1 extended with native list/search; code table +
-  apply_plan rows), `overview.md` native-agent paragraph, local CLAUDE.md new
-  one-tool-surface invariant line, NATIVE_TOOLS descriptions for the three wrapped
-  reads.
+- **`src/shared/index-delta.ts` (new)** — the wire contract:
+  `VaultIndexEntry { path; artifact: Artifact | null; error: ParseError | null }`
+  (artifact null iff parse failed) and `VaultIndexDelta { upserts; removes }` (absolute
+  paths).
+- **New IPC**: channel `vault:index-snapshot` (returns all current entries; handler in
+  new `src/main/ipc/vault-index.ts`, deps supplied via the established setter pattern
+  from `reconfigureForVault`) and event `vault:index-delta` (emitted after each watcher
+  batch is applied to the index, in batch order, inside `createLiveIndexUpdater`'s
+  serialization chain). Preload: `window.api.vault.indexSnapshot()` +
+  `window.api.on.indexDelta(cb)`. `vault:files-changed-batch` is unchanged and still
+  serves path-level subscribers (open-doc sync, sidebar lists) — never ingestion.
+- **Main is the sole parser**: `VaultIndex.addFile/updateFile` now return
+  `IngestResult { artifact, error }` so parse failures surface (previously dropped);
+  `vault-indexing.ts` keeps an `entriesByPath` map for snapshots, returns the applied
+  delta from `applyIndexEvents`, and ingests system artifacts
+  (`<vault>/<TE_DIR>/artifacts/{sessions,patterns,tensions}/`) at init. The only
+  `parseArtifact(` invocation in src/ is `src/shared/engine/indexer.ts`.
+- **Watcher carve-out** (`vault-watcher.ts`): the system-artifact subtree under the TE
+  dir is now watched; everything else under TE_DIR (state.json, threads/, embeddings/,
+  audit) stays ignored — integration-tested (artifact .md fires, state.json/audit
+  fire nothing).
+- **Renderer worker is a projection** (`vault-worker-helpers.ts`): message protocol is
+  now `load {entries}` / `append {entries}` / `apply-delta {upserts, removes}` (+
+  unchanged `search`, `index-pdf`); `parseArtifact` import and id-collision suffixing
+  deleted (main's ids are canonical); `buildGraph` + `SearchEngine` remain as pure
+  projections; `WorkerResult` shape unchanged, so vault-store consumers are untouched.
+- **App.tsx hydration**: per-file read loop deleted; orchestrateLoad fetches the
+  snapshot (wrapped in `withTimeout`, 30s) and chunks it into the worker with the
+  existing progressive-hydration pattern; a lifetime `indexDelta` subscription buffers
+  during hydration and flushes in a `finally` (a failed snapshot fetch cannot strand
+  the buffer flag). The old batch subscription's re-read/`updateMany` is gone; its
+  sidebar file-list maintenance remains, now routing system-artifact paths to
+  `systemFiles` instead of leaking them into `files` (spotcheck catch).
+- **`syncSystemArtifactFromDisk` deleted** (`system-artifact-runtime.ts` is now just
+  `openArtifactInEditor`; editor-store call site removed). It was a partial ingestion
+  that skipped `ghostIndex`/`artifactById`/`edgeCountByArtifactId` — that bug dies
+  with it. System-artifact edits now ride watcher → index → delta like every note.
+- **New CI gate:** `tests/main/index-authority.test.ts` — `parseArtifact` invoked only
+  from `indexer.ts`; `buildGraph` only from `indexer.ts` + `vault-worker-helpers.ts`;
+  worker imports no parser/gray-matter and ingests `VaultIndexEntry`; system-artifact
+  runtime has no parse/readFile; App.tsx hydrates via snapshot+delta with no
+  `fs.readFile` ingestion.
+- **Docs (same commit):** `overview.md` (worker table row + vault-file-changes data
+  flow rewritten around the single parse authority), `interface-contracts.md`
+  (agent-write-watcher paragraph's vault-watcher contrast updated for the carve-out),
+  local CLAUDE.md (new one-index-authority invariant line), PLAN.md item 5 completion
+  note.
 
-**Verify evidence:** full `npm run check` green — **336 files / 4122 tests** (baseline
-4112 + 10, +1 file), zero lint, zero type errors. `npm run build` exit 0. Two
-spotcheck passes: 10/10 checks PASS (one facade instance confirmed by repo-wide
-`new VaultQueryFacade` grep — only mcp-lifecycle + the separate headless mcp-cli
-process; boundary-injection escape tests pass on read_note AND read_canvas paths;
-no renderer consumer of the old shapes missed). `npm audit`: same 7 pre-existing
-sharp/libvips vulns (no deps changed).
+**Behavior change (intended, ratified by "single truth"):** main's index now includes
+system artifacts, so MCP `search.query` / `graph.get_neighbors` / `graph.get_ghosts`
+see sessions/patterns/tensions for the first time. The renderer already ingested them
+pre-change (files + systemFiles hydration), so renderer graph/search/enrichment corpus
+is unchanged.
+
+**Verify evidence:** full `npm run check` green — **337 files / 4135 tests** (baseline
+4122 + 13, +1 file), zero lint, zero type errors (re-run green after the two
+spotcheck fixes). `npm run build` exit 0. New gate passes 5/5. Spotcheck-verifier
+pass: checks 1–4, 6, 8 PASS; its check-5 finding (sidebar leak) and check-7 finding
+(strandable hydration flag) fixed as above; its check-9 "probable regression"
+(system artifacts inflating enrichment/graph counts) dismissed with evidence — old
+App.tsx:198 already fed `files + systemFiles` to the worker. `npm audit`: 16 vulns
+(2 low / 4 moderate / 10 high), all in the pre-existing sharp/libvips chain — count
+rose from 7 since last handoff because NEW advisories published; no dependency files
+changed in this diff.
 
 ## Landmines
 
-- **`tests/main/tool-surface.test.ts` is a permanent gate** alongside write-spine:
-  new native tools returning vault content must wrap via `@shared/spotlighting` and
-  route through the facade, or it bites.
-- **`search_vault`/`read_canvas` output shapes changed** (`results`/`snapshot`
-  wrapped strings). Anything new consuming native tool outputs must
-  `unwrapSpotlighting` for display; the model-facing envelope is the contract.
-- **MCP `canvas.apply_plan` now persists main-side** (was renderer-dispatch only).
-  If renderer canvas state ever looks doubled, check the plan-dispatch path — today
-  renderer applies in-memory + autosaves the same state, which is idempotent.
-- **Native PATH_OUT_OF_VAULT denials are still not audited** (resolveInVault
-  short-circuits before the facade; unchanged from before — enforcement intact,
-  denial-logging absent on the native lane).
-- **Optional hardening (not done, deliberate):** `canvas-apply.ts` has no
-  self-referential "sole canvas writer" gate; the invariant is enforced caller-side
-  in tool-surface.test.ts. Add one if the module grows call sites.
-- **Visual verification gap:** the three changed tool cards are covered by unit
-  tests (ToolCallRenderer 9/9) but were not eyeballed in a live native-agent run
-  (needs real API spend). Cheap check when next in the app: run a native-agent
-  "read note X" turn and confirm the tool card shows clean note text, not envelope
-  markers.
+- **`tests/main/index-authority.test.ts` is a permanent gate** alongside write-spine
+  and tool-surface: any new markdown→Artifact parse site outside `indexer.ts`, any
+  worker-side parsing, or any renderer content-read ingestion path trips it.
+- **Facade read-your-writes does not emit deltas**: `VaultQueryFacade.refreshIndex`
+  updates the index inline for the agent lane but does not touch `entriesByPath` or
+  emit `vault:index-delta`; the watcher echo (~350ms) re-applies idempotently and
+  carries both. Renderer view of an agent write lags by the echo — same as before.
+- **Snapshot before vault init returns `{ entries: [] }`** by design; the only caller
+  (orchestrateLoad) runs strictly after vault init. A new caller must keep that
+  ordering.
+- **Delta consumers must tolerate `artifact: null` entries** (parse failures now
+  travel the wire instead of being dropped) and treat upserts as replace-by-path.
+- **App.tsx's batch handler file-list logic is untested** (inline in the component);
+  the system-artifact routing fix there has no dedicated regression test — check the
+  sidebar when next in the app (a session/pattern write must appear under system
+  files, not the regular tree).
+- **Visual verification gap:** hydration + live-delta flow is unit/integration tested
+  but not eyeballed in a live run. Cheap check when next in `npm run dev`: vault loads
+  with graph populated, editing a note updates the graph within ~1s, editing a session
+  artifact in the editor updates its card/graph presence.
+- Spotcheck's "git status blind spot on this machine" finding was a false alarm: the
+  two "invisible" doc files were the orchestrator's own edits landing mid-run.
 - All prior landmines hold (design gates, visual baselines darwin-only, e2e fixture
   `state.json` rewrite — restore before commit; git index.lock retries; npm installs
-  need `--cache /tmp/npm-cache-te`; skip-worktree check `git ls-files -v | grep ^S`).
+  need `--cache /tmp/npm-cache-te`; skip-worktree check `git ls-files -v | grep ^S`;
+  native PATH_OUT_OF_VAULT denials unaudited; MCP apply_plan renderer double-apply
+  idempotence).

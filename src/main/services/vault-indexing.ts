@@ -7,6 +7,9 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, extname } from 'node:path'
 import { VaultIndex } from '@shared/engine/indexer'
 import { SearchEngine } from '@shared/engine/search-engine'
+import { TE_DIR } from '@shared/constants'
+import { SYSTEM_ARTIFACT_DIRECTORIES } from '@shared/system-artifacts'
+import type { VaultIndexEntry, VaultIndexDelta } from '@shared/index-delta'
 import type { VaultQueryDeps } from './vault-query-facade'
 
 interface FileEntry {
@@ -17,6 +20,20 @@ interface FileEntry {
 export interface LiveIndexDeps {
   readonly vaultIndex: VaultIndex
   readonly searchEngine: SearchEngine
+  /** Per-path parsed entries backing the index snapshot served over IPC. */
+  readonly entriesByPath: Map<string, VaultIndexEntry>
+}
+
+/**
+ * Subset of the deps needed to mutate the index for a single file. The
+ * entriesByPath map is optional so the facade's read-your-writes path (which
+ * only holds vaultIndex + searchEngine) can reuse this without the snapshot
+ * map; the watcher echo carries the snapshot update for those writes.
+ */
+interface ApplyDeps {
+  readonly vaultIndex: VaultIndex
+  readonly searchEngine: SearchEngine
+  readonly entriesByPath?: Map<string, VaultIndexEntry>
 }
 
 export interface IndexFileEvent {
@@ -29,80 +46,106 @@ export interface IndexFileEvent {
  * SearchEngine, replacing any prior entry for the same path. If the file's
  * artifact id changed (frontmatter id edit), the stale search doc keyed by
  * the old id is removed; if the new content fails to parse, the file drops
- * out of both structures.
+ * out of the search index (but is retained in the snapshot as a parse error).
+ * Returns the resulting snapshot entry.
  */
-export function applyFileToIndex(deps: LiveIndexDeps, path: string, content: string): void {
+export function applyFileToIndex(deps: ApplyDeps, path: string, content: string): VaultIndexEntry {
   const oldId = deps.vaultIndex.getIdForFile(path)
-  deps.vaultIndex.updateFile(path, content)
-  const newId = deps.vaultIndex.getIdForFile(path)
+  const { artifact, error } = deps.vaultIndex.updateFile(path, content)
+  const newId = artifact?.id
 
   if (oldId && oldId !== newId) {
     deps.searchEngine.remove(oldId)
   }
-  if (!newId) return
+  if (artifact) {
+    deps.searchEngine.upsert({
+      id: artifact.id,
+      title: artifact.title,
+      tags: [...artifact.tags],
+      body: artifact.body,
+      path
+    })
+  }
 
-  const artifact = deps.vaultIndex.getArtifact(newId)
-  if (!artifact) return
-  deps.searchEngine.upsert({
-    id: artifact.id,
-    title: artifact.title,
-    tags: [...artifact.tags],
-    body: artifact.body,
-    path
-  })
+  const entry: VaultIndexEntry = { path, artifact: artifact ?? null, error }
+  deps.entriesByPath?.set(path, entry)
+  return entry
 }
 
-/** Remove a file from both the VaultIndex and the SearchEngine. */
-export function removeFileFromIndex(deps: LiveIndexDeps, path: string): void {
+/** Remove a file from the VaultIndex, SearchEngine, and snapshot map. */
+export function removeFileFromIndex(deps: ApplyDeps, path: string): void {
   const id = deps.vaultIndex.getIdForFile(path)
   deps.vaultIndex.removeFile(path)
   if (id) deps.searchEngine.remove(id)
+  deps.entriesByPath?.delete(path)
 }
 
 /**
- * Apply a watcher batch to the index. Reads changed .md files from disk;
- * a read failure (e.g. deleted between batch and read) drops the file from
- * the index. Non-markdown paths are ignored.
+ * Apply a watcher batch to the index and return the delta it produced. Reads
+ * changed .md files from disk; a read failure (e.g. deleted between batch and
+ * read) drops the file from the index. Non-markdown paths are ignored.
  */
 export async function applyIndexEvents(
   deps: LiveIndexDeps,
   events: readonly IndexFileEvent[]
-): Promise<void> {
+): Promise<VaultIndexDelta> {
+  const upserts: VaultIndexEntry[] = []
+  const removes: string[] = []
   for (const { path, event } of events) {
     if (extname(path).toLowerCase() !== '.md') continue
     if (event === 'unlink') {
       removeFileFromIndex(deps, path)
+      removes.push(path)
       continue
     }
     try {
       const content = await readFile(path, 'utf-8')
-      applyFileToIndex(deps, path, content)
+      upserts.push(applyFileToIndex(deps, path, content))
     } catch {
       removeFileFromIndex(deps, path)
+      removes.push(path)
     }
   }
+  return { upserts, removes }
 }
 
 /**
  * Fire-and-forget watcher subscriber that keeps the main-process index live.
  * Batches are serialized through an internal promise chain so two overlapping
- * batches cannot interleave reads against the same path.
+ * batches cannot interleave reads against the same path. When `onDelta` is
+ * supplied, it is invoked with each batch's parsed delta after it applies, in
+ * batch order (inside the serialization chain).
  */
 export function createLiveIndexUpdater(
-  deps: LiveIndexDeps
+  deps: LiveIndexDeps,
+  onDelta?: (delta: VaultIndexDelta) => void
 ): (events: readonly IndexFileEvent[]) => void {
   let queue: Promise<void> = Promise.resolve()
   return (events) => {
-    queue = queue.then(() => applyIndexEvents(deps, events)).catch(() => {})
+    queue = queue
+      .then(async () => {
+        const delta = await applyIndexEvents(deps, events)
+        if (delta.upserts.length > 0 || delta.removes.length > 0) onDelta?.(delta)
+      })
+      .catch(() => {})
   }
+}
+
+/** Immutable copy of the current index snapshot for IPC delivery. */
+export function getIndexSnapshot(deps: LiveIndexDeps): { entries: VaultIndexEntry[] } {
+  return { entries: [...deps.entriesByPath.values()] }
 }
 
 /**
  * Build a VaultIndex and SearchEngine from file contents.
- * Files that fail to parse are silently skipped (errors recorded in VaultIndex).
+ * Files that fail to parse are retained in the snapshot as parse errors.
  */
 export function buildVaultDeps(files: readonly FileEntry[]): VaultQueryDeps & LiveIndexDeps {
-  const deps: LiveIndexDeps = { vaultIndex: new VaultIndex(), searchEngine: new SearchEngine() }
+  const deps: LiveIndexDeps = {
+    vaultIndex: new VaultIndex(),
+    searchEngine: new SearchEngine(),
+    entriesByPath: new Map<string, VaultIndexEntry>()
+  }
   for (const file of files) {
     applyFileToIndex(deps, file.path, file.content)
   }
@@ -141,7 +184,15 @@ const READ_CONCURRENCY = 12
  * Uses bounded concurrency to avoid overwhelming IPC/disk on large vaults.
  */
 export async function initVaultIndex(vaultRoot: string): Promise<VaultQueryDeps & LiveIndexDeps> {
-  const mdPaths = await listMdFiles(vaultRoot)
+  // System artifacts (sessions/patterns/tensions) live under the hidden TE dir,
+  // which listMdFiles skips. Scan their directories explicitly so the main
+  // index is the single authority over the whole corpus, not just user notes.
+  const artifactsBase = join(vaultRoot, TE_DIR, 'artifacts')
+  const systemDirs = Object.values(SYSTEM_ARTIFACT_DIRECTORIES).map((dir) =>
+    join(artifactsBase, dir)
+  )
+  const systemPaths = (await Promise.all(systemDirs.map(listMdFiles))).flat()
+  const mdPaths = [...(await listMdFiles(vaultRoot)), ...systemPaths]
 
   // Bounded concurrency file reads
   const files: FileEntry[] = []

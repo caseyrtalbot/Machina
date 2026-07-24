@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { isSystemArtifactPath } from '@shared/system-artifacts'
 import { logError } from '../utils/error-logger'
 
 type EditorMode = 'rich' | 'source'
@@ -105,11 +104,8 @@ async function persistDirtyDocument(
 
   try {
     await window.api.document.saveContent(path, state.content)
-    if (isSystemArtifactPath(path)) {
-      const { syncSystemArtifactFromDisk } =
-        await import('../system-artifacts/system-artifact-runtime')
-      await syncSystemArtifactFromDisk(path)
-    }
+    // System-artifact edits reflect into the index via the watcher → main
+    // re-parse → index-delta path, same as any note (one parse authority).
     if (options.markSavedOnSuccess && useEditorStore.getState().activeNotePath === path) {
       useEditorStore.getState().markSaved()
     }

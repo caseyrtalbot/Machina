@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useVaultWorker } from '../useVaultWorker'
+import type { VaultIndexEntry } from '@shared/index-delta'
 
 describe('useVaultWorker progressive hydration', () => {
   const workerMessages: unknown[] = []
@@ -29,30 +30,53 @@ describe('useVaultWorker progressive hydration', () => {
     vi.unstubAllGlobals()
   })
 
+  const entry = (path: string, id: string): VaultIndexEntry => ({
+    path,
+    artifact: {
+      id,
+      title: id,
+      type: 'note',
+      signal: 'untested',
+      tags: [],
+      connections: [],
+      clusters_with: [],
+      tensions_with: [],
+      appears_in: [],
+      related: [],
+      concepts: [],
+      origin: 'human',
+      sources: [],
+      bodyLinks: [],
+      body: '',
+      frontmatter: {}
+    },
+    error: null
+  })
+
   it('sends later hydration chunks as incremental appends instead of full reloads', () => {
     const { result, unmount } = renderHook(() => useVaultWorker(vi.fn()))
 
-    result.current.loadFiles([{ path: '/vault/a.md', content: 'A' }])
-    result.current.appendFiles([{ path: '/vault/b.md', content: 'B' }])
+    result.current.loadEntries([entry('/vault/a.md', 'a')])
+    result.current.appendEntries([entry('/vault/b.md', 'b')])
 
     expect(workerMessages).toEqual([
-      { type: 'load', files: [{ path: '/vault/a.md', content: 'A' }] },
-      { type: 'append', files: [{ path: '/vault/b.md', content: 'B' }] }
+      { type: 'load', entries: [entry('/vault/a.md', 'a')] },
+      { type: 'append', entries: [entry('/vault/b.md', 'b')] }
     ])
 
     unmount()
     expect(terminate).toHaveBeenCalledTimes(1)
   })
 
-  it('sends a watcher batch as a single update-many message', () => {
+  it('sends a watcher delta as a single apply-delta message', () => {
     const { result, unmount } = renderHook(() => useVaultWorker(vi.fn()))
 
-    result.current.updateMany([{ path: '/vault/a.md', content: 'A2' }], ['/vault/b.md'])
+    result.current.applyDelta([entry('/vault/a.md', 'a')], ['/vault/b.md'])
 
     expect(workerMessages).toEqual([
       {
-        type: 'update-many',
-        updates: [{ path: '/vault/a.md', content: 'A2' }],
+        type: 'apply-delta',
+        upserts: [entry('/vault/a.md', 'a')],
         removes: ['/vault/b.md']
       }
     ])

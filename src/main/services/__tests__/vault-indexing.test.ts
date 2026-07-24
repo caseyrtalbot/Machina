@@ -8,13 +8,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { TE_DIR } from '@shared/constants'
 import {
   buildVaultDeps,
   initVaultIndex,
   applyFileToIndex,
   removeFileFromIndex,
   applyIndexEvents,
-  createLiveIndexUpdater
+  createLiveIndexUpdater,
+  getIndexSnapshot
 } from '../vault-indexing'
 
 const HELLO_MD = [
@@ -230,6 +232,53 @@ describe('live index updates', () => {
         expect(deps.searchEngine.search('greeting')).toHaveLength(1)
       })
     })
+
+    it('applyIndexEvents returns a delta with upserts for add/change and removes for unlink', async () => {
+      const deps = buildVaultDeps([])
+      const helloPath = join(vaultRoot, 'notes', 'hello.md')
+
+      const addDelta = await applyIndexEvents(deps, [{ path: helloPath, event: 'add' }])
+      expect(addDelta.removes).toEqual([])
+      expect(addDelta.upserts).toHaveLength(1)
+      expect(addDelta.upserts[0].path).toBe(helloPath)
+      expect(addDelta.upserts[0].artifact?.id).toBe('hello')
+      expect(addDelta.upserts[0].error).toBeNull()
+
+      const unlinkDelta = await applyIndexEvents(deps, [{ path: helloPath, event: 'unlink' }])
+      expect(unlinkDelta.upserts).toEqual([])
+      expect(unlinkDelta.removes).toEqual([helloPath])
+    })
+
+    it('applyIndexEvents surfaces parse failures as an entry with artifact:null and an error', async () => {
+      const deps = buildVaultDeps([])
+      const badPath = join(vaultRoot, 'notes', 'bad.md')
+      // Unterminated frontmatter block makes gray-matter throw.
+      writeFileSync(badPath, '---\nid: [unclosed\n')
+
+      const delta = await applyIndexEvents(deps, [{ path: badPath, event: 'add' }])
+      expect(delta.upserts).toHaveLength(1)
+      expect(delta.upserts[0].artifact).toBeNull()
+      expect(delta.upserts[0].error?.filename).toBe(badPath)
+      // The parse error is retained in the snapshot even though it never enters search.
+      expect(getIndexSnapshot(deps).entries.find((e) => e.path === badPath)?.error).not.toBeNull()
+    })
+  })
+
+  describe('getIndexSnapshot', () => {
+    it('returns an immutable copy reflecting adds and removes', async () => {
+      // unlink never touches disk, so a literal path suffices here.
+      const helloPath = '/vault/notes/hello.md'
+      const deps = buildVaultDeps([{ path: helloPath, content: HELLO_MD }])
+
+      const first = getIndexSnapshot(deps)
+      expect(first.entries.map((e) => e.path)).toEqual([helloPath])
+      // Mutating the returned array must not affect the live snapshot.
+      first.entries.length = 0
+      expect(getIndexSnapshot(deps).entries).toHaveLength(1)
+
+      await applyIndexEvents(deps, [{ path: helloPath, event: 'unlink' }])
+      expect(getIndexSnapshot(deps).entries).toHaveLength(0)
+    })
   })
 })
 
@@ -259,6 +308,21 @@ describe('initVaultIndex', () => {
     )
     // Non-md file should be ignored
     writeFileSync(join(base, 'notes', 'readme.txt'), 'not markdown')
+    // A system artifact under the (hidden) TE dir that listMdFiles skips.
+    const sessionsDir = join(base, TE_DIR, 'artifacts', 'sessions')
+    mkdirSync(sessionsDir, { recursive: true })
+    writeFileSync(
+      join(sessionsDir, 'session-1.md'),
+      [
+        '---',
+        'id: session-1',
+        'title: Session One',
+        'type: session',
+        '---',
+        '',
+        'A recorded session.'
+      ].join('\n')
+    )
     vaultRoot = realpathSync(base)
   })
 
@@ -291,7 +355,17 @@ describe('initVaultIndex', () => {
     const deps = await initVaultIndex(vaultRoot)
 
     const allIds = deps.vaultIndex.getArtifacts().map((a) => a.id)
-    // 3 .md files: hello, world, deep-note
-    expect(allIds).toHaveLength(3)
+    // 4 .md files: hello, world, deep-note (user notes) + session-1 (system artifact)
+    expect(allIds).toHaveLength(4)
+  })
+
+  it('ingests system artifacts under the TE dir into the index and snapshot', async () => {
+    const deps = await initVaultIndex(vaultRoot)
+
+    expect(deps.vaultIndex.getArtifact('session-1')?.title).toBe('Session One')
+    const snapshotPaths = getIndexSnapshot(deps).entries.map((e) => e.path)
+    expect(snapshotPaths).toContain(
+      join(vaultRoot, TE_DIR, 'artifacts', 'sessions', 'session-1.md')
+    )
   })
 })

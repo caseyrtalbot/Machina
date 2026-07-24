@@ -67,7 +67,7 @@ describe('vault-worker index-pdf round-trip', () => {
     const controller = createWorkerController((msg) => posts.push(msg), 0)
     const send = (msg: WorkerInMessage): void => controller.handleMessage(msg)
 
-    send({ type: 'load', files: [] })
+    send({ type: 'load', entries: [] })
     posts.length = 0
 
     send({ type: 'index-pdf', pdfPath: PDF_PATH, pages: PAGES })
@@ -85,7 +85,7 @@ describe('vault-worker index-pdf round-trip', () => {
     const posts: WorkerMessage[] = []
     const controller = createWorkerController((msg) => posts.push(msg), 0)
     controller.handleMessage({ type: 'index-pdf', pdfPath: PDF_PATH, pages: PAGES })
-    controller.handleMessage({ type: 'load', files: [] })
+    controller.handleMessage({ type: 'load', entries: [] })
     posts.length = 0
 
     controller.handleMessage({ type: 'search', requestId: 1, query: 'luminous' })

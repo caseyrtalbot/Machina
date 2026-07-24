@@ -7,6 +7,7 @@ import type { CLIAgentSessionStatus } from './cli-agent-session-types'
 import type { InfraHealth } from './engine/vault-health'
 import type { Block } from './engine/block-model'
 import type { DockTab } from './dock-types'
+import type { VaultIndexEntry, VaultIndexDelta } from './index-delta'
 
 // `notePath` rides alongside an editor open: the editor DockTab is kind-keyed
 // (no path — see dock-types.ts), so the note to show travels outside the tab
@@ -51,6 +52,9 @@ export interface IpcChannels {
   // Response is the canonicalized vault root (symlinks resolved, NFC) so the
   // renderer, watcher, and main-process index share one path namespace.
   'vault:init': { request: { vaultPath: string }; response: string }
+  // Full parsed index snapshot for the active vault (main is the sole parse
+  // authority). The renderer seeds from this, then applies vault:index-delta.
+  'vault:index-snapshot': { request: void; response: { entries: VaultIndexEntry[] } }
   // Copy an external file (Finder drop, file picker) into <vault>/assets/ so
   // later reads pass PathGuard. In-vault sources are returned uncopied.
   'vault:import-asset': { request: { sourcePath: string }; response: { path: string } }
@@ -496,6 +500,9 @@ export interface IpcEvents {
   'vault:files-changed-batch': {
     events: readonly { path: string; event: 'add' | 'change' | 'unlink' }[]
   }
+  // Parsed index delta emitted after every watcher batch (main is the sole
+  // parse authority; the renderer applies these instead of re-parsing).
+  'vault:index-delta': VaultIndexDelta
 
   // Document Manager events (main -> renderer)
   // App Lifecycle events (main -> renderer)

@@ -5,20 +5,36 @@ import type {
   WorkerMessage,
   WorkerSearchResponse
 } from '@engine/vault-worker-helpers'
+import type { Artifact } from '@shared/types'
+import type { VaultIndexEntry } from '@shared/index-delta'
 
-// Real parser + real SearchEngine: this is the full worker-side round-trip
-// for human full-text search (3.1), minus the postMessage transport.
+// Real SearchEngine, entry-fed: this is the worker-side round-trip for human
+// full-text search (3.1). Parsing now lives in main (one parse authority), so
+// the worker ingests pre-parsed entries rather than markdown content.
 
-const note = (id: string, title: string, body: string, tags = '[]'): string => `---
-id: ${id}
-title: ${title}
-type: note
-created: 2026-06-01
-modified: 2026-06-01
-tags: ${tags}
----
-
-${body}`
+function entry(path: string, id: string, title: string, body: string): VaultIndexEntry {
+  const artifact: Artifact = {
+    id,
+    title,
+    type: 'note',
+    created: '2026-06-01',
+    modified: '2026-06-01',
+    signal: 'untested',
+    tags: [],
+    connections: [],
+    clusters_with: [],
+    tensions_with: [],
+    appears_in: [],
+    related: [],
+    concepts: [],
+    origin: 'human',
+    sources: [],
+    bodyLinks: [],
+    body,
+    frontmatter: {}
+  }
+  return { path, artifact, error: null }
+}
 
 const ALPHA_BODY =
   'A long exploration of ideas. The phrase quantum entanglement appears deep in the body, surrounded by context words on either side of the match.'
@@ -37,9 +53,9 @@ describe('vault-worker full-text search round-trip', () => {
     handleMessage = controller.handleMessage
     handleMessage({
       type: 'load',
-      files: [
-        { path: '/v/alpha.md', content: note('alpha', 'Alpha Note', ALPHA_BODY) },
-        { path: '/v/beta.md', content: note('beta', 'Beta Note', 'Nothing relevant here.') }
+      entries: [
+        entry('/v/alpha.md', 'alpha', 'Alpha Note', ALPHA_BODY),
+        entry('/v/beta.md', 'beta', 'Beta Note', 'Nothing relevant here.')
       ]
     })
     posts = []
@@ -67,15 +83,10 @@ describe('vault-worker full-text search round-trip', () => {
     expect(posts.map((p) => p.type)).toEqual(['search-results'])
   })
 
-  it('reflects update-many edits: new body terms found, stale terms gone', () => {
+  it('reflects apply-delta edits: new body terms found, stale terms gone', () => {
     handleMessage({
-      type: 'update-many',
-      updates: [
-        {
-          path: '/v/alpha.md',
-          content: note('alpha', 'Alpha Note', 'Now about gravity wells only.')
-        }
-      ],
+      type: 'apply-delta',
+      upserts: [entry('/v/alpha.md', 'alpha', 'Alpha Note', 'Now about gravity wells only.')],
       removes: []
     })
     posts = []
@@ -91,7 +102,7 @@ describe('vault-worker full-text search round-trip', () => {
   })
 
   it('drops removed files from the index', () => {
-    handleMessage({ type: 'update-many', updates: [], removes: ['/v/alpha.md'] })
+    handleMessage({ type: 'apply-delta', upserts: [], removes: ['/v/alpha.md'] })
     posts = []
 
     handleMessage({ type: 'search', requestId: 4, query: 'entanglement' })

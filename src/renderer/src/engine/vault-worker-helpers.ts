@@ -1,17 +1,17 @@
-import { parseArtifact } from './parser'
 import { buildGraph } from './graph-builder'
 import { SearchEngine } from '@shared/engine/search-engine'
 import type { SearchHit } from '@shared/engine/search-engine'
 import type { PdfPageText } from '@shared/engine/pdf-extractor'
 import type { Artifact } from '@shared/types'
+import type { VaultIndexEntry } from '@shared/index-delta'
 import type { ParseError, WorkerResult } from './types'
 
 export type WorkerInMessage =
-  | { type: 'load'; files: ReadonlyArray<{ path: string; content: string }> }
-  | { type: 'append'; files: ReadonlyArray<{ path: string; content: string }> }
+  | { type: 'load'; entries: ReadonlyArray<VaultIndexEntry> }
+  | { type: 'append'; entries: ReadonlyArray<VaultIndexEntry> }
   | {
-      type: 'update-many'
-      updates: ReadonlyArray<{ path: string; content: string }>
+      type: 'apply-delta'
+      upserts: ReadonlyArray<VaultIndexEntry>
       removes: readonly string[]
     }
   | { type: 'search'; requestId: number; query: string; limit?: number }
@@ -28,7 +28,7 @@ export interface WorkerSearchResponse {
 export type WorkerMessage = WorkerOutMessage | WorkerSearchResponse
 
 interface WorkerHelpers {
-  addFile: (path: string, content: string) => void
+  ingestEntry: (entry: VaultIndexEntry) => void
   removeFile: (path: string) => void
   buildResult: () => WorkerResult
   clearAll: () => void
@@ -51,29 +51,25 @@ export function createWorkerHelpers(): WorkerHelpers {
     }
   }
 
-  function addFile(path: string, content: string): void {
-    clearErrorsForPath(path)
-    const result = parseArtifact(content, path)
-    if (result.ok) {
-      let id = result.value.id
-      if (artifacts.has(id)) {
-        let suffix = 2
-        while (artifacts.has(`${id}-${suffix}`)) suffix++
-        id = `${id}-${suffix}`
-      }
-      const artifact = id !== result.value.id ? { ...result.value, id } : result.value
-      artifacts.set(id, artifact)
-      fileToId.set(path, id)
-      artifactPathById.set(id, path)
+  function ingestEntry(entry: VaultIndexEntry): void {
+    // Main's index is the single parse authority; ids arrive resolved, so we
+    // trust them (no renderer-side collision suffixing). Drop whatever this
+    // path previously contributed — artifact or error — and replace it.
+    removeFile(entry.path)
+    if (entry.artifact) {
+      const artifact = entry.artifact
+      artifacts.set(artifact.id, artifact)
+      fileToId.set(entry.path, artifact.id)
+      artifactPathById.set(artifact.id, entry.path)
       searchEngine.upsert({
-        id,
+        id: artifact.id,
         title: artifact.title,
         tags: artifact.tags ?? [],
         body: artifact.body ?? '',
-        path
+        path: entry.path
       })
-    } else {
-      errors.push({ filename: path, error: result.error })
+    } else if (entry.error) {
+      errors.push({ filename: entry.path, error: entry.error.error })
     }
   }
 
@@ -120,7 +116,7 @@ export function createWorkerHelpers(): WorkerHelpers {
     searchEngine.clear()
   }
 
-  return { addFile, removeFile, buildResult, clearAll, search, indexPdf }
+  return { ingestEntry, removeFile, buildResult, clearAll, search, indexPdf }
 }
 
 /** Minimum gap between graph rebuilds posted during chunked appends. */
@@ -130,14 +126,17 @@ export const APPEND_POST_INTERVAL_MS = 1000
  * Message-handling core of the vault worker, factored out of the worker shell
  * so it can be unit-tested with fake timers.
  *
+ * Entries arrive pre-parsed from main's VaultIndex (the single parse
+ * authority); the worker ingests them and never parses markdown itself.
+ *
  * Rebuild policy:
  * - `load` (first chunk) rebuilds and posts immediately so the UI has content.
  * - `append` (background chunks) throttles to one rebuild+post per
  *   APPEND_POST_INTERVAL_MS, with a trailing timer that guarantees one final
- *   post covering every appended file. Without this, a 5k-note vault does
+ *   post covering every appended entry. Without this, a 5k-note vault does
  *   ~100 escalating O(n²) graph rebuilds during hydration.
- * - `update-many` (one watcher batch) applies every remove+update, then does a
- *   single rebuild — instead of one rebuild per changed file.
+ * - `apply-delta` (one watcher batch, parsed by main) applies every
+ *   remove+upsert, then does a single rebuild — instead of one per change.
  * - `search` (human full-text query) answers from the hosted SearchEngine with
  *   no graph rebuild; the response carries the caller's requestId.
  * - `index-pdf` (3.10a) upserts per-page PDF text into the SearchEngine only —
@@ -147,7 +146,7 @@ export function createWorkerController(
   post: (msg: WorkerMessage) => void,
   intervalMs: number = APPEND_POST_INTERVAL_MS
 ): { handleMessage: (msg: WorkerInMessage) => void } {
-  const { addFile, removeFile, buildResult, clearAll, search, indexPdf } = createWorkerHelpers()
+  const { ingestEntry, removeFile, buildResult, clearAll, search, indexPdf } = createWorkerHelpers()
   let appendTimer: ReturnType<typeof setTimeout> | undefined
   let lastPostAt = Number.NEGATIVE_INFINITY
 
@@ -177,19 +176,16 @@ export function createWorkerController(
     switch (msg.type) {
       case 'load':
         clearAll()
-        for (const file of msg.files) addFile(file.path, file.content)
+        for (const entry of msg.entries) ingestEntry(entry)
         postNow('loaded')
         break
       case 'append':
-        for (const file of msg.files) addFile(file.path, file.content)
+        for (const entry of msg.entries) ingestEntry(entry)
         postThrottled()
         break
-      case 'update-many':
+      case 'apply-delta':
         for (const path of msg.removes) removeFile(path)
-        for (const file of msg.updates) {
-          removeFile(file.path)
-          addFile(file.path, file.content)
-        }
+        for (const entry of msg.upserts) ingestEntry(entry)
         postNow('updated')
         break
       case 'search':

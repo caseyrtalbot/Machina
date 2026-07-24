@@ -15,6 +15,7 @@ import type { AgentIdentity } from '../shared/agent-identity'
 import type { VaultMachinaConfig } from '../shared/thread-storage-types'
 import type { IpcEventData } from '../shared/ipc-channels'
 import type { DockTab } from '../shared/dock-types'
+import type { VaultIndexDelta } from '../shared/index-delta'
 import type { CommitApprovedOpts } from '../shared/git-types'
 import type { HarnessCreateRequest } from '../shared/harness-types'
 
@@ -65,7 +66,8 @@ const api = {
       vaultPath: string
     ) => typedInvoke('vault:emerge-ghost', { ghostId, ghostTitle, referencePaths, vaultPath }),
     indexPdfContent: (pdfPath: string, pages: ReadonlyArray<{ page: number; text: string }>) =>
-      typedInvoke('vault:index-pdf-content', { pdfPath, pages })
+      typedInvoke('vault:index-pdf-content', { pdfPath, pages }),
+    indexSnapshot: () => typedInvoke('vault:index-snapshot')
   },
   shell: {
     showInFolder: (path: string) => typedInvoke('shell:show-in-folder', { path }),
@@ -184,6 +186,8 @@ const api = {
         events: readonly { path: string; event: 'add' | 'change' | 'unlink' }[]
       }) => void
     ) => typedOn('vault:files-changed-batch', callback),
+    indexDelta: (callback: (data: VaultIndexDelta) => void) =>
+      typedOn('vault:index-delta', callback),
     docExternalChange: (callback: (data: { path: string; content: string }) => void) =>
       typedOn('doc:external-change', callback),
     docConflict: (callback: (data: { path: string; diskContent: string }) => void) =>

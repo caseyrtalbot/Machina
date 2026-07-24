@@ -1,6 +1,13 @@
 import type { Artifact, KnowledgeGraph } from '@shared/types'
 import { parseArtifact } from './parser'
 import { buildGraph } from './graph-builder'
+import type { ParseError } from './types'
+
+/** Outcome of ingesting one file: the stored artifact, or the parse error. */
+export interface IngestResult {
+  readonly artifact: Artifact | null
+  readonly error: ParseError | null
+}
 
 export class VaultIndex {
   private artifacts = new Map<string, Artifact>()
@@ -8,26 +15,28 @@ export class VaultIndex {
   private artifactPathById = new Map<string, string>()
   private graphCache: KnowledgeGraph | null = null
 
-  addFile(filename: string, content: string): void {
+  addFile(filename: string, content: string): IngestResult {
     this.graphCache = null
     const result = parseArtifact(content, filename)
-    if (result.ok) {
-      let id = result.value.id
-      if (this.artifacts.has(id)) {
-        let suffix = 2
-        while (this.artifacts.has(`${id}-${suffix}`)) suffix++
-        id = `${id}-${suffix}`
-      }
-      const artifact = id !== result.value.id ? { ...result.value, id } : result.value
-      this.artifacts.set(id, artifact)
-      this.fileToId.set(filename, id)
-      this.artifactPathById.set(id, filename)
+    if (!result.ok) {
+      return { artifact: null, error: { filename, error: result.error } }
     }
+    let id = result.value.id
+    if (this.artifacts.has(id)) {
+      let suffix = 2
+      while (this.artifacts.has(`${id}-${suffix}`)) suffix++
+      id = `${id}-${suffix}`
+    }
+    const artifact = id !== result.value.id ? { ...result.value, id } : result.value
+    this.artifacts.set(id, artifact)
+    this.fileToId.set(filename, id)
+    this.artifactPathById.set(id, filename)
+    return { artifact, error: null }
   }
 
-  updateFile(filename: string, content: string): void {
+  updateFile(filename: string, content: string): IngestResult {
     this.removeFile(filename)
-    this.addFile(filename, content)
+    return this.addFile(filename, content)
   }
 
   removeFile(filename: string): void {

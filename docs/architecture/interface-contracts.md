@@ -410,8 +410,9 @@ Contract points (each traceable to a verified finding):
   also retain the item so the user can retry; only successful resolution (or the
   non-repo approve-acknowledge) removes it.
 - **Watcher policy — its OWN ignore set, explicitly NOT vault-watcher's**
-  (`DEFAULT_IGNORE_PATTERNS` ignores TE_DIR and every dotpath, which would blind the
-  `verify.sh` auto-reject and all dotfile writes). Excluded: `.git`, `node_modules`,
+  (`DEFAULT_IGNORE_PATTERNS` ignores every dotpath and all of TE_DIR except the
+  system-artifact subtree, which would blind the `verify.sh` auto-reject and all
+  dotfile writes). Excluded: `.git`, `node_modules`,
   `dist/build/out`, and the app's own churn (`<TE_DIR>/state.json`, `threads/`,
   `artifacts/`, `embeddings/`). Watched: everything else, including dotfiles, `.env`,
   `.gitignore` itself, and `<TE_DIR>/agents/**`. `.gitignore` is NOT honored — an agent

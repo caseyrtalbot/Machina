@@ -155,6 +155,15 @@ is green. Layer 4 items may start once their stated dependencies exist.
 5. One index authority: the main-process VaultIndex is the single truth; the renderer
    vault-worker becomes a diff-fed projection; `system-artifact-runtime`'s inline
    parse is removed. → verify: one parse+graph ingestion path (grep).
+   (Completed 2026-07-24. Main's VaultIndex is the only markdown→Artifact parse site
+   (`parseArtifact` invoked solely from `src/shared/engine/indexer.ts`) and now covers
+   system artifacts; the renderer vault-worker ingests parsed `VaultIndexEntry` diffs
+   over new IPC (`vault:index-snapshot` + `vault:index-delta`) and keeps graph+search
+   only as projections — its own parse and per-file hydration reads deleted.
+   `syncSystemArtifactFromDisk` (a partial ingestion that skipped ghostIndex and
+   derived maps) deleted; system-artifact edits ride the watcher→index→delta path via
+   a watcher carve-out for `<TE_DIR>/artifacts/**` only. Verify gate held in CI by
+   `tests/main/index-authority.test.ts`.)
 6. Surface registry (was Phase 3): collapse the five-touchpoint surface enumeration
    (ribbon, palette sources, keybindings, `DockTabContent` switch, `dock-types.ts`)
    into one registry the others derive from; execute D3 (Health → status-bar popover)

@@ -46,7 +46,7 @@ Purity is what lets the same code run in four Web Workers without ceremony:
 
 | Worker | File | Computes |
 |--------|------|----------|
-| Vault | `src/renderer/src/engine/vault-worker.ts` | Parse + graph build + search index, off the main thread |
+| Vault | `src/renderer/src/engine/vault-worker.ts` | Graph build + search index as a projection over main-parsed artifact entries (it never parses markdown itself), off the main thread |
 | Graph physics | `src/renderer/src/engine/graph-physics-worker.ts` | D3-force layout for the Pixi graph view |
 | Ontology | `src/renderer/src/panels/canvas/ontology-worker.ts` | Grouping + layout for canvas ontology |
 | Project map | `src/renderer/src/workers/project-map-worker.ts` | Filesystem tree to canvas folder maps |
@@ -55,15 +55,18 @@ Purity is what lets the same code run in four Web Workers without ceremony:
 
 ### Vault file changes
 
-Disk is the source of truth; everything downstream reacts to it.
+Disk is the source of truth; everything downstream reacts to it. The main-process VaultIndex (`src/shared/engine/indexer.ts`, wired by `src/main/services/vault-indexing.ts`) is the single parse authority ("one index authority", 2026-07-24): it alone turns markdown into `Artifact`s, for ordinary notes and for system artifacts under `<TE_DIR>/artifacts/` alike.
 
 ```
-Disk (chokidar) -> vault-watcher.ts (main, batches changes)
-  -> IPC: vault:files-changed-batch
-  -> vault-event-hub.ts (renderer, fans out)
-  -> useVaultWorker -> vault-worker.ts (parse + graph, off main thread)
+Disk (chokidar) -> vault-watcher.ts (main, batches changes; system-artifact subtree watched,
+                   rest of TE_DIR ignored)
+  -> vault-indexing.ts applies the batch to VaultIndex + SearchEngine (the only parse site)
+  -> IPC: vault:index-delta (parsed VaultIndexEntry upserts + removes)
+  -> App.tsx -> vault-worker.ts (graph + search projection over the entries, no parsing)
   -> postMessage -> vault-store.setWorkerResult (one atomic store update)
 ```
+
+Initial hydration mirrors the live path: after vault init the renderer fetches `vault:index-snapshot` (all current entries) and feeds it to the worker in chunks, buffering any deltas that arrive mid-hydration. `vault:files-changed-batch` still fires alongside the deltas — it carries only `{path, event}` and serves path-level subscribers (open-document sync, sidebar file lists) via `vault-event-hub.ts`, not index ingestion.
 
 ### Document editing
 

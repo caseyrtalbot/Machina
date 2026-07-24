@@ -1,7 +1,9 @@
 import { watch, type FSWatcher } from 'chokidar'
+import { join } from 'node:path'
 import { EventBatcher, type BatchedEvent } from './event-batcher'
 import { loadGitignoreFilter, shouldIgnore } from './gitignore-filter'
 import { TE_DIR } from '@shared/constants'
+import { SYSTEM_ARTIFACT_DIRECTORIES, isSystemArtifactPath } from '@shared/system-artifacts'
 import type { Ignore } from 'ignore'
 
 type FileEvent = 'add' | 'change' | 'unlink'
@@ -38,8 +40,23 @@ export class VaultWatcher {
 
     const ig = await loadGitignoreFilter(vaultPath, DEFAULT_IGNORE_PATTERNS, customIgnorePatterns)
 
+    // The TE dir is ignored wholesale (state.json autosaves every ~1s, etc.),
+    // EXCEPT the system-artifact subtree (sessions/patterns/tensions), which the
+    // main index owns. To let chokidar descend to those leaves we must also
+    // un-ignore the ancestor dirs on the way down; a pruned ancestor would hide
+    // the whole subtree. Everything else under the TE dir stays ignored.
+    const artifactsBase = join(vaultPath, TE_DIR, 'artifacts')
+    const watchedAncestors = new Set<string>([
+      join(vaultPath, TE_DIR),
+      artifactsBase,
+      ...Object.values(SYSTEM_ARTIFACT_DIRECTORIES).map((dir) => join(artifactsBase, dir))
+    ])
+
     this.watcher = watch(vaultPath, {
-      ignored: (path: string) => shouldIgnore(ig, vaultPath, path),
+      ignored: (path: string) => {
+        if (watchedAncestors.has(path) || isSystemArtifactPath(path)) return false
+        return shouldIgnore(ig, vaultPath, path)
+      },
       persistent: true,
       ignoreInitial: true,
       followSymlinks: false,

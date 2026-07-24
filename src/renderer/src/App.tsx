@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Spinner } from './components/emptystate/Spinner'
 import { logError, notifyError, setErrorNotifier } from './utils/error-logger'
 import { withTimeout } from './utils/ipc-timeout'
+import { isSystemArtifactPath } from '@shared/system-artifacts'
 import { perfMark, perfMeasure } from './utils/perf-marks'
 import {
   chunkArray,
-  readChunk,
   yieldToEventLoop,
   setIndexingProgress,
   clearIndexingProgress
@@ -16,6 +16,7 @@ import { ThemeProvider } from './design/Theme'
 import { useSidebarSelectionStore } from './store/sidebar-selection-store'
 import { AgentShell } from './panels/agent-shell/AgentShell'
 import { useVaultStore } from './store/vault-store'
+import type { VaultIndexDelta } from '@shared/index-delta'
 import { useEditorStore, flushPendingSave } from './store/editor-store'
 import { SettingsModal } from './components/SettingsModal'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
@@ -23,7 +24,6 @@ import { PanelErrorBoundary } from './components/PanelErrorBoundary'
 import { ToastHost, showToast } from './components/Toast'
 import { FirstRunScreen, checkSavedVault } from './components/FirstRunScreen'
 import { useClaudeStatusStore } from './store/claude-status-store'
-import pLimit from 'p-limit'
 import { vaultEvents } from './engine/vault-event-hub'
 import {
   rehydrateUiState,
@@ -164,7 +164,14 @@ export default function App() {
     })
   }, [])
 
-  const { loadFiles, appendFiles, updateMany } = useVaultWorker(onWorkerResult)
+  const { loadEntries, appendEntries, applyDelta } = useVaultWorker(onWorkerResult)
+
+  // Renderer index is a projection of main's parse authority. Deltas arrive on
+  // a lifetime subscription (below); while a snapshot is hydrating we buffer
+  // them here and flush after the snapshot lands, so nothing emitted mid-load
+  // is lost and duplicate/late deltas are harmless (upserts replace by path).
+  const hydratingRef = useRef(true)
+  const deltaBufferRef = useRef<VaultIndexDelta[]>([])
 
   const orchestrateLoad = useCallback(
     async (requestedPath: string) => {
@@ -193,41 +200,51 @@ export default function App() {
       await window.api.config.write('app', 'workspaceHistory', updated)
 
       await window.api.vault.watchStart(path)
-      // Only send .md files to the vault worker (knowledge engine only parses markdown)
-      const { files, systemFiles } = useVaultStore.getState()
-      const mdPaths = [...files, ...systemFiles]
-        .filter((file) => file.path.endsWith('.md'))
-        .map((file) => file.path)
 
-      // Progressive hydration: read files in chunks so the UI becomes
-      // interactive after the first batch instead of blocking on all files.
-      const limit = pLimit(12)
-      const reader = (p: string) => withTimeout(window.api.fs.readFile(p), 5000, `readFile ${p}`)
-      const chunks = chunkArray(mdPaths)
-
-      setIndexingProgress(0, mdPaths.length)
+      // Hydrate the worker from main's index snapshot (parsed entries, no
+      // renderer-side markdown parsing). Buffer any deltas that fire while we
+      // chunk the snapshot in, then flush them and switch to live apply.
+      hydratingRef.current = true
+      deltaBufferRef.current = []
       try {
-        // First chunk: load synchronously so the UI has content to show.
-        const initialBatch = await readChunk(chunks[0] ?? [], reader, limit)
-        loadFiles(initialBatch)
-        perfMeasure('vault-load', 'vault-load-start')
-        let indexed = initialBatch.length
-        setIndexingProgress(indexed, mdPaths.length)
+        const { entries } = await withTimeout(
+          window.api.vault.indexSnapshot(),
+          30_000,
+          'vault:index-snapshot'
+        )
 
-        // Remaining chunks: load in background, yielding between each so the
-        // event loop can process user interactions and paint frames.
-        for (let i = 1; i < chunks.length; i++) {
-          await yieldToEventLoop(16) // ~1 frame of breathing room
-          const batch = await readChunk(chunks[i], reader, limit)
-          appendFiles(batch)
-          indexed += batch.length
-          setIndexingProgress(indexed, mdPaths.length)
+        // Progressive hydration: feed entries in chunks so the UI becomes
+        // interactive after the first batch instead of blocking on all of them.
+        const chunks = chunkArray(entries)
+        setIndexingProgress(0, entries.length)
+        try {
+          // First chunk: load synchronously so the UI has content to show.
+          loadEntries(chunks[0] ?? [])
+          perfMeasure('vault-load', 'vault-load-start')
+          let indexed = chunks[0]?.length ?? 0
+          setIndexingProgress(indexed, entries.length)
+
+          // Remaining chunks: append in background, yielding between each so the
+          // event loop can process user interactions and paint frames.
+          for (let i = 1; i < chunks.length; i++) {
+            await yieldToEventLoop(16) // ~1 frame of breathing room
+            appendEntries(chunks[i])
+            indexed += chunks[i].length
+            setIndexingProgress(indexed, entries.length)
+          }
+        } finally {
+          clearIndexingProgress()
         }
       } finally {
-        clearIndexingProgress()
+        // Always go live again: a failed snapshot fetch must not strand
+        // hydratingRef at true, or every future delta buffers forever.
+        const buffered = deltaBufferRef.current
+        deltaBufferRef.current = []
+        hydratingRef.current = false
+        for (const delta of buffered) applyDelta(delta.upserts, delta.removes)
       }
     },
-    [appendFiles, loadVault, loadFiles]
+    [appendEntries, loadVault, loadEntries, applyDelta]
   )
 
   // Wire notifyError into the toast stack so DATA-path failures (canvas save,
@@ -309,16 +326,33 @@ export default function App() {
     return registerQuitHandler()
   }, [])
 
+  // Live projection: main re-parses each watcher batch and emits a parsed
+  // delta. Buffer while a snapshot is hydrating (orchestrateLoad flushes the
+  // buffer); otherwise apply straight to the worker.
+  useEffect(() => {
+    const unsub = window.api.on.indexDelta((delta) => {
+      if (hydratingRef.current) {
+        deltaBufferRef.current.push(delta)
+      } else {
+        applyDelta(delta.upserts, delta.removes)
+      }
+    })
+    return unsub
+  }, [applyDelta])
+
+  // Sidebar file list + agent-modified marking off the raw watcher batch. This
+  // covers every file (not just indexed .md), so it stays even though artifact
+  // parsing now flows through the index-delta subscription above.
   useEffect(() => {
     const unsub = vaultEvents.subscribeBatch(async (events) => {
-      const data = { events }
       // Process all events in one pass using a Map to avoid state accumulation race
-      const currentFiles = useVaultStore.getState().files
-      const fileMap = new Map(currentFiles.map((f) => [f.path, f]))
+      const vaultState = useVaultStore.getState()
+      const fileMap = new Map(vaultState.files.map((f) => [f.path, f]))
+      // The watcher now fires for system artifacts too (index authority); keep
+      // them out of the regular files list — they live in systemFiles.
+      const systemFileMap = new Map(vaultState.systemFiles.map((f) => [f.path, f]))
       const touchedPaths = [
-        ...new Set(
-          data.events.filter((entry) => entry.event !== 'unlink').map((entry) => entry.path)
-        )
+        ...new Set(events.filter((entry) => entry.event !== 'unlink').map((entry) => entry.path))
       ]
       const mtimes = new Map(
         await Promise.all(
@@ -327,61 +361,50 @@ export default function App() {
           )
         )
       )
-      const mdToUpdate: string[] = []
-      const mdToRemove: string[] = []
 
-      for (const { path, event } of data.events) {
-        const isMd = path.endsWith('.md')
+      let systemTouched = false
+      for (const { path, event } of events) {
         const modified = mtimes.get(path) ?? ''
+        const isSystem = isSystemArtifactPath(path)
+        systemTouched ||= isSystem
+        const targetMap = isSystem ? systemFileMap : fileMap
 
         if (event === 'unlink') {
-          fileMap.delete(path)
-          if (isMd) mdToRemove.push(path)
+          targetMap.delete(path)
         } else if (event === 'add') {
-          const existing = fileMap.get(path)
+          const existing = targetMap.get(path)
           const filename = path.split('/').pop() ?? path
           const dotIdx = filename.lastIndexOf('.')
           const title = existing?.title ?? (dotIdx > 0 ? filename.slice(0, dotIdx) : filename)
-          fileMap.set(path, {
+          targetMap.set(path, {
             path,
             filename,
             title,
             modified,
             source: existing?.source ?? 'vault'
           })
-          if (isMd) mdToUpdate.push(path)
         } else {
-          const existing = fileMap.get(path)
+          const existing = targetMap.get(path)
           if (existing) {
-            fileMap.set(path, { ...existing, modified })
+            targetMap.set(path, { ...existing, modified })
           }
-          if (isMd) mdToUpdate.push(path)
         }
       }
 
       // Single state update for all file list changes
       setFiles(Array.from(fileMap.values()))
+      if (systemTouched) {
+        useVaultStore.getState().setSystemFiles(Array.from(systemFileMap.values()))
+      }
 
       // Mark files changed during an active agent run (with action label for icon coloring)
       const sel = useSidebarSelectionStore.getState()
-      if (sel.agentActive) {
-        const agentTouched = [...mdToUpdate, ...touchedPaths.filter((p) => !p.endsWith('.md'))]
-        if (agentTouched.length > 0) {
-          sel.markAgentModified(agentTouched, sel.activeAgentLabel ?? undefined)
-        }
-      }
-
-      // One worker message per watcher batch — a single graph rebuild
-      // instead of one rebuild per changed file.
-      const updates = await Promise.all(
-        mdToUpdate.map(async (path) => ({ path, content: await window.api.fs.readFile(path) }))
-      )
-      if (updates.length > 0 || mdToRemove.length > 0) {
-        updateMany(updates, mdToRemove)
+      if (sel.agentActive && touchedPaths.length > 0) {
+        sel.markAgentModified(touchedPaths, sel.activeAgentLabel ?? undefined)
       }
     })
     return unsub
-  }, [updateMany, setFiles])
+  }, [setFiles])
 
   const handleOpenFolder = useCallback(async () => {
     try {

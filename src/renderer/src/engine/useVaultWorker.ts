@@ -1,12 +1,13 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { registerSearchWorker, deliverSearchResults } from './vault-search'
 import type { WorkerResult } from './types'
+import type { VaultIndexEntry } from '@shared/index-delta'
 
 interface VaultWorkerActions {
-  loadFiles: (files: Array<{ path: string; content: string }>) => void
-  appendFiles: (files: Array<{ path: string; content: string }>) => void
-  /** Apply one watcher batch (updates + removes) in a single worker message — one graph rebuild. */
-  updateMany: (updates: Array<{ path: string; content: string }>, removes: string[]) => void
+  loadEntries: (entries: VaultIndexEntry[]) => void
+  appendEntries: (entries: VaultIndexEntry[]) => void
+  /** Apply one parsed watcher delta (upserts + removes) in a single worker message — one graph rebuild. */
+  applyDelta: (upserts: VaultIndexEntry[], removes: string[]) => void
 }
 
 export function useVaultWorker(onResult: (result: WorkerResult) => void): VaultWorkerActions {
@@ -38,20 +39,17 @@ export function useVaultWorker(onResult: (result: WorkerResult) => void): VaultW
     }
   }, [])
 
-  const loadFiles = useCallback((files: Array<{ path: string; content: string }>) => {
-    workerRef.current?.postMessage({ type: 'load', files })
+  const loadEntries = useCallback((entries: VaultIndexEntry[]) => {
+    workerRef.current?.postMessage({ type: 'load', entries })
   }, [])
 
-  const appendFiles = useCallback((files: Array<{ path: string; content: string }>) => {
-    workerRef.current?.postMessage({ type: 'append', files })
+  const appendEntries = useCallback((entries: VaultIndexEntry[]) => {
+    workerRef.current?.postMessage({ type: 'append', entries })
   }, [])
 
-  const updateMany = useCallback(
-    (updates: Array<{ path: string; content: string }>, removes: string[]) => {
-      workerRef.current?.postMessage({ type: 'update-many', updates, removes })
-    },
-    []
-  )
+  const applyDelta = useCallback((upserts: VaultIndexEntry[], removes: string[]) => {
+    workerRef.current?.postMessage({ type: 'apply-delta', upserts, removes })
+  }, [])
 
-  return { loadFiles, appendFiles, updateMany }
+  return { loadEntries, appendEntries, applyDelta }
 }
