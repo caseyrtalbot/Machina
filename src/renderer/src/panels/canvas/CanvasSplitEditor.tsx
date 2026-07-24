@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { useCanvas } from './canvas-store-context'
-import { colors } from '../../design/tokens'
 import { createEditorExtensions, detectLanguage } from './shared/codemirror-setup'
 import { useDocument } from '../../hooks/useDocument'
 
@@ -89,37 +88,20 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
   const dirPath = filePath.split('/').slice(-2, -1)[0] ?? ''
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: colors.bg.base }}>
+    <div className="te-cv-split-editor">
       {/* Conflict banner */}
       {doc.isConflict && (
-        <div
-          className="flex items-center justify-between px-3 py-1.5 shrink-0"
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--signal-warn) 12%, transparent)',
-            borderBottom: '1px solid color-mix(in srgb, var(--signal-warn) 30%, transparent)',
-            color: 'var(--signal-warn)'
-          }}
-        >
-          <span className="text-xs">File changed externally</span>
-          <span className="flex gap-1.5">
+        <div className="te-cv-split-conflict">
+          <span className="te-cv-split-conflict__msg">File changed externally</span>
+          <span className="te-cv-split-conflict__actions">
             <button
-              className="text-xs px-2 py-1 cursor-pointer"
-              style={{
-                backgroundColor: 'color-mix(in srgb, var(--signal-warn) 20%, transparent)',
-                color: 'var(--signal-warn)',
-                border: 'none'
-              }}
+              className="te-cv-split-conflict__reload"
               onClick={() => doc.resolveConflict('disk')}
             >
               Reload
             </button>
             <button
-              className="text-xs px-2 py-1 cursor-pointer"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                color: colors.text.secondary,
-                border: 'none'
-              }}
+              className="te-cv-split-conflict__keep"
               onClick={() => doc.resolveConflict('mine')}
             >
               Keep mine
@@ -129,31 +111,12 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
       )}
       {/* Header bar */}
       <div
-        className="canvas-split-editor__header flex items-center justify-between px-3 shrink-0"
+        className="canvas-split-editor__header te-cv-split-editor__headerbar"
         data-testid="canvas-split-editor-header"
-        style={
-          {
-            height: 34,
-            borderBottom: '1px solid var(--line-faint)',
-            backgroundColor: 'rgba(0, 0, 0, 0.15)',
-            position: 'relative',
-            zIndex: 60,
-            WebkitAppRegion: 'drag'
-          } as React.CSSProperties
-        }
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {dirPath && (
-            <span className="text-xs shrink-0" style={{ color: colors.text.muted }}>
-              {dirPath}/
-            </span>
-          )}
-          <span
-            className="text-xs truncate"
-            style={{ color: colors.text.secondary, fontWeight: 500 }}
-          >
-            {filename}
-          </span>
+        <div className="te-cv-split-editor__title">
+          {dirPath && <span className="te-cv-split-editor__dir">{dirPath}/</span>}
+          <span className="te-cv-split-editor__filename">{filename}</span>
         </div>
         <button
           type="button"
@@ -161,22 +124,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
             e.stopPropagation()
             closeSplit()
           }}
-          className="canvas-split-editor__close flex items-center justify-center cursor-pointer shrink-0"
-          style={{
-            width: 24,
-            height: 24,
-            color: colors.text.muted,
-            opacity: 0.5,
-            border: 'none',
-            background: 'transparent',
-            zIndex: 10
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '1'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '0.5'
-          }}
+          className="canvas-split-editor__close te-cv-split-close"
           title="Close split editor (Cmd+Shift+E)"
           aria-label="Close split editor"
         >
@@ -193,7 +141,7 @@ export function CanvasSplitEditor({ filePath }: CanvasSplitEditorProps) {
         </button>
       </div>
       {/* Editor container */}
-      <div ref={containerRef} className="flex-1 overflow-hidden" style={{ minHeight: 0 }} />
+      <div ref={containerRef} className="te-cv-split-editor__body" />
     </div>
   )
 }

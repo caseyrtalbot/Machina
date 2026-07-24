@@ -136,7 +136,7 @@ function DragPreviewLine({ drag }: { drag: DragState }) {
   const edgeColor = EDGE_KIND_COLORS[drag.edgeKind] ?? colors.accent.default
 
   return (
-    <svg className="fixed inset-0 w-full h-full pointer-events-none" style={{ zIndex: 39 }}>
+    <svg className="te-cv-drag-line">
       <path
         d={d}
         fill="none"
@@ -236,25 +236,19 @@ export function ConnectionDragOverlay() {
   return (
     <>
       <DragPreviewLine drag={drag} />
-      <div className="fixed inset-0 pointer-events-none z-40">
+      <div className="te-cv-drag-badge-layer">
         <div
-          className="text-xs px-2 py-1"
+          className="te-cv-drag-badge"
           style={{
-            position: 'fixed',
             left: drag.cursorX + 10,
             top: drag.cursorY + 10,
-            backgroundColor: colors.bg.elevated,
             color: edgeColor,
             border: `1px solid ${edgeColor}`
           }}
         >
           <span>{kindLabel}</span>
-          <span style={{ color: colors.text.muted, marginLeft: 8 }}>↓ on card</span>
-          {isFirstDrag && (
-            <div style={{ color: colors.text.muted, fontSize: 10, marginTop: 2 }}>
-              Shift/Opt for edge types
-            </div>
-          )}
+          <span className="te-cv-drag-hint">↓ on card</span>
+          {isFirstDrag && <div className="te-cv-drag-subhint">Shift/Opt for edge types</div>}
         </div>
       </div>
     </>

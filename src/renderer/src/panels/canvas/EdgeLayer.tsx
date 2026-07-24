@@ -95,7 +95,7 @@ function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
         fill="none"
         stroke="transparent"
         strokeWidth={12}
-        style={{ cursor: 'pointer' }}
+        className="te-cv-edge-hit"
         onClick={(e) => {
           e.stopPropagation()
           canvas.getState().setSelectedEdge(edge.id)
@@ -109,13 +109,8 @@ function EdgePathInner({ edge, nodeMap, zoom }: EdgePathProps) {
         markerEnd="url(#arrowhead)"
         opacity={endpointActive || isSelected ? 1 : isRevealed ? 0.6 : BASELINE_EDGE_OPACITY}
         strokeDasharray={endpointActive ? '8 4' : strokeDasharray}
-        style={
-          endpointActive
-            ? { animation: 'te-edge-flow 0.8s linear infinite' }
-            : isRevealed
-              ? { animation: 'te-edge-reveal 150ms ease forwards' }
-              : undefined
-        }
+        className="te-cv-edge-path"
+        data-edge-state={endpointActive ? 'active' : isRevealed ? 'revealed' : undefined}
       />
     </g>
   )
@@ -139,12 +134,7 @@ export function EdgeLayer() {
   }, [nodes])
 
   return (
-    <svg
-      className="absolute pointer-events-none"
-      width="1"
-      height="1"
-      style={{ left: 0, top: 0, overflow: 'visible' }}
-    >
+    <svg className="te-cv-edge-layer" width="1" height="1">
       <defs>
         <marker
           id="arrowhead"
@@ -158,7 +148,7 @@ export function EdgeLayer() {
           <polygon points="0 0, 10 3.5, 0 7" fill={colors.text.secondary} opacity="0.8" />
         </marker>
       </defs>
-      <g style={{ pointerEvents: 'all' }}>
+      <g className="te-cv-edge-hitgroup">
         {edges.map((edge) => (
           <MemoEdgePath key={edge.id} edge={edge} nodeMap={nodeMap} zoom={zoom} />
         ))}

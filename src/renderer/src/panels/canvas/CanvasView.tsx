@@ -83,20 +83,6 @@ async function importDroppedAsset(path: string): Promise<string> {
   }
 }
 
-const folderMapProgressStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 16,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  padding: '8px 16px',
-  borderRadius: 'var(--r-tool)',
-  background: 'var(--color-bg-elevated)',
-  border: '1px solid var(--color-border-subtle)',
-  fontSize: '13px',
-  color: 'var(--color-text-secondary)',
-  zIndex: 10
-}
-
 export function CanvasView({
   canvasId = DEFAULT_CANVAS_ID
 }: {
@@ -516,8 +502,8 @@ function CanvasViewInner(): React.ReactElement {
 
   return (
     <CommandStackProvider value={commandStack.current}>
-      <div className="flex h-full w-full overflow-hidden">
-        <div ref={containerRef} className="h-full relative" style={{ flex: 1, minWidth: 0 }}>
+      <div className="te-cv-view">
+        <div ref={containerRef} className="te-cv-view__stage">
           <CanvasToolbar
             canUndo={commandStack.current.canUndo()}
             canRedo={commandStack.current.canRedo()}
@@ -585,7 +571,7 @@ function CanvasViewInner(): React.ReactElement {
           {folderMapProgress &&
             folderMapProgress.phase !== 'idle' &&
             folderMapProgress.phase !== 'done' && (
-              <div style={folderMapProgressStyle}>
+              <div className="te-cv-view__folder-map-progress">
                 {folderMapProgress.phase === 'error'
                   ? `\u26A0 ${folderMapProgress.errorMessage ?? 'Mapping failed'}`
                   : `Mapping\u2026 ${folderMapProgress.filesProcessed}/${folderMapProgress.totalFiles} files`}

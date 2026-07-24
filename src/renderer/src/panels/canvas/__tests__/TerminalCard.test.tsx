@@ -312,8 +312,12 @@ describe('TerminalCard (webview host)', () => {
     const node = makeTerminalNode()
     const { container } = renderTerminalCard(TerminalCard, node)
 
+    // pointer-events is CSS-driven: the base .te-termcard-webview rule is `none`,
+    // and only [data-interactive='true'] flips it to `auto`. Unlocked/unfocused
+    // omits the attribute.
     const webview = container.querySelector('webview') as HTMLElement | null
-    expect(webview?.style.pointerEvents).toBe('none')
+    expect(webview?.className).toContain('te-termcard-webview')
+    expect(webview?.getAttribute('data-interactive')).toBeNull()
   })
 
   it('includes cwd in webview src params when metadata has initialCwd', async () => {

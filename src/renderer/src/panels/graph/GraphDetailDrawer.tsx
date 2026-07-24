@@ -4,40 +4,16 @@ import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useUiStore } from '@renderer/store/ui-store'
 import { openNoteInEditor } from '@renderer/store/dock-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
-import {
-  borderRadius,
-  colors,
-  floatingPanel,
-  getArtifactColor,
-  transitions,
-  typography
-} from '../../design/tokens'
+import { getArtifactColor } from '../../design/tokens'
 import type { Artifact } from '@shared/types'
 
-const DRAWER_WIDTH = 340
-const SPRING_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
-const SLIDE_DURATION = '220ms'
-const MAX_BODY_LINES = 6
 const MAX_BODY_CHARS = 480
 
 function BodyPreview({ body }: { body: string }) {
   if (!body.trim()) return null
   const truncated =
     body.length > MAX_BODY_CHARS ? body.slice(0, MAX_BODY_CHARS).trim() + '...' : body.trim()
-  return (
-    <p
-      className="text-xs leading-relaxed"
-      style={{
-        color: colors.text.secondary,
-        display: '-webkit-box',
-        WebkitLineClamp: MAX_BODY_LINES,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden'
-      }}
-    >
-      {truncated}
-    </p>
-  )
+  return <p className="te-graph-drawer__body">{truncated}</p>
 }
 
 function BacklinksList({
@@ -50,40 +26,24 @@ function BacklinksList({
   if (backlinks.length === 0) return null
   return (
     <div>
-      <div
-        className="text-[10px] uppercase font-medium mb-1.5"
-        style={{
-          color: colors.text.muted,
-          letterSpacing: '0.15em',
-          fontFamily: typography.fontFamily.mono
-        }}
-      >
-        Backlinks
-      </div>
-      <div className="flex flex-col gap-0.5">
+      <div className="te-graph-drawer__section-label">Backlinks</div>
+      <div className="te-graph-drawer__list">
         {backlinks.slice(0, 8).map((a) => (
           <button
             key={a.id}
             type="button"
             onClick={() => onNavigate(a.id)}
-            className="text-left text-xs truncate px-2 py-1 interactive-hover"
-            style={{
-              borderRadius: borderRadius.inline,
-              color: colors.text.secondary,
-              transition: transitions.hover
-            }}
+            className="te-graph-drawer__link interactive-hover"
           >
             <span
-              className="inline-block w-1.5 h-1.5 rounded-full mr-1.5"
-              style={{ backgroundColor: getArtifactColor(a.type), verticalAlign: 'middle' }}
+              className="te-graph-drawer__dot"
+              style={{ backgroundColor: getArtifactColor(a.type) }}
             />
             {a.title}
           </button>
         ))}
         {backlinks.length > 8 && (
-          <span className="text-[10px] px-2" style={{ color: colors.text.muted }}>
-            +{backlinks.length - 8} more
-          </span>
+          <span className="te-graph-drawer__more">+{backlinks.length - 8} more</span>
         )}
       </div>
     </div>
@@ -129,73 +89,37 @@ export function GraphDetailDrawer() {
   }
 
   return (
-    <div
-      className="absolute z-30 flex flex-col gap-4 overflow-y-auto"
-      style={{
-        top: 48,
-        right: 12,
-        bottom: 12,
-        width: DRAWER_WIDTH,
-        transform: isOpen ? 'translateX(0)' : `translateX(${DRAWER_WIDTH + 24}px)`,
-        opacity: isOpen ? 1 : 0,
-        transition: `transform ${SLIDE_DURATION} ${SPRING_EASING}, opacity ${SLIDE_DURATION} ${SPRING_EASING}`,
-        backgroundColor: floatingPanel.glass.bg,
-        backdropFilter: floatingPanel.glass.blur,
-        WebkitBackdropFilter: floatingPanel.glass.blur,
-        borderRadius: floatingPanel.borderRadius,
-        boxShadow: floatingPanel.shadowCompact,
-        border: `1px solid ${colors.border.default}`,
-        padding: '16px',
-        pointerEvents: isOpen ? 'auto' : 'none'
-      }}
-    >
+    <div className="te-graph-drawer" data-open={isOpen}>
       {artifact ? (
         <>
           {/* Header: title + type */}
           <div>
-            <div className="flex items-start justify-between gap-2">
-              <h3
-                className="text-[15px] font-semibold leading-tight"
-                style={{ color: colors.text.primary }}
-              >
-                {artifact.title}
-              </h3>
+            <div className="te-graph-drawer__header-row">
+              <h3 className="te-graph-drawer__title">{artifact.title}</h3>
               <button
                 type="button"
                 onClick={() => setSelectedNode(null)}
-                className="shrink-0 text-xs p-1 interactive-hover"
-                style={{ borderRadius: borderRadius.inline, color: colors.text.muted }}
+                className="te-graph-drawer__close interactive-hover"
                 title="Close drawer"
                 aria-label="Close drawer"
               >
                 ×
               </button>
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="te-graph-drawer__type-row">
               <span
-                className="w-2 h-2 rounded-full"
+                className="te-graph-drawer__type-dot"
                 style={{ backgroundColor: getArtifactColor(artifact.type) }}
               />
-              <span className="text-[11px]" style={{ color: colors.text.muted }}>
-                {artifact.type}
-              </span>
+              <span className="te-graph-drawer__type-label">{artifact.type}</span>
             </div>
           </div>
 
           {/* Tags */}
           {artifact.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="te-graph-drawer__tags">
               {artifact.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[11px] px-2 py-0.5"
-                  style={{
-                    borderRadius: borderRadius.inline,
-                    border: '1px solid var(--line-subtle)',
-                    color: colors.text.muted,
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)'
-                  }}
-                >
+                <span key={tag} className="te-graph-drawer__tag">
                   {tag}
                 </span>
               ))}
@@ -207,12 +131,7 @@ export function GraphDetailDrawer() {
             <button
               type="button"
               onClick={handleOpenInEditor}
-              className="text-xs self-start interactive-hover px-2 py-1"
-              style={{
-                borderRadius: borderRadius.inline,
-                color: colors.accent.default,
-                transition: transitions.hover
-              }}
+              className="te-graph-drawer__editor-btn interactive-hover"
             >
               Open in editor
             </button>
@@ -260,25 +179,19 @@ function GhostDrawerContent({
   return (
     <>
       <div>
-        <div className="flex items-start justify-between gap-2">
-          <h3
-            className="text-[15px] font-semibold leading-tight"
-            style={{ color: colors.text.primary }}
-          >
-            {ghostId}
-          </h3>
+        <div className="te-graph-drawer__header-row">
+          <h3 className="te-graph-drawer__title">{ghostId}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 text-xs p-1 interactive-hover"
-            style={{ borderRadius: borderRadius.inline, color: colors.text.muted }}
+            className="te-graph-drawer__close interactive-hover"
             title="Close drawer"
             aria-label="Close drawer"
           >
             ×
           </button>
         </div>
-        <div className="text-[11px] mt-1" style={{ color: colors.text.muted }}>
+        <div className="te-graph-drawer__meta">
           Ghost node · {ghostEntry?.referenceCount ?? 0} reference
           {(ghostEntry?.referenceCount ?? 0) !== 1 ? 's' : ''}
         </div>
@@ -286,62 +199,31 @@ function GhostDrawerContent({
 
       {ghostEntry && ghostEntry.references.length > 0 && (
         <div>
-          <div
-            className="text-[10px] uppercase font-medium mb-1.5"
-            style={{
-              color: colors.text.muted,
-              letterSpacing: '0.15em',
-              fontFamily: typography.fontFamily.mono
-            }}
-          >
-            Referenced by
-          </div>
-          <div className="flex flex-col gap-1">
+          <div className="te-graph-drawer__section-label">Referenced by</div>
+          <div className="te-graph-drawer__ref-list">
             {ghostEntry.references.map((ref, i) => (
-              <div
-                key={i}
-                className="text-xs px-2 py-1.5"
-                style={{
-                  borderRadius: borderRadius.inline,
-                  backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                  color: colors.text.secondary
-                }}
-              >
-                <div className="font-medium mb-0.5" style={{ color: colors.text.primary }}>
-                  {ref.fileTitle}
-                </div>
-                <div style={{ opacity: 0.7, lineHeight: 1.4 }}>{ref.context}</div>
+              <div key={i} className="te-graph-drawer__ref">
+                <div className="te-graph-drawer__ref-title">{ref.fileTitle}</div>
+                <div className="te-graph-drawer__ref-context">{ref.context}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="te-graph-drawer__actions">
         <button
           type="button"
           onClick={handleCreate}
           disabled={isEmerging}
-          className="text-xs px-2.5 py-1 interactive-hover"
-          style={{
-            borderRadius: borderRadius.inline,
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            color: colors.text.primary,
-            opacity: isEmerging ? 0.5 : 1,
-            transition: transitions.hover
-          }}
+          className="te-graph-drawer__ghost-btn interactive-hover"
         >
           {isEmerging ? 'Creating...' : 'Create File'}
         </button>
         <button
           type="button"
           onClick={() => dismissGhost(ghostId)}
-          className="text-xs px-2.5 py-1 interactive-hover"
-          style={{
-            borderRadius: borderRadius.inline,
-            color: colors.text.muted,
-            transition: transitions.hover
-          }}
+          className="te-graph-drawer__dismiss-btn interactive-hover"
         >
           Dismiss
         </button>

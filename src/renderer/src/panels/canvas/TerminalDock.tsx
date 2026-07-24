@@ -1,12 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useCanvas } from './canvas-store-context'
 import { useTerminalStatus, type TerminalStatus } from './useTerminalStatus'
-import {
-  colors,
-  spacing,
-  borderRadius,
-  typography
-} from '../../design/tokens'
 
 interface TerminalDockProps {
   readonly containerWidth: number
@@ -14,48 +8,6 @@ interface TerminalDockProps {
 }
 
 const STORAGE_KEY = 'te-terminal-dock-collapsed'
-
-/** Color and animation settings per terminal status */
-function dotStyle(status: TerminalStatus['status']): React.CSSProperties {
-  const base: React.CSSProperties = {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
-    flexShrink: 0
-  }
-
-  switch (status) {
-    case 'unknown':
-      return { ...base, backgroundColor: colors.text.muted, opacity: 0.5 }
-    case 'idle':
-      return { ...base, backgroundColor: colors.semantic.cluster }
-    case 'busy':
-      return {
-        ...base,
-        backgroundColor: 'var(--signal-info)',
-        animation: 'te-dock-pulse 2s ease-in-out infinite',
-        boxShadow: '0 0 6px var(--signal-info)'
-      }
-    case 'error':
-      return {
-        ...base,
-        backgroundColor: 'var(--signal-danger)',
-        animation: 'te-dock-pulse 1s ease-in-out infinite',
-        boxShadow: '0 0 6px var(--signal-danger)'
-      }
-    case 'dead':
-      return { ...base, backgroundColor: colors.text.muted }
-    case 'claude':
-      // No teal signal token exists; an active agent session reads as a
-      // "working" state, so it reuses --signal-info like busy.
-      return {
-        ...base,
-        backgroundColor: 'var(--signal-info)',
-        animation: 'te-dock-pulse 2s ease-in-out infinite',
-        boxShadow: '0 0 6px var(--signal-info)'
-      }
-  }
-}
 
 function TerminalPill({
   status,
@@ -72,17 +24,6 @@ function TerminalPill({
 }) {
   const isError = status.status === 'error'
 
-  const pillStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.unit,
-    padding: '4px 8px',
-    border: `1px solid ${isError ? 'color-mix(in srgb, var(--signal-danger) 30%, transparent)' : colors.border.subtle}`,
-    borderRadius: borderRadius.inline,
-    cursor: 'pointer',
-    flexShrink: 0
-  }
-
   const processLabel =
     status.processName && status.processName !== status.label ? status.processName : ''
   const fullCwd =
@@ -91,37 +32,14 @@ function TerminalPill({
   return (
     <div
       data-testid="terminal-pill"
-      className="terminal-pill"
+      className="terminal-pill te-termdock-pill"
       data-error={isError ? 'true' : undefined}
-      style={pillStyle}
       title={fullCwd || status.label}
       onClick={() => onNavigate(status)}
     >
-      <div data-testid="status-dot" style={dotStyle(status.status)} />
-      <span
-        style={{
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 12,
-          color: colors.text.secondary,
-          maxWidth: 120,
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap'
-        }}
-      >
-        {status.label}
-      </span>
-      {processLabel && (
-        <span
-          style={{
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 11,
-            color: colors.text.muted
-          }}
-        >
-          {processLabel}
-        </span>
-      )}
+      <div data-testid="status-dot" className="te-termdock-dot" data-status={status.status} />
+      <span className="te-termdock-pill-label">{status.label}</span>
+      {processLabel && <span className="te-termdock-pill-process">{processLabel}</span>}
     </div>
   )
 }
@@ -166,36 +84,21 @@ export function TerminalDock({
 
   if (terminalNodes.length === 0) return null
 
-  const wrapperStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    zIndex: 25,
-    pointerEvents: 'none',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 6
-  }
-
   if (collapsed) {
     return (
-      <div style={wrapperStyle}>
+      <div className="te-termdock">
         <div
           data-testid="terminal-dock-collapsed"
-          className="te-card-enter"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 6,
-            pointerEvents: 'auto',
-            cursor: 'pointer'
-          }}
+          className="te-card-enter te-termdock-collapsed"
           onClick={() => handleToggle(false)}
         >
           {statuses.map((s) => (
-            <div key={s.nodeId} data-testid="status-dot" style={dotStyle(s.status)} />
+            <div
+              key={s.nodeId}
+              data-testid="status-dot"
+              className="te-termdock-dot"
+              data-status={s.status}
+            />
           ))}
         </div>
       </div>
@@ -203,18 +106,8 @@ export function TerminalDock({
   }
 
   return (
-    <div style={wrapperStyle}>
-      <div
-        data-testid="terminal-dock-bar"
-        className="te-card-enter"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'stretch',
-          gap: 4,
-          pointerEvents: 'auto'
-        }}
-      >
+    <div className="te-termdock">
+      <div data-testid="terminal-dock-bar" className="te-card-enter te-termdock-bar">
         {statuses.map((s) => {
           const node = terminalNodes.find((n) => n.id === s.nodeId)
           if (!node) return null

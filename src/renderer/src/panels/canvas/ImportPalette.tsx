@@ -13,7 +13,6 @@ import {
   HUB_COUNT,
   type ImportMode
 } from './import-logic'
-import { colors, borderRadius } from '../../design/tokens'
 import { Modal } from '../../components/overlay/Modal'
 
 interface ImportPaletteProps {
@@ -126,78 +125,31 @@ export function ImportPalette({
       containment="parent"
       zLayer="surfacePopover"
       ariaLabel="Import notes"
-      panelStyle={{
-        width: 420,
-        maxHeight: 480,
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.container,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}
+      panelClassName="te-import-panel"
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '10px 14px',
-          borderBottom: `1px solid ${colors.border.subtle}`
-        }}
-      >
+      <div className="te-import-search">
         <input
           ref={inputRef}
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Filter tags..."
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            color: colors.text.primary,
-            fontSize: 14
-          }}
+          className="te-import-input"
         />
-        <kbd
-          style={{
-            fontSize: 11,
-            color: colors.text.muted,
-            background: 'rgba(255, 255, 255, 0.06)',
-            padding: '2px 6px',
-            borderRadius: borderRadius.inline,
-            border: `1px solid ${colors.border.subtle}`
-          }}
-        >
-          {'\u2318'}G
-        </kbd>
+        <kbd className="te-import-kbd">{'\u2318'}G</kbd>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+      <div className="te-import-list">
         {isEmpty ? (
-          <div
-            style={{
-              padding: '32px 16px',
-              textAlign: 'center',
-              color: colors.text.muted,
-              fontSize: 13
-            }}
-          >
-            No notes indexed yet
-          </div>
+          <div className="te-import-empty">No notes indexed yet</div>
         ) : (
           <>
             {/* Neighborhood */}
             <PaletteRow disabled={!activeNoteId} onClick={() => setNeighborhoodExpanded((v) => !v)}>
-              <span style={{ marginRight: 6, fontSize: 10 }}>
-                {neighborhoodExpanded ? '\u25BE' : '\u25B6'}
-              </span>
+              <span className="te-import-caret">{neighborhoodExpanded ? '\u25BE' : '\u25B6'}</span>
               <span>
                 Neighborhood of{' '}
-                <span style={{ color: colors.accent.default }}>
-                  {activeTitle ?? 'no active note'}
-                </span>
+                <span className="te-import-accent">{activeTitle ?? 'no active note'}</span>
               </span>
             </PaletteRow>
 
@@ -215,7 +167,7 @@ export function ImportPalette({
                     })
                   }
                 >
-                  <span style={{ color: colors.text.secondary }}>
+                  <span className="te-import-hop">
                     {depth} hop{depth > 1 ? 's' : ''}
                   </span>
                   <CountBadge count={count} />
@@ -239,7 +191,7 @@ export function ImportPalette({
               return (
                 <PaletteRow key={tag} onClick={() => handleImport({ mode: 'tag', tag })}>
                   <span>
-                    Tag: <span style={{ color: colors.accent.default }}>#{tag}</span>
+                    Tag: <span className="te-import-accent">#{tag}</span>
                   </span>
                   <CountBadge count={cappedCount} suffix={isCapped ? ` of ${count}` : undefined} />
                 </PaletteRow>
@@ -247,9 +199,7 @@ export function ImportPalette({
             })}
 
             {filteredTags.length === 0 && searchQuery && (
-              <div style={{ padding: '12px 16px', color: colors.text.muted, fontSize: 13 }}>
-                No matching tags
-              </div>
+              <div className="te-import-noresults">No matching tags</div>
             )}
           </>
         )}
@@ -278,26 +228,8 @@ function PaletteRow({
       type="button"
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        padding: `6px ${indent ? 28 : 14}px`,
-        background: 'transparent',
-        border: 'none',
-        cursor: disabled ? 'default' : 'pointer',
-        color: disabled ? colors.text.muted : colors.text.primary,
-        fontSize: 13,
-        textAlign: 'left',
-        opacity: disabled ? 0.5 : 1
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) e.currentTarget.style.background = 'var(--bg-tint-text)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent'
-      }}
+      className="te-import-row"
+      data-indent={indent}
     >
       {children}
     </button>
@@ -311,31 +243,9 @@ function CountBadge({
   readonly count: number
   readonly suffix?: string
 }): React.ReactElement {
-  return (
-    <span
-      style={{
-        fontSize: 11,
-        color: colors.text.muted,
-        background: colors.accent.muted,
-        padding: '1px 7px',
-        borderRadius: borderRadius.inline,
-        marginLeft: 'auto',
-        flexShrink: 0
-      }}
-    >
-      {suffix ? `(${count}${suffix})` : count}
-    </span>
-  )
+  return <span className="te-import-badge">{suffix ? `(${count}${suffix})` : count}</span>
 }
 
 function Separator(): React.ReactElement {
-  return (
-    <div
-      style={{
-        height: 1,
-        margin: '4px 14px',
-        background: colors.border.subtle
-      }}
-    />
-  )
+  return <div className="te-import-separator" />
 }

@@ -6,7 +6,6 @@ import matter from 'gray-matter'
 import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { openNoteInEditor } from '../../store/dock-store'
 import { CardShell } from './CardShell'
-import { borderRadius, colors } from '../../design/tokens'
 import { computeLineDelta, countLines } from './shared/file-view-utils'
 import {
   createEditorExtensions,
@@ -285,40 +284,28 @@ export function FileViewCard({ node }: FileViewCardProps) {
       onOpenInEditor={openInEditor}
       onContextMenu={handleContextMenu}
     >
-      <div
-        className="flex flex-col h-full"
-        style={{ minHeight: 0 }}
-        onDoubleClick={handleDoubleClick}
-      >
+      <div className="te-fileview-root" onDoubleClick={handleDoubleClick}>
         {/* Code content area */}
-        <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+        <div className="te-fileview-content">
           {loading && <LoadingState />}
           {!loading && error && (
-            <div style={{ padding: 28 }}>
-              <span className="text-sm" style={{ color: 'var(--signal-danger)' }}>
-                {error}
-              </span>
+            <div className="te-fileview-error">
+              <span className="te-fileview-error-text">{error}</span>
             </div>
           )}
           {/* Always render container so ref is available for CodeMirror mounting */}
           <div
             ref={containerRef}
-            className="h-full"
-            style={{ display: loading || error ? 'none' : 'block' }}
+            className="te-fileview-editor"
+            data-hidden={loading || Boolean(error)}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
 
         {/* Modified badge: compact notification bar at bottom */}
         {modified && (
-          <div
-            className="flex items-center justify-between shrink-0 px-3 py-1.5"
-            style={{
-              borderTop: `1px solid ${colors.border.subtle}`,
-              backgroundColor: colors.accent.muted
-            }}
-          >
-            <span className="text-xs font-mono" style={{ color: colors.accent.default }}>
+          <div className="te-fileview-modbar">
+            <span className="te-fileview-delta">
               {lineDelta}
               {lineDelta !== 'modified' ? ' lines' : ''}
             </span>
@@ -327,16 +314,7 @@ export function FileViewCard({ node }: FileViewCardProps) {
                 e.stopPropagation()
                 handleRefresh()
               }}
-              className="flex items-center justify-center hover:opacity-80"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: borderRadius.tool,
-                color: colors.accent.default,
-                cursor: 'pointer',
-                backgroundColor: 'transparent',
-                border: 'none'
-              }}
+              className="te-fileview-refresh"
               aria-label="Refresh file"
               title="Refresh file"
             >

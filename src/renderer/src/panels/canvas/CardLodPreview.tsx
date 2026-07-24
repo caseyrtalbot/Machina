@@ -1,6 +1,6 @@
 import { memo, useCallback, useRef } from 'react'
 import { useCanvas } from './canvas-store-context'
-import { colors, borderRadius } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 import { CARD_TYPE_INFO, type CanvasNode } from '@shared/canvas-types'
 import { getCardTypeColor } from './canvas-colors'
 import { useNodeDrag } from './use-canvas-drag'
@@ -55,27 +55,19 @@ function CardLodPreviewInner({ node }: CardLodPreviewProps) {
   return (
     <div
       data-canvas-node
-      className="absolute flex items-start"
+      className="canvas-lod-preview"
       style={{
         left: node.position.x,
         top: node.position.y,
         width: node.size.width,
         height: node.size.height,
         backgroundColor: color,
-        opacity: 0.15,
-        borderRadius: borderRadius.card,
-        border: isSelected ? `2px solid ${colors.accent.default}` : `1px solid ${color}`,
-        cursor: 'grab'
+        border: isSelected ? `2px solid ${colors.accent.default}` : `1px solid ${color}`
       }}
       onPointerDown={handlePointerDown}
       onClick={handleClick}
     >
-      <span
-        className="text-xs font-medium truncate px-2 py-1"
-        style={{ color: colors.text.primary, opacity: 1 }}
-      >
-        {info?.label ?? node.type}
-      </span>
+      <span className="canvas-lod-preview__label">{info?.label ?? node.type}</span>
     </div>
   )
 }

@@ -1,4 +1,3 @@
-import { colors, borderRadius } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 
 interface CardShellSkeletonProps {
@@ -8,54 +7,23 @@ interface CardShellSkeletonProps {
 export function CardShellSkeleton({ node }: CardShellSkeletonProps) {
   return (
     <div
-      className="absolute flex flex-col animate-pulse"
+      className="canvas-card-skeleton"
       style={{
         left: node.position.x,
         top: node.position.y,
         width: node.size.width,
-        height: node.size.height,
-        backgroundColor: colors.bg.surface,
-        borderRadius: borderRadius.card,
-        border: `1px solid ${colors.border.default}`,
-        opacity: 0.6
+        height: node.size.height
       }}
     >
       {/* Header skeleton */}
-      <div
-        className="px-3 py-2 shrink-0"
-        style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
-      >
-        <div
-          className="h-3"
-          style={{
-            width: '60%',
-            borderRadius: borderRadius.inline,
-            backgroundColor: colors.border.subtle
-          }}
-        />
+      <div className="canvas-card-skeleton__header">
+        <div className="canvas-card-skeleton__header-bar" />
       </div>
       {/* Body skeleton */}
-      <div className="flex-1 p-3 space-y-2">
-        <div
-          className="h-2"
-          style={{ borderRadius: borderRadius.inline, backgroundColor: colors.border.subtle }}
-        />
-        <div
-          className="h-2"
-          style={{
-            width: '80%',
-            borderRadius: borderRadius.inline,
-            backgroundColor: colors.border.subtle
-          }}
-        />
-        <div
-          className="h-2"
-          style={{
-            width: '60%',
-            borderRadius: borderRadius.inline,
-            backgroundColor: colors.border.subtle
-          }}
-        />
+      <div className="canvas-card-skeleton__body">
+        <div className="canvas-card-skeleton__line" />
+        <div className="canvas-card-skeleton__line canvas-card-skeleton__line--80" />
+        <div className="canvas-card-skeleton__line canvas-card-skeleton__line--60" />
       </div>
     </div>
   )

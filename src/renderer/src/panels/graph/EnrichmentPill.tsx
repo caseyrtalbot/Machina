@@ -3,7 +3,6 @@ import { useVaultStore } from '@renderer/store/vault-store'
 import { useThreadStore } from '@renderer/store/thread-store'
 import { useDockStore } from '@renderer/store/dock-store'
 import { useEnrichmentRunStore } from '@renderer/store/enrichment-run-store'
-import { floatingPanel, typography } from '@renderer/design/tokens'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
 import {
   MAX_ENRICHMENT_TARGETS,
@@ -85,41 +84,16 @@ export function EnrichmentPill({ rawFileCount }: { readonly rawFileCount: number
           : `${rawFileCount} file${rawFileCount !== 1 ? 's' : ''} still need metadata`
 
   return (
-    <div className="absolute inset-0 flex items-end justify-center z-10 pointer-events-none pb-14">
-      <div
-        className="flex items-center gap-2 px-4 py-2 pointer-events-auto"
-        style={{
-          backgroundColor: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          border: '1px solid color-mix(in srgb, var(--canvas-link-cyan) 18%, transparent)',
-          boxShadow: floatingPanel.shadowCompact
-        }}
-      >
-        <span
-          className="text-[10px] uppercase tracking-[0.16em]"
-          style={{
-            color: 'color-mix(in srgb, var(--canvas-link-cyan) 82%, transparent)',
-            fontFamily: typography.fontFamily.mono
-          }}
-        >
-          Enrichment
-        </span>
-        <span className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.25 }}>
-          |
-        </span>
-        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-          {status}
-        </span>
+    <div className="te-graph-enrich">
+      <div className="te-graph-enrich__pill">
+        <span className="te-graph-enrich__label">Enrichment</span>
+        <span className="te-graph-enrich__sep">|</span>
+        <span className="te-graph-enrich__status">{status}</span>
         {!busy && rawFileCount > 0 && (
           <button
             type="button"
             onClick={() => void handleEnrich()}
-            className="text-xs px-3 py-1 transition-all cursor-pointer"
-            style={{
-              backgroundColor: 'var(--color-accent-default)',
-              border: '1px solid var(--color-accent-default)',
-              color: 'var(--color-accent-fg)'
-            }}
+            className="te-graph-enrich__btn"
             title={`Run the in-app agent over up to ${MAX_ENRICHMENT_TARGETS} unconnected files. Every write asks for your approval.`}
           >
             {phase === 'idle' ? 'Enrich vault' : 'Enrich again'}

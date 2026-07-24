@@ -17,7 +17,6 @@ import type { CanvasStoreApi } from '../../store/canvas-store'
 import { useVaultStore } from '../../store/vault-store'
 import { TILE_PATTERNS, type TilePattern } from './canvas-tiling'
 import { getCommandStack, layoutCommand } from './canvas-commands'
-import { colors } from '../../design/tokens'
 
 interface CanvasToolbarProps {
   readonly canUndo: boolean
@@ -226,7 +225,7 @@ export function CanvasToolbar({
   ]
 
   return (
-    <div className="canvas-toolrail te-float-chip absolute top-3 left-3 z-30">
+    <div className="canvas-toolrail te-float-chip te-cv-toolrail">
       {/* INPUT: get stuff onto the canvas */}
       <div className="canvas-toolbtn-wrap">
         <button
@@ -364,7 +363,7 @@ export function CanvasToolbar({
           className="canvas-toolbtn"
           data-testid="canvas-organize"
           aria-label={organizePhase === 'processing' ? 'Organizing…' : 'Organize'}
-          style={{ cursor: organizePhase === 'processing' ? 'wait' : undefined }}
+          data-organizing={organizePhase === 'processing' ? '' : undefined}
         >
           <ToolIcon icon={LayoutDashboard} />
         </button>
@@ -374,7 +373,7 @@ export function CanvasToolbar({
       <div className="canvas-toolrail__divider" />
 
       {/* FRAMES: spatial bookmarks */}
-      <div className="flex w-full flex-col items-center gap-1" style={{ padding: '2px 0' }}>
+      <div className="te-cv-toolrail-frames">
         {[1, 2, 3, 4, 5].map((slot) => {
           const slotKey = String(slot)
           const filled = slotKey in focusFrames
@@ -395,15 +394,8 @@ export function CanvasToolbar({
                   : `Focus Frame ${slot} — ⇧⌘${slot} to save`
               }
               aria-label={filled ? `Jump to focus frame ${slot}` : `Focus frame ${slot} (empty)`}
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                border: `1.25px solid ${colors.text.muted}`,
-                backgroundColor: filled ? colors.text.muted : 'transparent',
-                cursor: 'pointer',
-                padding: 0
-              }}
+              className="te-cv-frame-dot"
+              data-filled={filled}
             />
           )
         })}
@@ -423,17 +415,11 @@ export function CanvasToolbar({
               setConfirmClear(true)
             }
           }}
-          className="canvas-toolbtn"
+          className="canvas-toolbtn te-cv-clear-btn"
           disabled={!clearEnabled}
           data-testid="canvas-clear"
           aria-label={confirmClear ? 'Confirm clear canvas' : 'Clear canvas'}
-          style={confirmClear ? { color: colors.claude.error } : undefined}
-          onMouseEnter={(e) => {
-            if (clearEnabled) e.currentTarget.style.color = colors.claude.error
-          }}
-          onMouseLeave={(e) => {
-            if (clearEnabled && !confirmClear) e.currentTarget.style.color = ''
-          }}
+          data-armed={confirmClear}
         >
           <ToolIcon icon={Trash2} />
         </button>

@@ -6,7 +6,6 @@ import { Markdown } from '@tiptap/markdown'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { HighlightMark } from '../editor/extensions/highlight-mark'
-import { colors } from '../../design/tokens'
 
 interface RichTextCardEditorProps {
   readonly value: string
@@ -91,11 +90,7 @@ export function RichTextCardEditor({
   }, [editor, editing])
 
   return (
-    <div
-      className="te-text-card-editor w-full h-full p-3 text-sm overflow-auto"
-      style={{ color: colors.text.primary }}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
+    <div className="te-text-card-editor" onKeyDown={(e) => e.stopPropagation()}>
       {editor && <EditorContent editor={editor} />}
     </div>
   )

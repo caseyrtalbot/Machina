@@ -5,11 +5,11 @@ history is the archive. A fresh agent starts here after reading `docs/PLAN.md` (
 canonical plan; do not restructure it) and `CLAUDE.md` (conventions + working protocol).
 
 **Position:** Layer 1 (Foundations) item 2 — design constitution (ADR 0005) — IN
-PROGRESS. **Slices 1–4 of 7 COMPLETE** (slice 1: `87da027` 2026-07-22; slice 2:
-`c7b2b89` 2026-07-23; slice 3: 2026-07-23; slice 4: 2026-07-23, this checkpoint).
-Next: **slice 5 — `panels/canvas/` + `panels/graph/`** (148 + 59 Tailwind
-class-strings; 189 + 46 inline styles), then slice 6 for editor+sidebar+ghosts+health
-and the Tailwind engine flip-off. One slice per clean checkpoint.
+PROGRESS. **Slices 1–5 of 7 COMPLETE** (slice 1: `87da027` 2026-07-22; slice 2:
+`c7b2b89` 2026-07-23; slices 3–5: 2026-07-23; slice 5 is this checkpoint). Next:
+**slice 6 — editor + sidebar + ghosts + health**, then flip the Tailwind engine off
+(vite plugin, `@import`, two deps) as the final act of slice 6. One slice per clean
+checkpoint.
 
 ## Item 2 scope: the six greppable gates + enforcement machinery
 
@@ -20,107 +20,135 @@ item.** This item converges the *mechanism* (one styling path: tokens + `te-` cl
 Layer 4 later retunes the token *values* and it propagates because there is one
 mechanism. Do not pull Layer 4 work forward.
 
-Terrain map (recon 2026-07-22; updated for slices 1–4):
+Terrain map (recon 2026-07-22; updated for slices 1–5):
 
 | Gate | Status |
 |---|---|
 | Appearance axes in `settings-store` | **CLOSED (slices 1 + 3).** Fonts are frozen constants (bundled Manrope/Space Mono; static `--font-display/--font-body/--font-mono`). The system-stack/one-mono *retune* stays Layer 4. |
-| Zero Tailwind | OPEN, agent-shell now clear. `harness-styles.ts` (the Tailwind class-string module) deleted in slice 4; its ~90 `harnessUi.*` refs converted to resurrected `.harness-*` CSS. Remaining ~320 utility class-strings: canvas 148, sidebar 60, graph 59, editor 51, health 2, ghosts 1. Engine still on: `@tailwindcss/vite` in `electron.vite.config.ts`, `@import 'tailwindcss'` at `assets/index.css:1`, two deps. Flip the engine off LAST, after all class-strings are gone (end of slice 6). |
-| Zero static inline `style={{}}` | OPEN, agent-shell now clear. Slice 4 converted 257 → 15 surviving `style={{` in agent-shell (plus `style={sizing}`/`style={common}` object forms), ALL dynamic exemptions: Electron `WebkitAppRegion` drag zones (AgentShell ×3), measured widths/heights (ThreadSidebar/ThreadPanel/HeaderFilesSidePanel/TerminalStrip), active-tab `display` (SurfaceDock/TerminalStrip), runtime identity colors (agent-badge, ApprovalsTray flag chips + `diffLineColor`), animation stagger (ThinkingIndicator), measured tooltip placement (ReadNoteCard), load-failure visibility (TerminalDockAdapter), pass-through props (TitlebarPanelToggle, Modal `panelStyle` glass on the two harness dialogs). Remaining static conversions: canvas 189, editor 99, sidebar 79, graph 46, ghosts 23, health 12; components 10 are documented dynamic exemptions (slice 3). |
-| Zero off-palette hex | OPEN. Unchanged from recon (~26 production violations; none in slice-4 scope). |
-| Zero `useState` hover | **CLOSED in slice 2.** |
-| Zero off-token `transition` | **CLOSED in slice 2.** All slice-4 CSS draws from `--t-*`/`--transition-*` (spotchecked). |
+| Zero Tailwind | OPEN, canvas + graph now clear (slice 5; agent-shell slice 4). Remaining ~114 utility class-strings (recon counts): sidebar 60, editor 51, health 2, ghosts 1. Engine still on: `@tailwindcss/vite` in `electron.vite.config.ts`, `@import 'tailwindcss'` at `assets/index.css:1`, two deps. Flip the engine off LAST, after all class-strings are gone (end of slice 6). |
+| Zero static inline `style={{}}` | OPEN, canvas + graph now clear (slice 5). 30 surviving `style={` across both are ALL dynamic exemptions: canvas 28 (pan/zoom transforms, zoom-derived dot-grid/spotlight tiles, measured marquee/minimap/section geometry, cursor-follow badges, drag-resized split width, `isInteracting`-gated card blur, runtime colors from getCardTypeColor/LANGUAGE_COLORS/getArtifactColor/STATUS_COLOR, PdfCard measured selection rect + page aspect, CardBadge prop color), graph 2 (getArtifactColor dots in GraphDetailDrawer). Remaining static conversions (recon counts): editor 99, sidebar 79, ghosts 23, health 12; components 10 are documented dynamic exemptions (slice 3). |
+| Zero off-palette hex | OPEN. Unchanged from recon (~26 production violations). Slice 5 carried off-palette literals verbatim from TSX into CSS per value-fidelity rule (`#dfa11a`, `#3dca8d`, `#050607`, assorted white/black rgba) — same violations, new home in the slice-5 CSS section; the hex pass will find them there. |
+| Zero `useState` hover | **CLOSED in slice 2.** Slice 5 removed 8 more JS onMouseEnter/Leave hover handlers (graph buttons, CodeCard lang menu, FileViewCard, CanvasToolbar, CanvasSplitEditor, ImportPalette rows) — all now CSS `:hover`. |
+| Zero off-token `transition` | **CLOSED in slice 2, held.** Slice 5 minted `--t-spring: 220ms cubic-bezier(0.16, 1, 0.3, 1)` (graph drawer slide) rather than carry a bespoke literal. |
 
 Enforcement machinery (all greenfield — lands in slice 7): unchanged plan — contrast
 unit test (`tests/design/contrast.test.ts`), dev-only gallery (`design/Gallery.tsx`
 behind `?gallery=1` DEV check), Playwright visual regression (`e2e/visual.spec.ts`),
 and the strict `tests/design/greppable-gates.test.ts` landing last (its transition
-scanner must handle multi-line declarations).
+scanner must handle multi-line declarations — slice 5 added several).
 
 ## Slice plan (dependency-ordered)
 
 1. **Settings axes deletion — DONE** (`87da027`).
 2. **Hover + transitions — DONE** (`c7b2b89`).
 3. **components/ + stragglers + font-axis deletion — DONE** (2026-07-23).
-4. **agent-shell/ — DONE** (this checkpoint).
-5. **canvas/ + graph/** (NEXT) — 148+59 Tailwind class-strings, 189+46 inline styles.
-   Canvas includes Pixi/`getComputedStyle` consumers and `workbench-animations.css` —
-   expect a higher dynamic-exemption ratio than agent-shell.
-6. **editor + sidebar + ghosts + health** — then flip the Tailwind engine off (vite
-   plugin, `@import`, two deps) as the final act of slice 6.
+4. **agent-shell/ — DONE** (2026-07-23).
+5. **canvas/ + graph/ — DONE** (this checkpoint).
+6. **editor + sidebar + ghosts + health** (NEXT) — then flip the Tailwind engine off
+   (vite plugin, `@import`, two deps) as the final act of slice 6.
 7. **Enforcement machinery** — the four tests/routes above; PLAN.md item 2 marked
    complete; invariants added to CLAUDE.md.
 
-## What shipped last (slice 4)
+## What shipped last (slice 5)
 
-Scope: all of `panels/agent-shell/`. Five parallel agents (harness-module dismantle /
-tool-renderers / tray+palette+breaker / thread cluster / shell+dock+terminal), each
-writing TSX edits directly and CSS to a scratchpad fragment; orchestrator assembled the
-five attributed sections onto the end of `assets/index.css` (4248 → 6908 lines),
-cross-checked every TSX class reference against a CSS definition (zero missing, both
-directions), then ran gates.
+Scope: all of `panels/canvas/` + `panels/graph/`. Six parallel agents by cluster
+(card-core / content cards / media+terminal cards / canvas chrome+overlays /
+dialogs+previews / graph), each writing TSX edits directly and CSS to a scratchpad
+fragment; orchestrator assembled the six attributed sections onto the end of
+`assets/index.css` (6908 → 9450 lines, section banner `Slice 5: canvas + graph`),
+cross-checked all 294 new class definitions against TSX references (zero missing,
+both directions), then ran gates.
 
-- **`harness-styles.ts` deleted** — the last Tailwind class-string module. Its 87 keys
-  became `.harness-*` CSS (names match the old deleted `HarnessGallery.css`, verified
-  against `git show 638e2ef^`); variant syntax (`hover:`, `aria-[current=page]:`,
-  `max-[760px]:`, `[&_span]:`) translated to real pseudo-classes/media/descendant
-  selectors. Rem values encode what Tailwind renders today at the 13px root (e.g.
-  `p-6` → 1.5rem = 19.5px), not the old stylesheet's px.
-- **New class vocabularies**: `.te-tool-*` (cards keyed by `data-variant`/`data-pending`
-  on ToolCardShell; its `style` prop replaced by `className`, no external consumers),
-  `.te-tray-*`/`.te-palette-*`/`.te-breaker-*`/`.te-watcher-*` (tray actions via
-  `data-tone` + `--tone` var), `.te-thread-*`/`.te-thinking-*`, `.te-shell-*`/
-  `.te-dock-*`/`.te-term-*`. Existing classes extended in place (`.side-dock-ribbon*`,
-  `.resize-handle*`, `.vault-switcher*`, `.thread-input-*`, `.te-new-thread-button`)
-  without touching the slice-2 hover-section cascade.
-- **State → attributes**: active/renaming thread rows, auto-accept toggle (`data-on`),
-  key hint (`data-visible`), palette/picker selection (existing `aria-selected`),
-  disabled states on native `:disabled`.
-- **Orphans removed**: layout constants relocated to CSS (WINDOW_HEADER_HEIGHT,
-  RIBBON_WIDTH, TRIGGER_BUTTON_SIZE, actionButtonStyle, etc.) and dead token imports
-  across all converted files.
+- **New class vocabularies**: `.canvas-card*` extended in place (state ring moved from
+  a 4-branch inline ternary to `data-selected/-terminal/-active` + `--focused/--locked`
+  modifiers; priority selected < focused < locked < active by source order at equal
+  specificity), `.canvas-card-skeleton*`, `.canvas-lod-preview*`, `.te-metadata-grid*`,
+  `.te-card-badge`, `.te-saved-badge`, `.te-cluster-*`; per-card `.te-notecard-*`,
+  `.te-mdcard-*`, `.te-textcard-*`, `.te-codecard-*`, `.te-fileview-*`, `.te-wbfile-*`,
+  `.te-folder-*`, `.te-sysart-*`, `.te-blockcard-*`; media `.te-imgcard-*`,
+  `.te-pdfcard-*`, `.te-termcard-*`, `.te-termdock-*`; chrome `.te-cv-*` (toolrail,
+  surface, minimap, zoom, section/drag overlays, edge layer, split editor, shortcut
+  sheet); dialogs `.te-savecard-*`, `.te-import-*`, `.te-ontology-*`, `.te-foldermap-*`;
+  graph `.te-graph-*`.
+- **`.te-float-chip` invariant honored**: canvas toolrail and all graph floating chips
+  (statusrail, settings gear, Fit All, zoom readout) compose it; ZoomIndicator and
+  CanvasMinimap deliberately do NOT (their `.canvas-zoom-indicator`/`.canvas-minimap`
+  glass recipe — `--canvas-hud-bg` + blur — is richer than the flat chip rail and
+  composing would regress it).
+- **Spotcheck findings fixed before checkpoint**: CardShell title font-size (static
+  `CARD_TITLE_FONT_SIZE_PX - 0.25` inline → `calc(var(--env-card-title-font-size) -
+  0.25px)` in CSS) and anchor-dot per-side offsets (static lookup → `data-side`
+  attribute rules).
 
-Verify: `npm run check` green (331 files / 4051 tests — identical to the post-hygiene
+Verify: `npm run check` green (331 files / 4051 tests — identical to the slice-4
 baseline, zero tests lost), build exit 0, spotcheck-verifier PASS on all six checks
-(~25-file value-fidelity sample, cascade audit of the extended selectors, orphan sweep
-both directions, deletion greps clean). Live CDP probe against `npm run dev:debug`:
-computed styles exact (titlebar 39px/8px gutters, controls 148px, ribbon 35px, sidebar
-240px, textarea 22px), approvals-tray popover + command palette open with exact glass
-values (`rgba(4,4,8,0.9)`, `blur(24px) saturate(1.4)`), harness gallery renders at
-1080px with 10 template cards, mode tabs, filters; screenshots eyeballed clean.
+(scripted fragment-vs-assembled value diff: zero mismatches; full-file duplicate-
+selector scan: 9 cross-section duplicates, all additive/disjoint; orphan sweep clean
+both directions). Live CDP probe against `npm run dev:debug`: canvas toolrail
+positioned via `.te-cv-toolrail` on float-chip recipe, card renders with shadow-card +
+the slice-2 transition triple (transform/box-shadow/border-color) intact + Manrope
+titlebar; graph statusrail chips on float-chip flat rail (`rgb(3,3,5)`, mono 0.75rem),
+drawer parked at `translateX(340px + 24px)` with 0.22s spring; `--t-spring` resolves
+live. Screenshots of both surfaces eyeballed clean.
 
 ## Landmines
 
+- **`--t-spring` is CSS-only** (like `--t-reveal`): `Theme.tsx` re-emits only
+  micro/fast/med/slow/surface from `transitions.*` — do not add spring to tokens.ts
+  without also updating Theme.tsx, and don't "fix" the asymmetry mid-slice.
+- **`--env-card-title-font-size` fallback mismatch**: index.css `:root` says 12px but
+  `Theme.tsx:114` overrides to 13px (`CARD_TITLE_FONT_SIZE_PX`) on mount. The live
+  card title is 12.75px via calc; anything reading the CSS file value pre-mount (or
+  happy-dom) sees 11.75px. Slice-7 gates tests must read computed styles live.
+- **`.canvas-card` state rules depend on source order**: the slice-5 section's
+  selected/focused/locked/active box-shadow rules sit at equal specificity AFTER the
+  slice-2 blocks and in that internal order — inserting rules between them changes
+  card state rendering. Same for `.te-termdock-pill` overriding `.terminal-pill`
+  border-radius by append order.
+- **Compound selectors are deliberate**: `.canvas-zoom-indicator.te-cv-zoom-indicator`,
+  `.canvas-toolbtn.te-cv-clear-btn:hover`,
+  `.canvas-split-editor__header.te-cv-split-editor__headerbar` raise specificity so
+  they win regardless of merge order — don't "simplify" them to single classes.
 - **`.thread-input-textarea` min/max-height (22px/200px) duplicate
   MIN_INPUT_HEIGHT/MAX_INPUT_HEIGHT in `ThreadInputBar.tsx`** — the JS resize clamp is
   still the live consumer. Change together (a CSS comment marks it).
-- **Pinned-px titlebar tests became class-presence tests** (AgentShell,
-  SideDockRibbon): happy-dom can't read the external stylesheet, so the 39px/148px/8px
-  values are now guaranteed only by CSS. Candidate assertion for the slice-7
-  greppable-gates/visual-regression suite.
-- **Glass literals** now at five sites (`onboarding`, `.te-ctx-menu`,
-  `.te-tray-popover`, `.te-palette-panel`, `.te-shell-welcome`) all mirroring
-  `floatingPanel.glass` — fold into CSS vars in slice 7 alongside the gates test.
+- **Happy-dom can't read the external stylesheet**: slice-4/5 test conversions assert
+  class presence / data-attributes, not computed values (e.g. TerminalCard webview
+  pointer-events, TerminalDock dot status). Pinned-px values are guaranteed only by
+  CSS — candidates for the slice-7 visual-regression suite.
+- **Glass literals** now at seven+ sites (`onboarding`, `.te-ctx-menu`,
+  `.te-tray-popover`, `.te-palette-panel`, `.te-shell-welcome`, plus slice-5
+  `.te-ontology-bar--preview`, `.te-foldermap-bar`, graph drawer/settings/enrich
+  panels) all mirroring `floatingPanel.glass`/popover values — fold into CSS vars in
+  slice 7 alongside the gates test.
+- **NoteCard sets `wrapper.style.cssText` imperatively** (~line 188) on a
+  mermaid-injection DOM node — not JSX `style=`, doesn't trip the grep gate; left
+  as-is deliberately.
+- **EdgeLayer/FolderMapPreview use SVG presentation attributes** (stroke/fill/x/y)
+  with runtime values — attributes, not `style=`; out of gate scope by design.
 - **npm audit has 9 pre-existing vulnerabilities** (3 high, sharp/libvips,
-  GHSA-f88m-g3jw-g9cj). No dependency changed in slice 4; needs a separate deps pass.
+  GHSA-f88m-g3jw-g9cj). No dependency changed in slices 4–5; needs a separate deps
+  pass.
 - **rem conversions assume the 13px root** (`--ui-fs`). Layer 4 may retune the root;
   rem scaling with it is intended — don't "normalize" rem→px.
-- **Hover-reveal CSS uses deliberate specificity ordering** (slice 2). The slice-4
+- **Hover-reveal CSS uses deliberate specificity ordering** (slice 2). Slice-4/5
   sections split properties (layout in new sections, color/state in the hover section)
-  for `.side-dock-ribbon-action` and `.resize-handle*` — keep the split disjoint.
-- **Visual-verify tricks**: settings modal opens via
-  `window.dispatchEvent(new Event('te:open-settings'))`; approvals tray via clicking
-  `.te-tray-trigger`; palette via synthetic ⌘K `KeyboardEvent`; harness gallery via the
-  sidebar "NEW AGENT" button. CDP scripts from this slice live in the session
-  scratchpad (`cdp-probe*.js`) — rewrite as needed, they're not tracked.
+  for `.side-dock-ribbon-action`, `.resize-handle*`, `.canvas-card__actions/__resize/
+  __anchor` — keep the split disjoint.
+- **Visual-verify tricks**: settings modal via
+  `window.dispatchEvent(new Event('te:open-settings'))`; approvals tray via
+  `.te-tray-trigger`; palette via synthetic ⌘K; canvas/graph via the side-dock ribbon
+  "Open canvas"/"Open graph" aria-labels; add a card via `[data-testid=canvas-add-card]`
+  then first `[role=menuitem]`. CDP driver from this slice:
+  session scratchpad `cdp.js` (run with `NODE_PATH=<repo>/node_modules`); not tracked.
 - **CanvasToolbar React gotcha** (regression-tested): never read `e.currentTarget`
   inside a setState updater — capture rects before setState.
 - **Cursor's background git worker + GitLens `gk mcp` hold `.git/index.lock`**
   intermittently — a commit can fail then succeed on retry. Don't `rm` the lock without
   confirming no git process is mid-operation.
 - **e2e runs rewrite `e2e/fixtures/test-vault/.machina/state.json`** — `git restore` it
-  before every commit; never commit it. (Slice 4 ran `npm run check` + build only;
-  fixture untouched, verified via `git status`.)
+  before every commit; never commit it. (Slice 5 ran `npm run check` + build only;
+  fixture verified clean via `git status`.)
 - eslint uses `--cache`; run `npx eslint --no-cache` when a stale result looks
   suspicious. npm installs need `--cache /tmp/npm-cache-te`.
 - `CLAUDE.md` is gitignored and is the sole operator doc. Item-2 completion invariants

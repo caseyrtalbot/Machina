@@ -109,19 +109,15 @@ export function EdgeDots({ containerWidth, containerHeight }: EdgeDotsProps) {
   if (dots.length === 0) return null
 
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 5 }}>
+    <div className="te-cv-edgedots">
       {dots.map((dot) => (
         <div
           key={dot.targetNodeId}
-          className="absolute pointer-events-auto edge-dot"
+          className="edge-dot te-cv-edgedot"
           style={{
             left: dot.x - DOT_SIZE / 2,
             top: dot.y - DOT_SIZE / 2,
-            width: DOT_SIZE,
-            height: DOT_SIZE,
-            borderRadius: '50%',
-            backgroundColor: dot.color,
-            cursor: 'pointer'
+            backgroundColor: dot.color
           }}
           onClick={() => handleClick(dot.targetNodeId)}
           title={dot.title}

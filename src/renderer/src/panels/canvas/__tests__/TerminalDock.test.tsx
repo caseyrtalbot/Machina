@@ -234,14 +234,13 @@ describe('TerminalDock', () => {
     const dots = screen.getAllByTestId('status-dot')
     expect(dots).toHaveLength(5)
 
-    // Verify dot background colors match spec (status colors now semantic tokens;
-    // dots stay round per knife-edge exception). claude reuses --signal-info (it is a
-    // "working" state like busy) — there is no distinct mint signal token.
-    expect(dots[0].style.backgroundColor).toBe('#3dca8d') // idle (semantic.cluster)
-    expect(dots[1].style.backgroundColor).toBe('var(--signal-info)') // busy
-    expect(dots[2].style.backgroundColor).toBe('var(--signal-danger)') // error
-    expect(dots[3].style.backgroundColor).toBe('var(--signal-info)') // claude
-    // dead uses CSS variable, check it exists
-    expect(dots[4].style.backgroundColor).toBeTruthy()
+    // Dot color/animation is CSS-driven off data-status (see .te-termdock-dot
+    // rules); assert the status attribute the stylesheet keys on. claude reuses
+    // the busy visual (--signal-info) — there is no distinct mint signal token.
+    expect(dots[0].getAttribute('data-status')).toBe('idle')
+    expect(dots[1].getAttribute('data-status')).toBe('busy')
+    expect(dots[2].getAttribute('data-status')).toBe('error')
+    expect(dots[3].getAttribute('data-status')).toBe('claude')
+    expect(dots[4].getAttribute('data-status')).toBe('dead')
   })
 })

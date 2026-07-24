@@ -3,7 +3,7 @@ import { logError } from '../../utils/error-logger'
 import { CardShell } from './CardShell'
 import { useCanvas, useCanvasApi } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
-import { colors, getArtifactColor, typography } from '../../design/tokens'
+import { getArtifactColor } from '../../design/tokens'
 import { openArtifactInEditor } from '../../system-artifacts/system-artifact-runtime'
 import { restorePatternSnapshot } from './workbench-artifact-placement'
 import type { CanvasNode } from '@shared/canvas-types'
@@ -34,13 +34,11 @@ function StatusPill({
 }) {
   return (
     <span
-      className="px-2 py-0.5 text-[10px] uppercase"
+      className="te-sysart-status"
       style={{
         color: accentColor,
         backgroundColor: accentColor + '14',
-        border: `1px solid ${accentColor}24`,
-        letterSpacing: 'var(--label-tracking)',
-        fontFamily: typography.fontFamily.mono
+        border: `1px solid ${accentColor}24`
       }}
     >
       {status}
@@ -50,14 +48,7 @@ function StatusPill({
 
 function StatChip({ label, value }: { readonly label: string; readonly value: string | number }) {
   return (
-    <span
-      className="px-1.5 py-0.5 text-[10px]"
-      style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
-        color: colors.text.muted,
-        fontFamily: typography.fontFamily.mono
-      }}
-    >
+    <span className="te-sysart-stat">
       {value} {label}
     </span>
   )
@@ -114,22 +105,16 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
       onClose={handleClose}
       onOpenInEditor={filePath ? handleOpenInEditor : undefined}
     >
-      <div className="p-3 space-y-2">
+      <div className="te-sysart-root">
         {/* Header: kind badge + status */}
-        <div className="flex items-center gap-2">
+        <div className="te-sysart-header">
           <span
-            className="shrink-0 flex items-center justify-center text-[10px] font-bold"
-            style={{
-              width: 24,
-              height: 24,
-              backgroundColor: accentColor + '18',
-              color: accentColor,
-              fontFamily: typography.fontFamily.mono
-            }}
+            className="te-sysart-kind-icon"
+            style={{ backgroundColor: accentColor + '18', color: accentColor }}
           >
             {KIND_ICONS[kind]}
           </span>
-          <span className="text-[11px] font-medium" style={{ color: accentColor }}>
+          <span className="te-sysart-kind-label" style={{ color: accentColor }}>
             {KIND_LABELS[kind]}
           </span>
           {status && <StatusPill status={status} accentColor={accentColor} />}
@@ -137,23 +122,13 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
 
         {/* Summary or question */}
         {kind === 'tension' && meta.question ? (
-          <p
-            className="text-xs leading-relaxed line-clamp-2 italic"
-            style={{ color: colors.text.secondary }}
-          >
-            {meta.question}
-          </p>
+          <p className="te-sysart-question">{meta.question}</p>
         ) : summary ? (
-          <p
-            className="text-xs leading-relaxed line-clamp-2"
-            style={{ color: colors.text.secondary }}
-          >
-            {summary}
-          </p>
+          <p className="te-sysart-summary">{summary}</p>
         ) : null}
 
         {/* Stat chips */}
-        <div className="flex flex-wrap gap-1">
+        <div className="te-sysart-stats">
           {kind === 'session' && meta.fileTouchCount != null && meta.fileTouchCount > 0 && (
             <StatChip label="files" value={meta.fileTouchCount} />
           )}
@@ -166,12 +141,11 @@ export function SystemArtifactCard({ node }: SystemArtifactCardProps) {
           {kind === 'pattern' && meta.hasSnapshot && (
             <button
               onClick={handleRestore}
-              className="px-1.5 py-0.5 text-[10px] cursor-pointer transition-colors"
+              className="te-sysart-restore"
               style={{
                 backgroundColor: accentColor + '14',
                 color: accentColor,
-                border: `1px solid ${accentColor}24`,
-                fontFamily: typography.fontFamily.mono
+                border: `1px solid ${accentColor}24`
               }}
               title="Restore this pattern's saved canvas layout"
             >

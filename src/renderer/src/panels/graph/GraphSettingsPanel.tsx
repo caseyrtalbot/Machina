@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { useGraphViewStore } from '@renderer/store/graph-view-store'
 import { useSettingsStore } from '@renderer/store/settings-store'
-import { borderRadius, colors, floatingPanel, typography } from '@renderer/design/tokens'
 import type { ForceParams } from './graph-types'
 import { DEFAULT_FORCE_PARAMS } from './graph-types'
 
@@ -21,15 +20,10 @@ interface SliderProps {
 
 function Slider({ label, value, min, max, step, displayValue, onChange }: SliderProps) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color: colors.text.secondary }}>
-          {label}
-        </span>
-        <span
-          className="text-xs tabular-nums font-mono"
-          style={{ color: colors.text.muted, fontSize: 10 }}
-        >
+    <div className="te-graph-slider-row">
+      <div className="te-graph-slider-row__head">
+        <span className="te-graph-settings__label">{label}</span>
+        <span className="te-graph-slider-row__value">
           {displayValue ?? value.toFixed(step < 1 ? 2 : 0)}
         </span>
       </div>
@@ -58,31 +52,17 @@ interface ToggleProps {
 
 function Toggle({ label, checked, onChange }: ToggleProps) {
   return (
-    <label className="flex items-center justify-between cursor-pointer py-0.5">
-      <span className="text-xs" style={{ color: colors.text.secondary }}>
-        {label}
-      </span>
+    <label className="te-graph-toggle">
+      <span className="te-graph-settings__label">{label}</span>
       <button
         onClick={() => onChange(!checked)}
-        className="relative rounded-full transition-colors"
-        style={{
-          width: 32,
-          height: 18,
-          backgroundColor: checked ? colors.accent.default : 'var(--color-border-default)'
-        }}
+        className="te-graph-toggle__track"
+        data-checked={checked}
         role="switch"
         aria-checked={checked}
         aria-label={label}
       >
-        <span
-          className="absolute top-0.5 rounded-full transition-transform"
-          style={{
-            width: 14,
-            height: 14,
-            backgroundColor: checked ? 'var(--color-accent-fg)' : 'var(--color-text-secondary)',
-            left: checked ? 15 : 3
-          }}
-        />
+        <span className="te-graph-toggle__knob" />
       </button>
     </label>
   )
@@ -94,20 +74,9 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div
-        className="font-semibold"
-        style={{
-          color: colors.text.muted,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform
-        }}
-      >
-        {title}
-      </div>
-      <div className="flex flex-col gap-2.5">{children}</div>
+    <div className="te-graph-section">
+      <div className="te-graph-section__title">{title}</div>
+      <div className="te-graph-section__body">{children}</div>
     </div>
   )
 }
@@ -163,34 +132,14 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
   }, [resetForceParams, onForceParamsChange])
 
   return (
-    <div
-      className="absolute top-12 right-3 z-10 flex flex-col gap-4 overflow-y-auto"
-      style={{
-        width: 240,
-        maxHeight: 'calc(100% - 24px)',
-        padding: '16px 14px',
-        backgroundColor: floatingPanel.glass.bg,
-        backdropFilter: floatingPanel.glass.blur,
-        boxShadow: floatingPanel.shadow,
-        border: '1px solid var(--color-border-default)',
-        scrollbarWidth: 'thin',
-        scrollbarColor: 'var(--color-border-default) transparent'
-      }}
-    >
+    <div className="te-graph-settings">
       {/* Stats bar */}
-      <div
-        className="flex items-center gap-3 text-xs font-mono"
-        style={{ color: colors.text.muted, fontSize: 10 }}
-      >
+      <div className="te-graph-settings__stats">
         <span>{nodeCount} nodes</span>
         <span>{edgeCount} edges</span>
         <span
-          className="ml-auto rounded-full"
-          style={{
-            width: 6,
-            height: 6,
-            backgroundColor: settled ? 'var(--signal-success)' : 'var(--signal-warn)'
-          }}
+          className="te-graph-settings__status-dot"
+          data-settled={settled}
           title={settled ? 'Settled' : `Simulating (${(alpha * 100).toFixed(0)}%)`}
         />
       </div>
@@ -284,41 +233,11 @@ export function GraphSettingsPanel({ onForceParamsChange, onReheat }: GraphSetti
       </Section>
 
       {/* Actions */}
-      <div className="flex gap-2">
-        <button
-          onClick={onReheat}
-          className="flex-1 text-xs py-1.5 transition-colors cursor-pointer"
-          style={{
-            borderRadius: borderRadius.inline,
-            backgroundColor: 'var(--color-bg-elevated)',
-            color: colors.text.secondary,
-            border: '1px solid var(--color-border-default)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = colors.accent.default
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-border-default)'
-          }}
-        >
+      <div className="te-graph-settings__actions">
+        <button onClick={onReheat} className="te-graph-settings__btn">
           Reheat
         </button>
-        <button
-          onClick={handleReset}
-          className="flex-1 text-xs py-1.5 transition-colors cursor-pointer"
-          style={{
-            borderRadius: borderRadius.inline,
-            backgroundColor: 'var(--color-bg-elevated)',
-            color: colors.text.secondary,
-            border: '1px solid var(--color-border-default)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = colors.accent.default
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-border-default)'
-          }}
-        >
+        <button onClick={handleReset} className="te-graph-settings__btn">
           Reset
         </button>
       </div>

@@ -169,15 +169,7 @@ export function CanvasMinimap({
     <div
       ref={minimapRef}
       data-testid="canvas-minimap"
-      className="canvas-minimap absolute pointer-events-auto"
-      style={{
-        bottom: 40,
-        right: 12,
-        width: MINIMAP_WIDTH,
-        height: MINIMAP_HEIGHT,
-        zIndex: 20,
-        cursor: 'crosshair'
-      }}
+      className="canvas-minimap te-cv-minimap"
       onClick={handleMinimapClick}
     >
       <div className="canvas-minimap__label">Map</div>
@@ -185,33 +177,25 @@ export function CanvasMinimap({
       {nodes.map((node) => (
         <div
           key={node.id}
-          className="absolute"
+          className="te-cv-minimap-node"
           style={{
             left: toMiniX(node.position.x),
             top: toMiniY(node.position.y),
             width: Math.max(2, node.size.width * scale),
             height: Math.max(2, node.size.height * scale),
-            backgroundColor: getCardTypeColor(node.type),
-            opacity: 0.6,
-            borderRadius: 0,
-            pointerEvents: 'none'
+            backgroundColor: getCardTypeColor(node.type)
           }}
         />
       ))}
 
       {/* Viewport indicator */}
       <div
-        className="absolute"
+        className="te-cv-minimap-viewport"
         style={{
           left: toMiniX(vpRect.x),
           top: toMiniY(vpRect.y),
           width: Math.max(4, vpRect.width * scale),
-          height: Math.max(4, vpRect.height * scale),
-          border: '1px solid color-mix(in srgb, var(--color-accent-default) 70%, transparent)',
-          backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)',
-          borderRadius: 0,
-          cursor: 'grab',
-          pointerEvents: 'auto'
+          height: Math.max(4, vpRect.height * scale)
         }}
         onPointerDown={handleViewportDrag}
         onClick={(e) => e.stopPropagation()}

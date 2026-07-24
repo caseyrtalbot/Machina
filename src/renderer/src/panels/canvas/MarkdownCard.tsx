@@ -3,7 +3,6 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
 import { getCanvasEditorExtensions } from './shared/tiptap-config'
-import { colors } from '../../design/tokens'
 import type { CanvasNode, MarkdownNodeMeta } from '@shared/canvas-types'
 
 interface MarkdownCardProps {
@@ -49,8 +48,7 @@ export function MarkdownCard({ node }: MarkdownCardProps) {
     onUpdate: handleUpdate,
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-full px-3 py-2',
-        style: `color: ${colors.text.primary}; font-size: 13px;`
+        class: 'te-mdcard-editor'
       },
       handleDOMEvents: {
         keydown: (_view, e) => {
@@ -111,22 +109,15 @@ export function MarkdownCard({ node }: MarkdownCardProps) {
 
   return (
     <CardShell node={node} title={title} onClose={() => removeNode(node.id)}>
-      <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
+      <div className="te-mdcard-root">
         {/* Mode toggle bar */}
-        <div
-          className="flex items-center justify-between px-2 py-1 shrink-0"
-          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
-        >
-          <span className="text-xs" style={{ color: colors.text.muted }}>
+        <div className="te-mdcard-toolbar">
+          <span className="te-mdcard-mode-label">
             {viewMode === 'rendered' ? 'Edit' : 'Source'}
           </span>
           <button
             onClick={toggleMode}
-            className="text-xs px-2 py-0.5"
-            style={{
-              backgroundColor: colors.accent.muted,
-              color: colors.text.secondary
-            }}
+            className="te-mdcard-mode-toggle"
             aria-label={
               viewMode === 'rendered' ? 'Switch to source view' : 'Switch to rendered view'
             }
@@ -136,12 +127,8 @@ export function MarkdownCard({ node }: MarkdownCardProps) {
         </div>
 
         {/* Editor content */}
-        <div
-          className="flex-1 overflow-auto"
-          style={{ minHeight: 0 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {editor && <EditorContent editor={editor} className="h-full" />}
+        <div className="te-mdcard-editor-scroll" onClick={(e) => e.stopPropagation()}>
+          {editor && <EditorContent editor={editor} className="te-mdcard-editor-host" />}
         </div>
       </div>
     </CardShell>

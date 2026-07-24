@@ -2,7 +2,6 @@ import { memo } from 'react'
 import type { CanvasNode } from '@shared/canvas-types'
 import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
-import { colors } from '../../design/tokens'
 
 interface ProjectFolderCardProps {
   readonly node: CanvasNode
@@ -29,65 +28,22 @@ function ProjectFolderCard({ node }: ProjectFolderCardProps) {
 
   return (
     <CardShell node={node} title={folderName} onClose={() => removeNode(node.id)}>
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '12px 16px',
-          overflow: 'hidden',
-          userSelect: 'none'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span data-testid="folder-icon" style={{ fontSize: '16px', opacity: 0.7 }}>
+      <div className="te-folder-root">
+        <div className="te-folder-row">
+          <span data-testid="folder-icon" className="te-folder-icon">
             {'\u{1F4C2}'}
           </span>
-          <span
-            data-testid="folder-name"
-            style={{
-              fontWeight: 600,
-              fontSize: '13px',
-              color: colors.text.primary,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              flex: 1
-            }}
-          >
+          <span data-testid="folder-name" className="te-folder-name">
             {folderName}
           </span>
           {typeof childCount === 'number' && childCount > 0 && (
-            <span
-              data-testid="folder-child-count"
-              style={{
-                fontSize: '11px',
-                padding: '1px 6px',
-                borderRadius: 'var(--r-inline)',
-                background: colors.bg.surface,
-                color: colors.text.secondary,
-                fontWeight: 500,
-                flexShrink: 0
-              }}
-            >
+            <span data-testid="folder-child-count" className="te-folder-count">
               {childCount}
             </span>
           )}
         </div>
         {relativePath && relativePath !== '.' && (
-          <div
-            data-testid="folder-path"
-            style={{
-              fontSize: '11px',
-              color: colors.text.muted,
-              marginTop: '4px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
-          >
+          <div data-testid="folder-path" className="te-folder-path">
             {relativePath}
           </div>
         )}

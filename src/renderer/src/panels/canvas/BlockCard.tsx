@@ -3,7 +3,7 @@ import { CardShell } from './CardShell'
 import { maskSecrets } from './block-pin'
 import { useCanvas } from './canvas-store-context'
 import { useBlockStore } from '../../store/block-store'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { Block, BlockState, SecretRef } from '@shared/engine/block-model'
 import { segmentOutput, maskSegmentText } from '@shared/engine/block-output-segments'
@@ -128,11 +128,7 @@ function renderOutput(
           data-testid="block-secret"
           data-secret-kind={seg.secret.kind}
           data-revealed="true"
-          style={{
-            background: 'color-mix(in srgb, currentColor 8%, transparent)',
-            borderRadius: borderRadius.inline,
-            padding: '0 2px'
-          }}
+          className="te-blockcard-secret"
           title={`${seg.secret.kind} (revealed)`}
         >
           {seg.text}
@@ -145,12 +141,7 @@ function renderOutput(
         data-testid="block-secret"
         data-secret-kind={seg.secret.kind}
         data-revealed="false"
-        style={{
-          background: 'color-mix(in srgb, currentColor 12%, transparent)',
-          borderRadius: borderRadius.inline,
-          padding: '0 2px',
-          letterSpacing: '0.04em'
-        }}
+        className="te-blockcard-secret"
         title={`${seg.secret.kind} (hidden — click reveal to show)`}
       >
         {maskSegmentText(seg.text)}
@@ -205,20 +196,11 @@ function BlockCardInner({ node }: BlockCardProps) {
       data-testid="block-status"
       data-state={stateKind}
       {...(ok !== undefined ? { 'data-exit-ok': String(ok) } : {})}
-      style={{
-        fontSize: 10,
-        fontFamily: typography.fontFamily.mono,
-        textTransform: 'uppercase',
-        letterSpacing: typography.metadata.letterSpacing,
-        color: statusColor,
-        border: `1px solid ${statusColor}`,
-        borderRadius: borderRadius.tool,
-        padding: '1px 6px',
-        whiteSpace: 'nowrap'
-      }}
+      className="te-blockcard-status"
+      style={{ color: statusColor, borderColor: statusColor }}
     >
       {stateKind === 'running' ? (
-        <span data-testid="block-spinner" style={{ marginRight: 4 }}>
+        <span data-testid="block-spinner" className="te-blockcard-spinner">
           ⟳
         </span>
       ) : null}
@@ -233,36 +215,22 @@ function BlockCardInner({ node }: BlockCardProps) {
       titleExtra={titleExtra}
       onClose={() => removeNode(node.id)}
     >
-      <div className="flex flex-col gap-2 p-3" style={{ minHeight: 0, height: '100%' }}>
-        <div className="flex items-center justify-between">
+      <div className="te-blockcard-root">
+        <div className="te-blockcard-meta">
           {cwdShort ? (
             <span
               data-testid="block-cwd"
               title={resolved.cwd ?? undefined}
-              style={{
-                fontSize: 11,
-                fontFamily: typography.fontFamily.mono,
-                color: colors.text.muted,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
+              className="te-blockcard-cwd"
             >
               {cwdShort}
             </span>
           ) : (
             <span />
           )}
-          <div className="flex items-center gap-2">
+          <div className="te-blockcard-controls">
             {elapsed ? (
-              <span
-                data-testid="block-elapsed"
-                style={{
-                  fontSize: 11,
-                  fontFamily: typography.fontFamily.mono,
-                  color: colors.text.muted
-                }}
-              >
+              <span data-testid="block-elapsed" className="te-blockcard-elapsed">
                 {elapsed}
               </span>
             ) : null}
@@ -272,17 +240,10 @@ function BlockCardInner({ node }: BlockCardProps) {
                 data-testid="block-reveal-toggle"
                 data-revealed={String(revealed)}
                 onClick={() => setRevealed((v) => !v)}
+                className="te-blockcard-reveal"
                 style={{
-                  fontSize: 10,
-                  fontFamily: typography.fontFamily.mono,
                   color: revealed ? colors.claude.warning : colors.text.muted,
-                  border: `1px solid ${revealed ? colors.claude.warning : colors.border.default}`,
-                  borderRadius: borderRadius.tool,
-                  padding: '1px 6px',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: typography.metadata.letterSpacing
+                  borderColor: revealed ? colors.claude.warning : colors.border.default
                 }}
               >
                 {revealed ? 'hide' : `reveal (${resolved.secrets.length})`}
@@ -295,17 +256,7 @@ function BlockCardInner({ node }: BlockCardProps) {
           data-testid="block-output"
           data-secrets={String(resolved.secrets.length)}
           data-revealed={String(revealed)}
-          style={{
-            margin: 0,
-            flex: 1,
-            minHeight: 0,
-            overflow: 'auto',
-            fontSize: 11,
-            fontFamily: typography.fontFamily.mono,
-            color: colors.text.secondary,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word'
-          }}
+          className="te-blockcard-output"
         >
           {renderOutput(resolved.outputText, resolved.secrets, revealed) ||
             (stateKind === 'running' ? '…' : '')}

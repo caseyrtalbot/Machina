@@ -2,7 +2,6 @@ import { useRef, useCallback, useEffect, useMemo, useState } from 'react'
 import { useCanvas } from './canvas-store-context'
 import { useCanvasViewport } from './use-canvas-viewport'
 import { useCanvasSelection } from './use-canvas-selection'
-import { colors, canvasTokens, transitions } from '../../design/tokens'
 import { TE_FILE_MIME, inferCardType } from './file-drop-utils'
 import { CANVAS_GRID_ENABLED, GRID_DOT_VISIBILITY } from '../../design/themes'
 
@@ -241,9 +240,8 @@ export function CanvasSurface({
     <div
       ref={containerRef}
       data-canvas-surface
-      className="relative w-full h-full overflow-hidden"
+      className="te-cv-surface"
       style={{
-        backgroundColor: canvasTokens.surface,
         backgroundImage: [
           'linear-gradient(180deg, color-mix(in srgb, var(--color-text-primary) 3%, transparent), transparent 24%)',
           'linear-gradient(90deg, color-mix(in srgb, var(--color-text-primary) 3%, transparent), transparent 18%, transparent 82%, color-mix(in srgb, var(--color-text-primary) 3%, transparent))',
@@ -252,8 +250,7 @@ export function CanvasSurface({
           svgDataUri
         ].join(', '),
         backgroundSize: `100% 100%, 100% 100%, 100% 100%, 100% 100%, ${tileSize}px ${tileSize}px`,
-        backgroundPosition: `0 0, 0 0, 0 0, 0 0, ${bgPos}`,
-        cursor: 'default'
+        backgroundPosition: `0 0, 0 0, 0 0, 0 0, ${bgPos}`
       }}
       onPointerDown={(e) => {
         onPointerDown(e)
@@ -270,22 +267,19 @@ export function CanvasSurface({
       {/* Spotlight overlay: brighter dots revealed by radial mask around cursor */}
       <div
         ref={spotlightRef}
-        className="absolute inset-0 pointer-events-none"
+        className="te-cv-surface__spotlight"
         style={{
           backgroundImage: spotlightSvg,
           backgroundSize: `${tileSize}px ${tileSize}px`,
-          backgroundPosition: bgPos,
-          opacity: 0,
-          transition: `opacity ${transitions.surface}`
+          backgroundPosition: bgPos
         }}
       />
 
       {/* Viewport transform layer */}
       <div
-        className="absolute origin-top-left"
+        className="te-cv-surface__transform"
         style={{
-          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          willChange: 'transform'
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`
         }}
       >
         {children}
@@ -293,33 +287,18 @@ export function CanvasSurface({
 
       {rect && (
         <div
-          className="fixed border pointer-events-none"
+          className="te-cv-surface__selection"
           style={{
             left: Math.min(rect.startX, rect.endX),
             top: Math.min(rect.startY, rect.endY),
             width: Math.abs(rect.endX - rect.startX),
-            height: Math.abs(rect.endY - rect.startY),
-            borderColor: 'color-mix(in srgb, var(--color-accent-default) 82%, white 18%)',
-            borderWidth: 1.5,
-            background:
-              'linear-gradient(180deg, color-mix(in srgb, var(--color-accent-default) 12%, transparent), color-mix(in srgb, var(--color-accent-default) 4%, transparent))'
+            height: Math.abs(rect.endY - rect.startY)
           }}
         />
       )}
 
       {/* Drag-over overlay */}
-      {dragOver && (
-        <div
-          className="absolute inset-2 pointer-events-none"
-          style={{
-            border: `0.5px dashed ${colors.accent.default}`,
-            background:
-              'linear-gradient(180deg, color-mix(in srgb, var(--color-accent-default) 10%, transparent), color-mix(in srgb, var(--color-accent-default) 4%, transparent))',
-            boxShadow:
-              'inset 0 0 0 1px color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
-          }}
-        />
-      )}
+      {dragOver && <div className="te-cv-surface__dragover" />}
     </div>
   )
 }

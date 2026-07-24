@@ -68,14 +68,13 @@ function TextCardImpl({ node }: TextCardProps) {
   }, [savedToPath, openInEditor])
 
   const headerActions = (
-    <div className="flex items-center gap-1">
+    <div className="te-textcard-header-actions">
       <button
         type="button"
         onClick={handleHeaderSaveClick}
         title="Save to vault (Cmd+Shift+S)"
         aria-label="Save to vault"
-        className="text-xs px-1"
-        style={{ opacity: 0.7, cursor: 'pointer' }}
+        className="te-textcard-save-btn"
         data-testid="text-card-save-button"
       >
         ⤓
@@ -97,13 +96,13 @@ function TextCardImpl({ node }: TextCardProps) {
       headerActions={headerActions}
     >
       <div
-        className="flex flex-col h-full"
+        className="te-textcard-root"
         onDoubleClick={(e) => {
           e.stopPropagation()
           setEditing(true)
         }}
       >
-        <div className="flex-1 min-h-0">
+        <div className="te-textcard-editor-slot">
           <RichTextCardEditor
             value={node.content}
             editing={editing}
@@ -112,14 +111,14 @@ function TextCardImpl({ node }: TextCardProps) {
             onSaveShortcut={handleSaveShortcut}
           />
         </div>
-        <div className="px-2 pb-1 flex items-center justify-between gap-2 min-h-[18px]">
+        <div className="te-textcard-footer">
           {showBadge && savedToPath ? (
             <SavedToBadge relativePath={savedToPath} onOpen={handleBadgeOpen} />
           ) : (
             <span />
           )}
           {errorMsg && (
-            <span className="text-[10px]" style={{ color: 'var(--signal-danger)' }} role="alert">
+            <span className="te-textcard-error" role="alert">
               {errorMsg}
             </span>
           )}

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { colors } from '../../design/tokens'
 import { Modal } from '../../components/overlay/Modal'
 
 type Mode = 'new' | 'append'
@@ -61,23 +60,13 @@ export function SaveTextCardDialog({
       open
       onClose={onClose}
       ariaLabelledBy="save-text-card-title"
-      panelClassName="border p-4 w-[480px] max-h-[70vh] flex flex-col gap-3"
-      panelStyle={{
-        backgroundColor: colors.bg.elevated,
-        borderColor: colors.border.default,
-        borderRadius: 0,
-        color: colors.text.primary
-      }}
+      panelClassName="te-savecard-panel"
     >
-      <h2
-        id="save-text-card-title"
-        className="text-sm font-semibold"
-        style={{ color: colors.text.primary, margin: 0 }}
-      >
+      <h2 id="save-text-card-title" className="te-savecard-title">
         Save text card
       </h2>
-      <div className="flex items-center gap-4 text-sm">
-        <label className="flex items-center gap-1 cursor-pointer">
+      <div className="te-savecard-modes">
+        <label className="te-savecard-mode-option">
           <input
             type="radio"
             name="save-mode"
@@ -86,7 +75,7 @@ export function SaveTextCardDialog({
           />
           New file
         </label>
-        <label className="flex items-center gap-1 cursor-pointer">
+        <label className="te-savecard-mode-option">
           <input
             type="radio"
             name="save-mode"
@@ -99,39 +88,29 @@ export function SaveTextCardDialog({
 
       {mode === 'new' ? (
         <>
-          <div className="text-xs" style={{ color: colors.text.secondary }}>
-            Folder
-          </div>
-          <div
-            className="border overflow-auto"
-            style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 180 }}
-          >
+          <div className="te-savecard-field-label">Folder</div>
+          <div className="te-savecard-list te-savecard-list--folders">
             {folders.map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFolder(f)}
-                className="w-full text-left px-2 py-1 text-xs"
-                style={{
-                  backgroundColor: f === folder ? colors.accent.muted : 'transparent'
-                }}
+                className="te-savecard-option"
+                data-selected={f === folder}
               >
                 {f || '/'}
               </button>
             ))}
           </div>
-          <div className="text-xs" style={{ color: colors.text.secondary }}>
-            Filename
-          </div>
+          <div className="te-savecard-field-label">Filename</div>
           <input
             type="text"
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
-            className="px-2 py-1 text-sm bg-transparent border"
-            style={{ borderColor: colors.border.default, borderRadius: 0 }}
+            className="te-savecard-input"
           />
           {collisionWarning && (
-            <div className="text-xs" style={{ color: 'var(--signal-warn)' }}>
+            <div className="te-savecard-warning">
               {collisionWarning} A unique suffix will be added on save.
             </div>
           )}
@@ -143,57 +122,30 @@ export function SaveTextCardDialog({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vault files..."
-            className="px-2 py-1 text-sm bg-transparent border"
-            style={{ borderColor: colors.border.default, borderRadius: 0 }}
+            className="te-savecard-input"
           />
-          <div
-            className="border overflow-auto"
-            style={{ borderColor: colors.border.subtle, borderRadius: 0, maxHeight: 240 }}
-          >
+          <div className="te-savecard-list te-savecard-list--files">
             {filteredFiles.map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setSelectedFile(f)}
-                className="w-full text-left px-2 py-1 text-xs"
-                style={{
-                  backgroundColor: f === selectedFile ? colors.accent.muted : 'transparent'
-                }}
+                className="te-savecard-option"
+                data-selected={f === selectedFile}
               >
                 {f}
               </button>
             ))}
-            {filteredFiles.length === 0 && (
-              <div className="px-2 py-2 text-xs" style={{ color: colors.text.secondary }}>
-                No matches
-              </div>
-            )}
+            {filteredFiles.length === 0 && <div className="te-savecard-empty">No matches</div>}
           </div>
         </>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-3 py-1 text-xs"
-          style={{ color: colors.text.secondary }}
-        >
+      <div className="te-savecard-footer">
+        <button type="button" onClick={onClose} className="te-savecard-cancel">
           Cancel
         </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!canSave}
-          className="px-3 py-1 text-xs"
-          style={{
-            backgroundColor: canSave ? colors.accent.default : colors.bg.surface,
-            color: canSave ? 'var(--color-accent-fg)' : colors.text.muted,
-            borderRadius: 0,
-            opacity: canSave ? 1 : 0.5,
-            cursor: canSave ? 'pointer' : 'default'
-          }}
-        >
+        <button type="button" onClick={handleSave} disabled={!canSave} className="te-savecard-save">
           Save
         </button>
       </div>

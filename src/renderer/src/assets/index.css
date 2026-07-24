@@ -629,6 +629,7 @@ body {
   --t-slow: 280ms cubic-bezier(0.4, 0, 0.2, 1);
   --t-surface: 180ms cubic-bezier(0.4, 0, 0.2, 1);
   --t-reveal: 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  --t-spring: 220ms cubic-bezier(0.16, 1, 0.3, 1);
   /* ── Surface ramp (Theme.tsx overrides per backgroundTint on mount) ── */
   --color-bg-base: #000000;
   --color-bg-surface: #050507;
@@ -6905,4 +6906,2545 @@ button {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* ═══ Slice 5: canvas + graph (ADR 0005) — assembled from six agent fragments ═══ */
+
+/* ─── Card core (panels/canvas/ CardShell + shared) ─── */
+
+/* ── CardShell.tsx ──
+ * NOTE: existing index.css already owns the primary .canvas-card vocabulary
+ * (.canvas-card, .canvas-card__titlebar, .canvas-card__title, .canvas-card__actions,
+ * .canvas-card__resize, .canvas-card__anchor, .canvas-card__action-btn, .canvas-card__badge,
+ * .tile-close-btn, .te-active-dot, .te-card-enter, .te-pin-pulse). The rules below
+ * ADD the static layout/paint that was previously inline. To keep the existing
+ * hover/reveal transitions on .canvas-card__actions/__resize/__anchor intact, these
+ * additive rules must be appended AFTER the existing .canvas-card blocks in index.css. */
+
+.canvas-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-tool);
+  overflow: hidden;
+  border: 1px solid var(--canvas-card-border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, var(--shadow-card);
+}
+
+/* Non-terminal cards: frosted material + gradient body. Terminal cards opt out
+ * (data-terminal) — near-black flat body, no blur. isInteracting drops the blur
+ * for pan/zoom perf, so backdrop-filter stays inline as a dynamic exemption. */
+.canvas-card:not([data-terminal]) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--canvas-card-bg) 96%, white 4%),
+    var(--canvas-card-bg)
+  );
+  contain: layout style;
+}
+
+.canvas-card[data-terminal] {
+  background: #050607;
+}
+
+/* State-driven ring + accent border. Written in ascending priority order so
+ * equal-specificity selectors resolve by source order: selected < focused <
+ * locked < active. data-selected/data-active are set from store state;
+ * --focused/--locked are the existing modifier classes. isActive overrides only
+ * the box-shadow in the original inline logic, so [data-active] appears last. */
+.canvas-card[data-selected] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent-default) 42%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    var(--shadow-card);
+}
+
+.canvas-card--focused {
+  border-color: color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent-default) 26%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    var(--shadow-card);
+}
+
+.canvas-card--locked {
+  border-color: color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent-default) 32%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    var(--shadow-card);
+}
+
+.canvas-card[data-active] {
+  box-shadow: 0 0 0 1px var(--color-accent-line), var(--shadow-card);
+}
+
+.canvas-card__titlebar {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  user-select: none;
+  background: color-mix(in srgb, var(--canvas-card-bg) 70%, var(--color-bg-elevated));
+  border-bottom: 1px solid var(--canvas-card-border);
+  border-radius: 0;
+  cursor: grab;
+}
+
+.canvas-card[data-terminal] .canvas-card__titlebar {
+  background: linear-gradient(180deg, rgba(3, 3, 5, 0.96), rgba(3, 3, 5, 0.9));
+}
+
+.canvas-card__title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.canvas-card__title {
+  font-family: var(--font-mono);
+  /* -0.25px optical trim off the titlebar size (was CARD_TITLE_FONT_SIZE_PX - 0.25 inline) */
+  font-size: calc(var(--env-card-title-font-size) - 0.25px);
+  line-height: 1;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  opacity: 0.94;
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-card__edge-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Modifier only — the base .canvas-card__badge (border/bg/mono/uppercase) lives
+ * in index.css. The PROJECT badge's inline styles overrode border/bg with accent
+ * tints, so those live here as a modifier and win by source order. */
+.canvas-card__badge--project {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  color: var(--color-accent-default);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  padding: 1px 6px;
+  border-radius: var(--r-inline);
+  border: 1px solid color-mix(in srgb, var(--color-accent-default) 32%, transparent);
+  background: color-mix(in srgb, var(--color-accent-default) 10%, transparent);
+}
+
+.canvas-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.canvas-card__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-primary);
+  opacity: 0.4;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: var(--r-tool);
+}
+
+.canvas-card__action-btn:hover {
+  opacity: 0.8;
+}
+
+/* The close button carried inline `border: none; background: none`, opting out
+ * of the base action-btn's transparent 1px border + hover fill. Preserve that. */
+.canvas-card__action-btn.tile-close-btn {
+  border: none;
+  background: none;
+}
+
+/* Active dot must not shrink inside the flex title group (was `shrink-0`). */
+.canvas-card__title-group .te-active-dot {
+  flex-shrink: 0;
+}
+
+.canvas-card__content {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.canvas-card:not([data-terminal]) .canvas-card__content {
+  contain: layout style paint;
+}
+
+.canvas-card[data-terminal] .canvas-card__content {
+  overflow: hidden;
+}
+
+/* Pointer-events shield: blocks content interaction until the card is focused. */
+.canvas-card__shield {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* Origin accent — subtle left border for non-human artifacts. Color varies by
+ * origin (source vs. agent), so backgroundColor stays inline as a runtime exemption. */
+.canvas-card__origin-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.canvas-card__resize {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 5;
+}
+
+.canvas-card__resize-icon {
+  color: var(--color-text-muted);
+}
+
+/* Edge-anchor dot base; per-side offset (top/right/bottom/left) stays inline
+ * as it's positional and driven by the side map. */
+.canvas-card__anchor {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background-color: color-mix(in srgb, var(--color-accent-default) 74%, white 26%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent);
+  cursor: crosshair;
+  z-index: 10;
+}
+.canvas-card__anchor[data-side='top'] {
+  top: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+.canvas-card__anchor[data-side='bottom'] {
+  bottom: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+.canvas-card__anchor[data-side='left'] {
+  left: -4px;
+  top: 50%;
+  margin-top: -4px;
+}
+.canvas-card__anchor[data-side='right'] {
+  right: -4px;
+  top: 50%;
+  margin-top: -4px;
+}
+
+/* ── CardShellSkeleton.tsx ──
+ * Replaces Tailwind `animate-pulse` (opacity-only pulse). The prior static
+ * inline opacity: 0.6 was overridden by that animation, so the keyframe is the
+ * single source of the loading opacity now. */
+@keyframes te-card-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.canvas-card-skeleton {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-surface);
+  border-radius: var(--r-card);
+  border: 1px solid var(--color-border-default);
+  animation: te-card-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.canvas-card-skeleton__header {
+  padding: 0.5rem 0.75rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.canvas-card-skeleton__header-bar {
+  height: 0.75rem;
+  width: 60%;
+  border-radius: var(--r-inline);
+  background-color: var(--border-subtle);
+}
+
+.canvas-card-skeleton__body {
+  flex: 1;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.canvas-card-skeleton__line {
+  height: 0.5rem;
+  border-radius: var(--r-inline);
+  background-color: var(--border-subtle);
+}
+
+.canvas-card-skeleton__line--80 {
+  width: 80%;
+}
+
+.canvas-card-skeleton__line--60 {
+  width: 60%;
+}
+
+/* ── CardLodPreview.tsx ──
+ * Colored rect keyed to card type; backgroundColor, opacity boundary, and
+ * selection border all derive from the runtime type color, so those stay inline. */
+.canvas-lod-preview {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  opacity: 0.15;
+  border-radius: var(--r-card);
+  cursor: grab;
+}
+
+.canvas-lod-preview__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.25rem 0.5rem;
+  color: var(--color-text-primary);
+  opacity: 1;
+}
+
+/* ── shared/MetadataGrid.tsx ── */
+.te-metadata-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  row-gap: 8px;
+  column-gap: 16px;
+  margin-bottom: 20px;
+  align-items: start;
+}
+
+.te-metadata-grid__row {
+  display: contents;
+}
+
+.te-metadata-grid__key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--label-tracking);
+  line-height: 1.8;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.te-metadata-grid__value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.te-metadata-grid__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding-top: 1px;
+}
+
+.te-metadata-grid__pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* ── shared/CardBadge.tsx ──
+ * backgroundColor is a prop (defaults to badgeGreen #4caf50) — stays inline. */
+.te-card-badge {
+  display: inline-block;
+  color: var(--color-accent-fg);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding: 4px 8px;
+  border-radius: var(--r-inline);
+  line-height: 1;
+  user-select: none;
+}
+
+/* ── SavedToBadge.tsx ── */
+.te-saved-badge {
+  padding: 0.125rem 0.5rem;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: var(--color-accent-muted);
+  color: var(--color-text-secondary);
+  border-radius: var(--r-inline);
+  max-width: 100%;
+  cursor: pointer;
+}
+
+/* ── ClusterLabels.tsx ──
+ * left/top/transform are viewport-driven (pan/zoom) and stay inline. */
+.te-cluster-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+}
+
+.te-cluster-label {
+  position: absolute;
+  transform-origin: bottom left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+/* ─── Content cards (panels/canvas/) ─── */
+
+/* ── NoteCard.tsx ── */
+.te-notecard-scroll {
+  height: 100%;
+  overflow: auto;
+  min-height: 0;
+}
+.te-notecard-empty {
+  padding: 28px;
+}
+.te-notecard-empty-text {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+.te-notecard-body {
+  padding: 28px 28px 24px;
+}
+.te-notecard-badge-row {
+  margin-bottom: 20px;
+}
+.te-notecard-prose:focus {
+  outline: none;
+}
+
+/* ── MarkdownCard.tsx ── */
+.te-mdcard-editor {
+  min-height: 100%;
+  padding: 0.5rem 0.75rem;
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+.te-mdcard-editor:focus {
+  outline: none;
+}
+.te-mdcard-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.te-mdcard-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.te-mdcard-mode-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.te-mdcard-mode-toggle {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  background-color: var(--color-accent-muted);
+  color: var(--color-text-secondary);
+}
+.te-mdcard-editor-scroll {
+  flex: 1 1 0%;
+  overflow: auto;
+  min-height: 0;
+}
+.te-mdcard-editor-host {
+  height: 100%;
+}
+
+/* ── TextCard.tsx ── */
+.te-textcard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.te-textcard-save-btn {
+  font-size: 0.75rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.te-textcard-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.te-textcard-editor-slot {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+.te-textcard-footer {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 18px;
+}
+.te-textcard-error {
+  font-size: 10px;
+  color: var(--signal-danger);
+}
+
+/* ── RichTextCardEditor.tsx ── */
+.te-text-card-editor {
+  width: 100%;
+  height: 100%;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  overflow: auto;
+  color: var(--color-text-primary);
+}
+
+/* ── CodeCard.tsx ── */
+.te-codecard-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.te-codecard-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.te-codecard-lang {
+  position: relative;
+}
+.te-codecard-lang-btn {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--r-inline);
+  background-color: var(--color-accent-muted);
+  color: var(--color-text-secondary);
+}
+.te-codecard-lang-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  border: 1px solid var(--color-border-default);
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  z-index: 50;
+  background-color: var(--color-bg-elevated);
+  min-width: 120px;
+}
+.te-codecard-lang-option {
+  width: 100%;
+  text-align: left;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+.te-codecard-lang-option[data-active='true'] {
+  color: var(--color-accent-default);
+}
+.te-codecard-lang-option:hover {
+  background-color: var(--color-accent-muted);
+}
+.te-codecard-editor-host {
+  flex: 1 1 0%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── FileViewCard.tsx ── */
+.te-fileview-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.te-fileview-content {
+  flex: 1 1 0%;
+  overflow: hidden;
+  min-height: 0;
+}
+.te-fileview-error {
+  padding: 28px;
+}
+.te-fileview-error-text {
+  font-size: 0.875rem;
+  color: var(--signal-danger);
+}
+.te-fileview-editor {
+  height: 100%;
+}
+.te-fileview-editor[data-hidden='true'] {
+  display: none;
+}
+.te-fileview-modbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 0.375rem 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  background-color: var(--color-accent-muted);
+}
+.te-fileview-delta {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-accent-default);
+}
+.te-fileview-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-tool);
+  color: var(--color-accent-default);
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+}
+.te-fileview-refresh:hover {
+  opacity: 0.8;
+}
+
+/* ── WorkbenchFileCard.tsx ── */
+.te-wbfile-root {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  height: 100%;
+  transition: box-shadow var(--t-surface);
+}
+.te-wbfile-root[data-active='true'] {
+  box-shadow: 0 0 0 1px var(--color-accent-line);
+}
+.te-wbfile-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  width: 28px;
+  height: 28px;
+  font-family: var(--font-mono);
+}
+.te-wbfile-info {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+.te-wbfile-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+.te-wbfile-dir {
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0.125rem;
+  color: var(--color-text-muted);
+}
+.te-wbfile-touch {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background-color: var(--color-bg-elevated);
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.te-wbfile-touch[data-hot='true'] {
+  color: var(--color-accent-default);
+}
+
+/* ── ProjectFolderCard.tsx ── */
+.te-folder-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 16px;
+  overflow: hidden;
+  user-select: none;
+}
+.te-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.te-folder-icon {
+  font-size: 16px;
+  opacity: 0.7;
+}
+.te-folder-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.te-folder-count {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--r-inline);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.te-folder-path {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── SystemArtifactCard.tsx ── */
+.te-sysart-status {
+  padding: 0.125rem 0.5rem;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--label-tracking);
+  font-family: var(--font-mono);
+}
+.te-sysart-stat {
+  padding: 0.125rem 0.375rem;
+  font-size: 10px;
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+.te-sysart-root {
+  padding: 0.75rem;
+}
+.te-sysart-root > * + * {
+  margin-top: 0.5rem;
+}
+.te-sysart-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.te-sysart-kind-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+}
+.te-sysart-kind-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+.te-sysart-question {
+  font-size: 0.75rem;
+  line-height: 1.625;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+.te-sysart-summary {
+  font-size: 0.75rem;
+  line-height: 1.625;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+}
+.te-sysart-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.te-sysart-restore {
+  padding: 0.125rem 0.375rem;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: background-color var(--t-fast);
+}
+
+/* ── BlockCard.tsx ── */
+.te-blockcard-secret {
+  border-radius: var(--r-inline);
+  padding: 0 2px;
+}
+.te-blockcard-secret[data-revealed='false'] {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  letter-spacing: 0.04em;
+}
+.te-blockcard-secret[data-revealed='true'] {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.te-blockcard-status {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  border-radius: var(--r-tool);
+  padding: 1px 6px;
+  white-space: nowrap;
+  border-width: 1px;
+  border-style: solid;
+}
+.te-blockcard-spinner {
+  margin-right: 4px;
+}
+.te-blockcard-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  min-height: 0;
+  height: 100%;
+}
+.te-blockcard-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.te-blockcard-cwd {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.te-blockcard-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.te-blockcard-elapsed {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+.te-blockcard-reveal {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  border-radius: var(--r-tool);
+  padding: 1px 6px;
+  background: transparent;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  border-width: 1px;
+  border-style: solid;
+}
+.te-blockcard-output {
+  margin: 0;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ─── Media + terminal cards (panels/canvas/) ─── */
+
+/* ── ImageCard.tsx ── */
+.te-imgcard-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0.5rem;
+  min-height: 0;
+}
+.te-imgcard-status {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.te-imgcard-status .te-spinner {
+  color: var(--color-accent-default);
+  margin: 0 auto 4px;
+}
+.te-imgcard-status-icon {
+  display: block;
+  margin: 0 auto 0.5rem;
+}
+.te-imgcard-status-label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.te-imgcard-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* ── PdfCard.tsx ── */
+.te-pdfcard-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.te-pdfcard-pagecount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.te-pdfcard-scroll {
+  flex: 1 1 0%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  min-height: 0;
+}
+.te-pdfcard-quote-btn {
+  position: absolute;
+  z-index: 3;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-accent-default);
+  background-color: rgba(4, 4, 8, 0.95);
+  border: 1px solid var(--color-accent-default);
+  border-radius: var(--r-inline);
+  box-shadow: var(--shadow-compact);
+  cursor: pointer;
+}
+.te-pdfcard-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  color: var(--color-text-muted);
+}
+.te-pdfcard-status .te-spinner {
+  color: var(--color-accent-default);
+  margin: 0 auto 4px;
+}
+.te-pdfcard-status-label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.te-pdfcard-page {
+  width: 100%;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.te-pdfcard-page-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── TerminalCard.tsx ── */
+.te-termcard-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  border-radius: var(--r-tool);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.te-termcard-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 10px;
+  color: #dfa11a;
+}
+.te-termcard-warning-dot {
+  display: inline-block;
+  border-radius: 9999px;
+  width: 5px;
+  height: 5px;
+  background-color: #dfa11a;
+}
+.te-termcard-hookbanner {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  background: rgba(12, 14, 20, 0.92);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-tool);
+  color: var(--color-text-muted);
+}
+.te-termcard-hookbanner-msg {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.te-termcard-hookbanner-setup {
+  flex-shrink: 0;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--color-accent-default);
+  font-size: 11px;
+}
+.te-termcard-hookbanner-dismiss {
+  flex-shrink: 0;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.te-termcard-dead {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(12, 14, 20, 0.85);
+}
+.te-termcard-dead-body {
+  text-align: center;
+}
+.te-termcard-dead-title {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-muted);
+}
+.te-termcard-dead-restart {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--color-border-default);
+  color: var(--color-accent-default);
+}
+.te-termcard-webview {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.te-termcard-webview[data-interactive='true'] {
+  pointer-events: auto;
+}
+
+/* ── TerminalDock.tsx ── */
+.te-termdock {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 25;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.te-termdock-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.te-termdock-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  pointer-events: auto;
+}
+.te-termdock-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-inline);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.te-termdock-pill[data-error='true'] {
+  border-color: color-mix(in srgb, var(--signal-danger) 30%, transparent);
+}
+.te-termdock-pill-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  max-width: 120px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.te-termdock-pill-process {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.te-termdock-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.te-termdock-dot[data-status='unknown'] {
+  background-color: var(--color-text-muted);
+  opacity: 0.5;
+}
+.te-termdock-dot[data-status='idle'] {
+  background-color: #3dca8d;
+}
+.te-termdock-dot[data-status='busy'],
+.te-termdock-dot[data-status='claude'] {
+  background-color: var(--signal-info);
+  animation: te-dock-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--signal-info);
+}
+.te-termdock-dot[data-status='error'] {
+  background-color: var(--signal-danger);
+  animation: te-dock-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--signal-danger);
+}
+.te-termdock-dot[data-status='dead'] {
+  background-color: var(--color-text-muted);
+}
+
+/* ─── Canvas chrome + overlays (panels/canvas/) ─── */
+/*
+ * Slice 5: Tailwind + static-inline-style elimination for canvas chrome.
+ * New vocabulary is the `.te-cv-*` namespace. Rules that layer on top of an
+ * existing shared class (`.canvas-toolrail`, `.canvas-minimap`,
+ * `.canvas-zoom-indicator`, `.canvas-split-editor__header`) never redefine that
+ * class — they compose a sibling `.te-cv-*` class and, where they must win over
+ * a base property, raise specificity with a compound selector so source order
+ * is irrelevant. Those compound-selector overrides are called out inline.
+ *
+ * rem values encode the utilities Tailwind shipped (root font-size 13px):
+ * p-2 → 0.5rem, py-1 → 0.25rem, py-1.5 → 0.375rem, px-3 → 0.75rem,
+ * gap-1 → 0.25rem, gap-1.5 → 0.375rem, text-xs → 0.75rem, inset-2 → 0.5rem,
+ * top-3/left-3/bottom-3/right-3 → 0.75rem.
+ */
+
+/* ── CanvasView.tsx ── */
+
+.te-cv-view {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.te-cv-view__stage {
+  position: relative;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.te-cv-view__folder-map-progress {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: var(--r-tool);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  z-index: 10;
+}
+
+/* ── CanvasSurface.tsx ── */
+/* Surface root: chrome (background-color, cursor) lives here; the zoom-derived
+ * dot-grid layers (background-image/size/position) stay inline — they recompute
+ * every wheel tick. */
+.te-cv-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--canvas-surface-bg);
+  cursor: default;
+}
+
+/* Spotlight dot layer: opacity is driven imperatively via ref (mouse enter/leave
+ * toggles 0↔1); the fade is the sole transition. The tiled dot image + tile
+ * offset stay inline (zoom-derived). */
+.te-cv-surface__spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-med);
+}
+
+.te-cv-surface__transform {
+  position: absolute;
+  transform-origin: top left;
+  will-change: transform;
+}
+
+/* Marquee selection rect: chrome only; left/top/width/height stay inline
+ * (drag-derived). */
+.te-cv-surface__selection {
+  position: fixed;
+  pointer-events: none;
+  border-width: 1.5px;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-accent-default) 82%, white 18%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent-default) 12%, transparent),
+    color-mix(in srgb, var(--color-accent-default) 4%, transparent)
+  );
+}
+
+.te-cv-surface__dragover {
+  position: absolute;
+  inset: 0.5rem;
+  pointer-events: none;
+  border: 0.5px dashed var(--color-accent-default);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent-default) 10%, transparent),
+    color-mix(in srgb, var(--color-accent-default) 4%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-default) 12%, transparent);
+}
+
+/* ── CanvasToolbar.tsx ── */
+/* Anchors the rail; `.canvas-toolrail` (layout) + `.te-float-chip` (chrome) are
+ * unchanged. */
+.te-cv-toolrail {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 30;
+}
+
+/* Organize button shows a wait cursor while the layout job runs. Attribute-
+ * presence rule; additive over `.canvas-toolbtn`, never a redefinition. */
+.canvas-toolbtn[data-organizing] {
+  cursor: wait;
+}
+
+.te-cv-toolrail-frames {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 2px 0;
+}
+
+.te-cv-frame-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.25px solid var(--color-text-muted);
+  background-color: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.te-cv-frame-dot[data-filled='true'] {
+  background-color: var(--color-text-muted);
+}
+
+/* Clear button turns error-red on hover and stays red once armed. Compound
+ * with `.canvas-toolbtn` (0,2,0) so it wins over `.canvas-toolbtn:hover`
+ * (0,3,0 → but scoped by :not(:disabled)); the compound keeps precedence
+ * independent of fragment order. #ff847d carried verbatim (colors.claude.error;
+ * hex gate is a later pass). */
+.canvas-toolbtn.te-cv-clear-btn:hover:not(:disabled),
+.canvas-toolbtn.te-cv-clear-btn[data-armed='true'] {
+  color: #ff847d;
+}
+
+/* ── CanvasMinimap.tsx ── */
+/* Placement + size of the HUD; chrome stays on `.canvas-minimap`. */
+.te-cv-minimap {
+  bottom: 40px;
+  right: 12px;
+  width: 160px;
+  height: 120px;
+  z-index: 20;
+  cursor: crosshair;
+  pointer-events: auto;
+}
+
+/* Card blips: position/size/fill are scale-derived and stay inline. */
+.te-cv-minimap-node {
+  position: absolute;
+  opacity: 0.6;
+  border-radius: 0;
+  pointer-events: none;
+}
+
+/* Viewport indicator rectangle: geometry stays inline (viewport-derived). */
+.te-cv-minimap-viewport {
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--color-accent-default) 70%, transparent);
+  background-color: color-mix(in srgb, var(--color-accent-default) 12%, transparent);
+  border-radius: 0;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+/* ── ZoomIndicator.tsx ── */
+/* Compound over `.canvas-zoom-indicator`: the element always carried an inline
+ * background + border that overrode the base class's hud-bg/panel-border. The
+ * compound (0,2,0) preserves that override regardless of fragment order. */
+.canvas-zoom-indicator.te-cv-zoom-indicator {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  pointer-events: none;
+  padding: 3px 10px;
+  background: color-mix(in srgb, var(--canvas-card-bg) 92%, transparent);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  animation: te-zoom-fade 1.7s ease forwards;
+  z-index: 10;
+}
+
+/* ── SectionOverlay.tsx ── */
+.te-cv-section-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+
+/* Group region + label sub-parts: all sizing/color is `viewport.zoom`-derived
+ * and stays inline; only the layout constants move here. */
+.te-cv-section-region {
+  position: absolute;
+}
+
+.te-cv-section-label {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.te-cv-section-label[data-root='true'] {
+  font-weight: 600;
+}
+
+.te-cv-section-dot {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.te-cv-section-count {
+  opacity: 0.4;
+}
+
+/* ── ConnectionDragOverlay.tsx ── */
+.te-cv-drag-line {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 39;
+}
+
+.te-cv-drag-badge-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* Badge chip: left/top follow the cursor and color/border take the edge-kind
+ * color, so those stay inline. */
+.te-cv-drag-badge {
+  position: fixed;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--color-bg-elevated);
+}
+
+.te-cv-drag-hint {
+  color: var(--color-text-muted);
+  margin-left: 8px;
+}
+
+.te-cv-drag-subhint {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+/* ── EdgeLayer.tsx ── */
+.te-cv-edge-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.te-cv-edge-hitgroup {
+  pointer-events: all;
+}
+
+.te-cv-edge-hit {
+  cursor: pointer;
+}
+
+/* Edge stroke animation is selected by endpoint state; the stroke/opacity/
+ * dasharray remain SVG presentation attributes on the element. */
+.te-cv-edge-path[data-edge-state='active'] {
+  animation: te-edge-flow 0.8s linear infinite;
+}
+.te-cv-edge-path[data-edge-state='revealed'] {
+  animation: te-edge-reveal 150ms ease forwards;
+}
+
+/* ── EdgeDots.tsx ── */
+.te-cv-edgedots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Blip: left/top (viewport-derived) and fill (edge-kind color) stay inline.
+ * Motion/opacity come from the existing `.edge-dot`. */
+.te-cv-edgedot {
+  position: absolute;
+  pointer-events: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* ── SplitDividerAndPanel.tsx ── */
+/* Panel width is drag-resized and stays inline. */
+.te-cv-split-panel {
+  height: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* ── CanvasSplitEditor.tsx ── */
+.te-cv-split-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-base);
+}
+
+.te-cv-split-conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.75rem;
+  flex-shrink: 0;
+  background-color: color-mix(in srgb, var(--signal-warn) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--signal-warn) 30%, transparent);
+  color: var(--signal-warn);
+}
+
+.te-cv-split-conflict__msg {
+  font-size: 0.75rem;
+}
+
+.te-cv-split-conflict__actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.te-cv-split-conflict__reload {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  background-color: color-mix(in srgb, var(--signal-warn) 20%, transparent);
+  color: var(--signal-warn);
+  border: none;
+}
+
+.te-cv-split-conflict__keep {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+  border: none;
+}
+
+/* Header bar composes with `.canvas-split-editor__header` (gradient + inset
+ * shadow). Compound selector so this rule's background-color (rgba(0,0,0,0.15))
+ * layers under — never resets — the base class's gradient background-image,
+ * matching the prior inline-over-class behavior regardless of fragment order. */
+.canvas-split-editor__header.te-cv-split-editor__headerbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  flex-shrink: 0;
+  height: 34px;
+  border-bottom: 1px solid var(--line-faint);
+  background-color: rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 60;
+  -webkit-app-region: drag;
+}
+
+.te-cv-split-editor__title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.te-cv-split-editor__dir {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.te-cv-split-editor__filename {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Close button composes with `.canvas-split-editor__close` (-webkit-app-region:
+ * no-drag). Opacity was toggled imperatively (instant, no transition) — kept
+ * instant here via a plain :hover, no transition added. */
+.te-cv-split-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  border: none;
+  background: transparent;
+  z-index: 10;
+}
+.te-cv-split-close:hover {
+  opacity: 1;
+}
+
+.te-cv-split-editor__body {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── CanvasEmptyStates.tsx (ShortcutOverlay) ── */
+/* Welcome/empty-vault cards render through the EmptyState primitive and carry
+ * no chrome here — invariant preserved. Only the bespoke shortcut sheet moves. */
+.te-cv-shortcut-sheet {
+  width: 340px;
+  padding: 20px 24px;
+  border-radius: var(--r-card);
+  background-color: rgba(4, 4, 8, 0.9);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.te-cv-shortcut-title {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.te-cv-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.te-cv-shortcut-keys {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.te-cv-shortcut-action {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.te-cv-shortcut-footer {
+  margin-top: 12px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  letter-spacing: 0.14em;
+}
+
+/* ─── Canvas dialogs + previews (panels/canvas/) ─── */
+
+/* ── SaveTextCardDialog.tsx ── */
+.te-savecard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  width: 480px;
+  max-height: 70vh;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+.te-savecard-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.te-savecard-modes {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.875rem;
+}
+.te-savecard-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.te-savecard-field-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+.te-savecard-list {
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+}
+.te-savecard-list--folders {
+  max-height: 180px;
+}
+.te-savecard-list--files {
+  max-height: 240px;
+}
+.te-savecard-option {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  font-size: 0.75rem;
+  background: transparent;
+}
+.te-savecard-option[data-selected='true'] {
+  background: var(--color-accent-muted);
+}
+.te-savecard-input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0;
+}
+.te-savecard-warning {
+  font-size: 0.75rem;
+  color: var(--signal-warn);
+}
+.te-savecard-empty {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+.te-savecard-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+.te-savecard-cancel {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+.te-savecard-save {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  border-radius: 0;
+  background: var(--color-accent-default);
+  color: var(--color-accent-fg);
+  cursor: pointer;
+}
+.te-savecard-save:disabled {
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── ImportPalette.tsx ── */
+.te-import-panel {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-height: 480px;
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-card);
+}
+.te-import-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.te-import-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+.te-import-kbd {
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-inline);
+}
+.te-import-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.te-import-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.te-import-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+.te-import-row[data-indent='true'] {
+  padding: 6px 28px;
+}
+.te-import-row:hover:not(:disabled) {
+  background: var(--bg-tint-text);
+}
+.te-import-row:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+  opacity: 0.5;
+}
+.te-import-caret {
+  margin-right: 6px;
+  font-size: 10px;
+}
+.te-import-accent {
+  color: var(--color-accent-default);
+}
+.te-import-hop {
+  color: var(--color-text-secondary);
+}
+.te-import-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: var(--color-accent-muted);
+  border-radius: var(--r-inline);
+}
+.te-import-separator {
+  height: 1px;
+  margin: 4px 14px;
+  background: var(--border-subtle);
+}
+.te-import-noresults {
+  padding: 12px 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* ── OntologyPreview.tsx ── */
+.te-ontology-bar {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: var(--r-tool);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+.te-ontology-bar--error {
+  background: color-mix(in srgb, var(--signal-danger) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--signal-danger) 30%, transparent);
+}
+/* mirrors floatingPanel.glass.popoverBg / popoverBlur */
+.te-ontology-bar--preview {
+  background: rgba(4, 4, 8, 0.95);
+  border: 1px solid var(--line-default);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+.te-ontology-count {
+  opacity: 0.6;
+}
+.te-ontology-dismiss {
+  opacity: 0.7;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+.te-ontology-btn {
+  padding: 4px 12px;
+  border-radius: var(--r-tool);
+  cursor: pointer;
+  font-size: 13px;
+}
+.te-ontology-btn--apply {
+  background: color-mix(in srgb, var(--signal-success) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--signal-success) 40%, transparent);
+  color: var(--signal-success);
+}
+.te-ontology-btn--cancel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-default);
+  color: var(--color-text-secondary);
+}
+
+/* ── FolderMapPreview.tsx ── */
+.te-foldermap-ghosts {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+/* mirrors floatingPanel.glass.blur / shadowCompact */
+.te-foldermap-bar {
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-radius: var(--r-tool);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  backdrop-filter: blur(24px) saturate(1.4);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.te-foldermap-apply {
+  padding: 4px 14px;
+  border-radius: 0;
+  border: none;
+  background: var(--color-accent-default);
+  color: var(--color-text-on-accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.te-foldermap-cancel {
+  padding: 4px 14px;
+  border-radius: 0;
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ─── Graph panel (panels/graph/) ─── */
+
+/* ── GraphDetailDrawer.tsx ── */
+
+/* Detached right-edge inspector drawer. Slides in/out on selection via the
+ * data-open flag. The 220ms spring easing is bespoke motion (no --t-* token
+ * matches this curve) and is carried verbatim to preserve the slide feel. */
+.te-graph-drawer {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  top: 48px;
+  right: 12px;
+  bottom: 12px;
+  width: 340px;
+  padding: 16px;
+  background: rgba(4, 4, 8, 0.9);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--color-border-default);
+  border-radius: 0;
+  box-shadow: var(--shadow-compact);
+  transform: translateX(calc(340px + 24px));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--t-spring),
+    opacity var(--t-spring);
+}
+.te-graph-drawer[data-open='true'] {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.te-graph-drawer__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.te-graph-drawer__title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+
+.te-graph-drawer__close {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 0.25rem;
+  border-radius: var(--r-inline);
+  color: var(--color-text-muted);
+}
+
+.te-graph-drawer__type-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.te-graph-drawer__type-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+}
+
+.te-graph-drawer__type-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.te-graph-drawer__meta {
+  font-size: 11px;
+  margin-top: 0.25rem;
+  color: var(--color-text-muted);
+}
+
+.te-graph-drawer__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.te-graph-drawer__tag {
+  font-size: 11px;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--r-inline);
+  border: 1px solid var(--line-subtle);
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.te-graph-drawer__editor-btn {
+  font-size: 0.75rem;
+  align-self: flex-start;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--r-inline);
+  color: var(--color-accent-default);
+}
+
+.te-graph-drawer__body {
+  font-size: 0.75rem;
+  line-height: 1.625;
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.te-graph-drawer__section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.15em;
+  font-family: var(--font-mono);
+}
+
+.te-graph-drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.te-graph-drawer__link {
+  text-align: left;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--r-inline);
+  color: var(--color-text-secondary);
+}
+
+.te-graph-drawer__dot {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  margin-right: 0.375rem;
+  vertical-align: middle;
+}
+
+.te-graph-drawer__more {
+  font-size: 10px;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  color: var(--color-text-muted);
+}
+
+.te-graph-drawer__ref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.te-graph-drawer__ref {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--r-inline);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--color-text-secondary);
+}
+
+.te-graph-drawer__ref-title {
+  font-weight: 500;
+  margin-bottom: 0.125rem;
+  color: var(--color-text-primary);
+}
+
+.te-graph-drawer__ref-context {
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.te-graph-drawer__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.te-graph-drawer__ghost-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--r-inline);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary);
+}
+.te-graph-drawer__ghost-btn:disabled {
+  opacity: 0.5;
+}
+
+.te-graph-drawer__dismiss-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--r-inline);
+  color: var(--color-text-muted);
+}
+
+/* ── GraphSettingsPanel.tsx ── */
+
+.te-graph-settings {
+  position: absolute;
+  top: 3rem;
+  right: 0.75rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  width: 240px;
+  max-height: calc(100% - 24px);
+  padding: 16px 14px;
+  background: rgba(4, 4, 8, 0.9);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: var(--shadow-floating);
+  border: 1px solid var(--color-border-default);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-default) transparent;
+}
+
+.te-graph-settings__stats {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.te-graph-settings__status-dot {
+  margin-left: auto;
+  border-radius: 9999px;
+  width: 6px;
+  height: 6px;
+  background: var(--signal-warn);
+}
+.te-graph-settings__status-dot[data-settled='true'] {
+  background: var(--signal-success);
+}
+
+.te-graph-settings__label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.te-graph-settings__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.te-graph-settings__btn {
+  flex: 1 1 0%;
+  font-size: 0.75rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  border-radius: var(--r-inline);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+  cursor: pointer;
+  transition: border-color var(--transition-hover);
+}
+.te-graph-settings__btn:hover {
+  border-color: var(--color-accent-default);
+}
+
+.te-graph-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.te-graph-slider-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.te-graph-slider-row__value {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.te-graph-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+.te-graph-toggle__track {
+  position: relative;
+  border-radius: 9999px;
+  width: 32px;
+  height: 18px;
+  background: var(--color-border-default);
+  transition: background-color var(--transition-hover);
+}
+.te-graph-toggle__track[data-checked='true'] {
+  background: var(--color-accent-default);
+}
+
+.te-graph-toggle__knob {
+  position: absolute;
+  top: 0.125rem;
+  border-radius: 9999px;
+  width: 14px;
+  height: 14px;
+  background: var(--color-text-secondary);
+  left: 3px;
+  transition: transform var(--transition-hover);
+}
+.te-graph-toggle__track[data-checked='true'] .te-graph-toggle__knob {
+  background: var(--color-accent-fg);
+  left: 15px;
+}
+
+.te-graph-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.te-graph-section__title {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.te-graph-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+/* ── GraphPanel.tsx ── */
+
+.te-graph-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg-base);
+}
+
+.te-graph-panel__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      color-mix(in srgb, var(--color-accent-default) 8%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.02),
+      transparent 28%,
+      transparent 72%,
+      rgba(255, 255, 255, 0.03)
+    );
+}
+
+.te-graph-statusrail {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.te-graph-statusrail__stats {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+
+.te-graph-statusrail__sep {
+  opacity: 0.3;
+  margin: 0 8px;
+}
+
+.te-graph-statusrail__tip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  pointer-events: auto;
+  color: var(--color-text-muted);
+}
+
+.te-graph-statusrail__tip-close {
+  cursor: pointer;
+  line-height: 1;
+  color: var(--color-text-muted);
+  padding: 0 2px;
+}
+
+.te-graph-settings-toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-text-secondary);
+  transition:
+    background-color var(--transition-hover),
+    color var(--transition-hover);
+}
+.te-graph-settings-toggle[data-active='true'] {
+  background: var(--color-accent-default);
+  color: var(--color-accent-fg);
+}
+
+.te-graph-controls {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.te-graph-controls__btn {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color var(--transition-hover);
+}
+.te-graph-controls__btn:hover {
+  border-color: var(--color-accent-default);
+}
+
+.te-graph-controls__zoom {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  padding: 0.375rem 0.5rem;
+  color: var(--color-text-muted);
+  min-width: 44px;
+  text-align: center;
+}
+
+/* ── EnrichmentPill.tsx ── */
+
+.te-graph-enrich {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+  padding-bottom: 3.5rem;
+}
+
+.te-graph-enrich__pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  pointer-events: auto;
+  background: rgba(4, 4, 8, 0.9);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--canvas-link-cyan) 18%, transparent);
+  box-shadow: var(--shadow-compact);
+}
+
+.te-graph-enrich__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: color-mix(in srgb, var(--canvas-link-cyan) 82%, transparent);
+  font-family: var(--font-mono);
+}
+
+.te-graph-enrich__sep {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  opacity: 0.25;
+}
+
+.te-graph-enrich__status {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.te-graph-enrich__btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  background: var(--color-accent-default);
+  border: 1px solid var(--color-accent-default);
+  color: var(--color-accent-fg);
+  transition:
+    background-color var(--transition-hover),
+    border-color var(--transition-hover);
 }

@@ -1,5 +1,4 @@
 import { useCanvas } from './canvas-store-context'
-import { borderRadius, colors, typography } from '../../design/tokens'
 
 export function ZoomIndicator() {
   const zoom = useCanvas((s) => s.viewport.zoom)
@@ -9,23 +8,7 @@ export function ZoomIndicator() {
   // Pure CSS approach: no state, no refs, no effects. The animation holds at
   // opacity 1 for ~1.3s then fades to 0 over ~0.4s.
   return (
-    <div
-      key={zoomPercent}
-      className="canvas-zoom-indicator absolute bottom-3 right-3 pointer-events-none"
-      style={{
-        padding: '3px 10px',
-        background: 'color-mix(in srgb, var(--canvas-card-bg) 92%, transparent)',
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline,
-        color: colors.text.secondary,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 10,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        animation: 'te-zoom-fade 1.7s ease forwards',
-        zIndex: 10
-      }}
-    >
+    <div key={zoomPercent} className="canvas-zoom-indicator te-cv-zoom-indicator">
       {zoomPercent}%
     </div>
   )

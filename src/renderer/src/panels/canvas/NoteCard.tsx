@@ -9,7 +9,6 @@ import { markdownToHtml } from './shared/markdown-html'
 import { CardBadge } from './shared/CardBadge'
 import { MetadataGrid } from './shared/MetadataGrid'
 import { frontmatterToEntries } from './shared/frontmatter-utils'
-import { colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import { vaultEvents } from '@engine/vault-event-hub'
 
@@ -219,23 +218,17 @@ export function NoteCard({ node }: NoteCardProps) {
       onOpenInEditor={openInEditor}
       onContextMenu={handleContextMenu}
     >
-      <div
-        ref={scrollRef}
-        className="h-full overflow-auto canvas-card-content"
-        style={{ minHeight: 0 }}
-      >
+      <div ref={scrollRef} className="canvas-card-content te-notecard-scroll">
         {loading ? (
           <LoadingState />
         ) : !body ? (
-          <div style={{ padding: 28 }}>
-            <span className="text-sm" style={{ color: colors.text.muted }}>
-              Empty note
-            </span>
+          <div className="te-notecard-empty">
+            <span className="te-notecard-empty-text">Empty note</span>
           </div>
         ) : (
-          <div style={{ padding: '28px 28px 24px' }}>
+          <div className="te-notecard-body">
             {showBadge && (
-              <div style={{ marginBottom: 20 }}>
+              <div className="te-notecard-badge-row">
                 <CardBadge label={badgeLabel} />
               </div>
             )}
@@ -244,7 +237,7 @@ export function NoteCard({ node }: NoteCardProps) {
 
             <div className="canvas-prose" onClick={handleWikilinkClick}>
               <div
-                className="ProseMirror focus:outline-none"
+                className="ProseMirror te-notecard-prose"
                 dangerouslySetInnerHTML={{ __html: processedHtml }}
               />
             </div>

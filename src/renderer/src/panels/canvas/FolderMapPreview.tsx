@@ -1,5 +1,5 @@
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
-import { colors, floatingPanel } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 
 interface FolderMapPreviewProps {
   readonly plan: CanvasMutationPlan
@@ -28,17 +28,7 @@ export function FolderMapPreviewGhosts({ plan }: { readonly plan: CanvasMutation
   }
 
   return (
-    <svg
-      style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: '100%',
-        height: '100%',
-        overflow: 'visible',
-        pointerEvents: 'none'
-      }}
-    >
+    <svg className="te-foldermap-ghosts">
       {addEdgeOps.map((op) => {
         if (op.type !== 'add-edge') return null
         const from = nodePositions.get(op.edge.fromNode)
@@ -116,57 +106,16 @@ export function FolderMapPreviewBar({ plan, onApply, onCancel }: FolderMapPrevie
   const edgeCount = addEdgeOps.length
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 52,
-        right: 16,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '10px 20px',
-        borderRadius: 'var(--r-tool)',
-        background: 'var(--color-bg-elevated)',
-        border: '1px solid var(--color-border-subtle)',
-        backdropFilter: floatingPanel.glass.blur,
-        fontSize: '13px',
-        color: 'var(--color-text-secondary)',
-        zIndex: 100,
-        boxShadow: floatingPanel.shadowCompact
-      }}
-    >
+    <div className="te-foldermap-bar">
       <span>
         Map {addNodeOps.length} items &mdash; {folderCount} folders, {fileCount} files, {edgeCount}{' '}
         links
         {plan.summary.skippedFiles > 0 && `. ${plan.summary.skippedFiles} skipped`}
       </span>
-      <button
-        onClick={onApply}
-        style={{
-          padding: '4px 14px',
-          borderRadius: 0,
-          border: 'none',
-          background: 'var(--color-accent-default)',
-          color: 'var(--color-text-on-accent)',
-          fontSize: '13px',
-          fontWeight: 500,
-          cursor: 'pointer'
-        }}
-      >
+      <button onClick={onApply} className="te-foldermap-apply">
         Apply
       </button>
-      <button
-        onClick={onCancel}
-        style={{
-          padding: '4px 14px',
-          borderRadius: 0,
-          border: '1px solid var(--color-border-subtle)',
-          background: 'transparent',
-          color: 'var(--color-text-secondary)',
-          fontSize: '13px',
-          cursor: 'pointer'
-        }}
-      >
+      <button onClick={onCancel} className="te-foldermap-cancel">
         Cancel
       </button>
     </div>

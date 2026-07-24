@@ -12,7 +12,6 @@ import { EnrichmentPill } from './EnrichmentPill'
 import { selectEnrichmentTargets } from './enrichment-targets'
 import { getGraphLod } from './graph-lod'
 import { resolveFocusIdx } from './graph-focus'
-import { colors } from '@renderer/design/tokens'
 import { useReducedMotion } from '@renderer/hooks/useReducedMotion'
 import { openArtifactInEditor } from '@renderer/system-artifacts/system-artifact-runtime'
 import type { SimNode, PhysicsCommand, PhysicsResult, ForceParams } from './graph-types'
@@ -136,26 +135,19 @@ function GraphStatusRail({
   const dismissGraphTutorial = useUiStore((s) => s.dismissGraphTutorial)
 
   return (
-    <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none">
-      <div
-        className="te-float-chip px-3 py-1.5 text-xs font-mono"
-        style={{ color: colors.text.secondary }}
-      >
+    <div className="te-graph-statusrail">
+      <div className="te-float-chip te-graph-statusrail__stats">
         {nodeCount} nodes
-        <span style={{ opacity: 0.3, margin: '0 8px' }}>|</span>
+        <span className="te-graph-statusrail__sep">|</span>
         {edgeCount} edges
       </div>
       {!tutorialDismissed && (
-        <div
-          className="te-float-chip flex items-center gap-2 px-3 py-1.5 text-xs pointer-events-auto"
-          style={{ color: colors.text.muted }}
-        >
+        <div className="te-float-chip te-graph-statusrail__tip">
           Hover to isolate neighborhoods. Drag to compare clusters.
           <button
             type="button"
             onClick={dismissGraphTutorial}
-            className="cursor-pointer leading-none"
-            style={{ color: colors.text.muted, padding: '0 2px' }}
+            className="te-graph-statusrail__tip-close"
             title="Dismiss tip"
             aria-label="Dismiss tip"
           >
@@ -512,18 +504,8 @@ export function GraphPanel() {
   const isGraphEmpty = graph.nodes.length === 0
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-full overflow-hidden"
-      style={{ background: 'var(--color-bg-base)' }}
-    >
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-accent-default) 8%, transparent), transparent 32%), linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28%, transparent 72%, rgba(255, 255, 255, 0.03))'
-        }}
-      />
+    <div ref={containerRef} className="te-graph-panel">
+      <div className="te-graph-panel__vignette" />
 
       {isGraphEmpty && (
         <GraphEmptyState artifactCount={artifactCount} rawFileCount={rawFileCount} />
@@ -542,13 +524,8 @@ export function GraphPanel() {
       <button
         type="button"
         onClick={() => setShowSettings((prev) => !prev)}
-        className="te-float-chip absolute top-3 right-3 z-20 flex items-center justify-center transition-all"
-        style={{
-          width: 32,
-          height: 32,
-          backgroundColor: showSettings ? 'var(--color-accent-default)' : undefined,
-          color: showSettings ? 'var(--color-accent-fg)' : 'var(--color-text-secondary)'
-        }}
+        className="te-float-chip te-graph-settings-toggle"
+        data-active={showSettings}
         title="Graph settings"
         aria-label="Graph settings"
         aria-expanded={showSettings}
@@ -575,33 +552,16 @@ export function GraphPanel() {
 
       {/* Bottom-left controls: Fit All + zoom indicator */}
       {!isGraphEmpty && (
-        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2">
+        <div className="te-graph-controls">
           <button
             type="button"
             onClick={handleFitAll}
-            className="te-float-chip text-xs px-3 py-1.5 transition-all cursor-pointer"
-            style={{ color: 'var(--color-text-secondary)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-accent-default)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border-default)'
-            }}
+            className="te-float-chip te-graph-controls__btn"
             title="Fit all nodes in view"
           >
             Fit All
           </button>
-          <span
-            className="te-float-chip text-xs tabular-nums font-mono px-2 py-1.5"
-            style={{
-              color: 'var(--color-text-muted)',
-              fontSize: 10,
-              minWidth: 44,
-              textAlign: 'center'
-            }}
-          >
-            {zoomPercent}%
-          </span>
+          <span className="te-float-chip te-graph-controls__zoom">{zoomPercent}%</span>
         </div>
       )}
     </div>

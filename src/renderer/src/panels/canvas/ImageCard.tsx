@@ -3,7 +3,6 @@ import { Spinner } from '../../components/emptystate/Spinner'
 import { useCanvas } from './canvas-store-context'
 import { logError } from '../../utils/error-logger'
 import { CardShell } from './CardShell'
-import { colors } from '../../design/tokens'
 import type { CanvasNode, ImageNodeMeta } from '@shared/canvas-types'
 
 interface ImageCardProps {
@@ -89,7 +88,7 @@ export function ImageCard({ node }: ImageCardProps): React.ReactElement {
 
   return (
     <CardShell node={node} title={title} onClose={() => removeNode(node.id)}>
-      <div className="flex items-center justify-center h-full p-2" style={{ minHeight: 0 }}>
+      <div className="te-imgcard-frame">
         <ImageContent
           loading={loading}
           displaySrc={displaySrc}
@@ -117,9 +116,9 @@ function ImageContent({
 }): React.ReactElement {
   if (loading) {
     return (
-      <div className="text-center" style={{ color: colors.text.muted }}>
-        <Spinner size={20} style={{ color: colors.accent.default, margin: '0 auto 4px' }} />
-        <span className="text-xs">Loading...</span>
+      <div className="te-imgcard-status">
+        <Spinner size={20} />
+        <span className="te-imgcard-status-label">Loading...</span>
       </div>
     )
   }
@@ -128,7 +127,7 @@ function ImageContent({
   // displaySrc null, and "No image source" misdiagnoses it.
   if (error) {
     return (
-      <div className="text-center" style={{ color: colors.text.muted }}>
+      <div className="te-imgcard-status">
         <svg
           width={32}
           height={32}
@@ -136,12 +135,12 @@ function ImageContent({
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
-          className="mx-auto mb-2"
+          className="te-imgcard-status-icon"
         >
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path d="M9 9l6 6M15 9l-6 6" />
         </svg>
-        <span className="text-xs">
+        <span className="te-imgcard-status-label">
           Couldn&apos;t load image. Drop it on the canvas to re-import.
         </span>
       </div>
@@ -150,7 +149,7 @@ function ImageContent({
 
   if (!displaySrc) {
     return (
-      <div className="text-center" style={{ color: colors.text.muted }}>
+      <div className="te-imgcard-status">
         <svg
           width={32}
           height={32}
@@ -158,13 +157,13 @@ function ImageContent({
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
-          className="mx-auto mb-2"
+          className="te-imgcard-status-icon"
         >
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <circle cx="8.5" cy="8.5" r="1.5" />
           <path d="M21 15l-5-5L5 21" />
         </svg>
-        <span className="text-xs">No image source</span>
+        <span className="te-imgcard-status-label">No image source</span>
       </div>
     )
   }
@@ -173,8 +172,7 @@ function ImageContent({
     <img
       src={displaySrc}
       alt={alt}
-      className="max-w-full max-h-full"
-      style={{ objectFit: 'contain' }}
+      className="te-imgcard-img"
       onError={onError}
       draggable={false}
     />

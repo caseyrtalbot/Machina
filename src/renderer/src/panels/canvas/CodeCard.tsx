@@ -6,7 +6,6 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
-import { borderRadius, colors } from '../../design/tokens'
 import type { CanvasNode, CodeNodeMeta } from '@shared/canvas-types'
 import {
   LANGUAGES,
@@ -124,36 +123,21 @@ export function CodeCard({ node }: CodeCardProps) {
 
   return (
     <CardShell node={node} title={title} onClose={() => removeNode(node.id)}>
-      <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
+      <div className="te-codecard-root">
         {/* Language selector bar */}
-        <div
-          className="flex items-center px-2 py-1 shrink-0"
-          style={{ borderBottom: `1px solid ${colors.border.subtle}` }}
-        >
-          <div className="relative">
+        <div className="te-codecard-toolbar">
+          <div className="te-codecard-lang">
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 setShowLangPicker(!showLangPicker)
               }}
-              className="text-xs px-2 py-0.5"
-              style={{
-                borderRadius: borderRadius.inline,
-                backgroundColor: colors.accent.muted,
-                color: colors.text.secondary
-              }}
+              className="te-codecard-lang-btn"
             >
               {language}
             </button>
             {showLangPicker && (
-              <div
-                className="absolute top-full left-0 mt-1 border shadow-lg py-1 z-50"
-                style={{
-                  backgroundColor: colors.bg.elevated,
-                  borderColor: colors.border.default,
-                  minWidth: 120
-                }}
-              >
+              <div className="te-codecard-lang-menu">
                 {LANGUAGES.map((lang) => (
                   <button
                     key={lang}
@@ -161,17 +145,8 @@ export function CodeCard({ node }: CodeCardProps) {
                       e.stopPropagation()
                       handleLanguageChange(lang)
                     }}
-                    className="w-full text-left px-3 py-1 text-xs"
-                    style={{
-                      color: lang === language ? colors.accent.default : colors.text.secondary,
-                      backgroundColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      ;(e.target as HTMLElement).style.backgroundColor = colors.accent.muted
-                    }}
-                    onMouseLeave={(e) => {
-                      ;(e.target as HTMLElement).style.backgroundColor = 'transparent'
-                    }}
+                    className="te-codecard-lang-option"
+                    data-active={lang === language}
                   >
                     {lang}
                   </button>
@@ -184,8 +159,7 @@ export function CodeCard({ node }: CodeCardProps) {
         {/* CodeMirror container */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden"
-          style={{ minHeight: 0 }}
+          className="te-codecard-editor-host"
           onClick={(e) => e.stopPropagation()}
         />
       </div>

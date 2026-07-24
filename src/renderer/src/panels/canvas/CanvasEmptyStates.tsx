@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { borderRadius, colors, floatingPanel, typography } from '../../design/tokens'
 import { EmptyState } from '../../components/emptystate/EmptyState'
 import { Overlay } from '../../components/overlay/Overlay'
 
@@ -75,66 +74,16 @@ export function ShortcutOverlay({ onClose }: { readonly onClose: () => void }) {
         data-testid="canvas-shortcut-overlay"
         // Click anywhere closes — the panel too, not just the scrim.
         onClick={onClose}
-        style={{
-          width: 340,
-          padding: '20px 24px',
-          borderRadius: borderRadius.card,
-          backgroundColor: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          border: `1px solid ${colors.border.subtle}`,
-          boxShadow: floatingPanel.shadow
-        }}
+        className="te-cv-shortcut-sheet"
       >
-        <div
-          style={{
-            fontSize: typography.metadata.size,
-            fontFamily: typography.fontFamily.mono,
-            color: colors.text.muted,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: 'uppercase',
-            marginBottom: 12
-          }}
-        >
-          Canvas Shortcuts
-        </div>
+        <div className="te-cv-shortcut-title">Canvas Shortcuts</div>
         {CANVAS_SHORTCUTS.map(([keys, action]) => (
-          <div
-            key={keys}
-            className="flex items-center justify-between"
-            style={{ padding: '3px 0' }}
-          >
-            <span
-              style={{
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 12,
-                color: colors.text.primary
-              }}
-            >
-              {keys}
-            </span>
-            <span
-              style={{
-                fontFamily: typography.fontFamily.body,
-                fontSize: 12,
-                color: colors.text.secondary
-              }}
-            >
-              {action}
-            </span>
+          <div key={keys} className="te-cv-shortcut-row">
+            <span className="te-cv-shortcut-keys">{keys}</span>
+            <span className="te-cv-shortcut-action">{action}</span>
           </div>
         ))}
-        <div
-          style={{
-            marginTop: 12,
-            fontSize: typography.metadata.size,
-            fontFamily: typography.fontFamily.mono,
-            color: colors.text.muted,
-            letterSpacing: typography.metadata.letterSpacing
-          }}
-        >
-          Click anywhere or press Esc to close
-        </div>
+        <div className="te-cv-shortcut-footer">Click anywhere or press Esc to close</div>
       </div>
     </Overlay>
   )

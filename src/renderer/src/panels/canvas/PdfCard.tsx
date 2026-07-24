@@ -5,7 +5,6 @@ import { pdfjs } from './pdf-worker-setup'
 import './pdf-text-layer.css'
 import { useCanvas } from './canvas-store-context'
 import { CardShell } from './CardShell'
-import { colors, borderRadius, typography, floatingPanel } from '../../design/tokens'
 import { createQuoteCard } from './pdf-quote'
 import { extractPdfPages } from '@shared/engine/pdf-extractor'
 import { indexPdfInSearch } from '../../engine/vault-search'
@@ -192,28 +191,11 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
 
   return (
     <CardShell node={node} title={title} onClose={() => removeNode(node.id)}>
-      <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
-        {pageCount > 1 && (
-          <div
-            className="flex items-center justify-center py-1 flex-shrink-0"
-            style={{
-              borderBottom: `1px solid ${colors.border.subtle}`,
-              fontSize: 11,
-              color: colors.text.secondary,
-              fontVariantNumeric: 'tabular-nums'
-            }}
-          >
-            {pageCount} pages
-          </div>
-        )}
+      <div className="te-pdfcard-frame">
+        {pageCount > 1 && <div className="te-pdfcard-pagecount">{pageCount} pages</div>}
 
         {/* Continuous-scroll page stack */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden relative"
-          style={{ minHeight: 0 }}
-          onMouseUp={handleMouseUp}
-        >
+        <div ref={scrollRef} className="te-pdfcard-scroll" onMouseUp={handleMouseUp}>
           <PdfStatus src={src} loading={loading} error={error} />
           {pdfDoc &&
             containerWidth > 0 &&
@@ -228,6 +210,7 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
           {quoteSel && (
             <button
               type="button"
+              className="te-pdfcard-quote-btn"
               onMouseDown={(e) => {
                 // Keep the text selection alive through the click
                 e.preventDefault()
@@ -238,21 +221,8 @@ export function PdfCard({ node }: PdfCardProps): React.ReactElement {
                 handleQuoteToNote()
               }}
               style={{
-                position: 'absolute',
                 top: Math.max(quoteSel.y - 30, 4),
-                left: Math.max(quoteSel.x - 48, 4),
-                zIndex: 3,
-                padding: '3px 8px',
-                fontSize: 10,
-                fontFamily: typography.fontFamily.mono,
-                textTransform: 'uppercase',
-                letterSpacing: typography.metadata.letterSpacing,
-                color: colors.accent.default,
-                backgroundColor: floatingPanel.glass.popoverBg,
-                border: `1px solid ${colors.accent.default}`,
-                borderRadius: borderRadius.inline,
-                boxShadow: floatingPanel.shadowCompact,
-                cursor: 'pointer'
+                left: Math.max(quoteSel.x - 48, 4)
               }}
             >
               Quote to note
@@ -275,19 +245,16 @@ function PdfStatus({
 }): React.ReactElement | null {
   if (src && !loading && !error) return null
   return (
-    <div
-      className="flex items-center justify-center h-full text-center px-4"
-      style={{ color: colors.text.muted }}
-    >
+    <div className="te-pdfcard-status">
       {!src ? (
-        <span className="text-xs">No PDF source</span>
+        <span className="te-pdfcard-status-label">No PDF source</span>
       ) : loading ? (
         <div>
-          <Spinner size={20} style={{ color: colors.accent.default, margin: '0 auto 4px' }} />
-          <span className="text-xs">Loading PDF...</span>
+          <Spinner size={20} />
+          <span className="te-pdfcard-status-label">Loading PDF...</span>
         </div>
       ) : (
-        <span className="text-xs">{error}</span>
+        <span className="te-pdfcard-status-label">{error}</span>
       )}
     </div>
   )
@@ -379,18 +346,11 @@ function PdfPage({ pdfDoc, pageNumber, width }: PdfPageProps): React.ReactElemen
   return (
     <div
       ref={wrapperRef}
-      className="te-pdf-page"
+      className="te-pdf-page te-pdfcard-page"
       data-page-number={pageNumber}
-      style={{
-        width: '100%',
-        height: Math.round(width * (aspect ?? DEFAULT_PAGE_ASPECT)),
-        borderBottom: `1px solid ${colors.border.subtle}`
-      }}
+      style={{ height: Math.round(width * (aspect ?? DEFAULT_PAGE_ASPECT)) }}
     >
-      <canvas
-        ref={canvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      />
+      <canvas ref={canvasRef} className="te-pdfcard-page-canvas" />
       <div ref={textRef} className="te-pdf-textlayer" />
     </div>
   )

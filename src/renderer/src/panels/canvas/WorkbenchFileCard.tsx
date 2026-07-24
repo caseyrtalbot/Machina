@@ -1,7 +1,7 @@
 import { useCallback, memo } from 'react'
 import { CardShell } from './CardShell'
 import { useCanvas } from './canvas-store-context'
-import { colors, LANGUAGE_COLORS, transitions, typography } from '../../design/tokens'
+import { colors, LANGUAGE_COLORS } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import './workbench-animations.css'
 
@@ -47,56 +47,26 @@ export function WorkbenchFileCard({ node }: WorkbenchFileCardProps) {
 
   return (
     <CardShell node={node} title={fileName} onClose={handleClose}>
-      <div
-        className="flex items-center gap-2 px-2.5 py-2 h-full workbench-file-card-enter"
-        style={{
-          boxShadow: isActive ? `0 0 0 1px ${colors.accent.line}` : undefined,
-          transition: `box-shadow ${transitions.surface}`
-        }}
-      >
+      <div className="te-wbfile-root workbench-file-card-enter" data-active={isActive}>
         {/* Language icon */}
         <div
-          className="shrink-0 flex items-center justify-center text-[10px] font-bold"
-          style={{
-            width: 28,
-            height: 28,
-            backgroundColor: langColor + '18',
-            color: langColor,
-            fontFamily: typography.fontFamily.mono
-          }}
+          className="te-wbfile-icon"
+          style={{ backgroundColor: langColor + '18', color: langColor }}
         >
           {getFileIcon(language)}
         </div>
 
         {/* File info */}
-        <div className="min-w-0 flex-1">
-          <div
-            className="text-xs font-semibold truncate"
-            style={{ color: colors.text.primary }}
-            title={relativePath}
-          >
+        <div className="te-wbfile-info">
+          <div className="te-wbfile-name" title={relativePath}>
             {fileName}
           </div>
-          {dirPath && (
-            <div className="text-[10px] truncate mt-0.5" style={{ color: colors.text.muted }}>
-              {dirPath}
-            </div>
-          )}
+          {dirPath && <div className="te-wbfile-dir">{dirPath}</div>}
         </div>
 
         {/* Touch count badge */}
         {touchCount > 0 && (
-          <div
-            className="shrink-0 flex items-center justify-center text-[10px] font-semibold"
-            style={{
-              minWidth: 20,
-              height: 20,
-              padding: '0 5px',
-              backgroundColor: colors.bg.elevated,
-              color: touchCount >= 5 ? colors.accent.default : colors.text.secondary,
-              fontFamily: typography.fontFamily.mono
-            }}
-          >
+          <div className="te-wbfile-touch" data-hot={touchCount >= 5}>
             {touchCount}
           </div>
         )}

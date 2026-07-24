@@ -33,7 +33,7 @@ export function SplitDividerAndPanel({ filePath }: { readonly filePath: string }
   return (
     <>
       <div className="panel-divider" onMouseDown={handleMouseDown} />
-      <div style={{ width, flexShrink: 0 }} className="h-full overflow-hidden">
+      <div className="te-cv-split-panel" style={{ width }}>
         <CanvasSplitEditor filePath={filePath} />
       </div>
     </>

@@ -3,14 +3,7 @@ import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu
 import { useCanvas, useCanvasApi, useCanvasId } from './canvas-store-context'
 import { useVaultStore } from '../../store/vault-store'
 import { useNodeDrag, useNodeResize } from './use-canvas-drag'
-import {
-  borderRadius,
-  colors,
-  canvasTokens,
-  floatingPanel,
-  typography
-} from '../../design/tokens'
-import { CARD_BLUR_PX, CARD_TITLE_FONT_SIZE_PX } from '../../design/themes'
+import { CARD_BLUR_PX } from '../../design/themes'
 import {
   startConnectionDrag,
   endConnectionDrag,
@@ -78,16 +71,7 @@ function TitleBarButton({
     <button
       ref={ref}
       onClick={onClick}
-      className="canvas-card__action-btn flex items-center justify-center hover:opacity-80"
-      style={{
-        width: 24,
-        height: 24,
-        color: colors.text.primary,
-        opacity: 0.4,
-        cursor: 'pointer',
-        padding: '0 2px',
-        borderRadius: borderRadius.tool
-      }}
+      className="canvas-card__action-btn"
       aria-label={label}
       title={label}
     >
@@ -123,7 +107,6 @@ export function CardShell({
   const lockCard = useCanvas((s) => s.lockCard)
   const unlockCard = useCanvas((s) => s.unlockCard)
   const cardBlur = CARD_BLUR_PX
-  const cardTitleFontSize = CARD_TITLE_FONT_SIZE_PX
   const { onDragStart } = useNodeDrag(node.id)
   const { onResizeStart } = useNodeResize(node.id, node.type)
   const [convertAnchor, setConvertAnchor] = useState<DOMRect | null>(null)
@@ -248,38 +231,19 @@ export function CardShell({
   return (
     <div
       data-canvas-node
-      className={`absolute flex flex-col canvas-card te-card-enter${isFocused ? ' canvas-card--focused' : ''}${isLocked ? ' canvas-card--locked' : ''}${isPinPulsing ? ' te-pin-pulse' : ''}`}
+      data-terminal={isTerminalCard ? '' : undefined}
+      data-selected={isSelected ? '' : undefined}
+      data-active={isActive ? '' : undefined}
+      className={`canvas-card te-card-enter${isFocused ? ' canvas-card--focused' : ''}${isLocked ? ' canvas-card--locked' : ''}${isPinPulsing ? ' te-pin-pulse' : ''}`}
       style={{
         left: node.position.x,
         top: node.position.y,
         width: node.size.width,
         height: node.size.height,
-        background: isTerminalCard
-          ? '#050607'
-          : `linear-gradient(180deg, color-mix(in srgb, var(--canvas-card-bg) 96%, white 4%), var(--canvas-card-bg))`,
-        borderRadius: borderRadius.tool,
-        border:
-          isFocused || isLocked
-            ? '1px solid color-mix(in srgb, var(--color-accent-default) 38%, var(--canvas-card-border))'
-            : `1px solid ${canvasTokens.cardBorder}`,
-        boxShadow: isLocked
-          ? `0 0 0 1px color-mix(in srgb, var(--color-accent-default) 32%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, ${floatingPanel.shadowCard}`
-          : isFocused
-            ? `0 0 0 1px color-mix(in srgb, var(--color-accent-default) 26%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, ${floatingPanel.shadowCard}`
-            : isSelected
-              ? `0 0 0 1px color-mix(in srgb, var(--color-accent-default) 42%, transparent), 0 1px 0 rgba(255,255,255,0.04) inset, ${floatingPanel.shadowCard}`
-              : `0 1px 0 rgba(255,255,255,0.03) inset, ${floatingPanel.shadowCard}`,
-        overflow: 'hidden',
-        contain: isTerminalCard ? undefined : 'layout style',
         backdropFilter:
           isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.4)`,
         WebkitBackdropFilter:
-          isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.4)`,
-        ...(isActive
-          ? {
-              boxShadow: `0 0 0 1px var(--color-accent-line), ${floatingPanel.shadowCard}`
-            }
-          : {})
+          isTerminalCard || isInteracting ? undefined : `blur(${cardBlur}px) saturate(1.4)`
       }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -289,71 +253,19 @@ export function CardShell({
       onMouseLeave={() => setHoveredNode(null)}
     >
       {/* Title bar — Console card header band: lighter than body, hairline border. */}
-      <div
-        className="canvas-card__titlebar flex items-center justify-between shrink-0 select-none"
-        style={{
-          padding: '8px 12px',
-          background: isTerminalCard
-            ? 'linear-gradient(180deg, rgba(3, 3, 5, 0.96), rgba(3, 3, 5, 0.9))'
-            : `color-mix(in srgb, var(--canvas-card-bg) 70%, var(--color-bg-elevated))`,
-          borderBottom: `1px solid ${canvasTokens.cardBorder}`,
-          borderRadius: 0,
-          cursor: 'grab'
-        }}
-        onPointerDown={onDragStart}
-      >
-        <span className="flex items-center gap-1.5 min-w-0 flex-1">
-          {isActive && <span className="te-active-dot shrink-0" />}
-          <span
-            className="canvas-card__title truncate"
-            style={{
-              fontFamily: typography.fontFamily.mono,
-              fontSize: cardTitleFontSize - 0.25,
-              lineHeight: 1,
-              fontWeight: 500,
-              color: colors.text.secondary,
-              opacity: 0.94,
-              direction: 'rtl',
-              textAlign: 'left',
-              unicodeBidi: 'plaintext'
-            }}
-            title={copyText}
-          >
+      <div className="canvas-card__titlebar" onPointerDown={onDragStart}>
+        <span className="canvas-card__title-group">
+          {isActive && <span className="te-active-dot" />}
+          <span className="canvas-card__title" title={copyText}>
             {title}
           </span>
           {titleExtra}
-          {edgeCount > 0 && (
-            <span
-              style={{
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 10,
-                color: colors.text.muted,
-                opacity: 0.7,
-                flexShrink: 0
-              }}
-            >
-              {edgeCount}
-            </span>
-          )}
+          {edgeCount > 0 && <span className="canvas-card__edge-count">{edgeCount}</span>}
         </span>
         {node.metadata?.scope === 'project' && (
-          <span
-            className="canvas-card__badge shrink-0 ml-2"
-            style={{
-              color: 'var(--color-accent-default)',
-              fontSize: 9,
-              fontFamily: typography.fontFamily.mono,
-              letterSpacing: '0.14em',
-              padding: '1px 6px',
-              borderRadius: borderRadius.inline,
-              border: '1px solid color-mix(in srgb, var(--color-accent-default) 32%, transparent)',
-              background: 'color-mix(in srgb, var(--color-accent-default) 10%, transparent)'
-            }}
-          >
-            PROJECT
-          </span>
+          <span className="canvas-card__badge canvas-card__badge--project">PROJECT</span>
         )}
-        <div className="canvas-card__actions flex items-center gap-0.5 ml-2 shrink-0 relative">
+        <div className="canvas-card__actions">
           <TitleBarButton
             onClick={(e) => {
               e.stopPropagation()
@@ -436,18 +348,7 @@ export function CardShell({
               e.stopPropagation()
               handleClose()
             }}
-            className="canvas-card__action-btn tile-close-btn flex items-center justify-center"
-            style={{
-              width: 24,
-              height: 24,
-              color: colors.text.primary,
-              opacity: 0.4,
-              cursor: 'pointer',
-              padding: '0 2px',
-              borderRadius: borderRadius.tool,
-              border: 'none',
-              background: 'none'
-            }}
+            className="canvas-card__action-btn tile-close-btn"
             aria-label="Close card"
             title="Close card"
           >
@@ -468,72 +369,43 @@ export function CardShell({
       {/* Content area — hidden scrollbars via .canvas-card-content */}
       <div
         data-canvas-card-content
-        className={`flex-1 relative${isTerminalCard ? '' : ' canvas-card-content'}`}
-        style={{
-          minHeight: 0,
-          overflow: isTerminalCard ? 'hidden' : undefined,
-          contain: isTerminalCard ? undefined : 'layout style paint'
-        }}
+        className={`canvas-card__content${isTerminalCard ? '' : ' canvas-card-content'}`}
       >
         {children}
         {/* Pointer-events shield: blocks content interaction until card is focused.
             First click selects+focuses the card, second click interacts with content. */}
-        {!isFocused && !isLocked && <div className="absolute inset-0 z-[1]" aria-hidden="true" />}
+        {!isFocused && !isLocked && <div className="canvas-card__shield" aria-hidden="true" />}
       </div>
 
-      {/* Origin accent — subtle left border for non-human artifacts */}
+      {/* Origin accent — subtle left border for non-human artifacts. Color varies
+          by origin at runtime, so backgroundColor stays inline. */}
       {origin && origin !== 'human' && (
         <div
           aria-hidden="true"
+          className="canvas-card__origin-accent"
           style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 2,
-            borderRadius: 0,
             backgroundColor:
               origin === 'source'
                 ? 'color-mix(in srgb, var(--signal-info) 50%, transparent)'
-                : 'color-mix(in srgb, var(--signal-success) 40%, transparent)',
-            pointerEvents: 'none',
-            zIndex: 6
+                : 'color-mix(in srgb, var(--signal-success) 40%, transparent)'
           }}
         />
       )}
 
       {/* Resize handle — revealed on card hover via .canvas-card__resize */}
-      <div
-        className="canvas-card__resize absolute bottom-0 right-0 cursor-nwse-resize"
-        style={{ width: 16, height: 16, zIndex: 5 }}
-        onPointerDown={onResizeStart}
-      >
-        <svg width={16} height={16} viewBox="0 0 16 16" style={{ color: colors.text.muted }}>
+      <div className="canvas-card__resize" onPointerDown={onResizeStart}>
+        <svg width={16} height={16} viewBox="0 0 16 16" className="canvas-card__resize-icon">
           <path d="M14 2L2 14M14 8L8 14" stroke="currentColor" strokeWidth="1" opacity="0.4" />
         </svg>
       </div>
 
-      {/* Anchor dots for edge creation — revealed on card hover */}
+      {/* Anchor dots for edge creation — revealed on card hover. */}
       {(['top', 'right', 'bottom', 'left'] as CanvasSide[]).map((side) => {
-        const style: React.CSSProperties = {
-          position: 'absolute',
-          width: 8,
-          height: 8,
-          borderRadius: 0,
-          backgroundColor: 'color-mix(in srgb, var(--color-accent-default) 74%, white 26%)',
-          boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent-default) 18%, transparent)',
-          cursor: 'crosshair',
-          zIndex: 10,
-          ...(side === 'top' && { top: -4, left: '50%', marginLeft: -4 }),
-          ...(side === 'bottom' && { bottom: -4, left: '50%', marginLeft: -4 }),
-          ...(side === 'left' && { left: -4, top: '50%', marginTop: -4 }),
-          ...(side === 'right' && { right: -4, top: '50%', marginTop: -4 })
-        }
         return (
           <div
             key={side}
             className="canvas-card__anchor"
-            style={style}
+            data-side={side}
             onPointerDown={(e) => {
               e.stopPropagation()
               startConnectionDrag(

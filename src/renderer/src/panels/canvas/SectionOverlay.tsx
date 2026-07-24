@@ -1,5 +1,5 @@
 import { useCanvas } from './canvas-store-context'
-import { canvasTokens, ontologyColors, typography } from '../../design/tokens'
+import { canvasTokens, ontologyColors } from '../../design/tokens'
 
 export function SectionOverlay({
   viewport
@@ -19,7 +19,7 @@ export function SectionOverlay({
   const showLabels = viewport.zoom >= 0.15
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 2 }}>
+    <div className="te-cv-section-overlay">
       {frames.map((frame) => {
         const group = ontologySnapshot.groupsById[frame.groupId]
         if (!group) return null
@@ -35,7 +35,7 @@ export function SectionOverlay({
         return (
           <div
             key={frame.groupId}
-            className="absolute"
+            className="te-cv-section-region"
             style={{
               left: screenX,
               top: screenY,
@@ -56,31 +56,27 @@ export function SectionOverlay({
           >
             {showLabels && (
               <div
+                className="te-cv-section-label"
+                data-root={frame.isRoot}
                 style={{
                   padding: `${4 * viewport.zoom}px ${8 * viewport.zoom}px`,
-                  fontFamily: typography.fontFamily.mono,
                   fontSize: (frame.isRoot ? 13 : 11) * viewport.zoom,
-                  fontWeight: frame.isRoot ? 600 : 500,
                   color: `${color}cc`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6 * viewport.zoom,
-                  whiteSpace: 'nowrap'
+                  gap: 6 * viewport.zoom
                 }}
               >
                 {frame.isRoot && (
                   <span
+                    className="te-cv-section-dot"
                     style={{
                       width: ot.headerDotRadius * 2 * viewport.zoom,
                       height: ot.headerDotRadius * 2 * viewport.zoom,
-                      borderRadius: '50%',
-                      backgroundColor: `${color}80`,
-                      flexShrink: 0
+                      backgroundColor: `${color}80`
                     }}
                   />
                 )}
                 <span>{group.label}</span>
-                <span style={{ opacity: 0.4, fontSize: 10 * viewport.zoom }}>
+                <span className="te-cv-section-count" style={{ fontSize: 10 * viewport.zoom }}>
                   {group.cardIds.length} {group.cardIds.length === 1 ? 'card' : 'cards'}
                   {ontologyIsStale && frame.isRoot && ' · stale'}
                 </span>

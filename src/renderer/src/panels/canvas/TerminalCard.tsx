@@ -10,7 +10,6 @@ import { buildCanvasContext } from '../../engine/context-serializer'
 import { buildBlockProjection, pickPinnableBlock } from './block-pin'
 import { canvasToStrip } from '../agent-shell/terminal-migration'
 import { CardShell } from './CardShell'
-import { borderRadius, colors } from '../../design/tokens'
 import type { CanvasNode } from '@shared/canvas-types'
 import type { Block } from '@shared/engine/block-model'
 import { type SessionId, sessionId as toSessionId } from '@shared/types'
@@ -471,17 +470,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
                 handleMoveToDock()
               }}
               title="Move to dock terminal strip"
-              className="canvas-card__action-btn flex items-center justify-center"
-              style={{
-                width: 24,
-                height: 24,
-                fontSize: 11,
-                borderRadius: borderRadius.tool,
-                color: colors.text.muted,
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer'
-              }}
+              className="canvas-card__action-btn te-termcard-action"
             >
               ⇥
             </button>
@@ -495,17 +484,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
                 handlePinLatestBlock()
               }}
               title="Pin latest block to canvas"
-              className="canvas-card__action-btn flex items-center justify-center"
-              style={{
-                width: 24,
-                height: 24,
-                fontSize: 11,
-                borderRadius: borderRadius.tool,
-                color: colors.text.muted,
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer'
-              }}
+              className="canvas-card__action-btn te-termcard-action"
             >
               ⊕
             </button>
@@ -516,14 +495,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
         <>
           {sessionAgent ? <CliAgentBadge presence={sessionAgent} /> : null}
           {isClaudeCard && (!claudeStatus.installed || !claudeStatus.authenticated) ? (
-            <span
-              className="flex items-center gap-1 text-[10px]"
-              style={{ color: colors.claude.warning }}
-            >
-              <span
-                className="inline-block rounded-full"
-                style={{ width: 5, height: 5, backgroundColor: colors.claude.warning }}
-              />
+            <span className="te-termcard-warning">
+              <span className="te-termcard-warning-dot" />
               {!claudeStatus.installed ? 'CLI not found' : 'Not signed in'}
             </span>
           ) : (
@@ -533,17 +506,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
       }
     >
       {!sessionDead && hookBanner !== 'hidden' ? (
-        <div
-          data-testid="terminal-hook-banner"
-          className="absolute left-2 right-2 bottom-2 z-10 flex items-center gap-2 px-3 py-2 text-xs"
-          style={{
-            background: 'rgba(12, 14, 20, 0.92)',
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: borderRadius.tool,
-            color: colors.text.muted
-          }}
-        >
-          <span className="flex-1 min-w-0">
+        <div data-testid="terminal-hook-banner" className="te-termcard-hookbanner">
+          <span className="te-termcard-hookbanner-msg">
             {hookBanner === 'offer' &&
               'Enable structured blocks: install the Machina shell hooks to capture commands on the canvas.'}
             {hookBanner === 'installing' && 'Installing shell hooks…'}
@@ -559,13 +523,7 @@ export function TerminalCard({ node }: TerminalCardProps) {
                 e.stopPropagation()
                 void handleInstallHooks()
               }}
-              className="shrink-0 cursor-pointer"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: colors.accent.default,
-                fontSize: 11
-              }}
+              className="te-termcard-hookbanner-setup"
             >
               Set up
             </button>
@@ -577,35 +535,17 @@ export function TerminalCard({ node }: TerminalCardProps) {
               e.stopPropagation()
               handleDismissHookBanner()
             }}
-            className="shrink-0 cursor-pointer"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: colors.text.muted,
-              fontSize: 12
-            }}
+            className="te-termcard-hookbanner-dismiss"
           >
             ×
           </button>
         </div>
       ) : null}
       {sessionDead ? (
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(12, 14, 20, 0.85)' }}
-        >
-          <div className="text-center">
-            <p className="text-sm mb-2" style={{ color: colors.text.muted }}>
-              Session ended
-            </p>
-            <button
-              onClick={handleRestart}
-              className="text-xs px-3 py-1 border"
-              style={{
-                borderColor: colors.border.default,
-                color: colors.accent.default
-              }}
-            >
+        <div className="te-termcard-dead">
+          <div className="te-termcard-dead-body">
+            <p className="te-termcard-dead-title">Session ended</p>
+            <button onClick={handleRestart} className="te-termcard-dead-restart">
               Restart
             </button>
           </div>
@@ -617,11 +557,8 @@ export function TerminalCard({ node }: TerminalCardProps) {
           ref={webviewRef as React.RefObject<never>}
           src={webviewSrc}
           preload={preloadPath}
-          style={{
-            width: '100%',
-            height: '100%',
-            pointerEvents: isFocused || isLocked ? 'auto' : 'none'
-          }}
+          className="te-termcard-webview"
+          data-interactive={isFocused || isLocked ? 'true' : undefined}
           webpreferences="contextIsolation=yes, sandbox=yes"
         />
         /* eslint-enable react/no-unknown-property */
