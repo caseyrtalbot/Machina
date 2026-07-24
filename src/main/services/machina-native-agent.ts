@@ -14,9 +14,9 @@ import {
   releaseNativeHold,
   type HoldQueue
 } from './machina-native-tools/queue-mirror'
-import { getDocumentManager } from '../ipc/documents'
 import { AuditLogger } from './audit-logger'
 import { WriteRateLimiter } from './hitl-gate'
+import type { VaultQueryFacade } from './vault-query-facade'
 import type { AgentNativeEventBody, DockAction } from '@shared/ipc-channels'
 import type { DockTab } from '@shared/dock-types'
 import type { ToolResult } from '@shared/thread-types'
@@ -89,6 +89,20 @@ export function setNativeHoldQueueProvider(provider: () => HoldQueue): void {
     const current = holdQueueProvider
     if (current !== null) releaseNativeHold(current(), toolUseId, accepted)
   })
+}
+
+/**
+ * Late-bound provider for the shared VaultQueryFacade (the one McpLifecycle
+ * builds per open vault). The native tool lane routes note reads/writes through
+ * it so it shares the MCP lane's audit trail, Spotlighting, and PathGuard —
+ * a single facade instance, no second construction. index.ts wires this once
+ * against mcpLifecycle.getFacade(); it re-reads the current facade each run so
+ * a vault switch is picked up automatically.
+ */
+let vaultFacadeProvider: (() => VaultQueryFacade | null) | null = null
+
+export function setNativeVaultFacadeProvider(provider: () => VaultQueryFacade | null): void {
+  vaultFacadeProvider = provider
 }
 
 function emit(runId: string, threadId: string, body: AgentNativeEventBody): void {
@@ -176,6 +190,12 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
   const audit = new AuditLogger(join(app.getPath('userData'), 'audit'))
   const rateLimiter = new WriteRateLimiter()
 
+  // Shared vault facade (the MCP lane's, one per open vault). Note reads/writes
+  // route through it; a vault is always open when a run starts, so a missing
+  // facade is a wiring bug, not a user-facing condition.
+  const facade = vaultFacadeProvider?.() ?? null
+  if (!facade) throw new Error('native agent run started with no vault facade wired')
+
   void (async () => {
     try {
       // True when the loop exits by exhausting MAX_TOOL_ITERATIONS while the
@@ -239,6 +259,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
           emittedToolUseIds.add(tu.id)
           const { result: res, call } = await callTool(tu.name, input, {
             vaultPath: opts.vaultPath,
+            facade,
             autoAccept: opts.autoAccept ?? false,
             toolUseId: tu.id,
             emitPending: (toolUseId, preview) => {
@@ -264,8 +285,7 @@ export async function runMachinaNative(opts: RunOptions): Promise<string> {
             },
             signal: abort.signal,
             audit,
-            rateLimiter,
-            documentManager: getDocumentManager()
+            rateLimiter
           })
           emittedToolUseIds.delete(tu.id)
           // Restart the timeout for the next SDK iteration.

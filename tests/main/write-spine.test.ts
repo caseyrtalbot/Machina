@@ -63,8 +63,7 @@ describe('write-spine invariant (PLAN Layer 1 item 3)', () => {
   it('the write-spine consumers import from the note-write module', () => {
     const mustImport = [
       join(REPO_ROOT, 'src/main/services/vault-query-facade.ts'),
-      join(REPO_ROOT, 'src/main/ipc/ghost-emerge.ts'),
-      join(REPO_ROOT, 'src/main/services/machina-native-tools/note-tools.ts')
+      join(REPO_ROOT, 'src/main/ipc/ghost-emerge.ts')
     ]
     for (const abs of mustImport) {
       const src = readFileSync(abs, 'utf-8')
@@ -72,5 +71,20 @@ describe('write-spine invariant (PLAN Layer 1 item 3)', () => {
         /from ['"].*utils\/note-write['"]/
       )
     }
+  })
+
+  it('native note-tools writes only through the facade, never note-write directly', () => {
+    // Layer 1 item 4: the native lane converged onto VaultQueryFacade, so
+    // note-tools must NOT hold its own stamped-write call — the facade owns the
+    // single audited/stamped write spine. If this regresses, the native lane has
+    // grown a second write path that skips the facade's audit + Spotlighting.
+    const abs = join(REPO_ROOT, 'src/main/services/machina-native-tools/note-tools.ts')
+    const src = stripJsComments(readFileSync(abs, 'utf-8'))
+    expect(src, 'note-tools.ts must not call writeStampedNote/createStampedNote').not.toMatch(
+      /\b(?:writeStampedNote|createStampedNote)\s*\(/
+    )
+    expect(src, 'note-tools.ts must not import the note-write module').not.toMatch(
+      /from ['"].*utils\/note-write['"]/
+    )
   })
 })

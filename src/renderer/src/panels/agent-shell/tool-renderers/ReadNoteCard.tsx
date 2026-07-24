@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
+import { unwrapSpotlighting } from '@shared/spotlighting'
 import { openNoteInEditor } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
@@ -21,7 +22,9 @@ function extractContent(result: ToolResult | undefined): string | null {
   if (!result || !result.ok) return null
   if (typeof result.output !== 'object' || result.output === null) return null
   const c = (result.output as { content?: unknown }).content
-  return typeof c === 'string' ? c : null
+  // read_note wraps content in a Spotlighting envelope for the LLM; strip it so
+  // the hover preview shows the raw note text.
+  return typeof c === 'string' ? unwrapSpotlighting(c) : null
 }
 
 export function ReadNoteCard({

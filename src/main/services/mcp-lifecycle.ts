@@ -110,6 +110,7 @@ function buildGate(): HitlGate {
 
 export class McpLifecycle {
   private serverFactory: (() => McpServer) | null = null
+  private facade: VaultQueryFacade | null = null
   private vaultRoot: string | null = null
   private httpServer: HttpServer | null = null
   private port: number | null = null
@@ -157,6 +158,7 @@ export class McpLifecycle {
     const guard = new PathGuard(vaultRoot)
     const logger = new AuditLogger(join(app.getPath('userData'), 'audit'))
     const facade = new VaultQueryFacade(guard, logger, vaultRoot, deps)
+    this.facade = facade
     const gate = buildGate()
     const rateLimiter = new WriteRateLimiter()
 
@@ -169,6 +171,15 @@ export class McpLifecycle {
 
     this.vaultRoot = vaultRoot
     this.serverFactory = () => createMcpServer(facade, { gate, rateLimiter, dispatchCanvasPlan })
+  }
+
+  /**
+   * The shared VaultQueryFacade for the currently open vault, or null before
+   * the first createForVault. The in-app native agent lane reads this so both
+   * lanes share one facade instance (audit trail, Spotlighting, live index).
+   */
+  getFacade(): VaultQueryFacade | null {
+    return this.facade
   }
 
   /** Build one McpServer instance from the prepared factory (per HTTP session). */

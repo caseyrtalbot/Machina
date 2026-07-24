@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { glob } from 'glob'
-import { writeStampedNote } from '../../utils/note-write'
+import { wrapSpotlighting } from '@shared/spotlighting'
 import { awaitApproval, resolveInVault, type NativeToolResult, type ToolContext } from './context'
 
 const SEARCH_HIT_LIMIT = 200
@@ -11,12 +11,22 @@ const SEARCH_SNIPPET_LEN = 200
 const SEARCH_TIMEOUT_MS = 15_000
 
 export async function readNote(rel: string, ctx: ToolContext): Promise<NativeToolResult> {
+  // resolveInVault maps a boundary violation to PATH_OUT_OF_VAULT and yields the
+  // canonical abs path; the facade re-guards and audits the read (the native
+  // lane previously left reads with no audit trail).
   const resolved = resolveInVault(ctx.vaultPath, rel)
   if (!resolved.ok) return resolved
   try {
-    const content = await fs.readFile(resolved.abs, 'utf8')
+    const content = await ctx.facade.readFile(resolved.abs, { tool: 'read_note' })
     const lines = content.split('\n').length
-    return { ok: true, output: { content, path: rel, lines: `1-${lines}` } }
+    return {
+      ok: true,
+      output: {
+        content: wrapSpotlighting('read_note', rel, content),
+        path: rel,
+        lines: `1-${lines}`
+      }
+    }
   } catch (err) {
     const e = err as NodeJS.ErrnoException
     if (e.code === 'ENOENT') {
@@ -287,7 +297,6 @@ export async function writeNote(
   content: string,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
-  const start = Date.now()
   const resolved = resolveInVault(ctx.vaultPath, rel)
   if (!resolved.ok) return resolved
   const abs = resolved.abs
@@ -316,19 +325,14 @@ export async function writeNote(
   }
 
   try {
+    // atomicWrite renames into place and does not create parents, so nested
+    // creates (e.g. "deep/nested/note.md") still need the dir made here.
     await fs.mkdir(path.dirname(abs), { recursive: true })
-    // Shared safe-write path: stamps provenance + suppresses the watcher echo
-    // (no spurious doc:external-change), same mechanics as the MCP facade.
-    await writeStampedNote(abs, content, 'native-agent', ctx.documentManager)
+    // Single audited/stamped write spine shared with the MCP lane: the facade
+    // re-guards, stamps provenance, suppresses the watcher echo, refreshes the
+    // live index, and audits as 'write_note'.
+    await ctx.facade.writeFile(abs, content, { agentId: 'native-agent', tool: 'write_note' })
     ctx.rateLimiter?.record()
-    ctx.audit?.log({
-      ts: new Date().toISOString(),
-      tool: 'write_note',
-      args: { path: rel, created },
-      affectedPaths: [rel],
-      decision: 'allowed',
-      durationMs: Date.now() - start
-    })
     return {
       ok: true,
       // bytes = the agent's authored payload size, deliberately excluding the
@@ -369,13 +373,13 @@ export async function editNote(
   replace: string,
   ctx: ToolContext
 ): Promise<NativeToolResult> {
-  const start = Date.now()
   const resolved = resolveInVault(ctx.vaultPath, rel)
   if (!resolved.ok) return resolved
   const abs = resolved.abs
   let content: string
   try {
-    content = await fs.readFile(abs, 'utf8')
+    // Audited pre-edit read through the shared facade (read-before-write).
+    content = await ctx.facade.readFile(abs, { tool: 'edit_note' })
   } catch (err) {
     const e = err as NodeJS.ErrnoException
     if (e.code === 'ENOENT') {
@@ -429,16 +433,9 @@ export async function editNote(
 
   const next = content.replace(find, replace)
   try {
-    await writeStampedNote(abs, next, 'native-agent', ctx.documentManager)
+    // Same shared write spine as write_note; audits as 'edit_note'.
+    await ctx.facade.writeFile(abs, next, { agentId: 'native-agent', tool: 'edit_note' })
     ctx.rateLimiter?.record()
-    ctx.audit?.log({
-      ts: new Date().toISOString(),
-      tool: 'edit_note',
-      args: { path: rel },
-      affectedPaths: [rel],
-      decision: 'allowed',
-      durationMs: Date.now() - start
-    })
     return {
       ok: true,
       output: {
@@ -468,10 +465,34 @@ export async function searchVault(
   }
   const scope = paths && paths.length > 0 ? [...paths] : ['.']
   const rgResult = await searchWithRipgrep(query, scope, ctx.vaultPath, ctx.signal)
-  if (rgResult.ok) return rgResult
+  if (rgResult.ok) return wrapSearchHits(query, rgResult)
   if (ctx.signal?.aborted) return rgResult
   if (rgResult.error.hint === 'rg-spawn-failed') {
-    return searchWithJsFallback(query, paths ?? [], ctx.vaultPath, ctx.signal)
+    return wrapSearchHits(
+      query,
+      await searchWithJsFallback(query, paths ?? [], ctx.vaultPath, ctx.signal)
+    )
   }
   return rgResult
+}
+
+// Snippets are raw vault lines — an injection vector. Serialize the hits array
+// and Spotlight-wrap it ONCE so the snippets never reach the LLM unwrapped; the
+// `truncated`/`engine` metadata stays outside the envelope (structural, safe).
+// The renderer's SearchVaultCard unwraps `results` back into hits for display.
+function wrapSearchHits(query: string, res: NativeToolResult): NativeToolResult {
+  if (!res.ok) return res
+  const { hits, truncated, engine } = res.output as {
+    hits: readonly SearchHit[]
+    truncated: boolean
+    engine: string
+  }
+  return {
+    ok: true,
+    output: {
+      results: wrapSpotlighting('search_vault', query, JSON.stringify(hits)),
+      truncated,
+      engine
+    }
+  }
 }

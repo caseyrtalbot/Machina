@@ -31,6 +31,16 @@ interface NeighborResult {
 interface WriteFileOpts {
   readonly agentId: string
   readonly expectedMtime?: string
+  /** Audit tool label. Defaults to 'vault.write_file' (the MCP name); the
+   * native lane passes 'write_note' / 'edit_note' so its audit trail names the
+   * tool the agent actually invoked. */
+  readonly tool?: string
+}
+
+interface ReadFileOpts {
+  /** Audit tool label. Defaults to 'vault.read_file' (the MCP name); the
+   * native lane passes 'read_note' / 'edit_note'. */
+  readonly tool?: string
 }
 
 /** Error thrown when optimistic lock fails due to mtime mismatch. */
@@ -106,15 +116,16 @@ export class VaultQueryFacade {
     }
   }
 
-  async readFile(filePath: string): Promise<string> {
+  async readFile(filePath: string, opts?: ReadFileOpts): Promise<string> {
     const start = Date.now()
+    const tool = opts?.tool ?? 'vault.read_file'
     let resolved: string
     try {
       resolved = this.guard.assertWithinVault(filePath)
     } catch (err) {
       this.logger.log({
         ts: new Date().toISOString(),
-        tool: 'vault.read_file',
+        tool,
         args: { path: filePath },
         affectedPaths: [filePath],
         decision: 'denied',
@@ -126,7 +137,7 @@ export class VaultQueryFacade {
     const content = await readFile(resolved, 'utf-8')
     this.logger.log({
       ts: new Date().toISOString(),
-      tool: 'vault.read_file',
+      tool,
       args: { path: filePath },
       affectedPaths: [resolved],
       decision: 'allowed',
@@ -137,13 +148,14 @@ export class VaultQueryFacade {
 
   async writeFile(filePath: string, content: string, opts: WriteFileOpts): Promise<void> {
     const start = Date.now()
+    const tool = opts.tool ?? 'vault.write_file'
     let resolved: string
     try {
       resolved = this.guard.assertWithinVault(filePath)
     } catch (err) {
       this.logger.log({
         ts: new Date().toISOString(),
-        tool: 'vault.write_file',
+        tool,
         args: { path: filePath },
         affectedPaths: [filePath],
         decision: 'denied',
@@ -172,7 +184,7 @@ export class VaultQueryFacade {
 
     this.logger.log({
       ts: new Date().toISOString(),
-      tool: 'vault.write_file',
+      tool,
       args: { path: filePath, agentId: opts.agentId },
       affectedPaths: [resolved],
       decision: 'allowed',

@@ -5,7 +5,7 @@
  * without stdio.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync, realpathSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -531,6 +531,109 @@ describe('MCP Server', () => {
       expect(written).toContain('created_by:')
       expect(gate.calls).toHaveLength(1)
       expect(gate.calls[0].tool).toBe('vault.create_file')
+
+      await client.close()
+      await server.close()
+    })
+  })
+
+  describe('canvas.apply_plan tool', () => {
+    const validNode = {
+      id: 'node_persisted',
+      type: 'markdown',
+      position: { x: 0, y: 0 },
+      size: { width: 200, height: 120 },
+      content: '# Added by apply_plan',
+      metadata: {}
+    }
+
+    function addNodePlan() {
+      return {
+        id: 'plan_1',
+        operationId: 'op_1',
+        source: 'agent' as const,
+        ops: [{ type: 'add-node', node: validNode }],
+        summary: { addedNodes: 1, addedEdges: 0, movedNodes: 0, skippedFiles: 0, unresolvedRefs: 0 }
+      }
+    }
+
+    function seedCanvas(content: unknown): string {
+      const file = join(vaultRoot, 'board.canvas')
+      writeFileSync(file, JSON.stringify(content, null, 2))
+      return file
+    }
+
+    it('persists the mutation to disk even when no renderer dispatch is wired', async () => {
+      // createConnectedPair builds the server WITHOUT dispatchCanvasPlan wired, so
+      // this pins the item-4 behavior change: canvas.apply_plan now persists the
+      // canvas file main-side via the shared applier. The old handler only
+      // dispatched to the renderer and never wrote disk, so an accepted plan for a
+      // canvas the renderer had not loaded was silently dropped.
+      const gate = new AlwaysApproveGate()
+      const { client, server } = await createConnectedPair(vaultRoot, gate)
+      const file = seedCanvas({ nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } })
+      const expectedMtime = statSync(file).mtime.toISOString()
+
+      const result = await client.callTool({
+        name: 'canvas.apply_plan',
+        arguments: { canvasPath: file, expectedMtime, plan: addNodePlan() }
+      })
+
+      expect(result.isError).toBeFalsy()
+      const after = JSON.parse(readFileSync(file, 'utf-8')) as { nodes: Array<{ id: string }> }
+      expect(after.nodes.map((n) => n.id)).toEqual(['node_persisted'])
+
+      await client.close()
+      await server.close()
+    })
+
+    it('rejects a stale expectedMtime and leaves the file unchanged', async () => {
+      const gate = new AlwaysApproveGate()
+      const { client, server } = await createConnectedPair(vaultRoot, gate)
+      const file = seedCanvas({ nodes: [], edges: [] })
+
+      const result = await client.callTool({
+        name: 'canvas.apply_plan',
+        arguments: {
+          canvasPath: file,
+          expectedMtime: '1999-01-01T00:00:00.000Z',
+          plan: addNodePlan()
+        }
+      })
+
+      expect(result.isError).toBe(true)
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text
+      expect(text).toContain('Stale: canvas modified since snapshot')
+      const after = JSON.parse(readFileSync(file, 'utf-8')) as { nodes: unknown[] }
+      expect(after.nodes).toEqual([])
+
+      await client.close()
+      await server.close()
+    })
+
+    it('rejects an invalid op and leaves the file unchanged', async () => {
+      const gate = new AlwaysApproveGate()
+      const { client, server } = await createConnectedPair(vaultRoot, gate)
+      const file = seedCanvas({ nodes: [], edges: [] })
+      const expectedMtime = statSync(file).mtime.toISOString()
+
+      const result = await client.callTool({
+        name: 'canvas.apply_plan',
+        arguments: {
+          canvasPath: file,
+          expectedMtime,
+          plan: {
+            ...addNodePlan(),
+            ops: [{ type: 'move-node', nodeId: 'ghost', position: { x: 1, y: 1 } }]
+          }
+        }
+      })
+
+      expect(result.isError).toBe(true)
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text
+      expect(text).toContain('Validation failed')
+      const after = JSON.parse(readFileSync(file, 'utf-8')) as { nodes: unknown[] }
+      expect(after.nodes).toEqual([])
 
       await client.close()
       await server.close()

@@ -35,6 +35,7 @@ import { registerEmbeddingsIpc, setEmbedderService } from './ipc/embeddings'
 import { EmbedderService } from './services/embedder-service'
 import { TE_DIR } from '../shared/constants'
 import { McpLifecycle } from './services/mcp-lifecycle'
+import { setNativeVaultFacadeProvider } from './services/machina-native-agent'
 import { initAutoUpdates } from './services/auto-update'
 import { PtyMonitor } from './services/pty-monitor'
 import { initVaultIndex, createLiveIndexUpdater } from './services/vault-indexing'
@@ -167,6 +168,11 @@ const RENDERER_CRASH_WINDOW_MS = 60_000
 let rendererCrashTimes: readonly number[] = []
 
 const mcpLifecycle = new McpLifecycle()
+
+// The in-app native agent lane shares the MCP lane's per-vault VaultQueryFacade
+// (one instance, built in createForVault). Read lazily so a vault switch is
+// picked up without re-wiring.
+setNativeVaultFacadeProvider(() => mcpLifecycle.getFacade())
 const quitCoordinator = new QuitCoordinator()
 const claudeStatus = new ClaudeStatusService()
 let healthMonitor: VaultHealthMonitor | null = null

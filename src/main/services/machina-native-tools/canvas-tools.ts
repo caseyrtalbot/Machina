@@ -3,7 +3,9 @@ import path from 'node:path'
 import { createCanvasNode } from '@shared/canvas-types'
 import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import { TE_DIR } from '@shared/constants'
-import { enqueueCanvasWrite } from '../canvas-write-queue'
+import { PathGuardError } from '@shared/agent-types'
+import { wrapSpotlighting } from '@shared/spotlighting'
+import { applyCanvasPlanToFile, writeCanvasViewport } from '../canvas-apply'
 import { resolveInVault, type NativeToolResult, type ToolContext } from './context'
 
 export const CANVAS_ID_RE = /^[a-zA-Z0-9_-]+$/
@@ -63,19 +65,30 @@ export async function readCanvas(canvasId: string, ctx: ToolContext): Promise<Na
   if (!resolved.ok) return resolved
   const file = resolved.abs
   try {
+    // Route through the shared facade for the path-level audit the MCP twin
+    // (canvas.get_snapshot) already leaves; canvasFilePath/CANVAS_ID_RE remains
+    // the first barrier so a bad id is rejected before we touch the facade.
+    ctx.facade.assertReadable(file, 'read_canvas')
     const raw = await fs.readFile(file, 'utf8')
     const parsed = JSON.parse(raw) as CanvasFileShape
-    return {
-      ok: true,
-      output: {
-        canvasId,
+    // Canvas nodes/edges are untrusted vault content — Spotlight-wrap the whole
+    // snapshot so the payload never reaches the LLM unwrapped. The renderer's
+    // ReadCanvasCard unwraps + parses it back for display.
+    const snapshot = wrapSpotlighting(
+      'read_canvas',
+      canvasId,
+      JSON.stringify({
         version: typeof parsed.version === 'number' ? parsed.version : undefined,
         viewport: parsed.viewport ?? null,
         cards: Array.isArray(parsed.nodes) ? parsed.nodes : [],
         edges: Array.isArray(parsed.edges) ? parsed.edges : []
-      }
-    }
+      })
+    )
+    return { ok: true, output: { canvasId, snapshot } }
   } catch (err) {
+    if (err instanceof PathGuardError) {
+      return { ok: false, error: { code: 'PATH_OUT_OF_VAULT', message: err.message } }
+    }
     const e = err as NodeJS.ErrnoException
     if (e.code === 'ENOENT') {
       return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
@@ -92,63 +105,52 @@ export async function pinToCanvas(
   const resolved = canvasFilePath(ctx.vaultPath, canvasId)
   if (!resolved.ok) return resolved
   const file = resolved.abs
-  return enqueueCanvasWrite(file, async () => {
-    let canvas: CanvasFileShape
-    try {
-      canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException
-      if (e.code === 'ENOENT') {
-        return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
-      }
-      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
-    }
-    // Three pin shapes:
-    //   1. path set → pin a `note` card pointing at the vault file. The
-    //      canvas renderer reads the .md off disk and renders the actual
-    //      note with full markdown formatting (this is the canonical way
-    //      to pin existing vault content).
-    //   2. content set → pin a `markdown` card with the agent-authored
-    //      body so headings/bold/lists/wikilinks all render rich.
-    //   3. neither → pin a `markdown` card with just the title.
-    // Older `text` cards rendered as raw plaintext, which surfaced literal
-    // `## heading` and `**bold**` markers when the agent passed markdown.
-    const pos = { x: card.position?.x ?? 0, y: card.position?.y ?? 0 }
-    const refs = card.refs ?? []
-    const node = card.path
-      ? createCanvasNode('note', pos, {
-          content: card.path,
-          metadata: { refs }
-        })
-      : (() => {
-          const body = card.content ?? ''
-          const text = body ? `# ${card.title}\n\n${body}` : `# ${card.title}`
-          return createCanvasNode('markdown', pos, {
-            content: text,
-            metadata: { viewMode: 'rendered', refs }
-          })
-        })()
-    const nodes = Array.isArray(canvas.nodes) ? [...canvas.nodes, node] : [node]
-    const next: CanvasFileShape = { ...canvas, nodes }
-    try {
-      await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
-      ctx.audit?.log({
-        ts: new Date().toISOString(),
-        tool: 'pin_to_canvas',
-        args: { canvasId, cardId: node.id },
-        affectedPaths: [path.relative(ctx.vaultPath, file)],
-        decision: 'allowed'
+  // Three pin shapes:
+  //   1. path set → pin a `note` card pointing at the vault file. The
+  //      canvas renderer reads the .md off disk and renders the actual
+  //      note with full markdown formatting (this is the canonical way
+  //      to pin existing vault content).
+  //   2. content set → pin a `markdown` card with the agent-authored
+  //      body so headings/bold/lists/wikilinks all render rich.
+  //   3. neither → pin a `markdown` card with just the title.
+  // Older `text` cards rendered as raw plaintext, which surfaced literal
+  // `## heading` and `**bold**` markers when the agent passed markdown.
+  const pos = { x: card.position?.x ?? 0, y: card.position?.y ?? 0 }
+  const refs = card.refs ?? []
+  const node = card.path
+    ? createCanvasNode('note', pos, {
+        content: card.path,
+        metadata: { refs }
       })
-      ctx.dispatchCanvasPlan?.(
-        buildAgentPlan([{ type: 'add-node', node }], { ...EMPTY_PLAN_SUMMARY, addedNodes: 1 }),
-        file
-      )
-      return { ok: true, output: { cardId: node.id, canvasId, node } }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return { ok: false, error: { code: 'IO_FATAL', message } }
-    }
+    : (() => {
+        const body = card.content ?? ''
+        const text = body ? `# ${card.title}\n\n${body}` : `# ${card.title}`
+        return createCanvasNode('markdown', pos, {
+          content: text,
+          metadata: { viewMode: 'rendered', refs }
+        })
+      })()
+
+  const plan = buildAgentPlan([{ type: 'add-node', node }], {
+    ...EMPTY_PLAN_SUMMARY,
+    addedNodes: 1
   })
+  const applied = await applyCanvasPlanToFile(file, plan)
+  if (!applied.ok) {
+    if (applied.error === 'not-found') {
+      return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
+    }
+    return { ok: false, error: { code: 'IO_FATAL', message: applied.message } }
+  }
+  ctx.audit?.log({
+    ts: new Date().toISOString(),
+    tool: 'pin_to_canvas',
+    args: { canvasId, cardId: node.id },
+    affectedPaths: [path.relative(ctx.vaultPath, file)],
+    decision: 'allowed'
+  })
+  ctx.dispatchCanvasPlan?.(plan, file)
+  return { ok: true, output: { cardId: node.id, canvasId, node } }
 }
 
 export async function unpinFromCanvas(
@@ -159,58 +161,31 @@ export async function unpinFromCanvas(
   const resolved = canvasFilePath(ctx.vaultPath, canvasId)
   if (!resolved.ok) return resolved
   const file = resolved.abs
-  return enqueueCanvasWrite(file, async () => {
-    let canvas: CanvasFileShape
-    try {
-      canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException
-      if (e.code === 'ENOENT') {
-        return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
-      }
-      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+  // remove-node in applyPlanOps cascades to drop edges that reference the card,
+  // so the plan carries only the node removal. validateCanvasMutationOps rejects
+  // a remove-node for an id that isn't present, which is exactly the
+  // CARD_NOT_FOUND condition — the only op here is this removal, so a validation
+  // failure means the card was missing.
+  const plan = buildAgentPlan([{ type: 'remove-node', nodeId: cardId }], EMPTY_PLAN_SUMMARY)
+  const applied = await applyCanvasPlanToFile(file, plan)
+  if (!applied.ok) {
+    if (applied.error === 'not-found') {
+      return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
     }
-    const nodes = Array.isArray(canvas.nodes) ? canvas.nodes : []
-    const idx = nodes.findIndex(
-      (n): n is { id: string } =>
-        n != null &&
-        typeof n === 'object' &&
-        typeof (n as { id?: unknown }).id === 'string' &&
-        (n as { id: string }).id === cardId
-    )
-    if (idx === -1) {
+    if (applied.error === 'validation') {
       return { ok: false, error: { code: 'CARD_NOT_FOUND', message: cardId } }
     }
-    const nextNodes = [...nodes.slice(0, idx), ...nodes.slice(idx + 1)]
-    // Drop edges that reference the removed card so the file stays consistent.
-    const edges = Array.isArray(canvas.edges) ? canvas.edges : []
-    const nextEdges = edges.filter((e) => {
-      if (!e || typeof e !== 'object') return true
-      const rec = e as Record<string, unknown>
-      return rec.from !== cardId && rec.to !== cardId
-    })
-    const next: CanvasFileShape = { ...canvas, nodes: nextNodes, edges: nextEdges }
-    try {
-      await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
-      ctx.audit?.log({
-        ts: new Date().toISOString(),
-        tool: 'unpin_from_canvas',
-        args: { canvasId, cardId },
-        affectedPaths: [path.relative(ctx.vaultPath, file)],
-        decision: 'allowed'
-      })
-      // remove-node in applyPlanOps cascades to drop matching edges, so we
-      // do not need to enumerate removed edges in the plan ops.
-      ctx.dispatchCanvasPlan?.(
-        buildAgentPlan([{ type: 'remove-node', nodeId: cardId }], EMPTY_PLAN_SUMMARY),
-        file
-      )
-      return { ok: true, output: { cardId, canvasId } }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return { ok: false, error: { code: 'IO_FATAL', message } }
-    }
+    return { ok: false, error: { code: 'IO_FATAL', message: applied.message } }
+  }
+  ctx.audit?.log({
+    ts: new Date().toISOString(),
+    tool: 'unpin_from_canvas',
+    args: { canvasId, cardId },
+    affectedPaths: [path.relative(ctx.vaultPath, file)],
+    decision: 'allowed'
   })
+  ctx.dispatchCanvasPlan?.(plan, file)
+  return { ok: true, output: { cardId, canvasId } }
 }
 
 export async function listCanvases(ctx: ToolContext): Promise<NativeToolResult> {
@@ -270,31 +245,22 @@ export async function focusCanvas(
   const resolved = canvasFilePath(ctx.vaultPath, canvasId)
   if (!resolved.ok) return resolved
   const file = resolved.abs
-  return enqueueCanvasWrite(file, async () => {
-    let canvas: CanvasFileShape
-    try {
-      canvas = JSON.parse(await fs.readFile(file, 'utf8')) as CanvasFileShape
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException
-      if (e.code === 'ENOENT') {
-        return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
-      }
-      return { ok: false, error: { code: 'IO_FATAL', message: e.message ?? String(err) } }
+  // Viewport is not a mutation op (no viewport op exists, by design), so focus
+  // does not build a plan; its file write is serialized on the shared per-file
+  // queue via writeCanvasViewport so ALL canvas file writes live in one module.
+  const written = await writeCanvasViewport(file, viewport)
+  if (!written.ok) {
+    if (written.error === 'not-found') {
+      return { ok: false, error: { code: 'CANVAS_NOT_FOUND', message: canvasId } }
     }
-    const next: CanvasFileShape = { ...canvas, viewport }
-    try {
-      await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8')
-      ctx.audit?.log({
-        ts: new Date().toISOString(),
-        tool: 'focus_canvas',
-        args: { canvasId },
-        affectedPaths: [path.relative(ctx.vaultPath, file)],
-        decision: 'allowed'
-      })
-      return { ok: true, output: { canvasId, viewport } }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return { ok: false, error: { code: 'IO_FATAL', message } }
-    }
+    return { ok: false, error: { code: 'IO_FATAL', message: written.message } }
+  }
+  ctx.audit?.log({
+    ts: new Date().toISOString(),
+    tool: 'focus_canvas',
+    args: { canvasId },
+    affectedPaths: [path.relative(ctx.vaultPath, file)],
+    decision: 'allowed'
   })
+  return { ok: true, output: { canvasId, viewport } }
 }

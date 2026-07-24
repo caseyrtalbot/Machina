@@ -1,4 +1,5 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
+import { unwrapSpotlighting } from '@shared/spotlighting'
 import { openNoteInEditor } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { ToolCardShell } from './ToolCardShell'
@@ -13,6 +14,21 @@ interface Hit {
 }
 
 const PREVIEW_LIMIT = 10
+
+// search_vault serializes hits into a Spotlighting-wrapped `results` string
+// (snippets are untrusted vault content). Unwrap + parse it back into hits for
+// display; malformed or absent payloads degrade to an empty list.
+function parseHits(output: unknown): Hit[] {
+  if (typeof output !== 'object' || output === null) return []
+  const results = (output as { results?: unknown }).results
+  if (typeof results !== 'string') return []
+  try {
+    const parsed = JSON.parse(unwrapSpotlighting(results))
+    return Array.isArray(parsed) ? (parsed as Hit[]) : []
+  } catch {
+    return []
+  }
+}
 
 export function SearchVaultCard({
   call,
@@ -32,9 +48,9 @@ export function SearchVaultCard({
 
   const output =
     typeof result.output === 'object' && result.output !== null
-      ? (result.output as { hits?: Hit[]; truncated?: boolean; engine?: string })
+      ? (result.output as { truncated?: boolean; engine?: string })
       : {}
-  const hits = output.hits ?? []
+  const hits = parseHits(result.output)
   const truncated = output.truncated === true
 
   function open(rel: string) {

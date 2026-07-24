@@ -95,7 +95,7 @@ Three surfaces, with deliberately different trust models.
 
 ### Native agent (in-app)
 
-`src/main/services/machina-native-agent.ts` runs a tool loop on `@anthropic-ai/sdk` (`messages.stream`) over twelve vault and canvas tools (`machina-native-tools.ts`). The decision to stay on the raw SDK rather than the Claude Agent SDK is recorded in [ADR 0001](adr/0001-native-agent-stays-on-anthropic-sdk.md).
+`src/main/services/machina-native-agent.ts` runs a tool loop on `@anthropic-ai/sdk` (`messages.stream`) over twelve vault and canvas tools (`machina-native-tools.ts`). The tools share the MCP lane's plumbing ("one tool surface", 2026-07-24): vault reads and writes go through the same `VaultQueryFacade` instance the MCP server uses (`McpLifecycle.getFacade()`), content-bearing reads wrap in Spotlighting (`src/shared/spotlighting.ts`), and canvas mutations persist through the shared `canvas-apply.ts` applier — details in [safety-subsystem.md](safety-subsystem.md). The decision to stay on the raw SDK rather than the Claude Agent SDK is recorded in [ADR 0001](adr/0001-native-agent-stays-on-anthropic-sdk.md).
 
 Its writes are guarded in depth, summarized here at a high level:
 

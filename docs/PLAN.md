@@ -138,6 +138,20 @@ is green. Layer 4 items may start once their stated dependencies exist.
    write tools reads unwrapped content).
    → verify: duplicated native-tool read/write/canvas implementations deleted; native
    read path wrapped.
+   (Completed 2026-07-24. Convergence landed at the implementation layer: native note
+   reads/writes route through the SAME `VaultQueryFacade` instance the MCP server uses
+   (`McpLifecycle.getFacade()`; native reads audited for the first time); Spotlighting
+   moved to `src/shared/spotlighting.ts` (sole definition site, renderer unwraps for
+   display) and wraps `read_note`/`search_vault`/`read_canvas`; canvas mutation
+   persistence converged on the shared `canvas-apply.ts` applier
+   (`validateCanvasMutationOps` + `applyPlanOps`) used by native pin/unpin/focus AND
+   MCP `canvas.apply_plan` — which now persists main-side instead of silently dropping
+   accepted plans when the canvas isn't open in the renderer. Hand-rolled native
+   read/write/canvas implementations deleted; gate held in CI by
+   `tests/main/tool-surface.test.ts`. Bonus fix: native unpin's edge cascade compared
+   `from`/`to` against real `fromNode`/`toNode` edges and had never fired. Native
+   pin/unpin/focus stay ungated per their ratified schema; safety posture otherwise
+   only improved.)
 5. One index authority: the main-process VaultIndex is the single truth; the renderer
    vault-worker becomes a diff-fed projection; `system-artifact-runtime`'s inline
    parse is removed. → verify: one parse+graph ingestion path (grep).

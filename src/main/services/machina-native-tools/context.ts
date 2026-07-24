@@ -6,6 +6,7 @@ import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import { PathGuardError, type AuditEntry } from '@shared/agent-types'
 import { PathGuard } from '../path-guard'
 import type { WriteRateLimiter } from '../hitl-gate'
+import type { VaultQueryFacade } from '../vault-query-facade'
 
 interface ApprovalDecision {
   readonly accept: boolean
@@ -58,6 +59,12 @@ export function awaitApproval(toolUseId: string): Promise<ApprovalDecision> {
 
 export interface ToolContext {
   readonly vaultPath: string
+  /** Safe, audited vault access shared with the MCP lane (one facade instance
+   * per open vault, built in McpLifecycle.createForVault). Note reads/writes
+   * route through it so the in-app native lane leaves the same audit trail and
+   * Spotlighting envelope the headless MCP path already produces. Required: a
+   * vault is always open when an agent runs. */
+  readonly facade: VaultQueryFacade
   readonly autoAccept: boolean
   readonly toolUseId?: string
   readonly emitPending?: (toolUseId: string, preview: AgentNativeApprovalPreview) => void
@@ -85,11 +92,6 @@ export interface ToolContext {
    * autoAccept, an exceeded limiter forces a one-off human checkpoint on the
    * next write so a looping agent can't write unboundedly without review. */
   readonly rateLimiter?: WriteRateLimiter
-  /** Structural slice of DocumentManager. Injected per run so native note
-   * writes register the self-write and the vault watcher suppresses the echo
-   * (no spurious doc:external-change for an open note) — the same backstop the
-   * MCP path's VaultQueryFacade already applies. Absent in unit calls. */
-  readonly documentManager?: { readonly registerExternalWrite: (path: string) => void }
 }
 
 export type NativeToolResult =
