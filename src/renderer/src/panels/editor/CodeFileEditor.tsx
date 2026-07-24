@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { colors } from '../../design/tokens'
 import { createEditorExtensions, detectLanguage } from '../canvas/shared/codemirror-setup'
 import { useDocument } from '../../hooks/useDocument'
 
@@ -83,18 +82,11 @@ export function CodeFileEditor({ filePath }: CodeFileEditorProps) {
   const filename = filePath.split('/').pop() ?? filePath
 
   return (
-    <div className="h-full flex flex-col">
-      <div
-        className="flex items-center px-4 py-2 text-xs shrink-0"
-        style={{ color: colors.text.muted, borderBottom: `1px solid ${colors.border.default}` }}
-      >
-        <span style={{ color: colors.text.primary }}>{filename}</span>
+    <div className="te-codefile">
+      <div className="te-codefile-header">
+        <span className="te-codefile-name">{filename}</span>
       </div>
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-hidden"
-        style={{ backgroundColor: colors.bg.base }}
-      />
+      <div ref={containerRef} className="te-codefile-surface" />
     </div>
   )
 }

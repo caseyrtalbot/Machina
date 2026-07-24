@@ -1,13 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Artifact } from '@shared/types'
 import { linkifyMentions, type MentionMatch } from '@engine/unlinked-mentions'
-import {
-  borderRadius,
-  colors,
-  getArtifactColor,
-  transitions,
-  typography
-} from '../../design/tokens'
+import { colors, getArtifactColor } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useUiStore } from '../../store/ui-store'
 import { useVaultStore, type UnlinkedMention } from '../../store/vault-store'
@@ -97,51 +91,24 @@ function BacklinkItem({
   const context = extractContext(artifact.body, currentNoteId, currentNoteTitle)
 
   return (
+    // Console: 12px vertical / 32px horizontal padding aligns with the chrome
+    // row scale used elsewhere in the editor.
     <button
       type="button"
       onClick={() => onNavigate(artifact.id)}
-      className="w-full text-left flex flex-col gap-0.5 focus-ring interactive-hover"
-      style={{
-        borderRadius: borderRadius.card,
-        // Console: 12px vertical / 32px horizontal padding aligns with the
-        // chrome row scale used elsewhere in the editor.
-        padding: '8px 32px',
-        fontFamily: typography.fontFamily.mono
-      }}
+      className="te-backlinks-item focus-ring interactive-hover"
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="te-backlinks-item-head">
         {/* Square chip dot — replaces the round one to match the hairline-square aesthetic */}
         <span
           aria-hidden="true"
-          style={{
-            width: 8,
-            height: 8,
-            backgroundColor: typeColor,
-            borderRadius: borderRadius.inline,
-            flexShrink: 0
-          }}
+          className="te-backlinks-dot"
+          style={{ backgroundColor: typeColor }}
         />
-        <span
-          className="truncate"
-          style={{
-            color: colors.text.primary,
-            fontSize: '11px',
-            transition: transitions.hover
-          }}
-        >
-          {artifact.title}
-        </span>
+        <span className="te-backlinks-title">{artifact.title}</span>
       </div>
       {context && (
-        <p
-          className="truncate"
-          style={{
-            color: colors.text.muted,
-            fontSize: '11px',
-            paddingLeft: 16
-          }}
-          title={context}
-        >
+        <p className="te-backlinks-context" title={context}>
           {context}
         </p>
       )}
@@ -166,17 +133,9 @@ function LinkSection({
 }: LinkSectionProps) {
   if (artifacts.length === 0) return null
   return (
-    <div style={{ paddingBottom: 8 }}>
-      <div style={{ padding: '4px 32px' }}>
-        <SectionLabel
-          style={{
-            fontSize: '10px',
-            letterSpacing: typography.metadata.letterSpacing,
-            color: colors.text.muted
-          }}
-        >
-          {label}
-        </SectionLabel>
+    <div className="te-backlinks-section">
+      <div className="te-backlinks-section-label">
+        <SectionLabel>{label}</SectionLabel>
       </div>
       {artifacts.map((artifact) => (
         <BacklinkItem
@@ -210,48 +169,23 @@ function UnlinkedMentionItem({ mention, state, onNavigate, onLinkify }: Unlinked
         : `Link${matches.length > 1 ? ` ${matches.length}` : ''}`
 
   return (
-    <div
-      className="w-full flex items-center gap-2"
-      style={{
-        // Console: same 8px / 32px row scale as BacklinkItem.
-        padding: '8px 32px',
-        fontFamily: typography.fontFamily.mono
-      }}
-    >
+    // Console: same 8px / 32px row scale as BacklinkItem.
+    <div className="te-backlinks-mention">
       <button
         type="button"
         onClick={() => onNavigate(artifact.id)}
-        className="flex-1 min-w-0 text-left flex flex-col gap-0.5 focus-ring interactive-hover"
-        style={{ borderRadius: borderRadius.card }}
+        className="te-backlinks-mention-nav focus-ring interactive-hover"
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="te-backlinks-item-head">
           <span
             aria-hidden="true"
-            style={{
-              width: 8,
-              height: 8,
-              backgroundColor: typeColor,
-              borderRadius: borderRadius.inline,
-              flexShrink: 0
-            }}
+            className="te-backlinks-dot"
+            style={{ backgroundColor: typeColor }}
           />
-          <span
-            className="truncate"
-            style={{
-              color: colors.text.primary,
-              fontSize: '11px',
-              transition: transitions.hover
-            }}
-          >
-            {artifact.title}
-          </span>
+          <span className="te-backlinks-title">{artifact.title}</span>
         </div>
         {snippet && (
-          <p
-            className="truncate"
-            style={{ color: colors.text.muted, fontSize: '11px', paddingLeft: 16 }}
-            title={snippet}
-          >
+          <p className="te-backlinks-context" title={snippet}>
             {snippet}
           </p>
         )}
@@ -260,17 +194,9 @@ function UnlinkedMentionItem({ mention, state, onNavigate, onLinkify }: Unlinked
         type="button"
         onClick={() => onLinkify(artifact.id)}
         disabled={state !== 'idle'}
-        className="focus-ring interactive-hover"
+        className="te-backlinks-linkbtn focus-ring interactive-hover"
         title="Wrap mentions in [[...]]"
-        style={{
-          color: state === 'idle' ? colors.accent.default : colors.text.muted,
-          fontSize: '11px',
-          padding: '2px 8px',
-          borderRadius: borderRadius.inline,
-          border: `1px solid ${colors.border.subtle}`,
-          flexShrink: 0,
-          transition: transitions.hover
-        }}
+        style={{ color: state === 'idle' ? colors.accent.default : colors.text.muted }}
       >
         {label}
       </button>
@@ -356,49 +282,19 @@ export function BacklinksPanel({
   return (
     // Console: hairline top border separates the backlinks bar from the
     // editor body. Padding 12 / 32 matches the breadcrumb row scale.
-    <div
-      style={{
-        borderTop: `1px solid ${colors.border.subtle}`
-      }}
-    >
+    <div className="te-backlinks">
       {/* Header row */}
       <button
         type="button"
         onClick={() => toggle(currentNotePath)}
-        className="w-full flex items-center justify-between focus-ring interactive-hover"
-        style={{
-          padding: '12px 32px',
-          transition: transitions.hover,
-          fontFamily: typography.fontFamily.mono
-        }}
+        className="te-backlinks-header focus-ring interactive-hover"
       >
-        <SectionLabel
-          style={{
-            fontSize: '11px',
-            letterSpacing: typography.metadata.letterSpacing
-          }}
-        >
-          Links
-        </SectionLabel>
-        <div className="flex items-center gap-2">
-          <span
-            style={{
-              color: colors.text.muted,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: '11px'
-            }}
-          >
-            {totalCount}
-          </span>
-          <span
-            style={{
-              color: colors.text.muted,
-              fontSize: '11px',
-              transition: transitions.hover
-            }}
-          >
-            {collapsed ? '\u25BE' : '\u25B4'}
-          </span>
+        {/* fontSize kept inline: SectionLabel merges its 10px baseStyle inline,
+            so a class cannot raise it to 11px without !important. */}
+        <SectionLabel style={{ fontSize: '11px' }}>Links</SectionLabel>
+        <div className="te-backlinks-header-meta">
+          <span className="te-backlinks-count">{totalCount}</span>
+          <span className="te-backlinks-caret">{collapsed ? '\u25BE' : '\u25B4'}</span>
         </div>
       </button>
 
@@ -420,17 +316,9 @@ export function BacklinksPanel({
             onNavigate={onNavigate}
           />
           {unlinkedMentions.length > 0 && (
-            <div style={{ paddingBottom: 8 }}>
-              <div style={{ padding: '4px 32px' }}>
-                <SectionLabel
-                  style={{
-                    fontSize: '10px',
-                    letterSpacing: typography.metadata.letterSpacing,
-                    color: colors.text.muted
-                  }}
-                >
-                  Unlinked mentions
-                </SectionLabel>
+            <div className="te-backlinks-section">
+              <div className="te-backlinks-section-label">
+                <SectionLabel>Unlinked mentions</SectionLabel>
               </div>
               {unlinkedMentions.map((mention) => (
                 <UnlinkedMentionItem

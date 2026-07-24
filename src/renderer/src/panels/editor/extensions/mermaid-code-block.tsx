@@ -119,7 +119,7 @@ function MermaidCodeBlockView({ node }: ReactNodeViewProps): React.ReactElement 
         <div className="mermaid-label">mermaid</div>
         <MermaidDiagram code={node.textContent} />
         {/* Hidden content keeps ProseMirror model in sync for serialization */}
-        <div style={{ display: 'none' }}>
+        <div className="te-mermaidblock-hidden">
           <NodeViewContent />
         </div>
       </NodeViewWrapper>

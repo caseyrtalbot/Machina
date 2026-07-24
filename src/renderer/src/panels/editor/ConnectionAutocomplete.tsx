@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Artifact } from '@shared/types'
-import { colors } from '../../design/tokens'
 
 const MAX_RESULTS = 8
 
@@ -98,15 +97,8 @@ export function ConnectionAutocomplete({
   }
 
   return (
-    <div
-      className="absolute left-0 top-full mt-1 z-30 shadow-lg overflow-hidden"
-      style={{
-        backgroundColor: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        minWidth: 220
-      }}
-    >
-      <div className="p-1.5">
+    <div className="te-connauto">
+      <div className="te-connauto-inputwrap">
         <input
           ref={inputRef}
           type="text"
@@ -125,28 +117,12 @@ export function ConnectionAutocomplete({
               ? `connection-autocomplete-option-${clampedHighlight}`
               : undefined
           }
-          className="w-full bg-transparent border-0 text-xs px-1.5 py-1"
-          style={{ color: colors.text.primary, fontFamily: 'var(--font-mono)' }}
+          className="te-connauto-input"
         />
       </div>
-      <div
-        id="connection-autocomplete-listbox"
-        className="border-t"
-        style={{
-          borderColor: colors.border.default,
-          maxHeight: '240px',
-          overflowY: 'auto',
-          scrollbarGutter: 'stable'
-        }}
-        role="listbox"
-      >
+      <div id="connection-autocomplete-listbox" className="te-connauto-list" role="listbox">
         {suggestions.length === 0 ? (
-          <div
-            className="px-3 py-1.5 text-xs"
-            style={{ color: colors.text.muted, fontFamily: 'var(--font-mono)' }}
-          >
-            No matches
-          </div>
+          <div className="te-connauto-empty">No matches</div>
         ) : (
           suggestions.map((s, index) => (
             <button
@@ -157,12 +133,7 @@ export function ConnectionAutocomplete({
               aria-selected={index === clampedHighlight}
               onClick={() => onSelect(s.artifact.title)}
               onMouseEnter={() => setHighlight(index)}
-              className="w-full text-left px-3 py-1.5 text-xs transition-colors"
-              style={{
-                color: colors.text.secondary,
-                fontFamily: 'var(--font-mono)',
-                backgroundColor: index === clampedHighlight ? colors.bg.surface : 'transparent'
-              }}
+              className="te-connauto-option"
             >
               {s.artifact.title}
             </button>

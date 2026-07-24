@@ -4,13 +4,7 @@ import { rewriteWikilinks } from '@engine/rename-links'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { useEditorStore } from '../../store/editor-store'
 import { useVaultStore } from '../../store/vault-store'
-import {
-  borderRadius,
-  colors,
-  getArtifactColor,
-  transitions,
-  typography
-} from '../../design/tokens'
+import { colors, getArtifactColor } from '../../design/tokens'
 import { ContextMenu } from '../../components/ContextMenu'
 import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { fileMenuEntries } from './file-menu-entries'
@@ -155,11 +149,8 @@ function ActionBar({
               height="10"
               viewBox="0 0 16 16"
               fill="none"
-              style={{
-                transform: filesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-                transition: `transform ${transitions.default}`,
-                color: colors.text.muted
-              }}
+              className="te-tree-chevron"
+              data-expanded={filesCollapsed ? 'false' : 'true'}
             >
               <path
                 d="M6 4L10 8L6 12"
@@ -170,51 +161,19 @@ function ActionBar({
               />
             </svg>
             <span className="sidebar-section-copy">
-              {/* Console section header: muted mono 10px / 0.14em uppercase. */}
-              <span
-                className="sidebar-section-label"
-                style={{
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: typography.metadata.size,
-                  letterSpacing: typography.metadata.letterSpacing,
-                  textTransform: typography.metadata.textTransform,
-                  fontWeight: 600
-                }}
-              >
-                Files
-              </span>
-              {/* Right-aligned count in disabled-text gray, recedes behind the
-                section label. */}
-              <span
-                className="sidebar-section-count"
-                style={{
-                  color: colors.text.disabled,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: typography.metadata.size,
-                  letterSpacing: typography.metadata.letterSpacing,
-                  fontVariantNumeric: 'tabular-nums'
-                }}
-              >
-                {fileCount}
-              </span>
+              {/* Console section header: muted mono 10px / 0.14em uppercase (CSS). */}
+              <span className="sidebar-section-label">Files</span>
+              {/* Right-aligned count in disabled-text gray, recedes behind the label. */}
+              <span className="sidebar-section-count">{fileCount}</span>
             </span>
           </button>
         </>
       }
       trailing={
-        <div className="flex items-center gap-0.5">
+        <div className="te-sidebar-actionbar-actions">
           <button
             onClick={onNewFile}
             className="sidebar-icon-button"
-            // Console icon button: 24×24, square inline radius, muted icon
-            // color. Background lift on hover lives in the CSS class.
-            style={{
-              color: colors.text.muted,
-              width: 24,
-              height: 24,
-              borderRadius: borderRadius.inline
-            }}
             title="New file"
             aria-label="New file"
           >
@@ -233,12 +192,6 @@ function ActionBar({
           <button
             onClick={cycleSortMode}
             className="sidebar-icon-button"
-            style={{
-              color: colors.text.muted,
-              width: 24,
-              height: 24,
-              borderRadius: borderRadius.inline
-            }}
             title={`Sort: ${SORT_LABELS[sortMode]}`}
             aria-label={`Sort: ${SORT_LABELS[sortMode]}. Click to cycle.`}
           >
@@ -289,28 +242,16 @@ function SystemArtifactCollections({
   } as const
 
   return (
-    <div className="px-2 py-2">
+    <div className="te-sysart-list">
       {(Object.keys(grouped) as SystemArtifactKind[]).map((kind) => {
         const kindItems = grouped[kind]
         if (kindItems.length === 0) return null
 
         return (
-          <div key={kind} className="mb-3 last:mb-0">
-            {/* Console section header: muted mono 10px / 0.14em uppercase. */}
-            <div
-              className="px-2 pb-2 sidebar-section-label"
-              style={{
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: typography.metadata.size,
-                letterSpacing: typography.metadata.letterSpacing,
-                textTransform: typography.metadata.textTransform,
-                fontWeight: 600
-              }}
-            >
-              {prettyKind(kind)}
-            </div>
-            <div className="flex flex-col gap-0.5">
+          <div key={kind} className="te-sysart-group">
+            {/* Console section header: muted mono 10px / 0.14em uppercase (CSS). */}
+            <div className="sidebar-section-label te-sysart-group-label">{prettyKind(kind)}</div>
+            <div className="te-sysart-items">
               {kindItems.map((item) => {
                 const isActive = activeFilePath === item.path
                 const accentColor = getArtifactColor(item.type)
@@ -319,43 +260,19 @@ function SystemArtifactCollections({
                   <button
                     key={item.id}
                     onClick={() => onSelect?.(item)}
-                    className="file-row-hover flex items-center gap-2 px-2 py-1.5 text-left transition-colors"
+                    className="file-row-hover te-sysart-row"
                     data-active={isActive ? 'true' : 'false'}
                     title={item.path}
-                    // Console row: 2px accent left-stripe when active so this
-                    // matches FileTree/Bookmarks treatment.
-                    style={{
-                      borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
-                      borderRadius: borderRadius.inline
-                    }}
                   >
-                    <span
-                      className="shrink-0 rounded-full"
-                      style={{ width: 6, height: 6, backgroundColor: accentColor }}
-                    />
-                    <span className="min-w-0 flex-1">
+                    <span className="te-sysart-dot" style={{ backgroundColor: accentColor }} />
+                    <span className="te-sysart-row-text">
                       <span
-                        className="block truncate"
-                        style={{
-                          color: isActive ? colors.text.primary : colors.text.secondary,
-                          fontSize: 'var(--env-sidebar-font-size)'
-                        }}
+                        className="te-sysart-item-title"
+                        style={{ color: isActive ? colors.text.primary : colors.text.secondary }}
                       >
                         {item.title}
                       </span>
-                      {item.status && (
-                        <span
-                          className="block truncate uppercase"
-                          style={{
-                            color: colors.text.muted,
-                            fontFamily: typography.fontFamily.mono,
-                            letterSpacing: 'var(--label-tracking)',
-                            fontSize: 'var(--env-sidebar-tertiary-font-size)'
-                          }}
-                        >
-                          {item.status}
-                        </span>
-                      )}
+                      {item.status && <span className="te-sysart-item-status">{item.status}</span>}
                     </span>
                   </button>
                 )
@@ -497,7 +414,7 @@ export function Sidebar({
 
   return (
     <div className="workspace-sidebar-shell">
-      <div className="sidebar-top-stack flex-shrink-0">
+      <div className="sidebar-top-stack te-sidebar-flex-static">
         <SearchBar onSearch={onSearch} />
         <ActionBar
           sortMode={sortMode}
@@ -521,7 +438,7 @@ export function Sidebar({
           />
         )}
       </div>
-      <div className="flex-shrink-0">
+      <div className="te-sidebar-flex-static">
         <SystemArtifactCollections
           items={systemArtifacts}
           activeFilePath={activeFilePath}
@@ -540,7 +457,7 @@ export function Sidebar({
       {!filesCollapsed && (
         <>
           <TagBrowser />
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hover">
+          <div className="te-sidebar-tree-scroll scrollbar-hover">
             <FileTree
               nodes={nodes}
               activeFilePath={activeFilePath}

@@ -6,7 +6,6 @@ import { machinaCodeTheme } from '../canvas/shared/code-theme'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { ContextMenu, type ContextMenuItem } from '../../components/ContextMenu'
-import { colors } from '../../design/tokens'
 
 interface SourceEditorProps {
   content: string
@@ -134,11 +133,7 @@ export function SourceEditor({ content, onChange }: SourceEditorProps) {
 
   return (
     <>
-      <div
-        ref={containerRef}
-        className="h-full overflow-hidden"
-        style={{ backgroundColor: colors.bg.base }}
-      />
+      <div ref={containerRef} className="te-sourceeditor" />
       {contextMenu && (
         <ContextMenu
           position={{ x: contextMenu.x, y: contextMenu.y }}

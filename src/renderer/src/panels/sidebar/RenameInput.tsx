@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { borderRadius, colors } from '../../design/tokens'
-
 interface RenameInputProps {
   initialValue: string
   onConfirm: (newName: string) => void
@@ -46,13 +44,7 @@ export function RenameInput({ initialValue, onConfirm, onCancel }: RenameInputPr
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
       onBlur={onCancel}
-      className="w-full bg-transparent text-sm px-1 py-0.5"
-      style={{
-        borderRadius: borderRadius.inline,
-        color: colors.text.primary,
-        border: `1px solid ${colors.accent.default}`,
-        backgroundColor: colors.bg.base
-      }}
+      className="te-rename-input"
     />
   )
 }

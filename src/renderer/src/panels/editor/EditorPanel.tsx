@@ -28,7 +28,6 @@ import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { ContextMenu, type ContextMenuItem } from '../../components/ContextMenu'
 import { EmptyState } from '../../components/emptystate/EmptyState'
 import { PanelHeader } from '../../components/panelheader/PanelHeader'
-import { borderRadius, colors, typography } from '../../design/tokens'
 import { useDocument } from '../../hooks/useDocument'
 import { resolveWikilinkTarget, parseWikilinkTarget } from '@shared/engine/wikilink-resolver'
 import { OutlinePanel } from './OutlinePanel'
@@ -247,8 +246,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
     onUpdate: handleUpdate,
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-full px-8 py-12',
-        style: `color: ${colors.text.primary};`
+        class: 'te-edpanel-prose'
       },
       handleDOMEvents: {
         contextmenu: (view, event) => handleContextMenu(view, event)
@@ -390,14 +388,9 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   // DocumentManager under file B's path during rapid file switching.
 
   // Empty state - only show when no file is selected
-  // Floating chrome inset: editor content shifts right to clear the floating sidebar
-  const insetStyle = {
-    backgroundColor: 'var(--color-bg-base)'
-  } as React.CSSProperties
-
   if (!activeNotePath) {
     return (
-      <div className="h-full" style={insetStyle}>
+      <div className="te-edpanel-inset">
         <EmptyState
           title="No file selected"
           body="Select a file from the sidebar or press Cmd+N to create one"
@@ -409,69 +402,27 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
   // Non-markdown files get a code editor with syntax highlighting
   if (!activeNotePath.endsWith('.md')) {
     return (
-      <div className="h-full" style={insetStyle}>
+      <div className="te-edpanel-inset">
         <CodeFileEditor filePath={activeNotePath} />
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col" style={insetStyle}>
+    <div className="te-edpanel-inset te-edpanel-inset--column">
       {doc.isConflict && (
-        <div
-          className="flex items-center justify-between px-4 py-2 shrink-0"
-          style={{
-            // Console callout: 2px accent left-bar + accent-soft tint
-            borderLeft: `2px solid ${colors.claude.warning}`,
-            backgroundColor: `color-mix(in srgb, ${colors.claude.warning} 10%, transparent)`,
-            borderBottom: `1px solid ${colors.border.subtle}`,
-            color: colors.claude.warning,
-            fontFamily: typography.fontFamily.mono
-          }}
-        >
-          <span
-            style={{
-              fontSize: typography.metadata.size,
-              textTransform: 'uppercase',
-              letterSpacing: typography.metadata.letterSpacing,
-              fontWeight: 600
-            }}
-          >
-            File changed on disk
-          </span>
-          <span className="flex gap-2">
+        /* Console callout: 2px accent left-bar + accent-soft tint. */
+        <div className="te-edpanel-conflict">
+          <span className="te-edpanel-conflict-label">File changed on disk</span>
+          <span className="te-edpanel-conflict-actions">
             <button
-              className="hover:opacity-80"
-              style={{
-                fontSize: '10px',
-                padding: '2px 8px',
-                borderRadius: borderRadius.inline,
-                backgroundColor: 'transparent',
-                color: colors.claude.warning,
-                border: `1px solid ${colors.claude.warning}`,
-                cursor: 'pointer',
-                fontFamily: typography.fontFamily.mono,
-                textTransform: 'uppercase',
-                letterSpacing: typography.metadata.letterSpacing
-              }}
+              className="te-edpanel-conflict-btn te-edpanel-conflict-btn--warn"
               onClick={handleReloadFromDisk}
             >
               Reload from disk
             </button>
             <button
-              className="hover:opacity-80"
-              style={{
-                fontSize: '10px',
-                padding: '2px 8px',
-                borderRadius: borderRadius.inline,
-                backgroundColor: 'transparent',
-                color: colors.text.secondary,
-                border: `1px solid ${colors.border.default}`,
-                cursor: 'pointer',
-                fontFamily: typography.fontFamily.mono,
-                textTransform: 'uppercase',
-                letterSpacing: typography.metadata.letterSpacing
-              }}
+              className="te-edpanel-conflict-btn te-edpanel-conflict-btn--neutral"
               onClick={handleKeepMine}
             >
               Keep my version
@@ -483,26 +434,24 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
         leading={
           /* Back/forward chrome: the history stack already exists in
              editor-store; this is the visible way out of a wikilink rabbit-hole. */
-          <div className="flex items-center">
+          <div className="te-edpanel-row">
             <button
               type="button"
-              className="editor-mode-toggle__btn"
+              className="editor-mode-toggle__btn te-edpanel-navbtn"
               onClick={goBack}
               disabled={!canGoBack}
               aria-label="Back"
               title="Back (⌘⌥←)"
-              style={!canGoBack ? { opacity: 0.35, cursor: 'default' } : undefined}
             >
               ←
             </button>
             <button
               type="button"
-              className="editor-mode-toggle__btn"
+              className="editor-mode-toggle__btn te-edpanel-navbtn"
               onClick={goForward}
               disabled={!canGoForward}
               aria-label="Forward"
               title="Forward (⌘⌥→)"
-              style={!canGoForward ? { opacity: 0.35, cursor: 'default' } : undefined}
             >
               →
             </button>
@@ -512,7 +461,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           <>
             {/* Mode switch, not a tab bar: aria-pressed buttons (role="tab" lives
             only in the TabBar primitive). */}
-            <div role="group" aria-label="Editor mode" className="flex items-center">
+            <div role="group" aria-label="Editor mode" className="te-edpanel-row">
               <button
                 type="button"
                 aria-pressed={mode === 'rich'}
@@ -532,22 +481,21 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
             </div>
             <button
               type="button"
-              className={`editor-mode-toggle__btn${outlineVisible ? ' editor-mode-toggle__btn--active' : ''}`}
+              className={`editor-mode-toggle__btn te-edpanel-outline-btn${outlineVisible ? ' editor-mode-toggle__btn--active' : ''}`}
               aria-pressed={outlineVisible}
               onClick={toggleOutline}
               title="Toggle outline (⌘⇧O)"
-              style={{ marginLeft: 8 }}
             >
               Outline
             </button>
           </>
         }
       />
-      <div className="flex-1 flex min-h-0 min-w-0 relative">
+      <div className="te-edpanel-body">
         {mode === 'rich' && editor && findSignal > 0 && (
           <FindBar editor={editor} focusSignal={findSignal} onClose={closeFindBar} />
         )}
-        <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+        <div className="te-edpanel-scroll">
           <FrontmatterHeader
             artifact={artifact}
             frontmatter={frontmatterData}
@@ -575,13 +523,7 @@ export function EditorPanel({ onNavigate }: EditorPanelProps) {
           )}
         </div>
         {outlineVisible && editor && mode === 'rich' && (
-          <div
-            className="shrink-0 overflow-hidden"
-            style={{
-              width: 200,
-              borderLeft: `1px solid ${colors.border.subtle}`
-            }}
-          >
+          <div className="te-edpanel-outline">
             <OutlinePanel editor={editor} />
           </div>
         )}

@@ -6,8 +6,8 @@ import {
   type DragFileData,
   type DragMoveData
 } from '../canvas/file-drop-utils'
-import { ARTIFACT_COLORS, borderRadius, colors, transitions, typography } from '../../design/tokens'
-import { SIDEBAR_FONT_SIZE_PX, SIGNAL_COLORS } from '../../design/themes'
+import { ARTIFACT_COLORS, colors } from '../../design/tokens'
+import { SIGNAL_COLORS } from '../../design/themes'
 import { useSidebarSelectionStore } from '../../store/sidebar-selection-store'
 import { RenameInput } from './RenameInput'
 import type { ArtifactType } from '@shared/types'
@@ -226,11 +226,8 @@ function Chevron({ isExpanded }: { isExpanded: boolean }) {
       viewBox="0 0 16 16"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      style={{
-        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-        transition: `transform ${transitions.default}`,
-        flexShrink: 0
-      }}
+      className="te-tree-chevron"
+      data-expanded={isExpanded ? 'true' : 'false'}
     >
       <path
         d="M6 4L10 8L6 12"
@@ -300,8 +297,6 @@ export const FileTree = memo(function FileTree({
     [nodes, collapsedPaths, dirIndex]
   )
 
-  const settingsFontSize = SIDEBAR_FONT_SIZE_PX
-  const resolvedFont = 'var(--font-body)'
   const showDateHeaders = sortMode === 'modified' || sortMode === 'modified-asc'
 
   // --- Imperative drag management ---
@@ -441,7 +436,7 @@ export const FileTree = memo(function FileTree({
   }, [])
 
   return (
-    <div ref={treeRef} data-testid="file-tree" className="file-tree text-sm select-none px-1 py-1">
+    <div ref={treeRef} data-testid="file-tree" className="file-tree te-filetree-root">
       {visibleNodes.map((node, i) => {
         // Insert date separator when sorted by modified and the date bucket changes
         let dateHeader: React.ReactNode = null
@@ -456,21 +451,10 @@ export const FileTree = memo(function FileTree({
           }
           if (needsHeader) {
             // Console section header: muted mono 10px / 0.14em uppercase.
-            // Inline override so date headers stay tokenized even though the
-            // .date-separator base class lives in the sidebar CSS.
+            // te-filetree-date composes the console typography over the shared
+            // .date-separator layout base.
             dateHeader = (
-              <div
-                key={`date-${dateKey}`}
-                className="date-separator"
-                style={{
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: typography.metadata.size,
-                  letterSpacing: typography.metadata.letterSpacing,
-                  textTransform: typography.metadata.textTransform,
-                  fontWeight: 600
-                }}
-              >
+              <div key={`date-${dateKey}`} className="date-separator te-filetree-date">
                 {formatDateLabel(node.modified)}
               </div>
             )
@@ -495,8 +479,6 @@ export const FileTree = memo(function FileTree({
                 isRenaming={renamingPath === node.path}
                 onRenameConfirm={onRenameConfirm}
                 onRenameCancel={onRenameCancel}
-                treeFontSize={settingsFontSize}
-                treeFontFamily={resolvedFont}
               />
             ) : (
               <FileRow
@@ -518,8 +500,6 @@ export const FileTree = memo(function FileTree({
                 isRenaming={renamingPath === node.path}
                 onRenameConfirm={onRenameConfirm}
                 onRenameCancel={onRenameCancel}
-                treeFontSize={settingsFontSize}
-                treeFontFamily={resolvedFont}
               />
             )}
           </Fragment>
@@ -539,9 +519,7 @@ function DirectoryRow({
   onDragEnd,
   isRenaming,
   onRenameConfirm,
-  onRenameCancel,
-  treeFontSize,
-  treeFontFamily
+  onRenameCancel
 }: {
   node: FlatTreeNode
   isCollapsed: boolean
@@ -553,8 +531,6 @@ function DirectoryRow({
   isRenaming?: boolean
   onRenameConfirm?: (newName: string) => void
   onRenameCancel?: () => void
-  treeFontSize: number
-  treeFontFamily: string
 }) {
   return (
     <div
@@ -569,28 +545,19 @@ function DirectoryRow({
       onDragStart={(e) => onDragStart(e, node)}
       onDragEnd={onDragEnd}
       onMouseUp={(e) => e.currentTarget.removeAttribute('draggable')}
-      className="tree-directory-row flex items-center py-[2px] transition-colors"
-      // Console: square inline radius, mono icons, primary text. Matches
-      // FileRow's left-stripe contract via a transparent border so depth
-      // alignment stays pixel-true with active file rows.
+      className="tree-directory-row te-filetree-dir-row"
+      // Depth drives indent geometry (margin/padding) and depth 0 gets a top
+      // gap; the rest of the row styling lives in CSS.
       style={{
         paddingLeft: node.depth === 0 ? 4 : undefined,
-        paddingRight: 8,
         marginTop: node.depth === 0 ? 6 : undefined,
-        color: colors.text.primary,
-        fontFamily: treeFontFamily,
-        fontWeight: 500,
-        fontSize: treeFontSize,
-        letterSpacing: '0.02em',
-        borderLeft: '2px solid transparent',
-        borderRadius: borderRadius.inline,
         ...indentBorderStyle(node.depth)
       }}
     >
-      <span className="mr-1 flex items-center" style={{ color: colors.text.muted }}>
+      <span className="te-filetree-dir-chevron-wrap">
         <Chevron isExpanded={!isCollapsed} />
       </span>
-      <span className="mr-1.5 flex items-center shrink-0" style={{ opacity: 0.8 }}>
+      <span className="te-filetree-icon-wrap">
         <FolderIcon originColor={folderOriginColor} />
       </span>
       {isRenaming ? (
@@ -600,23 +567,12 @@ function DirectoryRow({
           onCancel={onRenameCancel ?? (() => {})}
         />
       ) : (
-        <span className="truncate flex-1">{node.name}</span>
+        <span className="te-filetree-dir-name">{node.name}</span>
       )}
       {!isRenaming && node.itemCount > 0 && (
         // Right-aligned item count: console mono 10px in disabled-text gray so
         // the count recedes behind the folder name.
-        <span
-          className="ml-auto"
-          style={{
-            color: colors.text.disabled,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 10,
-            letterSpacing: 0,
-            fontVariantNumeric: 'tabular-nums'
-          }}
-        >
-          {node.itemCount}
-        </span>
+        <span className="te-filetree-dir-count">{node.itemCount}</span>
       )}
     </div>
   )
@@ -655,9 +611,7 @@ function FileRow({
   onDragEnd,
   isRenaming,
   onRenameConfirm,
-  onRenameCancel,
-  treeFontSize,
-  treeFontFamily
+  onRenameCancel
 }: {
   node: FlatTreeNode
   parentName?: string
@@ -677,8 +631,6 @@ function FileRow({
   isRenaming?: boolean
   onRenameConfirm?: (newName: string) => void
   onRenameCancel?: () => void
-  treeFontSize: number
-  treeFontFamily: string
 }) {
   const { base, ext } = splitName(node.name)
   const isAgentModified = useSidebarSelectionStore((s) => s.agentModifiedPaths.has(node.path))
@@ -703,55 +655,25 @@ function FileRow({
       onClick={(e) => onFileSelect(node.path, e)}
       onDoubleClick={() => (onFileDoubleClick ?? onFileSelect)(node.path)}
       onContextMenu={(e) => onContextMenu?.(e, node.path, false)}
-      className="flex items-center py-[2px] file-row-hover"
-      // Console row: 12px text, hairline 2px accent left-stripe when active
-      // (transparent on idle so the indent grid stays aligned), 4px paddingLeft
-      // for the icon area at depth 0; nested rows pick up indent from
-      // indentBorderStyle. Square inline radius.
+      className="file-row-hover te-filetree-file-row"
+      // Depth drives indent geometry and the depth-0 icon inset; the accent
+      // left-stripe is applied via [data-active] in CSS. Nested rows pick up
+      // indent from indentBorderStyle.
       style={{
         paddingLeft: node.depth === 0 ? 4 : undefined,
-        paddingRight: 8,
-        fontFamily: treeFontFamily,
-        fontSize: treeFontSize,
-        borderLeft: isActive ? `2px solid ${colors.accent.default}` : '2px solid transparent',
-        borderRadius: borderRadius.inline,
         ...indentBorderStyle(node.depth, isActive)
       }}
     >
       <span
-        className="mr-1.5 flex items-center shrink-0 relative"
+        className="te-filetree-file-icon-wrap"
         style={{ opacity: isActive ? 1 : isOnCanvas ? 0.8 : actionColor ? 0.9 : 0.5 }}
       >
         <FileIcon filename={node.name} origin={origin} />
         {/* Action color dot — shows which action last touched this file */}
         {actionColor && (
-          <span
-            style={{
-              position: 'absolute',
-              bottom: -1,
-              left: -2,
-              width: 5,
-              height: 5,
-              borderRadius: '50%',
-              backgroundColor: actionColor,
-              opacity: 0.9
-            }}
-          />
+          <span className="te-filetree-action-dot" style={{ backgroundColor: actionColor }} />
         )}
-        {isOnCanvas && (
-          <span
-            style={{
-              position: 'absolute',
-              top: -1,
-              right: -2,
-              width: 4,
-              height: 4,
-              borderRadius: '50%',
-              backgroundColor: colors.accent.default,
-              opacity: 0.7
-            }}
-          />
-        )}
+        {isOnCanvas && <span className="te-filetree-canvas-dot" />}
       </span>
       {isRenaming ? (
         <RenameInput
@@ -761,7 +683,7 @@ function FileRow({
         />
       ) : (
         <span
-          className="truncate flex-1 file-name-text"
+          className="file-name-text te-filetree-file-name"
           style={{
             color: actionColor
               ? actionColor
@@ -777,17 +699,7 @@ function FileRow({
         </span>
       )}
       {canvasConnectionCount >= 1 && (
-        <span
-          className="ml-auto flex-shrink-0"
-          style={{
-            color: colors.accent.default,
-            opacity: 0.6,
-            fontSize: 'var(--env-sidebar-tertiary-font-size)',
-            fontVariantNumeric: 'tabular-nums'
-          }}
-        >
-          {canvasConnectionCount}
-        </span>
+        <span className="te-filetree-conn-count">{canvasConnectionCount}</span>
       )}
     </div>
   )

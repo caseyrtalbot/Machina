@@ -8,7 +8,6 @@ import {
   type SlashCommandItem,
   type SlashCommandListHandle
 } from './slash-command-list'
-import { floatingPanel } from '../../../design/tokens'
 
 const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   {
@@ -146,16 +145,7 @@ export const SlashCommand = Extension.create({
           }
 
           const renderPanel = (props: SuggestionProps) => (
-            <div
-              style={{
-                width: 280,
-                backgroundColor: floatingPanel.glass.bg,
-                backdropFilter: floatingPanel.glass.blur,
-                borderRadius: floatingPanel.borderRadius,
-                boxShadow: floatingPanel.shadow,
-                overflow: 'hidden'
-              }}
-            >
+            <div className="te-slashmenu-panel">
               <SlashCommandList
                 ref={listRef}
                 items={props.items as SlashCommandItem[]}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 import { ContextMenu, type ContextMenuEntry } from '../../components/ContextMenu'
 import { logError } from '../../utils/error-logger'
 import { useVaultHealthStore } from '../../store/vault-health-store'
@@ -34,7 +34,7 @@ function HealthDot() {
     case 'green': {
       const passingCount = runs.filter((r) => r.passed).length
       fill = colors.accent.default
-      title = `Vault healthy \u2022 ${passingCount}/${runs.length} checks passing`
+      title = `Vault healthy • ${passingCount}/${runs.length} checks passing`
       break
     }
     case 'degraded':
@@ -43,7 +43,7 @@ function HealthDot() {
       break
     default:
       fill = colors.text.muted
-      title = 'Checking\u2026'
+      title = 'Checking…'
   }
 
   const handleClick = () => {
@@ -58,12 +58,9 @@ function HealthDot() {
       height={6}
       viewBox="0 0 6 6"
       data-testid="health-dot"
+      data-clickable={status !== 'green' ? 'true' : undefined}
       onClick={handleClick}
-      style={{
-        marginLeft: 6,
-        cursor: status !== 'green' ? 'pointer' : 'default',
-        flexShrink: 0
-      }}
+      className="te-vault-selector__health-dot"
       role="status"
     >
       <title>{title}</title>
@@ -149,8 +146,8 @@ export function VaultSelector({
   return (
     // minWidth 0 lets this flex item shrink so the vault name truncates instead
     // of overflowing into (and overlapping) the Files label beside it.
-    <div className="relative" style={{ minWidth: 0 }} ref={menuRef}>
-      <div className="flex items-center" style={{ minWidth: 0 }}>
+    <div className="te-vault-selector" ref={menuRef}>
+      <div className="te-vault-selector__row">
         <button
           onClick={toggle}
           onContextMenu={(e) => {
@@ -160,28 +157,11 @@ export function VaultSelector({
               setCtxMenu({ x: e.clientX, y: e.clientY, path: currentPath })
             }
           }}
-          className="sidebar-vault-button"
+          className="sidebar-vault-button te-vault-selector__button"
           data-open={open ? 'true' : 'false'}
           title={currentPath ?? undefined}
-          style={{
-            color: colors.text.primary,
-            borderRadius: borderRadius.inline,
-            gap: 8
-          }}
         >
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 18,
-              height: 18,
-              flexShrink: 0,
-              borderRadius: borderRadius.inline,
-              background: colors.accent.soft,
-              border: `1px solid ${colors.accent.line}`
-            }}
-          >
+          <span className="te-vault-selector__icon">
             <svg
               width={11}
               height={11}
@@ -191,34 +171,13 @@ export function VaultSelector({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ color: colors.accent.default }}
+              className="te-vault-selector__glyph"
             >
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
           </span>
-          <span
-            className="sidebar-vault-name truncate"
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              letterSpacing: 0,
-              color: colors.text.primary,
-              minWidth: 0
-            }}
-          >
-            {currentName}
-          </span>
-          <svg
-            width={9}
-            height={9}
-            viewBox="0 0 10 10"
-            style={{
-              color: colors.text.muted,
-              flexShrink: 0,
-              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: transitions.default
-            }}
-          >
+          <span className="te-vault-selector__name">{currentName}</span>
+          <svg width={9} height={9} viewBox="0 0 10 10" className="te-vault-selector__chevron">
             <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
         </button>
@@ -226,54 +185,22 @@ export function VaultSelector({
       </div>
 
       {open && (
-        <div
-          className="sidebar-popover absolute left-0 flex flex-col py-1 z-50"
-          style={{
-            top: '100%',
-            marginTop: 6,
-            minWidth: 280,
-            maxWidth: 'min(420px, calc(100vw - 24px))'
-          }}
-        >
+        <div className="sidebar-popover te-vault-selector__popover">
           {currentPath && (
             <>
-              <div className="px-3 pt-2 pb-1 sidebar-kicker">Current</div>
-              <div
-                className="px-3 pb-2"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 2
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: colors.text.primary
-                  }}
-                >
-                  {currentName}
-                </span>
-                <span
-                  className="truncate"
-                  title={currentPath}
-                  style={{
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: 10,
-                    letterSpacing: 0,
-                    color: colors.text.muted
-                  }}
-                >
+              <div className="sidebar-kicker te-vault-selector__kicker">Current</div>
+              <div className="te-vault-selector__current">
+                <span className="te-vault-selector__current-name">{currentName}</span>
+                <span className="te-vault-selector__current-path" title={currentPath}>
                   {currentPath}
                 </span>
               </div>
-              <div className="sidebar-popover-divider mx-3 my-1" />
+              <div className="sidebar-popover-divider te-vault-selector__divider" />
             </>
           )}
           {recentVaults.length > 0 && (
             <>
-              <div className="px-3 pt-2 pb-1 sidebar-kicker">Recent</div>
+              <div className="sidebar-kicker te-vault-selector__kicker">Recent</div>
               {recentVaults.map((path) => {
                 const name = vaultDisplayName(path)
                 return (
@@ -290,8 +217,7 @@ export function VaultSelector({
                         setCtxMenu({ x: e.clientX, y: e.clientY, path })
                       }
                     }}
-                    className="sidebar-popover-item"
-                    style={{ color: colors.text.secondary }}
+                    className="sidebar-popover-item te-vault-selector__recent"
                   >
                     <svg
                       width={12}
@@ -300,25 +226,24 @@ export function VaultSelector({
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
-                      style={{ color: colors.text.muted }}
+                      className="te-vault-selector__recent-icon"
                     >
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                     </svg>
-                    <span className="truncate">{name}</span>
+                    <span className="te-vault-selector__recent-name">{name}</span>
                   </button>
                 )
               })}
             </>
           )}
 
-          <div className="sidebar-popover-divider mx-3 my-1" />
+          <div className="sidebar-popover-divider te-vault-selector__divider" />
           <button
             onClick={() => {
               setOpen(false)
               onOpenPicker()
             }}
-            className="sidebar-popover-item"
-            style={{ color: colors.text.muted }}
+            className="sidebar-popover-item te-vault-selector__open-different"
           >
             <span>Open Different Vault...</span>
           </button>

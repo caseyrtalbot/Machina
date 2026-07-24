@@ -171,8 +171,13 @@ describe('FileTree', () => {
       />
     )
 
+    // Typography moved from inline props to CSS (ADR 0005 slice 6):
+    // .file-row-hover.te-filetree-file-row pins font-family var(--font-body) and
+    // font-size var(--env-sidebar-font-size). happy-dom cannot read the external
+    // stylesheet, so assert the class hook and that no inline font styling remains.
     const row = screen.getByText('styled').closest('.file-row-hover') as HTMLElement
-    expect(row.style.fontFamily).toBe('var(--font-body)')
-    expect(row.style.fontSize).toBe('13px')
+    expect(row.classList.contains('te-filetree-file-row')).toBe(true)
+    expect(row.style.fontFamily).toBe('')
+    expect(row.style.fontSize).toBe('')
   })
 })

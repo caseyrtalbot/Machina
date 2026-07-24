@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, type Ref } from 'react'
 import type { Editor, Range } from '@tiptap/core'
-import { typography, colors, transitions, borderRadius } from '../../../design/tokens'
 
 export interface SlashCommandItem {
   readonly title: string
@@ -65,73 +64,23 @@ export function SlashCommandList({ items, command, ref }: SlashCommandListProps)
   useImperativeHandle(ref, () => ({ onKeyDown }), [onKeyDown])
 
   if (items.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '12px 16px',
-          color: colors.text.muted,
-          fontSize: 12,
-          fontFamily: typography.fontFamily.mono
-        }}
-      >
-        No matching commands
-      </div>
-    )
+    return <div className="te-slashmenu-empty">No matching commands</div>
   }
 
   return (
-    <div ref={listRef} className="flex flex-col py-1" style={{ maxHeight: 280, overflowY: 'auto' }}>
+    <div ref={listRef} className="te-slashmenu-list">
       {items.map((item, index) => (
         <button
           key={item.title}
-          className="flex items-center gap-3 text-left"
-          style={{
-            padding: '8px 12px',
-            backgroundColor: index === selectedIndex ? 'var(--bg-tint-accent)' : 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: colors.text.primary,
-            transition: `background-color ${transitions.focusRing}`
-          }}
+          className="te-slashmenu-item"
+          data-selected={index === selectedIndex}
           onClick={() => command(item)}
           onMouseEnter={() => setSelectedIndex(index)}
         >
-          <span
-            style={{
-              width: 28,
-              height: 28,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: borderRadius.inline,
-              backgroundColor: 'var(--bg-tint-text)',
-              fontSize: 14,
-              flexShrink: 0
-            }}
-          >
-            {item.icon}
-          </span>
-          <span className="flex flex-col min-w-0">
-            <span
-              style={{
-                fontSize: 13,
-                fontFamily: typography.fontFamily.mono,
-                color: colors.text.primary
-              }}
-            >
-              {item.title}
-            </span>
-            <span
-              style={{
-                fontSize: 11,
-                color: colors.text.muted,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {item.description}
-            </span>
+          <span className="te-slashmenu-icon">{item.icon}</span>
+          <span className="te-slashmenu-text">
+            <span className="te-slashmenu-title">{item.title}</span>
+            <span className="te-slashmenu-desc">{item.description}</span>
           </span>
         </button>
       ))}

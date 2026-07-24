@@ -11,7 +11,6 @@ import {
 } from './slash-command-list'
 import { filterWikilinkSuggestions } from './wikilink-suggestion-filter'
 import { useVaultStore } from '../../../store/vault-store'
-import { floatingPanel } from '../../../design/tokens'
 
 function toItems(artifacts: readonly Artifact[]): SlashCommandItem[] {
   return artifacts.map((a) => ({
@@ -54,16 +53,7 @@ export function createWikilinkSuggestion(editor: Editor): Plugin {
       }
 
       const renderPanel = (props: SuggestionProps) => (
-        <div
-          style={{
-            width: 280,
-            backgroundColor: floatingPanel.glass.bg,
-            backdropFilter: floatingPanel.glass.blur,
-            borderRadius: floatingPanel.borderRadius,
-            boxShadow: floatingPanel.shadow,
-            overflow: 'hidden'
-          }}
-        >
+        <div className="te-slashmenu-panel">
           <SlashCommandList
             ref={listRef}
             items={props.items as SlashCommandItem[]}

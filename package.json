@@ -97,7 +97,6 @@
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@playwright/test": "^1.58.2",
-    "@tailwindcss/vite": "^4.2.1",
     "@testing-library/react": "^16.3.2",
     "@types/d3-force": "^3.0.10",
     "@types/d3-quadtree": "^3.0.6",
@@ -121,7 +120,6 @@
     "prettier": "^3.7.4",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.5",
     "vitest": "^4.1.0"

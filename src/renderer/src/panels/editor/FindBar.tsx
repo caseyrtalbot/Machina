@@ -1,24 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import { findPluginKey, type FindPluginMeta } from './extensions/find-in-note'
-import { borderRadius, colors, typography, zIndex } from '../../design/tokens'
 
 interface FindBarProps {
   editor: Editor
   /** Bumped on each Cmd+F so an already-open bar refocuses its input. */
   focusSignal: number
   onClose: () => void
-}
-
-const buttonStyle: React.CSSProperties = {
-  background: 'transparent',
-  border: 'none',
-  color: colors.text.secondary,
-  cursor: 'pointer',
-  fontSize: '13px',
-  lineHeight: 1,
-  padding: '2px 4px',
-  borderRadius: borderRadius.inline
 }
 
 export function FindBar({ editor, focusSignal, onClose }: FindBarProps) {
@@ -102,19 +90,7 @@ export function FindBar({ editor, focusSignal, onClose }: FindBarProps) {
   )
 
   return (
-    <div
-      className="flex items-center gap-1"
-      style={{
-        position: 'absolute',
-        top: 8,
-        right: 16,
-        zIndex: zIndex.surfaceHud,
-        padding: '4px 8px',
-        backgroundColor: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline
-      }}
-    >
+    <div className="te-findbar">
       <input
         ref={inputRef}
         type="text"
@@ -127,32 +103,16 @@ export function FindBar({ editor, focusSignal, onClose }: FindBarProps) {
           dispatchFind({ query: e.target.value, activeIndex: 0 })
         }}
         onKeyDown={handleKeyDown}
-        style={{
-          width: 160,
-          background: 'transparent',
-          border: 'none',
-          outline: 'none',
-          color: colors.text.primary,
-          fontSize: '12px',
-          fontFamily: typography.fontFamily.body
-        }}
+        className="te-findbar-input"
       />
-      <span
-        style={{
-          color: query && counts.total === 0 ? colors.claude.warning : colors.text.muted,
-          fontSize: typography.metadata.size,
-          fontFamily: typography.fontFamily.mono,
-          letterSpacing: typography.metadata.letterSpacing,
-          whiteSpace: 'nowrap'
-        }}
-      >
+      <span className="te-findbar-count" data-empty={Boolean(query) && counts.total === 0}>
         {counts.total > 0 ? `${counts.active + 1}/${counts.total}` : '0/0'}
       </span>
       <button
         type="button"
         aria-label="Previous match"
         title="Previous match (⇧↩)"
-        style={buttonStyle}
+        className="te-findbar-btn"
         onClick={() => step(-1)}
       >
         ↑
@@ -161,7 +121,7 @@ export function FindBar({ editor, focusSignal, onClose }: FindBarProps) {
         type="button"
         aria-label="Next match"
         title="Next match (↩)"
-        style={buttonStyle}
+        className="te-findbar-btn"
         onClick={() => step(1)}
       >
         ↓
@@ -170,7 +130,7 @@ export function FindBar({ editor, focusSignal, onClose }: FindBarProps) {
         type="button"
         aria-label="Close find bar"
         title="Close (Esc)"
-        style={buttonStyle}
+        className="te-findbar-btn"
         onClick={handleClose}
       >
         ✕

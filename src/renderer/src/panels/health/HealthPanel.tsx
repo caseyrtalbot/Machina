@@ -6,7 +6,7 @@ import { useVaultStore } from '../../store/vault-store'
 import { openNoteInEditor } from '../../store/dock-store'
 import { computeDerivedHealth } from '@shared/engine/vault-health'
 import type { HealthIssue } from '@shared/engine/vault-health'
-import { colors, transitions, typography } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ function formatTimeAgo(ts: number): string {
 
 function CenteredMessage({ children }: { readonly children: React.ReactNode }) {
   return (
-    <div className="h-full" style={{ backgroundColor: colors.bg.base }}>
+    <div className="te-health-centered">
       <EmptyState body={children} />
     </div>
   )
@@ -73,20 +73,7 @@ function RefreshButton() {
       aria-label="Refresh health checks"
       disabled={disabled}
       onClick={handleRefresh}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 24,
-        height: 24,
-        borderRadius: 0,
-        border: 'none',
-        background: 'transparent',
-        color: colors.text.muted,
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        transition: `opacity ${transitions.default}`
-      }}
+      className="te-health-refresh"
     >
       <svg
         width={14}
@@ -126,19 +113,8 @@ function GreenState({ totalRuns }: { readonly totalRuns: number }) {
 
 function UnknownState() {
   return (
-    <div
-      className="flex flex-col items-center justify-center gap-2"
-      style={{ padding: '4rem 2rem', textAlign: 'center' }}
-    >
-      <div
-        style={{
-          fontSize: 14,
-          color: colors.text.muted,
-          animation: 'te-pulse 600ms ease-in-out infinite alternate'
-        }}
-      >
-        Checking vault health...
-      </div>
+    <div className="te-health-unknown">
+      <div className="te-health-unknown-text">Checking vault health...</div>
     </div>
   )
 }
@@ -172,34 +148,13 @@ function IssueRow({ issue }: { readonly issue: HealthIssue }) {
   const fileName = issue.filePath?.split('/').pop() ?? null
 
   return (
-    <div className="health-issue-row" style={{ padding: '8px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span
-          style={{
-            fontSize: 13,
-            color: colors.text.primary,
-            fontWeight: 400
-          }}
-        >
-          {issue.title}
-        </span>
+    <div className="health-issue-row te-health-issue">
+      <div className="te-health-issue-header">
+        <span className="te-health-issue-title">{issue.title}</span>
       </div>
-      <div style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>{issue.detail}</div>
+      <div className="te-health-issue-detail">{issue.detail}</div>
       {fileName && (
-        <button
-          type="button"
-          onClick={handleFileClick}
-          style={{
-            fontSize: 12,
-            color: colors.accent.default,
-            cursor: 'pointer',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            marginTop: 2,
-            fontFamily: 'inherit'
-          }}
-        >
+        <button type="button" onClick={handleFileClick} className="te-health-issue-file">
           {fileName}
         </button>
       )}
@@ -214,15 +169,7 @@ function DegradedState({ issues }: { readonly issues: readonly HealthIssue[] }) 
     <div>
       {groups.map((group) => (
         <div key={group.severity}>
-          <SectionLabel
-            as="h3"
-            style={{
-              padding: '12px 0 8px',
-              borderBottom: '1px solid var(--line-faint)',
-              marginBottom: 4,
-              marginTop: 0
-            }}
-          >
+          <SectionLabel as="h3" className="te-health-section-head">
             {group.label}
           </SectionLabel>
           {group.issues.map((issue, i) => (
@@ -256,20 +203,8 @@ export function HealthPanel() {
   const passingRuns = runs.filter((r) => r.passed).length
 
   return (
-    <div
-      className="h-full overflow-y-auto"
-      style={{
-        fontFamily: typography.fontFamily.body,
-        backgroundColor: colors.bg.base
-      }}
-    >
-      <div
-        style={{
-          maxWidth: '52rem',
-          margin: '0 auto',
-          padding: '2rem 2rem 3rem'
-        }}
-      >
+    <div className="te-health-scroll">
+      <div className="te-health-container">
         <PanelHeader
           variant="masthead"
           title="Vault Health"

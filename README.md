@@ -224,7 +224,7 @@ Read the full tour in the [architecture overview](docs/architecture/overview.md)
 | Layer | Technologies |
 |---|---|
 | Shell | Electron 39, electron-vite 5, Vite 7 |
-| UI | React 19, TypeScript 5.9 (strict), Tailwind CSS v4, Zustand 5 |
+| UI | React 19, TypeScript 5.9 (strict), Zustand 5 |
 | Canvas | React DOM + CSS transforms, viewport culling, level-of-detail |
 | Graph view | Pixi.js 8, d3-force 3 |
 | Editor | Tiptap 3, ProseMirror, CodeMirror 6, mermaid 11 |

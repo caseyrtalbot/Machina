@@ -7,7 +7,7 @@ interface RichEditorProps {
 
 export function RichEditor({ editor }: RichEditorProps) {
   return (
-    <div className="h-full">
+    <div className="te-richeditor">
       <EditorContent editor={editor} />
     </div>
   )

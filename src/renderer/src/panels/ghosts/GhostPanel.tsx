@@ -5,7 +5,6 @@ import { useDockStore } from '../../store/dock-store'
 import { useGraphViewStore } from '../../store/graph-view-store'
 import { useGhostEmerge } from '../../hooks/useGhostEmerge'
 import type { GhostEntry } from '../../engine/ghost-index'
-import { colors, transitions, typography, borderRadius, floatingPanel } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { CheckCircleIcon, EmptyState } from '../../components/emptystate/EmptyState'
 import { PanelHeader } from '../../components/panelheader/PanelHeader'
@@ -143,57 +142,20 @@ function ContextPopup({ ghost, anchorRef, onClose }: ContextPopupProps) {
       aria-modal="true"
       aria-labelledby={titleId}
       onClick={(e) => e.stopPropagation()}
-      style={{
-        position: 'fixed',
-        top: pos.top,
-        left: pos.left,
-        width: 320,
-        maxHeight: 'calc(100vh - 40px)',
-        overflowY: 'auto',
-        background: 'rgba(14, 16, 22, 0.96)',
-        backdropFilter: floatingPanel.glass.blur,
-        border: '1px solid var(--line-default)',
-        borderRadius: borderRadius.card,
-        padding: '12px 16px',
-        boxShadow: floatingPanel.shadow,
-        zIndex: 100
-      }}
+      className="te-ghostpanel-popup"
+      style={{ top: pos.top, left: pos.left }}
     >
-      <div
-        id={titleId}
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: colors.text.primary,
-          marginBottom: 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6
-        }}
-      >
-        <span style={{ opacity: 0.5 }}>
+      <div id={titleId} className="te-ghostpanel-popup-title">
+        <span className="te-ghostpanel-popup-title-icon">
           <IconThinking />
         </span>
         {ghost.id} &middot; {ghost.referenceCount} reference
         {ghost.referenceCount !== 1 ? 's' : ''}
       </div>
       {ghost.references.map((ref, i) => (
-        <div
-          key={i}
-          style={{
-            padding: '6px 0',
-            borderBottom:
-              i < ghost.references.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none'
-          }}
-        >
-          <div
-            style={{ fontSize: 12, fontWeight: 500, color: colors.text.primary, marginBottom: 2 }}
-          >
-            {ref.fileTitle}
-          </div>
-          <div style={{ fontSize: 11, color: colors.text.secondary, lineHeight: 1.45 }}>
-            {ref.context}
-          </div>
+        <div key={i} className="te-ghostpanel-ref">
+          <div className="te-ghostpanel-ref-title">{ref.fileTitle}</div>
+          <div className="te-ghostpanel-ref-context">{ref.context}</div>
         </div>
       ))}
     </div>
@@ -216,44 +178,12 @@ function ActionIcon({ label, onClick, children, buttonRef }: ActionIconProps) {
     <button
       ref={buttonRef}
       type="button"
-      className="ghost-action-icon"
+      className="ghost-action-icon te-ghostpanel-action"
       aria-label={label}
       onClick={onClick}
-      style={{
-        width: 22,
-        height: 22,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: borderRadius.tool,
-        border: 'none',
-        cursor: 'pointer',
-        position: 'relative',
-        padding: 0
-      }}
     >
       {children}
-      <span
-        className="ghost-action-icon__tip"
-        style={{
-          position: 'absolute',
-          bottom: 'calc(100% + 6px)',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 11,
-          color: colors.text.primary,
-          background: 'rgba(20, 22, 28, 0.95)',
-          border: '1px solid var(--line-default)',
-          padding: '3px 8px',
-          borderRadius: borderRadius.tool,
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          backdropFilter: 'blur(12px)',
-          zIndex: 50
-        }}
-      >
-        {label}
-      </span>
+      <span className="ghost-action-icon__tip te-ghostpanel-tip">{label}</span>
     </button>
   )
 }
@@ -290,67 +220,19 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
   }, [ghost.id])
 
   return (
-    <div
-      className="ghost-row"
-      onClick={() => setContextOpen((prev) => !prev)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '8px 0',
-        gap: 10,
-        cursor: 'pointer',
-        position: 'relative'
-      }}
-    >
+    <div className="ghost-row" onClick={() => setContextOpen((prev) => !prev)}>
       {/* Frequency bar */}
-      <div
-        style={{
-          width: 32,
-          height: 3,
-          background: 'rgba(255, 255, 255, 0.04)',
-          borderRadius: 0,
-          overflow: 'hidden',
-          flexShrink: 0
-        }}
-      >
-        <div
-          style={{
-            width: barWidth,
-            height: '100%',
-            background: colors.accent.default,
-            borderRadius: 0,
-            opacity: 0.5
-          }}
-        />
+      <div className="te-ghostpanel-bar-track">
+        <div className="te-ghostpanel-bar-fill" style={{ width: barWidth }} />
       </div>
 
       {/* Name */}
-      <span
-        className="ghost-row__name"
-        style={{
-          flex: 1,
-          fontSize: 13,
-          fontWeight: 400,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}
-      >
-        {ghost.id}
-      </span>
+      <span className="ghost-row__name te-ghostpanel-name">{ghost.id}</span>
 
       {/* Actions (hover-reveal). Clicks stop here so they don't toggle the row popup. */}
       <div
-        className="ghost-row__actions"
+        className="ghost-row__actions te-ghostpanel-actions"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          display: 'flex',
-          gap: 4,
-          position: 'absolute',
-          right: 0,
-          background: 'linear-gradient(90deg, transparent, var(--color-bg-base) 12px)',
-          paddingLeft: 16
-        }}
       >
         <ActionIcon label={isEmerging ? 'Creating…' : 'Create note'} onClick={handleCreate}>
           {isEmerging ? <Spinner size={14} /> : <IconPlus />}
@@ -371,18 +253,7 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
       </div>
 
       {/* Count (hidden on hover) */}
-      <span
-        className="ghost-row__count"
-        style={{
-          fontSize: 11,
-          color: colors.text.muted,
-          fontVariantNumeric: 'tabular-nums',
-          minWidth: 18,
-          textAlign: 'right' as const
-        }}
-      >
-        {ghost.referenceCount}
-      </span>
+      <span className="ghost-row__count te-ghostpanel-count">{ghost.referenceCount}</span>
 
       {/* Context popup */}
       {contextOpen && (
@@ -402,12 +273,12 @@ function GhostRow({ ghost, maxCount, onDismiss }: GhostRowProps) {
 
 function AllResolvedState() {
   return (
-    <div className="h-full" style={{ color: colors.text.muted, backgroundColor: colors.bg.base }}>
+    <div className="te-ghostpanel-resolved">
       <EmptyState
         icon={<CheckCircleIcon />}
         maxWidth={200}
         body={
-          <span style={{ color: colors.text.muted }}>
+          <span className="te-ghostpanel-resolved-body">
             All references resolved.
             <br />
             Your vault is fully connected.
@@ -447,20 +318,8 @@ export function GhostPanel() {
   }
 
   return (
-    <div
-      className="h-full overflow-y-auto"
-      style={{
-        fontFamily: typography.fontFamily.body,
-        backgroundColor: colors.bg.base
-      }}
-    >
-      <div
-        style={{
-          maxWidth: '52rem',
-          margin: '0 auto',
-          padding: '2rem 2rem 3rem'
-        }}
-      >
+    <div className="te-ghostpanel-scroll">
+      <div className="te-ghostpanel-container">
         <PanelHeader
           variant="masthead"
           title="Unresolved References"
@@ -473,12 +332,8 @@ export function GhostPanel() {
           <div key={section.label}>
             <SectionLabel
               as="div"
-              style={{
-                color: colors.text.primary,
-                padding: '12px 0 8px',
-                borderBottom: '1px solid var(--line-faint)',
-                marginBottom: 4
-              }}
+              className="te-ghostpanel-section-head"
+              style={{ color: 'var(--color-text-primary)' }}
             >
               {section.label}
             </SectionLabel>
@@ -496,52 +351,16 @@ export function GhostPanel() {
         {/* Dismissed ghosts: restorable, kept out of graph + sections */}
         {dismissedEntries.length > 0 && (
           <div>
-            <SectionLabel
-              as="div"
-              style={{
-                color: colors.text.muted,
-                padding: '12px 0 8px',
-                borderBottom: '1px solid var(--line-faint)',
-                marginBottom: 4
-              }}
-            >
+            <SectionLabel as="div" className="te-ghostpanel-section-head">
               Dismissed ({dismissedEntries.length})
             </SectionLabel>
             {dismissedEntries.map((ghost) => (
-              <div
-                key={ghost.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '8px 0',
-                  gap: 10
-                }}
-              >
-                <span
-                  style={{
-                    flex: 1,
-                    fontSize: 13,
-                    color: colors.text.muted,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {ghost.id}
-                </span>
+              <div key={ghost.id} className="te-ghostpanel-dismissed-row">
+                <span className="te-ghostpanel-dismissed-name">{ghost.id}</span>
                 <button
                   type="button"
                   onClick={() => undismissGhost(ghost.id)}
-                  className="cursor-pointer"
-                  style={{
-                    fontSize: 11,
-                    color: colors.text.secondary,
-                    border: '1px solid var(--line-faint)',
-                    borderRadius: borderRadius.tool,
-                    padding: '2px 8px',
-                    background: 'transparent',
-                    transition: `color ${transitions.focusRing}`
-                  }}
+                  className="te-ghostpanel-restore"
                 >
                   Restore
                 </button>

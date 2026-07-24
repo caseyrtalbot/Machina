@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Artifact } from '@shared/types'
-import {
-  borderRadius,
-  colors,
-  getArtifactColor,
-  typography
-} from '../../design/tokens'
+import { getArtifactColor } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useVaultStore } from '../../store/vault-store'
 import { useEditorStore } from '../../store/editor-store'
@@ -66,51 +61,6 @@ export function buildMetadataEntries(artifact: Artifact): readonly MetadataEntry
   return entries
 }
 
-// ── Shared styles ──
-
-// Console-direction pill: hairline-square (radius 2), mono 10px, surface bg.
-// Key/value pills use the `colors.text.muted` → `colors.text.primary` pattern
-// applied at the call site; this base only carries chrome.
-const pillStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.4rem',
-  fontFamily: typography.fontFamily.mono,
-  fontSize: '10px',
-  fontWeight: 500,
-  letterSpacing: '0.08em',
-  borderRadius: borderRadius.inline,
-  padding: '2px 8px',
-  border: `1px solid ${colors.border.default}`,
-  backgroundColor: 'var(--color-bg-surface)',
-  color: colors.text.primary,
-  lineHeight: 1.4
-}
-
-const sectionLabelStyle: React.CSSProperties = {
-  textTransform: typography.metadata.textTransform,
-  letterSpacing: typography.metadata.letterSpacing,
-  fontSize: typography.metadata.size,
-  fontWeight: 600,
-  color: colors.text.muted
-}
-
-const rowLabelStyle: React.CSSProperties = {
-  ...sectionLabelStyle,
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.35rem'
-}
-
-const rowValueStyle: React.CSSProperties = {
-  color: colors.text.secondary,
-  minHeight: 22,
-  display: 'flex',
-  alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: '0.4rem'
-}
-
 // ── Wikilink display helper ──
 
 /** Strip [[brackets]] from display text while preserving raw value for editing */
@@ -153,30 +103,21 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
   }
 
   return (
-    <div className="relative" style={{ marginTop: '0.25em' }}>
+    <div className="te-frontmatter-addprop">
       <button
         type="button"
         onClick={() => {
           setIsOpen(!isOpen)
           setTimeout(() => inputRef.current?.focus(), 50)
         }}
-        className="transition-colors hover:opacity-80"
-        style={{ color: colors.text.muted, fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+        className="te-frontmatter-addprop-trigger"
       >
         + add property
       </button>
 
       {isOpen && (
-        <div
-          className="absolute left-0 top-full mt-1 z-30 shadow-lg overflow-hidden"
-          style={{
-            backgroundColor: colors.bg.elevated,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: borderRadius.inline,
-            minWidth: 160
-          }}
-        >
-          <div className="p-1.5">
+        <div className="te-frontmatter-addprop-menu">
+          <div className="te-frontmatter-addprop-field">
             <input
               ref={inputRef}
               type="text"
@@ -187,25 +128,17 @@ function AddPropertyButton({ existingKeys, onAdd }: AddPropertyButtonProps) {
                 if (e.key === 'Escape') setIsOpen(false)
               }}
               placeholder="Property name..."
-              className="w-full bg-transparent border-0 text-xs px-1.5 py-1"
-              style={{ color: colors.text.primary, fontFamily: 'var(--font-mono)' }}
+              className="te-frontmatter-addprop-input"
             />
           </div>
           {available.length > 0 && (
-            <div className="border-t" style={{ borderColor: colors.border.default }}>
+            <div className="te-frontmatter-addprop-divider">
               {available.map((prop) => (
                 <button
                   key={prop}
                   type="button"
                   onClick={() => handleAdd(prop)}
-                  className="w-full text-left px-3 py-1.5 text-xs transition-colors hover:opacity-80"
-                  style={{ color: colors.text.secondary, fontFamily: 'var(--font-mono)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = colors.bg.surface
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
+                  className="te-frontmatter-addprop-item"
                 >
                   {prop}
                 </button>
@@ -272,37 +205,21 @@ function PropertyRow({
 
   return (
     <div
-      className="fm-property-row"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(110px, 150px) minmax(0, 1fr)',
-        columnGap: '1rem',
-        alignItems: 'center',
-        paddingTop: isFirst ? 0 : '0.1rem'
-      }}
+      className="fm-property-row te-frontmatter-prop-row"
+      data-first={isFirst ? 'true' : undefined}
     >
-      <div style={rowLabelStyle}>
+      <div className="te-frontmatter-row-label">
         {editable && (
           <button
             type="button"
             onClick={onDelete}
-            className="fm-property-row__delete"
-            style={{
-              color: colors.text.muted,
-              fontSize: '9px',
-              lineHeight: 1,
-              cursor: 'pointer',
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              flexShrink: 0
-            }}
+            className="fm-property-row__delete te-frontmatter-prop-delete"
             aria-label={`Delete property ${propKey}`}
           >
             {'\u00D7'}
           </button>
         )}
-        <span style={{ flex: 1 }}>{formatPropertyLabel(propKey)}</span>
+        <span className="te-frontmatter-prop-key">{formatPropertyLabel(propKey)}</span>
         {editable && (
           <TypeBadge
             type={pType}
@@ -314,7 +231,7 @@ function PropertyRow({
           />
         )}
       </div>
-      <div style={rowValueStyle}>{renderInput()}</div>
+      <div className="te-frontmatter-row-value">{renderInput()}</div>
     </div>
   )
 }
@@ -385,76 +302,38 @@ export function FrontmatterHeader({
   )
 
   return (
-    <div
-      style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: '11px',
-        color: colors.text.muted,
-        lineHeight: 1.7,
-        maxWidth: '52rem',
-        margin: '0 auto',
-        marginBottom: '2.25em'
-      }}
-      className="px-8 pt-5"
-    >
+    <div className="te-frontmatter">
       {/* Console-direction type pill: square 2px radius, hairline border, mono caps */}
-      <div style={{ marginBottom: '1rem' }}>
+      <div className="te-frontmatter-type-pill-row">
         <span
+          className="te-frontmatter-type-pill"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontFamily: typography.fontFamily.mono,
-            textTransform: 'uppercase',
-            letterSpacing: typography.metadata.letterSpacing,
-            fontSize: typography.metadata.size,
-            fontWeight: 600,
             border: `1px solid ${typeColor}60`,
-            borderRadius: borderRadius.inline,
-            padding: '2px 8px',
             backgroundColor: `${typeColor}10`,
             color: typeColor
           }}
         >
-          <span style={{ color: colors.text.muted }}>type</span>
+          <span className="te-frontmatter-type-pill__key">type</span>
           <span style={{ color: typeColor }}>{artifactType}</span>
         </span>
       </div>
 
       {/* Origin indicator (only for source/agent) */}
       {artifact?.origin && artifact.origin !== 'human' && (
-        <div
-          style={{
-            marginTop: '0.5rem',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '10px',
-            color: colors.text.muted,
-            letterSpacing: typography.metadata.letterSpacing
-          }}
-        >
-          <span style={{ textTransform: 'uppercase' }}>
+        <div className="te-frontmatter-origin">
+          <span className="te-frontmatter-origin__kind">
             {artifact.origin === 'source' ? 'source material' : 'agent-compiled'}
           </span>
           {artifact.sources.length > 0 && (
-            <span style={{ marginLeft: '0.75rem', color: colors.text.secondary }}>
+            <span className="te-frontmatter-origin__from">
               from{' '}
               {artifact.sources.map((src, i) => (
                 <span key={src}>
                   {i > 0 && ', '}
                   <span
                     onClick={() => onNavigate?.(src)}
-                    style={{
-                      cursor: onNavigate ? 'pointer' : 'default',
-                      textDecoration: 'underline',
-                      textDecorationColor: `${colors.text.muted}40`,
-                      textUnderlineOffset: '2px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (onNavigate) e.currentTarget.style.color = colors.text.primary
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = colors.text.secondary
-                    }}
+                    className="te-frontmatter-source-link"
+                    data-nav={onNavigate ? 'true' : undefined}
                   >
                     {src}
                   </span>
@@ -466,14 +345,7 @@ export function FrontmatterHeader({
       )}
 
       {/* Key-value lines: typed editing */}
-      <div
-        style={{
-          display: 'grid',
-          gap: '0.55rem',
-          borderTop: `1px solid ${colors.border.default}`,
-          paddingTop: '0.9rem'
-        }}
-      >
+      <div className="te-frontmatter-props">
         {displayKeys.map((key, index) => (
           <PropertyRow
             key={key}
@@ -546,14 +418,8 @@ function RelationshipSection({
   }
 
   return (
-    <div
-      style={{
-        marginTop: '1.1rem',
-        paddingTop: '0.9rem',
-        borderTop: `1px solid ${colors.border.default}`
-      }}
-    >
-      <SectionLabel as="div" style={{ marginBottom: '0.7rem' }}>
+    <div className="te-frontmatter-relationships">
+      <SectionLabel as="div" className="te-frontmatter-rel-heading">
         Relationships
       </SectionLabel>
       {rows.map(({ key, label }) => {
@@ -624,25 +490,9 @@ function RelationshipRow({
   }
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(110px, 136px) minmax(0, 1fr)',
-        columnGap: '1rem',
-        alignItems: 'center',
-        marginBottom: '0.55rem'
-      }}
-    >
-      <SectionLabel
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.35rem'
-        }}
-      >
-        {label}
-      </SectionLabel>
-      <div style={{ ...rowValueStyle, gap: '0.45rem' }}>
+    <div className="te-frontmatter-rel-row">
+      <SectionLabel className="te-frontmatter-rel-row-label">{label}</SectionLabel>
+      <div className="te-frontmatter-rel-value">
         {ids.map((id) => (
           <ConnectionPill
             key={id}
@@ -652,20 +502,11 @@ function RelationshipRow({
           />
         ))}
         {editable && (
-          <div ref={wrapperRef} className="relative" style={{ display: 'inline-block' }}>
+          <div ref={wrapperRef} className="te-frontmatter-addconn">
             <button
               type="button"
               onClick={() => setAddOpen((v) => !v)}
-              className="transition-colors hover:opacity-80"
-              style={{
-                color: colors.text.muted,
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)',
-                background: 'none',
-                border: 'none',
-                padding: '2px 4px',
-                cursor: 'pointer'
-              }}
+              className="te-frontmatter-addconn-trigger"
             >
               + add connection
             </button>
@@ -694,22 +535,11 @@ interface ConnectionPillProps {
 function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
   return (
     <span
-      className="fm-connection-pill"
+      className="fm-connection-pill te-frontmatter-connection-pill"
       data-nav={onNavigate ? 'true' : undefined}
-      style={{
-        ...pillStyle,
-        border: undefined,
-        position: 'relative',
-        cursor: onNavigate ? 'pointer' : 'default',
-        color: colors.text.secondary,
-        paddingRight: onRemove ? '22px' : undefined
-      }}
+      data-remove={onRemove ? 'true' : undefined}
     >
-      <span
-        className="fm-connection-pill__label"
-        onClick={() => onNavigate?.(id)}
-        style={{ display: 'inline-block' }}
-      >
+      <span className="fm-connection-pill__label" onClick={() => onNavigate?.(id)}>
         {id}
       </span>
       {onRemove && (
@@ -720,20 +550,6 @@ function ConnectionPill({ id, onNavigate, onRemove }: ConnectionPillProps) {
           onClick={(e) => {
             e.stopPropagation()
             onRemove()
-          }}
-          style={{
-            position: 'absolute',
-            right: 6,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            margin: 0,
-            lineHeight: 1,
-            cursor: 'pointer',
-            color: colors.text.muted,
-            fontSize: '10px'
           }}
         >
           {'\u00D7'}

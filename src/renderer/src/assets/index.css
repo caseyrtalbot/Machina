@@ -1,5 +1,275 @@
-@import 'tailwindcss';
+@layer theme, base, components, utilities;
 @import './fonts/fonts.css';
+
+/* ═══ Vendored Tailwind v4.2.2 prelude (ADR 0005 slice 6: engine removed) ═══
+ * Compiled @layer theme + @layer base (preflight) extracted verbatim from the last
+ * engine-on build. Layered rules lose to the unlayered app CSS below — identical
+ * cascade semantics to when the engine emitted them. The utilities layer and --tw-*
+ * property registrations were dropped: the final engine-on build emitted only bare
+ * single-word utilities from scanner false positives, zero real references.
+ * Source: tailwindcss v4.2.2, MIT License, https://tailwindcss.com */
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --spacing: .25rem;
+    --ease-in: cubic-bezier(.4, 0, 1, 1);
+    --ease-out: cubic-bezier(0, 0, .2, 1);
+    --default-transition-duration: .15s;
+    --default-transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+
+@layer base {
+  *, :after, :before, ::backdrop {
+    box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+    padding: 0;
+  }
+
+  ::file-selector-button {
+    box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, :host {
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    line-height: 1.5;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    -webkit-text-decoration: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+
+  b, strong {
+    font-weight: bolder;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+
+  small {
+    font-size: 80%;
+  }
+
+  sub, sup {
+    vertical-align: baseline;
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+  }
+
+  sub {
+    bottom: -.25em;
+  }
+
+  sup {
+    top: -.5em;
+  }
+
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+
+  :-moz-focusring {
+    outline: auto;
+  }
+
+  progress {
+    vertical-align: baseline;
+  }
+
+  summary {
+    display: list-item;
+  }
+
+  ol, ul, menu {
+    list-style: none;
+  }
+
+  img, svg, video, canvas, audio, iframe, embed, object {
+    vertical-align: middle;
+    display: block;
+  }
+
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  button, input, select, optgroup, textarea {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    opacity: 1;
+    background-color: #0000;
+    border-radius: 0;
+  }
+
+  ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    opacity: 1;
+    background-color: #0000;
+    border-radius: 0;
+  }
+
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+
+  ::placeholder {
+    opacity: 1;
+  }
+
+  @supports (not ((-webkit-appearance: -apple-pay-button))) or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentColor;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+      ::placeholder {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+
+  ::-webkit-datetime-edit {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-year-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-month-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-day-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-hour-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-minute-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-second-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-millisecond-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+
+  button, input:where([type="button"], [type="reset"], [type="submit"]) {
+    appearance: button;
+  }
+
+  ::file-selector-button {
+    appearance: button;
+  }
+
+  ::-webkit-inner-spin-button {
+    height: auto;
+  }
+
+  ::-webkit-outer-spin-button {
+    height: auto;
+  }
+
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
 
 /* ─── Base Typography ─── */
 
@@ -894,13 +1164,6 @@ body {
   color: var(--color-text-muted);
 }
 
-.sidebar-vault-name {
-  font-size: var(--env-sidebar-font-size);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--color-text-primary) 88%, transparent);
-}
-
 .sidebar-vault-path {
   font-family: var(--font-mono);
   font-size: var(--env-sidebar-tertiary-font-size);
@@ -1214,11 +1477,6 @@ body {
   outline: 1px solid color-mix(in srgb, var(--color-accent-default) 48%, transparent);
   outline-offset: -1px;
 }
-.tree-directory-row[data-drop-target='true'] > .truncate {
-  color: var(--color-accent-default) !important;
-  transition: color var(--transition-focus-ring);
-}
-
 /* External file drop zone on the whole tree container */
 .file-tree[data-drop-active='true'] {
   outline: 0.5px dashed color-mix(in srgb, var(--color-accent-default) 40%, transparent);
@@ -9447,4 +9705,2328 @@ button {
   transition:
     background-color var(--transition-hover),
     border-color var(--transition-hover);
+}
+
+/* ═══ Slice 6: editor + sidebar + ghosts + health (ADR 0005) — assembled from five agent fragments ═══ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SLICE 6 · editor-meta cluster
+   Source: src/renderer/src/panels/editor/{FrontmatterHeader,PropertyInputs,
+   BacklinksPanel,OutlinePanel}.tsx
+   Tailwind utility class-strings + static inline styles converted to classes.
+
+   SURVIVING style={ } (runtime-computed only — one line each):
+   FrontmatterHeader.tsx (2):
+     · type-pill outer  style={{ border, backgroundColor, color }} — all derived
+       from typeColor = getArtifactColor(type), a runtime hex (valid 8-digit
+       `${hex}60`/`${hex}10` alpha). Dynamic color.
+     · type-pill value  style={{ color: typeColor }} — runtime type hex.
+   PropertyInputs.tsx (2):
+     · NumberInput edit  style={{ width: `${…}ch` }} — width measured from draft
+       string length (runtime).
+     · ListInput add-input  style={{ width: `${…}ch` }} — width measured from
+       input string length (runtime).
+   BacklinksPanel.tsx (4):
+     · BacklinkItem dot  style={{ backgroundColor: typeColor }} — runtime type hex.
+     · UnlinkedMentionItem dot  style={{ backgroundColor: typeColor }} — runtime.
+     · UnlinkedMentionItem link btn  style={{ color: state==='idle' ? accent : muted }}
+       — runtime linkify state.
+     · Backlinks header <SectionLabel style={{ fontSize:'11px' }}> — FORCED, not
+       runtime. SectionLabel merges its baseStyle (font-size:10px) INLINE, so a
+       className cannot raise it to 11px without !important. Kept inline verbatim.
+       FLAG: needs a SectionLabel size variant to fully retire.
+   OutlinePanel.tsx (1):
+     · heading row  style={{ '--depth': depth }} — runtime nesting depth feeds the
+       padding-left calc below (pixel-identical to 12 + depth*12).
+
+   Transitions: this cluster's source used transitions.hover (150ms ease-out),
+   transitions.fast (120ms), and transitions.focusRing (100ms ease-out). The
+   --t-* catalog has no 150ms or 100ms member, so exact-fidelity mapping uses the
+   pre-existing token pair var(--transition-hover) (index.css:619, =150ms ease-out,
+   already used by the neighbouring .fm-* rules) and var(--transition-focus-ring)
+   (=100ms ease-out); transitions.fast → var(--t-fast). FLAG for orchestrator:
+   these two legacy tokens sit outside the --t-* set but are the only value-exact
+   matches; approximating to --t-fast/--t-med would change the timing.
+
+   Pre-existing latent color bugs carried forward pixel-identically (NOT fixed —
+   flagged for the colour pass): several call sites wrote `${cssVar}NN` (e.g.
+   `var(--color-accent-default)40`) which is invalid CSS and rendered as
+   dropped/transparent/currentColor. Reproduced faithfully below with a note at
+   each site: BooleanInput on-track tint, ListInput add-pill border, and the
+   frontmatter source-link underline colour.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── FrontmatterHeader ── */
+
+.te-frontmatter {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  max-width: 52rem;
+  margin: 0 auto 2.25em;
+  padding: 1.25rem 2rem 0;
+}
+
+.te-frontmatter-type-pill-row {
+  margin-bottom: 1rem;
+}
+.te-frontmatter-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--r-inline);
+  padding: 2px 8px;
+  /* border / background-color / color are set inline from the runtime type hex. */
+}
+.te-frontmatter-type-pill__key {
+  color: var(--color-text-muted);
+}
+
+.te-frontmatter-origin {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.14em;
+}
+.te-frontmatter-origin__kind {
+  text-transform: uppercase;
+}
+.te-frontmatter-origin__from {
+  margin-left: 0.75rem;
+  color: var(--color-text-secondary);
+}
+/* Source link: base cursor default, pointer + primary-on-hover only when
+   navigable (data-nav). Underline colour intentionally omitted — the source
+   wrote `var(--color-text-muted)40` (invalid) which rendered as currentColor;
+   the default text-decoration-color is currentColor, so this is pixel-identical.
+   FLAG: latent invalid alpha on the source-link underline. */
+.te-frontmatter-source-link {
+  cursor: default;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.te-frontmatter-source-link[data-nav='true'] {
+  cursor: pointer;
+}
+.te-frontmatter-source-link[data-nav='true']:hover {
+  color: var(--color-text-primary);
+}
+
+.te-frontmatter-props {
+  display: grid;
+  gap: 0.55rem;
+  border-top: 1px solid var(--color-border-default);
+  padding-top: 0.9rem;
+}
+
+.te-frontmatter-prop-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+  column-gap: 1rem;
+  align-items: center;
+  padding-top: 0.1rem;
+}
+.te-frontmatter-prop-row[data-first='true'] {
+  padding-top: 0;
+}
+.te-frontmatter-row-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+/* Delete × chrome; .fm-property-row__delete (index.css) owns the hover reveal. */
+.te-frontmatter-prop-delete {
+  color: var(--color-text-muted);
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+.te-frontmatter-prop-key {
+  flex: 1;
+}
+.te-frontmatter-row-value {
+  color: var(--color-text-secondary);
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.te-frontmatter-relationships {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border-default);
+}
+.te-frontmatter-rel-heading {
+  margin-bottom: 0.7rem;
+}
+.te-frontmatter-rel-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 136px) minmax(0, 1fr);
+  column-gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.55rem;
+}
+.te-frontmatter-rel-row-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.te-frontmatter-rel-value {
+  color: var(--color-text-secondary);
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.te-frontmatter-addconn {
+  position: relative;
+  display: inline-block;
+}
+.te-frontmatter-addconn-trigger {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  /* transition-colors: color-family only (opacity snaps, as in the source). */
+  transition: color var(--transition-hover), background-color var(--transition-hover),
+    border-color var(--transition-hover);
+}
+.te-frontmatter-addconn-trigger:hover {
+  opacity: 0.8;
+}
+
+/* Connection pill: .fm-connection-pill (index.css) owns the border + border/label
+   hover accents and the remove-× opacity reveal; this class carries the pill
+   chrome (border omitted — owned there) and data-driven cursor / padding. */
+.te-frontmatter-connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  border-radius: var(--r-inline);
+  padding: 2px 8px;
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  position: relative;
+  cursor: default;
+}
+.te-frontmatter-connection-pill[data-nav='true'] {
+  cursor: pointer;
+}
+.te-frontmatter-connection-pill[data-remove='true'] {
+  padding-right: 22px;
+}
+.te-frontmatter-connection-pill .fm-connection-pill__label {
+  display: inline-block;
+}
+.te-frontmatter-connection-pill .fm-connection-pill__remove {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+/* Add-property popover */
+.te-frontmatter-addprop {
+  position: relative;
+  margin-top: 0.25em;
+}
+.te-frontmatter-addprop-trigger {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  /* transition-colors: color-family only (opacity snaps, as in the source). */
+  transition: color var(--transition-hover), background-color var(--transition-hover),
+    border-color var(--transition-hover);
+}
+.te-frontmatter-addprop-trigger:hover {
+  opacity: 0.8;
+}
+.te-frontmatter-addprop-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 0.25rem;
+  z-index: 30;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  min-width: 160px;
+}
+.te-frontmatter-addprop-field {
+  padding: 0.375rem;
+}
+.te-frontmatter-addprop-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.25rem 0.375rem;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+}
+.te-frontmatter-addprop-divider {
+  border-top: 1px solid var(--color-border-default);
+}
+.te-frontmatter-addprop-item {
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  /* transition-colors: bg fades on hover, opacity snaps (matches the source). */
+  transition: color var(--transition-hover), background-color var(--transition-hover),
+    border-color var(--transition-hover);
+}
+.te-frontmatter-addprop-item:hover {
+  opacity: 0.8;
+  background-color: var(--color-bg-surface);
+}
+
+/* ── PropertyInputs ── */
+
+.te-prop-input {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: transparent;
+  border: 0;
+}
+.te-prop-date-input {
+  color-scheme: dark;
+  cursor: pointer;
+}
+.te-prop-list-input {
+  font-size: 10px;
+}
+
+/* Boolean toggle: track + knob driven by data-on. NOTE: the on-track tint is
+   transparent because the source wrote `var(--color-accent-default)40` (invalid
+   CSS → dropped), so the true state rendered with no track fill. Reproduced
+   pixel-identically. FLAG: latent invalid alpha (intended ~accent 25%). */
+.te-prop-toggle {
+  width: 30px;
+  height: 16px;
+  border-radius: var(--r-inline);
+  border: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-surface);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  /* transition-colors: the track background-color animates on toggle. */
+  transition: background-color var(--transition-hover);
+}
+.te-prop-toggle[data-on='true'] {
+  background-color: transparent;
+}
+.te-prop-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-inline);
+  background-color: var(--color-text-muted);
+  transition: left var(--t-fast);
+}
+.te-prop-toggle[data-on='true'] .te-prop-toggle__knob {
+  left: 14px;
+  background-color: var(--color-accent-default);
+}
+
+.te-prop-num-display {
+  color: var(--color-text-secondary);
+  cursor: text;
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.te-prop-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  vertical-align: middle;
+}
+.te-prop-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  border-radius: var(--r-inline);
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+.te-prop-pill-remove {
+  margin-left: 0.25rem;
+  color: var(--color-text-muted);
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.te-prop-pill-remove:hover {
+  opacity: 1;
+}
+/* Add-item pill: no border — the source wrote
+   `0.5px dashed var(--color-text-muted)40` (invalid → whole border dropped),
+   so it rendered borderless. Reproduced pixel-identically. FLAG: latent invalid
+   alpha (intended a dashed muted 25% hairline). */
+.te-prop-list-add {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  border-radius: var(--r-inline);
+  padding: 2px 8px;
+  border: none;
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: opacity var(--transition-hover);
+}
+.te-prop-list-add:hover {
+  opacity: 0.8;
+}
+
+.te-prop-text-display {
+  color: var(--color-text-secondary);
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  cursor: text;
+}
+
+/* Type badge: .fm-type-badge (index.css) owns the opacity reveal; this carries
+   the label chrome. */
+.te-prop-typebadge-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.te-prop-typebadge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.te-prop-typebadge-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 0.25rem;
+  z-index: 40;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  min-width: 56px;
+}
+.te-prop-typebadge-item {
+  width: 100%;
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  /* transition-colors: bg fades on hover, opacity snaps (matches the source). */
+  transition: color var(--transition-hover), background-color var(--transition-hover),
+    border-color var(--transition-hover);
+}
+.te-prop-typebadge-item:hover {
+  opacity: 0.8;
+  background-color: var(--color-bg-surface);
+}
+
+/* ── BacklinksPanel ── */
+
+.te-backlinks {
+  border-top: 1px solid var(--border-subtle);
+}
+.te-backlinks-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 32px;
+  transition: var(--transition-hover);
+  font-family: var(--font-mono);
+}
+.te-backlinks-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.te-backlinks-count {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.te-backlinks-caret {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  transition: var(--transition-hover);
+}
+.te-backlinks-section {
+  padding-bottom: 8px;
+}
+.te-backlinks-section-label {
+  padding: 4px 32px;
+}
+.te-backlinks-item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  border-radius: var(--r-card);
+  padding: 8px 32px;
+  font-family: var(--font-mono);
+}
+.te-backlinks-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.te-backlinks-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-inline);
+  flex-shrink: 0;
+  /* background-color set inline from runtime type hex. */
+}
+.te-backlinks-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  font-size: 11px;
+  transition: var(--transition-hover);
+}
+.te-backlinks-context {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  padding-left: 16px;
+}
+.te-backlinks-mention {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 8px 32px;
+  font-family: var(--font-mono);
+}
+.te-backlinks-mention-nav {
+  flex: 1 1 0%;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  border-radius: var(--r-card);
+}
+.te-backlinks-linkbtn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-inline);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  transition: var(--transition-hover);
+  /* color set inline from runtime linkify state. */
+}
+
+/* ── OutlinePanel ── */
+
+.te-outline-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding-block: 0.5rem;
+}
+.te-outline-title {
+  padding: 0 0.75rem 0.5rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.te-outline-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+/* Heading row: --depth (runtime) drives the indent calc (pixel-identical to
+   12 + depth*12); data-nested paints the hairline indent guide; data-active +
+   :hover reproduce the former JS mouse-enter/leave colour + background swaps. */
+.te-outline-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding-left: calc(12px + var(--depth, 0) * 12px);
+  padding-right: 12px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-left: 1px solid transparent;
+  cursor: pointer;
+  border-radius: var(--r-card);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--transition-focus-ring), background var(--transition-focus-ring);
+}
+.te-outline-row[data-nested='true'] {
+  border-left-color: var(--border-subtle);
+}
+.te-outline-row[data-active='true'] {
+  color: var(--color-accent-default);
+  background: color-mix(in srgb, var(--color-accent-default) 8%, transparent);
+}
+.te-outline-row:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+.te-outline-row:not([data-active='true']):hover {
+  color: var(--color-text-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * SLICE 6 — editor-core cluster (src/renderer/src/panels/editor/)
+ * Files: EditorPanel, RichEditor, SourceEditor, CodeFileEditor, FindBar,
+ *        EditorBubbleMenu, ConnectionAutocomplete, extensions/{mermaid-code-block,
+ *        slash-command-list, slash-command, wikilink-suggestion}
+ *
+ * SURVIVING `style={` inline styles: NONE.
+ *   Every JSX style={{...}} in scope was static and converted to a class below.
+ *   Out-of-scope (NOT JSX style={{}}, left as-is per slice-5 imperative-DOM
+ *   precedent, flagged for orchestrator):
+ *     - extensions/slash-command.tsx & wikilink-suggestion.tsx: container.style.*
+ *       (position/left/top/zIndex/animation) set imperatively on a
+ *       document.createElement div the render() closure owns. left/top are
+ *       floating-ui-style runtime positioning; animation carries a literal
+ *       'te-scale-in 150ms ease-out'.
+ *     - extensions/mermaid-code-block.tsx: getComputedStyle reads for mermaid
+ *       themeVariables and regex stripping of the rendered SVG's inline style —
+ *       not JSX styling.
+ *
+ * Transition note: rules sourced from transitions.focusRing (100ms ease-out) —
+ * .te-bubblemenu-btn, .te-slashmenu-item — use var(--transition-focus-ring)
+ * (exact 100ms ease-out, ratified vocabulary). Rules sourced from Tailwind
+ * transition-colors (150ms) — .te-connauto-option — use var(--t-fast) (120ms;
+ * no exact token, house idiom).
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── EditorPanel ── */
+.te-edpanel-prose {
+  min-height: 100%;
+  padding: 3rem 2rem;
+  color: var(--color-text-primary);
+}
+.te-edpanel-prose:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.te-edpanel-inset {
+  height: 100%;
+  background-color: var(--color-bg-base);
+}
+.te-edpanel-inset--column {
+  display: flex;
+  flex-direction: column;
+}
+
+.te-edpanel-conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  flex-shrink: 0;
+  border-left: 2px solid #dfa11a;
+  background-color: color-mix(in srgb, #dfa11a 10%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+  color: #dfa11a;
+  font-family: var(--font-mono);
+}
+.te-edpanel-conflict-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+.te-edpanel-conflict-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.te-edpanel-conflict-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: var(--r-inline);
+  background-color: transparent;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.te-edpanel-conflict-btn:hover {
+  opacity: 0.8;
+}
+.te-edpanel-conflict-btn--warn {
+  color: #dfa11a;
+  border: 1px solid #dfa11a;
+}
+.te-edpanel-conflict-btn--neutral {
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+}
+
+.te-edpanel-row {
+  display: flex;
+  align-items: center;
+}
+/* Composes with .editor-mode-toggle__btn — disabled back/forward nav buttons. */
+.te-edpanel-navbtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Composes with .editor-mode-toggle__btn — outline toggle spacing. */
+.te-edpanel-outline-btn {
+  margin-left: 8px;
+}
+
+.te-edpanel-body {
+  flex: 1 1 0%;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+.te-edpanel-scroll {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.te-edpanel-outline {
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 200px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+/* ── RichEditor ── */
+.te-richeditor {
+  height: 100%;
+}
+
+/* ── SourceEditor ── */
+.te-sourceeditor {
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg-base);
+}
+
+/* ── CodeFileEditor ── */
+.te-codefile {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.te-codefile-header {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-default);
+}
+.te-codefile-name {
+  color: var(--color-text-primary);
+}
+.te-codefile-surface {
+  flex: 1 1 0%;
+  overflow: hidden;
+  background-color: var(--color-bg-base);
+}
+
+/* ── FindBar ── */
+.te-findbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 30;
+  padding: 4px 8px;
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+}
+.te-findbar-input {
+  width: 160px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-family: var(--font-body);
+}
+.te-findbar-count {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+.te-findbar-count[data-empty='true'] {
+  color: #dfa11a;
+}
+.te-findbar-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--r-inline);
+}
+
+/* ── EditorBubbleMenu ── */
+.te-bubblemenu {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  background-color: rgba(4, 4, 8, 0.9);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-tool);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.te-bubblemenu-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-inline);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  transition:
+    background-color var(--transition-focus-ring),
+    color var(--transition-focus-ring);
+}
+.te-bubblemenu-btn:hover:not([aria-pressed='true']) {
+  background-color: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  color: var(--color-text-primary);
+}
+.te-bubblemenu-btn[aria-pressed='true'] {
+  font-weight: 600;
+  background-color: var(--color-accent-muted);
+  color: var(--color-accent-default);
+}
+.te-bubblemenu-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.te-bubblemenu-hl {
+  background-color: color-mix(in srgb, var(--signal-warn) 30%, transparent);
+  padding: 0 3px;
+  border-radius: var(--r-inline);
+  font-size: 12px;
+  line-height: 1;
+}
+.te-bubblemenu-divider {
+  width: 1px;
+  height: 16px;
+  background-color: var(--border-subtle);
+  margin: 0 2px;
+}
+
+/* ── ConnectionAutocomplete ── */
+.te-connauto {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 0.25rem;
+  z-index: 30;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  overflow: hidden;
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  min-width: 220px;
+}
+.te-connauto-inputwrap {
+  padding: 0.375rem;
+}
+.te-connauto-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.25rem 0.375rem;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+}
+.te-connauto-list {
+  border-top: 1px solid var(--color-border-default);
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.te-connauto-empty {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+.te-connauto-option {
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+.te-connauto-option[aria-selected='true'] {
+  background-color: var(--color-bg-surface);
+}
+
+/* ── SlashCommandList ── */
+.te-slashmenu-empty {
+  padding: 12px 16px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.te-slashmenu-list {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.te-slashmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+  padding: 8px 12px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  transition: background-color var(--transition-focus-ring);
+}
+.te-slashmenu-item[data-selected='true'] {
+  background-color: var(--bg-tint-accent);
+}
+.te-slashmenu-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-inline);
+  background-color: var(--bg-tint-text);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.te-slashmenu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.te-slashmenu-title {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+}
+.te-slashmenu-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── SlashCommand / WikilinkSuggestion popup panel ── */
+.te-slashmenu-panel {
+  width: 280px;
+  background-color: rgba(4, 4, 8, 0.9);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border-radius: 0;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+/* ── MermaidCodeBlock ── */
+.te-mermaidblock-hidden {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ADR 0005 slice 6 — sidebar-shell cluster
+ * Files: panels/sidebar/{Sidebar,FileTree,RenameInput,WorkspaceFilter,SearchBar}.tsx
+ *
+ * Converts the last Tailwind utility class-strings and static inline styles in
+ * the sidebar shell to design-token CSS. Composes over existing index.css
+ * sidebar vocabulary (.sidebar-search-shell, .sidebar-section-*, .workspace-chip,
+ * .sidebar-icon-button, .file-row-hover, .tree-directory-row, .file-name-text,
+ * .date-separator) via winning compound selectors — never redefining them.
+ *
+ * SURVIVING inline style={} (runtime-computed, exempt) — 7 total:
+ *   FileTree.tsx
+ *     • DirectoryRow row     — { paddingLeft/marginTop by depth, ...indentBorderStyle(depth) }
+ *                              runtime indent geometry (depth-based margins/padding).
+ *     • FileRow row          — { paddingLeft by depth, ...indentBorderStyle(depth, isActive) }
+ *                              runtime indent geometry + active guide color.
+ *     • FileRow icon wrap    — { opacity } runtime (active/onCanvas/action state).
+ *     • FileRow action dot   — { backgroundColor: actionColor } runtime action color.
+ *     • FileRow name         — { color } runtime (action/agent-modified/active color).
+ *   Sidebar.tsx
+ *     • SystemArtifact dot   — { backgroundColor: accentColor } runtime artifact color.
+ *     • SystemArtifact title — { color } runtime (active vs idle).
+ *
+ * FLAG — transition token deviation: three added transitions use
+ * var(--transition-hover) (150ms ease-out, defined in index.css :root) rather
+ * than a --t-* token. Rationale: the originals were transitions.default
+ * (150ms ease-out) and Tailwind transition-colors (150ms); --transition-hover
+ * is the EXACT-value token the surrounding sidebar CSS already uses for hover
+ * (.sidebar-search-shell, .workspace-chip, .sidebar-icon-button, and the base
+ * .file-row-hover color transition all use it). Choosing it preserves pixel/
+ * timing fidelity and cross-component consistency. Nearest enumerated --t-*
+ * tokens are --t-fast (120ms) / --t-med (180ms); neither matches 150ms. Swap to
+ * a --t-* token if the orchestrator prefers strict enumeration.
+ *
+ * Pre-existing dead CSS left untouched (not this slice's job): the base
+ * .workspace-chip typography (body/0.06em/tertiary) is now fully superseded by
+ * .te-wsfilter-chip; kept as composition base for radius/weight/white-space.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── RenameInput ── */
+
+.te-rename-input {
+  width: 100%;
+  padding: 2px 4px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-base);
+  border: 1px solid var(--color-accent-default);
+  border-radius: var(--r-inline);
+}
+
+/* ── WorkspaceFilter ── */
+
+/* Compose over base .workspace-chip (keeps radius, font-weight, white-space,
+ * transition). The :hover variants lock the console look so the base
+ * .workspace-chip:hover background lift never appears — matching the prior
+ * inline-style behavior where the element style suppressed the hover rule. */
+.workspace-filter .te-wsfilter-chip,
+.workspace-filter .te-wsfilter-chip:hover {
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.workspace-filter .te-wsfilter-chip[data-active='true'],
+.workspace-filter .te-wsfilter-chip[data-active='true']:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-default);
+  border-color: var(--color-accent-line);
+}
+
+/* ── SearchBar ── */
+
+.te-searchbar-root {
+  position: relative;
+}
+
+/* Console restyle over base .sidebar-search-shell: transparent recessed slot,
+ * 28px min-height, hairline border brightening to accent-line on focus. */
+.te-searchbar-root .sidebar-search-shell {
+  min-height: 28px;
+  padding: 6px 10px;
+  background: transparent;
+  border-color: var(--color-border-default);
+}
+
+.te-searchbar-root .sidebar-search-shell[data-focused='true'] {
+  background: transparent;
+  border-color: var(--color-accent-line);
+}
+
+.te-searchbar-root .sidebar-search-prompt {
+  font-size: 12px;
+  color: var(--color-text-disabled);
+}
+
+.te-searchbar-root .sidebar-search-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.te-searchbar-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(4, 4, 8, 0.95);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--r-inline);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.25);
+  z-index: 50;
+}
+
+.te-searchbar-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.te-searchbar-result-title {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-searchbar-result-meta {
+  color: var(--color-text-muted);
+}
+
+.te-searchbar-result-snippet {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Sidebar (shell + ActionBar + SystemArtifactCollections) ── */
+
+.te-sidebar-flex-static {
+  flex-shrink: 0;
+}
+
+.te-sidebar-tree-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Shared right-pointing chevron: rotates to 90° when expanded. Used by the
+ * ActionBar "Files" toggle and every FileTree DirectoryRow. */
+.te-tree-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transform: rotate(0deg);
+  transition: transform var(--transition-hover);
+}
+
+.te-tree-chevron[data-expanded='true'] {
+  transform: rotate(90deg);
+}
+
+/* ActionBar section header — console recipe over base .sidebar-section-label. */
+.sidebar-section-toggle .sidebar-section-label {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+
+.sidebar-section-toggle .sidebar-section-count {
+  color: var(--color-text-disabled);
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.te-sidebar-actionbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 24×24 square icon buttons over base .sidebar-icon-button (26×26 tool-radius).
+ * Hover lift stays inherited from the base rule. */
+.te-sidebar-actionbar-actions .sidebar-icon-button {
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-muted);
+  border-radius: var(--r-inline);
+}
+
+.te-sysart-list {
+  padding: 8px;
+}
+
+.te-sysart-group {
+  margin-bottom: 12px;
+}
+
+.te-sysart-group:last-child {
+  margin-bottom: 0;
+}
+
+.te-sysart-group-label {
+  padding: 0 8px 8px;
+}
+
+/* Console recipe over base .sidebar-section-label (compound wins). */
+.sidebar-section-label.te-sysart-group-label {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+
+.te-sysart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* System-artifact row over base .file-row-hover: 2px accent left-stripe when
+ * active (transparent idle so it aligns with file/bookmark rows). */
+.file-row-hover.te-sysart-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-inline);
+  transition:
+    color var(--transition-hover),
+    background-color var(--transition-hover),
+    border-color var(--transition-hover);
+}
+
+.te-sysart-row[data-active='true'] {
+  border-left-color: var(--color-accent-default);
+}
+
+.te-sysart-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+}
+
+.te-sysart-row-text {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+
+.te-sysart-item-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--env-sidebar-font-size);
+}
+
+.te-sysart-item-status {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: var(--label-tracking);
+  font-size: var(--env-sidebar-tertiary-font-size);
+}
+
+/* ── FileTree ── */
+
+.te-filetree-root {
+  padding: 4px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  user-select: none;
+}
+
+/* Console section header over base .date-separator (keeps its flex layout,
+ * gap, and padding; overrides typography to the console recipe). */
+.date-separator.te-filetree-date {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* DirectoryRow — layout/typography over base .tree-directory-row (which owns
+ * min-height, hover, and its transition). Compound wins the r-inline radius
+ * over the base r-tool. Depth-driven indent stays inline. */
+.tree-directory-row.te-filetree-dir-row {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  padding-right: 8px;
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: var(--env-sidebar-font-size);
+  letter-spacing: 0.02em;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-inline);
+}
+
+.te-filetree-dir-chevron-wrap {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.te-filetree-icon-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+  opacity: 0.8;
+}
+
+.te-filetree-dir-name {
+  flex: 1 1 0%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Replaces index.css's `.tree-directory-row[data-drop-target] > .truncate` rule
+ * for the renamed dir-name class (drop-target folder name turns accent). */
+.tree-directory-row[data-drop-target='true'] > .te-filetree-dir-name {
+  color: var(--color-accent-default);
+  transition: color var(--transition-focus-ring);
+}
+
+.te-filetree-dir-count {
+  margin-left: auto;
+  color: var(--color-text-disabled);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* FileRow — layout over base .file-row-hover (which owns min-height, active/
+ * selected/hover/drag backgrounds, and the color transition). Compound wins the
+ * r-inline radius over the base r-tool. Depth indent + colors stay inline. */
+.file-row-hover.te-filetree-file-row {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  padding-right: 8px;
+  font-family: var(--font-body);
+  font-size: var(--env-sidebar-font-size);
+  border-left: 2px solid transparent;
+  border-radius: var(--r-inline);
+}
+
+.te-filetree-file-row[data-active='true'] {
+  border-left-color: var(--color-accent-default);
+}
+
+.te-filetree-file-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+.te-filetree-action-dot {
+  position: absolute;
+  bottom: -1px;
+  left: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  opacity: 0.9;
+}
+
+.te-filetree-canvas-dot {
+  position: absolute;
+  top: -1px;
+  right: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-accent-default);
+  opacity: 0.7;
+}
+
+.te-filetree-file-name {
+  flex: 1 1 0%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-filetree-conn-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-accent-default);
+  opacity: 0.6;
+  font-size: var(--env-sidebar-tertiary-font-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+   ADR 0005 slice 6 — sidebar-sections cluster
+   Files: panels/sidebar/{VaultSelector,DailyNoteSection,TagBrowser,BookmarksList}.tsx
+
+   Surviving inline style={ } across the cluster (dynamic-only exemptions):
+   - TagBrowser.tsx  style={{ paddingLeft: 8 + depth * 12 }}
+       Runtime geometry: tree-nesting indent, computed from the node's depth.
+       Everything else on that row is class-driven; only the depth offset stays.
+   VaultSelector.tsx, DailyNoteSection.tsx, BookmarksList.tsx: zero survivors.
+
+   Notes for the orchestrator:
+   - `truncate` (Tailwind) was folded into each element's own class as
+     overflow/text-overflow/white-space rather than minted as a shared class,
+     to avoid colliding with other agents' fragments.
+   - `.sidebar-vault-name` (index.css) is no longer referenced by VaultSelector:
+     its every property was already overridden by the old inline style, so the
+     element now carries one dedicated class instead. The index.css rule is left
+     untouched (now unused by this cluster) per surgical-edit discipline.
+   - Rows that formerly used `.file-row-hover` (daily-note pinned rows, bookmark
+     rows) dropped it: the old inline `background` suppressed all of its hover/
+     active backgrounds, so the visible contribution was only min-height + radius,
+     now replicated directly. This keeps the (pre-existing) no-hover-background
+     behavior pixel-identical without source-order-fragile overrides.
+   - Timing-function note (FLAG): the two rotate transitions (vault chevron,
+     daily-note caret) mapped Tailwind/`transitions.default` 150ms to
+     var(--transition-hover) (150ms ease-out). Duration is exact; Tailwind's
+     `transition-transform` used cubic-bezier(.4,0,.2,1) rather than ease-out.
+     No 150ms cubic-bezier token exists; flagged rather than minting one.
+   - Button transitions (bg/color/opacity) come from the global `button` rule in
+     index.css; per-button transitions were intentionally not re-declared.
+   ========================================================================== */
+
+/* ── VaultSelector ── */
+.te-vault-selector {
+  position: relative;
+  min-width: 0;
+}
+
+.te-vault-selector__row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sidebar-vault-button.te-vault-selector__button {
+  color: var(--color-text-primary);
+}
+
+.te-vault-selector__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: var(--r-inline);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-line);
+}
+
+.te-vault-selector__glyph {
+  color: var(--color-accent-default);
+}
+
+.te-vault-selector__name {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-vault-selector__chevron {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transform: rotate(0deg);
+  transition: transform var(--transition-hover);
+}
+
+.sidebar-vault-button[data-open='true'] .te-vault-selector__chevron {
+  transform: rotate(180deg);
+}
+
+.te-vault-selector__health-dot {
+  margin-left: 6px;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.te-vault-selector__health-dot[data-clickable='true'] {
+  cursor: pointer;
+}
+
+.te-vault-selector__popover {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.te-vault-selector__kicker {
+  padding: 8px 12px 4px;
+}
+
+.te-vault-selector__current {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 12px 8px;
+}
+
+.te-vault-selector__current-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.te-vault-selector__current-path {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-vault-selector__divider {
+  margin: 4px 12px;
+}
+
+.sidebar-popover-item.te-vault-selector__recent {
+  color: var(--color-text-secondary);
+}
+
+.te-vault-selector__recent-icon {
+  color: var(--color-text-muted);
+}
+
+.te-vault-selector__recent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-popover-item.te-vault-selector__open-different {
+  color: var(--color-text-muted);
+}
+
+/* ── DailyNoteSection ── */
+.te-dailynote {
+  padding: 4px 12px 8px;
+}
+
+.te-dailynote-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 4px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.te-dailynote-caret {
+  font-size: 9px;
+  transform: rotate(0deg);
+  transition: transform var(--transition-hover);
+}
+
+.te-dailynote-toggle[data-collapsed='true'] .te-dailynote-caret {
+  transform: rotate(-90deg);
+}
+
+.te-dailynote-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.te-dailynote-navbtn {
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.te-dailynote-month {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.te-dailynote-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  margin-bottom: 2px;
+}
+
+.te-dailynote-weekday {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.te-dailynote-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+}
+
+.te-dailynote-day {
+  position: relative;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--r-inline);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: center;
+}
+
+.te-dailynote-day[data-hasnote='true'] {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.te-dailynote-day[data-today='true'] {
+  background: var(--color-accent-default);
+  color: var(--color-accent-fg);
+  font-weight: 600;
+}
+
+.te-dailynote-dot {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--color-accent-default);
+}
+
+.te-dailynote-today {
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 0;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-inline);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.te-dailynote-pinned {
+  margin-top: 6px;
+}
+
+.te-dailynote-pinned-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 2px 0 2px 24px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--r-inline);
+  cursor: pointer;
+  font-size: var(--env-sidebar-font-size);
+}
+
+.te-dailynote-pinned-name {
+  color: var(--color-text-secondary);
+  font-size: var(--env-sidebar-font-size);
+}
+
+.te-dailynote-pinned-row[data-active='true'] .te-dailynote-pinned-name {
+  color: var(--color-text-primary);
+}
+
+/* ── TagBrowser ── */
+.te-tagbrowser {
+  flex-shrink: 0;
+}
+
+.te-tagbrowser-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.te-tagbrowser-caret {
+  color: var(--color-text-muted);
+  font-size: var(--env-sidebar-tertiary-font-size);
+}
+
+.te-tagbrowser-count {
+  color: var(--color-text-disabled);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.te-tagbrowser-operator {
+  padding: 2px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-inline);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.tag-browser__chip.te-tagbrowser-chip {
+  background: transparent;
+  border: 1px solid var(--color-accent-line);
+  color: var(--color-accent-default);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.te-tagbrowser-chip-remove {
+  opacity: 0.6;
+}
+
+.te-tagbrowser-chip-remove:hover {
+  opacity: 1;
+}
+
+.te-tagbrowser-clear {
+  padding-left: 4px;
+  padding-right: 4px;
+  opacity: 0.6;
+  color: var(--color-text-muted);
+  font-size: var(--env-sidebar-tertiary-font-size);
+}
+
+.te-tagbrowser-clear:hover {
+  opacity: 1;
+}
+
+.te-tagbrowser-tree {
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.te-tagbrowser-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  text-align: left;
+  background-color: transparent;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-inline);
+}
+
+.te-tagbrowser-row[data-selected='true'] {
+  background-color: var(--color-accent-soft);
+  border-left: 2px solid var(--color-accent-default);
+}
+
+.te-tagbrowser-expand {
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--env-sidebar-tertiary-font-size);
+}
+
+.te-tagbrowser-spacer {
+  width: 12px;
+}
+
+.te-tagbrowser-name {
+  flex: 1 1 0%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: var(--env-sidebar-font-size);
+}
+
+.te-tagbrowser-row[data-selected='true'] .te-tagbrowser-name {
+  color: var(--color-accent-default);
+}
+
+.te-tagbrowser-nodecount {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--env-sidebar-secondary-font-size);
+}
+
+/* ── BookmarksList ── */
+.te-bookmarks {
+  flex-shrink: 0;
+}
+
+.te-bookmarks-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.te-bookmarks-caret {
+  color: var(--color-text-muted);
+  font-size: var(--env-sidebar-tertiary-font-size);
+}
+
+.te-bookmarks-label {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.te-bookmarks-count {
+  color: var(--color-text-disabled);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.te-bookmarks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px 4px;
+}
+
+.te-bookmarks-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--row-h);
+  padding: 4px 8px 4px 6px;
+  text-align: left;
+  background: transparent;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-inline);
+}
+
+.te-bookmarks-row[data-active='true'] {
+  background: var(--color-bg-elevated);
+  border-left: 2px solid var(--color-accent-default);
+}
+
+.te-bookmarks-star {
+  flex-shrink: 0;
+}
+
+.te-bookmarks-name {
+  flex: 1 1 0%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.te-bookmarks-row[data-active='true'] .te-bookmarks-name {
+  color: var(--color-text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SLICE 6 — ghosts + health cluster
+ *   panels/ghosts/GhostPanel.tsx, panels/health/HealthPanel.tsx
+ *
+ * Composes onto pre-existing index.css hover vocabularies (never redefines
+ * them): .ghost-row / .ghost-row__name / .ghost-row__actions / .ghost-row__count,
+ * .ghost-action-icon / .ghost-action-icon__tip, .health-issue-row. New box-model
+ * classes carry the te-ghostpanel-* / te-health-* prefixes and sit alongside
+ * those classes on the same element. `.ghost-row` had no base rule in index.css,
+ * so its box model is created here (that IS the composition target for the
+ * existing .ghost-row:hover child selectors).
+ *
+ * SURVIVING inline style={} after conversion (dynamic-only exemptions):
+ *   GhostPanel.tsx:
+ *     1. ContextPopup outer  style={{ top: pos.top, left: pos.left }}
+ *        — measured anchor geometry (getBoundingClientRect), runtime-computed.
+ *     2. bar-fill            style={{ width: barWidth }}
+ *        — score-derived width (referenceCount / maxCount), runtime-computed.
+ *     3. section-1 SectionLabel style={{ color: 'var(--color-text-primary)' }}
+ *        — SectionLabel (out of scope) merges its baseStyle color:muted INLINE;
+ *          an appended class cannot override an inline property, so the
+ *          primary-color override must stay style-borne. Forced by an
+ *          out-of-scope component, not a dynamic value.
+ *   HealthPanel.tsx: none.
+ *
+ * FLAG: RefreshButton opacity transition was `150ms ease-out` (transitions.default).
+ *   No --t-* token equals 150ms ease-out (--t-fast=120ms, --t-med=180ms, both
+ *   cubic-bezier). Mapped to var(--t-fast) to match this file's dominant
+ *   opacity-fade idiom; NOT pixel-identical (30ms + easing-curve delta).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── GhostPanel ── */
+
+.te-ghostpanel-scroll {
+  height: 100%;
+  overflow-y: auto;
+  font-family: var(--font-body, system-ui, sans-serif);
+  background-color: var(--color-bg-base);
+}
+
+.te-ghostpanel-container {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 2rem 3rem;
+}
+
+.te-ghostpanel-section-head {
+  padding: 12px 0 8px;
+  border-bottom: 1px solid var(--line-faint);
+  margin-bottom: 4px;
+}
+
+/* Base row box model (no base .ghost-row rule exists upstream; the existing
+   .ghost-row:hover child selectors compose onto this). */
+.ghost-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  gap: 10px;
+  cursor: pointer;
+  position: relative;
+}
+
+.te-ghostpanel-bar-track {
+  width: 32px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.te-ghostpanel-bar-fill {
+  height: 100%;
+  background: var(--color-accent-default);
+  opacity: 0.5;
+}
+
+/* composes onto .ghost-row__name (color + hover) */
+.te-ghostpanel-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* composes onto .ghost-row__actions (opacity + hover-reveal) */
+.te-ghostpanel-actions {
+  display: flex;
+  gap: 4px;
+  position: absolute;
+  right: 0;
+  background: linear-gradient(90deg, transparent, var(--color-bg-base) 12px);
+  padding-left: 16px;
+}
+
+/* composes onto .ghost-action-icon (background/color + hover) */
+.te-ghostpanel-action {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-tool);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+}
+
+/* composes onto .ghost-action-icon__tip (opacity + hover-reveal) */
+.te-ghostpanel-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--color-text-primary);
+  background: rgba(20, 22, 28, 0.95);
+  border: 1px solid var(--line-default);
+  padding: 3px 8px;
+  border-radius: var(--r-tool);
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  z-index: 50;
+}
+
+/* composes onto .ghost-row__count (transition + hover-hide) */
+.te-ghostpanel-count {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+  text-align: right;
+}
+
+.te-ghostpanel-popup {
+  position: fixed;
+  width: 320px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: rgba(14, 16, 22, 0.96);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--line-default);
+  border-radius: var(--r-card);
+  padding: 12px 16px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.te-ghostpanel-popup-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.te-ghostpanel-popup-title-icon {
+  opacity: 0.5;
+}
+
+.te-ghostpanel-ref {
+  padding: 6px 0;
+}
+.te-ghostpanel-ref:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.te-ghostpanel-ref-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.te-ghostpanel-ref-context {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.te-ghostpanel-dismissed-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  gap: 10px;
+}
+
+.te-ghostpanel-dismissed-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.te-ghostpanel-restore {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-tool);
+  padding: 2px 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--transition-focus-ring);
+}
+
+.te-ghostpanel-resolved {
+  height: 100%;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-base);
+}
+
+.te-ghostpanel-resolved-body {
+  color: var(--color-text-muted);
+}
+
+/* ── HealthPanel ── */
+
+.te-health-scroll {
+  height: 100%;
+  overflow-y: auto;
+  font-family: var(--font-body, system-ui, sans-serif);
+  background-color: var(--color-bg-base);
+}
+
+.te-health-container {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 2rem 3rem;
+}
+
+.te-health-centered {
+  height: 100%;
+  background-color: var(--color-bg-base);
+}
+
+.te-health-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity var(--t-fast);
+}
+.te-health-refresh:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.te-health-unknown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.te-health-unknown-text {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  animation: te-pulse 600ms ease-in-out infinite alternate;
+}
+
+/* composes onto .health-issue-row (background + hover tint) */
+.te-health-issue {
+  padding: 8px 0;
+}
+
+.te-health-issue-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.te-health-issue-title {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-weight: 400;
+}
+
+.te-health-issue-detail {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.te-health-issue-file {
+  font-size: 12px;
+  color: var(--color-accent-default);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 2px;
+  font-family: inherit;
+}
+
+.te-health-section-head {
+  padding: 12px 0 8px;
+  border-bottom: 1px solid var(--line-faint);
+  margin-bottom: 4px;
+  margin-top: 0;
 }

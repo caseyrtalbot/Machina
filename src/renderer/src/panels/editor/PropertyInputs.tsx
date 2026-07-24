@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import type { PropertyValue } from './markdown-utils'
 
 // ── Type inference ──
@@ -55,16 +54,6 @@ export function convertValue(value: PropertyValue, toType: PropertyType): Proper
   }
 }
 
-// ── Shared styles ──
-
-const inputStyle: React.CSSProperties = {
-  color: colors.text.secondary,
-  fontFamily: typography.fontFamily.mono,
-  fontSize: '11px',
-  background: 'transparent',
-  border: 0
-}
-
 // ── Boolean Input ──
 
 interface BooleanInputProps {
@@ -74,36 +63,16 @@ interface BooleanInputProps {
 
 export function BooleanInput({ value, onChange }: BooleanInputProps) {
   return (
+    // Console: hairline-square toggle. Track stays subtly hinted (2px) so the
+    // moving indicator inside reads as a square block, not a pill.
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className="transition-colors"
-      style={{
-        width: 30,
-        height: 16,
-        // Console: hairline-square toggle. Track stays subtly hinted (2px) so
-        // the moving indicator inside reads as a square block, not a pill.
-        borderRadius: borderRadius.inline,
-        border: `1px solid ${colors.border.default}`,
-        backgroundColor: value ? `${colors.accent.default}40` : 'var(--color-bg-surface)',
-        position: 'relative',
-        cursor: 'pointer',
-        padding: 0
-      }}
+      className="te-prop-toggle"
+      data-on={value ? 'true' : undefined}
       aria-label={`Toggle ${value ? 'off' : 'on'}`}
     >
-      <span
-        style={{
-          position: 'absolute',
-          top: 2,
-          left: value ? 14 : 2,
-          width: 10,
-          height: 10,
-          borderRadius: borderRadius.inline,
-          backgroundColor: value ? colors.accent.default : colors.text.muted,
-          transition: `left ${transitions.fast}`
-        }}
-      />
+      <span className="te-prop-toggle__knob" />
     </button>
   )
 }
@@ -141,7 +110,8 @@ export function NumberInput({ value, onChange }: NumberInputProps) {
             setEditing(false)
           }
         }}
-        style={{ ...inputStyle, width: `${Math.max(draft.length + 2, 6)}ch` }}
+        className="te-prop-input"
+        style={{ width: `${Math.max(draft.length + 2, 6)}ch` }}
       />
     )
   }
@@ -152,15 +122,7 @@ export function NumberInput({ value, onChange }: NumberInputProps) {
         setDraft(String(value))
         setEditing(true)
       }}
-      style={{
-        color: colors.text.secondary,
-        cursor: 'text',
-        minHeight: 22,
-        display: 'flex',
-        alignItems: 'center',
-        fontFamily: 'var(--font-mono)',
-        fontSize: '11px'
-      }}
+      className="te-prop-num-display"
     >
       {value}
     </span>
@@ -182,11 +144,7 @@ export function DateInput({ value, onChange }: DateInputProps) {
       onChange={(e) => {
         if (e.target.value !== value) onChange(e.target.value)
       }}
-      style={{
-        ...inputStyle,
-        colorScheme: 'dark',
-        cursor: 'pointer'
-      }}
+      className="te-prop-input te-prop-date-input"
     />
   )
 }
@@ -232,38 +190,16 @@ export function ListInput({ value, onChange }: ListInputProps) {
     }
   }
 
-  // Console-direction list pill: hairline-square, mono 10px, surface bg.
-  const pillStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    fontFamily: typography.fontFamily.mono,
-    fontSize: '10px',
-    fontWeight: 500,
-    letterSpacing: '0.08em',
-    borderRadius: borderRadius.inline,
-    padding: '2px 8px',
-    border: `1px solid ${colors.border.default}`,
-    backgroundColor: 'var(--color-bg-surface)',
-    color: colors.text.primary,
-    lineHeight: 1.4
-  }
-
   return (
-    <span className="inline-flex flex-wrap items-center gap-1" style={{ verticalAlign: 'middle' }}>
+    // Console-direction list pill: hairline-square, mono 10px, surface bg.
+    <span className="te-prop-list">
       {value.map((item) => (
-        <span key={item} style={pillStyle}>
+        <span key={item} className="te-prop-pill">
           {item}
           <button
             type="button"
             onClick={() => onChange(value.filter((v) => v !== item))}
-            className="ml-1"
-            style={{ color: colors.text.muted, fontSize: '9px', lineHeight: 1, opacity: 0.6 }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '1'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '0.6'
-            }}
+            className="te-prop-pill-remove"
             aria-label={`Remove ${item}`}
           >
             {'\u00D7'}
@@ -282,12 +218,8 @@ export function ListInput({ value, onChange }: ListInputProps) {
             if (inputValue.trim()) addItem(inputValue)
             setAdding(false)
           }}
-          className="bg-transparent border-0"
-          style={{
-            ...inputStyle,
-            fontSize: '10px',
-            width: `${Math.max((inputValue.length || 4) + 1, 5)}ch`
-          }}
+          className="te-prop-input te-prop-list-input"
+          style={{ width: `${Math.max((inputValue.length || 4) + 1, 5)}ch` }}
         />
       ) : (
         <button
@@ -296,13 +228,7 @@ export function ListInput({ value, onChange }: ListInputProps) {
             setAdding(true)
             setTimeout(() => inputRef.current?.focus(), 30)
           }}
-          style={{
-            ...pillStyle,
-            color: colors.text.muted,
-            cursor: 'pointer',
-            border: `0.5px dashed ${colors.text.muted}40`
-          }}
-          className="hover:opacity-80 transition-opacity"
+          className="te-prop-list-add"
           aria-label="Add item"
         >
           +
@@ -344,7 +270,7 @@ export function TextInput({ value, displayValue, onChange }: TextInputProps) {
             setEditing(false)
           }
         }}
-        style={inputStyle}
+        className="te-prop-input"
       />
     )
   }
@@ -355,15 +281,7 @@ export function TextInput({ value, displayValue, onChange }: TextInputProps) {
         setDraft(value)
         setEditing(true)
       }}
-      style={{
-        color: colors.text.secondary,
-        minHeight: 22,
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '0.4rem',
-        cursor: 'text'
-      }}
+      className="te-prop-text-display"
     >
       {(displayValue ?? value) || '\u00A0'}
     </span>
@@ -391,37 +309,18 @@ export function TypeBadge({ type, onTypeChange }: TypeBadgeProps) {
   const [open, setOpen] = useState(false)
 
   return (
-    <span className="relative" style={{ display: 'inline-flex', alignItems: 'center' }}>
+    <span className="te-prop-typebadge-wrap">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: typography.microLabel.size,
-          letterSpacing: typography.microLabel.letterSpacing,
-          color: colors.text.muted,
-          textTransform: typography.microLabel.textTransform,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '0 2px'
-        }}
-        className="fm-type-badge"
+        className="fm-type-badge te-prop-typebadge"
         data-open={open ? 'true' : undefined}
         aria-label={`Property type: ${type}. Click to change.`}
       >
         {TYPE_LABELS[type]}
       </button>
       {open && (
-        <div
-          className="absolute left-0 top-full mt-1 z-40 shadow-lg overflow-hidden"
-          style={{
-            backgroundColor: colors.bg.elevated,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: borderRadius.inline,
-            minWidth: 56
-          }}
-        >
+        <div className="te-prop-typebadge-menu">
           {ALL_TYPES.filter((t) => t !== type).map((t) => (
             <button
               key={t}
@@ -430,21 +329,7 @@ export function TypeBadge({ type, onTypeChange }: TypeBadgeProps) {
                 onTypeChange(t)
                 setOpen(false)
               }}
-              className="w-full text-left px-2 py-1 transition-colors hover:opacity-80"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '9px',
-                color: colors.text.secondary,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = colors.bg.surface
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-              }}
+              className="te-prop-typebadge-item"
             >
               {TYPE_LABELS[t]}
             </button>

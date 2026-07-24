@@ -1,6 +1,5 @@
 import { BubbleMenu } from '@tiptap/react/menus'
 import type { Editor } from '@tiptap/react'
-import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 
 interface EditorBubbleMenuProps {
   readonly editor: Editor
@@ -14,43 +13,15 @@ interface FormatButtonProps {
 }
 
 function FormatButton({ active, onClick, title, children }: FormatButtonProps) {
+  // Console: hairline-square buttons. Active (aria-pressed) uses accent-muted bg
+  // and accent-default fg; hover tint applies only to the inactive state.
   return (
     <button
       onClick={onClick}
       title={title}
       aria-label={title}
       aria-pressed={active}
-      style={{
-        width: 28,
-        height: 28,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        // Console: hairline-square buttons. Active state uses accent-muted bg
-        // and accent-default fg; the radius hint (2px) keeps focus rings clean.
-        borderRadius: borderRadius.inline,
-        border: 'none',
-        cursor: 'pointer',
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 12,
-        fontWeight: active ? 600 : 400,
-        backgroundColor: active ? 'var(--color-accent-muted)' : 'transparent',
-        color: active ? 'var(--color-accent-default)' : colors.text.secondary,
-        transition: `background-color ${transitions.focusRing}, color ${transitions.focusRing}`
-      }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.backgroundColor =
-            'color-mix(in srgb, var(--color-text-primary) 6%, transparent)'
-          e.currentTarget.style.color = colors.text.primary
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.backgroundColor = 'transparent'
-          e.currentTarget.style.color = colors.text.secondary
-        }
-      }}
+      className="te-bubblemenu-btn"
     >
       {children}
     </button>
@@ -69,17 +40,8 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         return from !== to
       }}
     >
-      <div
-        className="flex items-center gap-0.5 p-1"
-        style={{
-          backgroundColor: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          // Console-direction: hairline border on a knife-edge chrome surface.
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: borderRadius.tool,
-          boxShadow: floatingPanel.shadowCompact
-        }}
-      >
+      {/* Console-direction: hairline border on a knife-edge glass chrome surface. */}
+      <div className="te-bubblemenu">
         <FormatButton
           active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -109,7 +71,7 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
           onClick={() => editor.chain().focus().toggleCode().run()}
           title="Inline code (Cmd+E)"
         >
-          <span style={{ fontFamily: typography.fontFamily.mono, fontSize: 12 }}>&lt;/&gt;</span>
+          <span className="te-bubblemenu-code">&lt;/&gt;</span>
         </FormatButton>
 
         <FormatButton
@@ -117,29 +79,11 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
           onClick={() => editor.chain().focus().toggleMark('highlight').run()}
           title="Highlight (Cmd+Shift+H)"
         >
-          <span
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--signal-warn) 30%, transparent)',
-              padding: '0 3px',
-              borderRadius: borderRadius.inline,
-              fontSize: 12,
-              lineHeight: 1
-            }}
-          >
-            H
-          </span>
+          <span className="te-bubblemenu-hl">H</span>
         </FormatButton>
 
         {/* Hairline divider — matches the chrome border weight */}
-        <div
-          aria-hidden="true"
-          style={{
-            width: 1,
-            height: 16,
-            backgroundColor: colors.border.subtle,
-            margin: '0 2px'
-          }}
-        />
+        <div aria-hidden="true" className="te-bubblemenu-divider" />
 
         <FormatButton
           active={editor.isActive('link')}

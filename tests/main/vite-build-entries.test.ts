@@ -28,7 +28,10 @@ describe('electron.vite.config build entries', () => {
 
   it('preserves existing renderer plugins', () => {
     expect(configSource).toContain('react()')
-    expect(configSource).toContain('tailwindcss()')
+  })
+
+  it('has no Tailwind engine (ADR 0005: one styling mechanism)', () => {
+    expect(configSource).not.toContain('tailwindcss')
   })
 
   it('preserves existing renderer aliases', () => {

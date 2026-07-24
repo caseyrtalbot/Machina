@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { FileText } from 'lucide-react'
-import { borderRadius, colors, typography } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 import { SectionLabel } from '../../design/components/SectionLabel'
 import { useSettingsStore } from '../../store/settings-store'
 import { useVaultStore } from '../../store/vault-store'
@@ -133,98 +133,44 @@ export function DailyNoteSection({
   for (let d = 1; d <= totalDays; d++) cells.push(d)
 
   return (
-    <div className="px-3 pt-1 pb-2">
+    <div className="te-dailynote">
       {/* Header */}
       <button
-        className="flex items-center gap-1.5 w-full text-left mb-1"
-        style={{
-          color: colors.text.muted,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: 0
-        }}
+        className="te-dailynote-toggle"
+        data-collapsed={collapsed ? 'true' : undefined}
         onClick={toggleCollapsed}
       >
-        <span
-          className="text-[9px] transition-transform"
-          style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-        >
-          ▼
-        </span>
+        <span className="te-dailynote-caret">▼</span>
         {/* Console section header: muted mono 10px / 0.14em uppercase. */}
-        <SectionLabel style={{ color: 'inherit' }}>Daily Notes</SectionLabel>
+        <SectionLabel>Daily Notes</SectionLabel>
       </button>
 
       {!collapsed && (
         <div>
           {/* Month navigation */}
-          <div className="flex items-center justify-between mb-1">
-            <button
-              onClick={prevMonth}
-              aria-label="Previous month"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: colors.text.muted,
-                cursor: 'pointer',
-                fontSize: '11px',
-                padding: '2px 4px'
-              }}
-            >
+          <div className="te-dailynote-nav">
+            <button onClick={prevMonth} aria-label="Previous month" className="te-dailynote-navbtn">
               ‹
             </button>
             {/* Mono numeric/month label — sits visually with the rest of the
                 console chrome instead of looking like sentence text. */}
-            <span
-              style={{
-                color: colors.text.secondary,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: '0.04em'
-              }}
-            >
-              {formatMonthYear(year, month)}
-            </span>
-            <button
-              onClick={nextMonth}
-              aria-label="Next month"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: colors.text.muted,
-                cursor: 'pointer',
-                fontSize: '11px',
-                padding: '2px 4px'
-              }}
-            >
+            <span className="te-dailynote-month">{formatMonthYear(year, month)}</span>
+            <button onClick={nextMonth} aria-label="Next month" className="te-dailynote-navbtn">
               ›
             </button>
           </div>
 
           {/* Weekday labels */}
-          <div className="grid grid-cols-7 gap-0 mb-0.5">
+          <div className="te-dailynote-weekdays">
             {WEEKDAY_LABELS.map((label, i) => (
-              <div
-                key={i}
-                className="text-center"
-                style={{
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.mono,
-                  fontSize: typography.microLabel.size,
-                  letterSpacing: typography.microLabel.letterSpacing,
-                  textTransform: typography.microLabel.textTransform,
-                  lineHeight: '16px'
-                }}
-              >
+              <div key={i} className="te-dailynote-weekday">
                 {label}
               </div>
             ))}
           </div>
 
           {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-0">
+          <div className="te-dailynote-grid">
             {cells.map((day, i) => {
               if (day === null) {
                 return <div key={`empty-${i}`} />
@@ -238,101 +184,38 @@ export function DailyNoteSection({
                 <button
                   key={dateStr}
                   onDoubleClick={() => handleDayClick(day)}
-                  style={{
-                    // Today gets the warm accent fill rather than pure white
-                    // so the calendar reads consistently with the rest of the
-                    // Console palette.
-                    background: isToday ? colors.accent.default : 'none',
-                    border: 'none',
-                    borderRadius: borderRadius.inline,
-                    color: isToday
-                      ? 'var(--color-accent-fg)'
-                      : hasNote
-                        ? colors.text.primary
-                        : colors.text.muted,
-                    cursor: 'pointer',
-                    fontFamily: typography.fontFamily.mono,
-                    fontSize: '10px',
-                    fontWeight: hasNote || isToday ? 600 : 400,
-                    lineHeight: '20px',
-                    padding: 0,
-                    textAlign: 'center' as const,
-                    position: 'relative' as const
-                  }}
+                  className="te-dailynote-day"
+                  data-today={isToday ? 'true' : undefined}
+                  data-hasnote={hasNote ? 'true' : undefined}
                 >
                   {day}
-                  {hasNote && !isToday && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        bottom: '1px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '3px',
-                        height: '3px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--color-accent-default)'
-                      }}
-                    />
-                  )}
+                  {hasNote && !isToday && <span className="te-dailynote-dot" />}
                 </button>
               )
             })}
           </div>
 
           {/* Today button */}
-          <button
-            onClick={goToToday}
-            className="w-full mt-1.5"
-            // Console: minimal hairline button — transparent ground, mono
-            // uppercase 10px label. No filled pills.
-            style={{
-              background: 'transparent',
-              border: `1px solid ${colors.border.subtle}`,
-              borderRadius: borderRadius.inline,
-              color: colors.text.muted,
-              cursor: 'pointer',
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              padding: '4px 0',
-              textAlign: 'center'
-            }}
-          >
+          <button onClick={goToToday} className="te-dailynote-today">
             Today
           </button>
 
           {/* Pinned daily note files for viewed month */}
           {vaultPath && pinnedNotes.length > 0 && (
-            <div className="mt-1.5">
+            <div className="te-dailynote-pinned">
               {pinnedNotes.map(({ dateStr: d, path }) => {
                 const isActive = activeFilePath === path
                 return (
                   <button
                     key={d}
                     type="button"
-                    className="file-row-hover flex items-center gap-1.5 w-full text-left py-[2px]"
+                    className="te-dailynote-pinned-row"
                     data-active={isActive || undefined}
                     onClick={() => onFileSelect(path)}
                     onContextMenu={(e) => onContextMenu?.(e, path, false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      paddingLeft: 24,
-                      fontSize: 'var(--env-sidebar-font-size)'
-                    }}
                   >
                     <FileText size={14} color={colors.text.muted} strokeWidth={1.5} />
-                    <span
-                      style={{
-                        color: isActive ? colors.text.primary : colors.text.secondary,
-                        fontSize: 'var(--env-sidebar-font-size)'
-                      }}
-                    >
-                      {d}
-                    </span>
+                    <span className="te-dailynote-pinned-name">{d}</span>
                     <span className="file-name-text__ext">.md</span>
                   </button>
                 )

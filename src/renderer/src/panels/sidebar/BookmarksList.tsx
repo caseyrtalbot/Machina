@@ -2,14 +2,7 @@ import { useState } from 'react'
 import { Star } from 'lucide-react'
 import { useUiStore } from '../../store/ui-store'
 import { useVaultStore } from '../../store/vault-store'
-import {
-  borderRadius,
-  colors,
-  iconSize,
-  iconStroke,
-  transitions,
-  typography
-} from '../../design/tokens'
+import { colors, iconSize, iconStroke } from '../../design/tokens'
 
 interface BookmarksListProps {
   activeFilePath: string | null
@@ -34,48 +27,22 @@ export function BookmarksList({ activeFilePath, onFileSelect }: BookmarksListPro
   })
 
   return (
-    <div className="flex-shrink-0">
+    <div className="te-bookmarks">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
         className="tag-browser__toggle interactive-hover"
-        style={{ transition: transitions.hover }}
       >
-        <div className="flex items-center gap-1.5">
-          <span
-            style={{ color: colors.text.muted, fontSize: 'var(--env-sidebar-tertiary-font-size)' }}
-          >
-            {expanded ? '▾' : '▸'}
-          </span>
+        <div className="te-bookmarks-toggle-left">
+          <span className="te-bookmarks-caret">{expanded ? '▾' : '▸'}</span>
           {/* Console section header: mono 10px / 0.14em uppercase, muted */}
-          <span
-            style={{
-              color: colors.text.muted,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              fontWeight: 600
-            }}
-          >
-            Bookmarks
-          </span>
-          <span
-            style={{
-              color: colors.text.disabled,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              fontVariantNumeric: 'tabular-nums'
-            }}
-          >
-            {bookmarkedPaths.length}
-          </span>
+          <span className="te-bookmarks-label">Bookmarks</span>
+          <span className="te-bookmarks-count">{bookmarkedPaths.length}</span>
         </div>
       </button>
 
       {expanded && (
-        <div className="flex flex-col gap-0.5 px-1 pb-1">
+        <div className="te-bookmarks-list">
           {items.map((item) => {
             const isActive = activeFilePath === item.path
             return (
@@ -87,33 +54,17 @@ export function BookmarksList({ activeFilePath, onFileSelect }: BookmarksListPro
                   e.preventDefault()
                   toggleBookmark(item.path)
                 }}
-                className="file-row-hover flex items-center gap-2 px-2 py-1 text-left"
-                style={{
-                  // Active rows pick up a 2px accent left-stripe + brighter
-                  // background, matching the tree row treatment.
-                  background: isActive ? 'var(--color-bg-elevated)' : 'transparent',
-                  borderLeft: `2px solid ${isActive ? colors.accent.default : 'transparent'}`,
-                  borderRadius: borderRadius.inline,
-                  paddingLeft: 6,
-                  transition: transitions.hover
-                }}
+                className="te-bookmarks-row"
+                data-active={isActive || undefined}
                 title={`${item.path}\nRight-click to remove`}
               >
                 <Star
-                  className="shrink-0"
+                  className="te-bookmarks-star"
                   size={iconSize.sm}
                   strokeWidth={iconStroke}
                   color={isActive ? colors.accent.default : colors.text.muted}
                 />
-                <span
-                  className="truncate flex-1"
-                  style={{
-                    color: isActive ? colors.text.primary : colors.text.secondary,
-                    fontSize: 12
-                  }}
-                >
-                  {item.title}
-                </span>
+                <span className="te-bookmarks-name">{item.title}</span>
               </button>
             )
           })}
