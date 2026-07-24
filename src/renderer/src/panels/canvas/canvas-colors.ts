@@ -6,6 +6,11 @@
  *
  * Deliberately NOT `getArtifactColor`: that hashes the type string into
  * CUSTOM_TYPE_PALETTE, which would assign these card types unrelated colors.
+ *
+ * This map IS a palette definition (ADR 0005 hex allowlist), same category as
+ * the color maps in design/tokens.ts: the canonical source for Pixi/WebGL
+ * card-type colors, which have no corresponding CSS token and are consumed by
+ * the LOD/minimap renderers, not CSS.
  */
 const CARD_TYPE_COLORS: Record<string, string> = {
   text: '#94a3b8',

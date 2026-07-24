@@ -14,6 +14,8 @@ import './assets/index.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { ThemeProvider } from './design/Theme'
+import { Gallery } from './design/Gallery'
 
 // Prevent Electron from navigating to dropped files.
 // Without this, OS-level file drops load the file in the window
@@ -21,8 +23,19 @@ import App from './App'
 document.addEventListener('dragover', (e) => e.preventDefault())
 document.addEventListener('drop', (e) => e.preventDefault())
 
+// Dev-only enumeration route (ADR 0005 §Enforcement). Rendered instead of the
+// app when ?gallery=1 is present; wrapped in ThemeProvider so token CSS vars
+// resolve. Never linked from within the app — reachable only via the query.
+const isGallery = window.location.search.includes('gallery=1')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {isGallery ? (
+      <ThemeProvider>
+        <Gallery />
+      </ThemeProvider>
+    ) : (
+      <App />
+    )}
   </StrictMode>
 )

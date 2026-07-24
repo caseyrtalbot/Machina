@@ -24,6 +24,7 @@ CLAUDE.md
 *.png
 !build/icon.png
 !docs/assets/*.png
+!e2e/visual.spec.ts-snapshots/*.png
 
 # Working documents (specs, plans, research)
 docs/working/

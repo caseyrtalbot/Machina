@@ -1,6 +1,7 @@
 import type { SimNode, GraphViewport, LodLevel } from './graph-types'
 import { shouldShowLabel } from './graph-lod'
 import { SIGNAL_OPACITY } from '@shared/types'
+import { STRUCTURAL_COLORS } from '@renderer/design/themes'
 
 export class LabelLayer {
   private canvas: HTMLCanvasElement
@@ -72,7 +73,7 @@ export class LabelLayer {
       this.labelColor =
         getComputedStyle(document.documentElement)
           .getPropertyValue('--color-text-primary')
-          .trim() || '#e2e8f0'
+          .trim() || STRUCTURAL_COLORS.text.primary
     }
     ctx.font = `500 ${fontSize}px ${this.fontFamily}`
     ctx.textAlign = 'center'

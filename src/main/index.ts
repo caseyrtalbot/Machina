@@ -352,10 +352,16 @@ function createWindow(): BrowserWindow {
     }
   })
 
+  // Dev-only gallery route (ADR 0005 §Enforcement): the packaged app loads its
+  // own file:// URL, so the e2e visual spec opts in via TE_GALLERY=1, which
+  // appends ?gallery=1 for the renderer to branch on.
+  const galleryQuery = process.env['TE_GALLERY'] === '1'
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    window.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    const url = process.env['ELECTRON_RENDERER_URL']
+    window.loadURL(galleryQuery ? `${url}?gallery=1` : url)
   } else {
-    window.loadFile(join(__dirname, '../renderer/index.html'))
+    const indexHtml = join(__dirname, '../renderer/index.html')
+    window.loadFile(indexHtml, galleryQuery ? { search: 'gallery=1' } : undefined)
   }
 
   if (initialWindowState.isMaximized) {

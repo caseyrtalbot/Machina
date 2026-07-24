@@ -270,6 +270,7 @@
     display: none !important;
   }
 }
+/* ═══ END vendored Tailwind prelude — hex above this line is allowlisted ═══ */
 
 /* ─── Base Typography ─── */
 
@@ -730,7 +731,7 @@ h6 {
 }
 .te-btn[data-variant='primary'] {
   background: var(--color-accent-default);
-  color: var(--color-accent-fg, #1a0f08);
+  color: var(--color-accent-fg);
   border-color: var(--color-accent-default);
   font-weight: 500;
 }
@@ -938,6 +939,8 @@ body {
   --signal-warn: #dfa11a;
   --signal-danger: #ff847d;
   --signal-info: #6dafff;
+  /* Terminal-dock idle status green (distinct from --signal-success). */
+  --signal-idle: #3dca8d;
 
   /* ── Density (Theme.tsx overrides per density on mount) ── */
   --row-h: 26px;
@@ -999,6 +1002,17 @@ body {
   --canvas-card-bg: rgba(10, 10, 14, 0.94);
   --canvas-card-title-bg: rgba(0, 0, 0, 0.45);
   --canvas-link-cyan: #5cb8c4;
+  --canvas-text-heading: #e8e8e8;
+  --canvas-blockquote-bar: #4a4a4a;
+  /* Terminal card surface — one shade off --color-bg-surface, kept exact. */
+  --canvas-terminal-bg: #050607;
+
+  /* ── Glass material (ADR 0005): one recipe per elevation, referenced at
+   * every floating-panel / popover site instead of inlined rgba + blur. ── */
+  --glass-bg: rgba(4, 4, 8, 0.9);
+  --glass-popover-bg: rgba(4, 4, 8, 0.95);
+  --glass-blur: blur(24px) saturate(1.4);
+  --glass-popover-blur: blur(16px) saturate(1.3);
 }
 
 @media (resolution < 2dppx) {
@@ -2698,11 +2712,11 @@ body {
 
 /* Canvas card link color override */
 .canvas-prose .ProseMirror a {
-  color: var(--canvas-link-cyan, #5cb8c4);
+  color: var(--canvas-link-cyan);
   opacity: 1;
 }
 .canvas-prose .ProseMirror a:hover {
-  color: var(--canvas-link-cyan, #5cb8c4);
+  color: var(--canvas-link-cyan);
   filter: brightness(1.15);
 }
 
@@ -2725,7 +2739,7 @@ body {
 .canvas-prose .ProseMirror h1 {
   font-size: 2.4em;
   font-weight: 700;
-  color: var(--canvas-text-heading, #e8e8e8);
+  color: var(--canvas-text-heading);
   letter-spacing: -0.03em;
   line-height: 1.1;
   margin-top: 0;
@@ -2757,7 +2771,7 @@ body {
 }
 
 .canvas-prose .ProseMirror blockquote {
-  border-left: 3px solid var(--canvas-blockquote-bar, #4a4a4a);
+  border-left: 3px solid var(--canvas-blockquote-bar);
   padding-left: 16px;
   margin-left: 0;
   margin-right: 0;
@@ -3501,7 +3515,7 @@ button {
     background-color var(--transition-hover),
     color var(--transition-hover),
     opacity var(--transition-hover),
-    transform 80ms ease-out;
+    transform var(--t-micro);
 }
 
 /* ─── Rich Text Card Editor (canvas TextCard) Prose Styles ─── */
@@ -3964,9 +3978,9 @@ button {
 .onboarding__panel {
   overflow: hidden;
   width: 340px;
-  background-color: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background-color: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-floating);
 }
@@ -4095,8 +4109,8 @@ button {
 .first-run__panel {
   width: 420px;
   max-width: 90vw;
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-floating);
   padding: 32px 36px;
@@ -4258,9 +4272,9 @@ button {
   max-width: 380px;
 }
 .te-toast {
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-subtle);
   border-left: 2px solid var(--color-accent-default);
   box-shadow: var(--shadow-compact);
@@ -4298,9 +4312,9 @@ button {
 .te-ctx-menu {
   padding: 4px;
   z-index: 1000;
-  background: rgba(4, 4, 8, 0.95);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  background: var(--glass-popover-bg);
+  backdrop-filter: var(--glass-popover-blur);
+  -webkit-backdrop-filter: var(--glass-popover-blur);
   border: 1px solid var(--color-border-default);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-compact);
@@ -4410,8 +4424,8 @@ button {
   padding: 28px;
   border-radius: var(--r-card);
   background-color: var(--canvas-card-bg);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--canvas-card-border);
   box-shadow: var(--shadow-floating);
 }
@@ -5690,9 +5704,9 @@ button {
   max-height: 72vh;
   display: flex;
   flex-direction: column;
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-subtle);
   border-radius: 0;
   box-shadow: var(--shadow-compact);
@@ -5943,9 +5957,9 @@ button {
   align-items: center;
 }
 .te-palette-panel {
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--line-default);
   border-radius: var(--r-tool);
   width: 640px;
@@ -6825,9 +6839,9 @@ button {
   right: 20px;
   max-width: 300px;
   padding: 12px 16px;
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-subtle);
   border-radius: 0;
   color: var(--color-text-primary);
@@ -7202,7 +7216,7 @@ button {
 }
 
 .canvas-card[data-terminal] {
-  background: #050607;
+  background: var(--canvas-terminal-bg);
 }
 
 /* State-driven ring + accent border. Written in ascending priority order so
@@ -7555,7 +7569,7 @@ button {
 }
 
 /* ── shared/CardBadge.tsx ──
- * backgroundColor is a prop (defaults to badgeGreen #4caf50) — stays inline. */
+ * backgroundColor is a prop (defaults to canvasTokens.badgeGreen) — stays inline. */
 .te-card-badge {
   display: inline-block;
   color: var(--color-accent-fg);
@@ -8166,7 +8180,7 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--color-accent-default);
-  background-color: rgba(4, 4, 8, 0.95);
+  background-color: var(--glass-popover-bg);
   border: 1px solid var(--color-accent-default);
   border-radius: var(--r-inline);
   box-shadow: var(--shadow-compact);
@@ -8220,14 +8234,14 @@ button {
   align-items: center;
   gap: 0.25rem;
   font-size: 10px;
-  color: #dfa11a;
+  color: var(--signal-warn);
 }
 .te-termcard-warning-dot {
   display: inline-block;
   border-radius: 9999px;
   width: 5px;
   height: 5px;
-  background-color: #dfa11a;
+  background-color: var(--signal-warn);
 }
 .te-termcard-hookbanner {
   position: absolute;
@@ -8364,7 +8378,7 @@ button {
   opacity: 0.5;
 }
 .te-termdock-dot[data-status='idle'] {
-  background-color: #3dca8d;
+  background-color: var(--signal-idle);
 }
 .te-termdock-dot[data-status='busy'],
 .te-termdock-dot[data-status='claude'] {
@@ -8526,11 +8540,11 @@ button {
 /* Clear button turns error-red on hover and stays red once armed. Compound
  * with `.canvas-toolbtn` (0,2,0) so it wins over `.canvas-toolbtn:hover`
  * (0,3,0 → but scoped by :not(:disabled)); the compound keeps precedence
- * independent of fragment order. #ff847d carried verbatim (colors.claude.error;
- * hex gate is a later pass). */
+ * independent of fragment order. Danger red via --signal-danger
+ * (colors.claude.error). */
 .canvas-toolbtn.te-cv-clear-btn:hover:not(:disabled),
 .canvas-toolbtn.te-cv-clear-btn[data-armed='true'] {
-  color: #ff847d;
+  color: var(--signal-danger);
 }
 
 /* ── CanvasMinimap.tsx ── */
@@ -8832,9 +8846,9 @@ button {
   width: 340px;
   padding: 20px 24px;
   border-radius: var(--r-card);
-  background-color: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background-color: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border-subtle);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.5),
@@ -9097,9 +9111,9 @@ button {
 }
 /* mirrors floatingPanel.glass.popoverBg / popoverBlur */
 .te-ontology-bar--preview {
-  background: rgba(4, 4, 8, 0.95);
+  background: var(--glass-popover-bg);
   border: 1px solid var(--line-default);
-  backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: var(--glass-popover-blur);
 }
 .te-ontology-count {
   opacity: 0.6;
@@ -9150,7 +9164,7 @@ button {
   border-radius: var(--r-tool);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-subtle);
-  backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: var(--glass-blur);
   font-size: 13px;
   color: var(--color-text-secondary);
   z-index: 100;
@@ -9195,9 +9209,9 @@ button {
   bottom: 12px;
   width: 340px;
   padding: 16px;
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border-default);
   border-radius: 0;
   box-shadow: var(--shadow-compact);
@@ -9398,9 +9412,9 @@ button {
   width: 240px;
   max-height: calc(100% - 24px);
   padding: 16px 14px;
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-floating);
   border: 1px solid var(--color-border-default);
   scrollbar-width: thin;
@@ -9669,9 +9683,9 @@ button {
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   pointer-events: auto;
-  background: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid color-mix(in srgb, var(--canvas-link-cyan) 18%, transparent);
   box-shadow: var(--shadow-compact);
 }
@@ -9748,12 +9762,11 @@ button {
    these two legacy tokens sit outside the --t-* set but are the only value-exact
    matches; approximating to --t-fast/--t-med would change the timing.
 
-   Pre-existing latent color bugs carried forward pixel-identically (NOT fixed —
-   flagged for the colour pass): several call sites wrote `${cssVar}NN` (e.g.
-   `var(--color-accent-default)40`) which is invalid CSS and rendered as
-   dropped/transparent/currentColor. Reproduced faithfully below with a note at
-   each site: BooleanInput on-track tint, ListInput add-pill border, and the
-   frontmatter source-link underline colour.
+   Pre-existing latent color bugs (call sites wrote `${cssVar}NN`, e.g.
+   `var(--color-accent-default)40` — invalid CSS that rendered as
+   dropped/transparent/currentColor) were FIXED in the slice-7 colour pass via
+   color-mix(); see the "slice 7 fix" notes at each site: BooleanInput on-track
+   tint, ListInput add-pill border, and the frontmatter source-link underline.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── FrontmatterHeader ── */
@@ -9803,13 +9816,12 @@ button {
   color: var(--color-text-secondary);
 }
 /* Source link: base cursor default, pointer + primary-on-hover only when
-   navigable (data-nav). Underline colour intentionally omitted — the source
-   wrote `var(--color-text-muted)40` (invalid) which rendered as currentColor;
-   the default text-decoration-color is currentColor, so this is pixel-identical.
-   FLAG: latent invalid alpha on the source-link underline. */
+   navigable (data-nav). Underline = muted 25% (slice 7 fix: the source wrote
+   the invalid `var(--color-text-muted)40`, which fell back to currentColor). */
 .te-frontmatter-source-link {
   cursor: default;
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-text-muted) 25%, transparent);
   text-underline-offset: 2px;
 }
 .te-frontmatter-source-link[data-nav='true'] {
@@ -10039,10 +10051,9 @@ button {
   font-size: 10px;
 }
 
-/* Boolean toggle: track + knob driven by data-on. NOTE: the on-track tint is
-   transparent because the source wrote `var(--color-accent-default)40` (invalid
-   CSS → dropped), so the true state rendered with no track fill. Reproduced
-   pixel-identically. FLAG: latent invalid alpha (intended ~accent 25%). */
+/* Boolean toggle: track + knob driven by data-on. On-track tint = accent 25%
+   (slice 7 fix: the source wrote the invalid `var(--color-accent-default)40`,
+   which dropped so the true state rendered with no track fill). */
 .te-prop-toggle {
   width: 30px;
   height: 16px;
@@ -10056,7 +10067,7 @@ button {
   transition: background-color var(--transition-hover);
 }
 .te-prop-toggle[data-on='true'] {
-  background-color: transparent;
+  background-color: color-mix(in srgb, var(--color-accent-default) 25%, transparent);
 }
 .te-prop-toggle__knob {
   position: absolute;
@@ -10114,10 +10125,9 @@ button {
 .te-prop-pill-remove:hover {
   opacity: 1;
 }
-/* Add-item pill: no border — the source wrote
-   `0.5px dashed var(--color-text-muted)40` (invalid → whole border dropped),
-   so it rendered borderless. Reproduced pixel-identically. FLAG: latent invalid
-   alpha (intended a dashed muted 25% hairline). */
+/* Add-item pill: dashed muted 25% hairline (slice 7 fix: the source wrote the
+   invalid `0.5px dashed var(--color-text-muted)40`, which dropped the whole
+   border so it rendered borderless). */
 .te-prop-list-add {
   display: inline-flex;
   align-items: center;
@@ -10127,7 +10137,7 @@ button {
   letter-spacing: 0.08em;
   border-radius: var(--r-inline);
   padding: 2px 8px;
-  border: none;
+  border: 0.5px dashed color-mix(in srgb, var(--color-text-muted) 25%, transparent);
   background-color: var(--color-bg-surface);
   color: var(--color-text-muted);
   line-height: 1.4;
@@ -10418,10 +10428,10 @@ button {
   justify-content: space-between;
   padding: 0.5rem 1rem;
   flex-shrink: 0;
-  border-left: 2px solid #dfa11a;
-  background-color: color-mix(in srgb, #dfa11a 10%, transparent);
+  border-left: 2px solid var(--signal-warn);
+  background-color: color-mix(in srgb, var(--signal-warn) 10%, transparent);
   border-bottom: 1px solid var(--border-subtle);
-  color: #dfa11a;
+  color: var(--signal-warn);
   font-family: var(--font-mono);
 }
 .te-edpanel-conflict-label {
@@ -10448,8 +10458,8 @@ button {
   opacity: 0.8;
 }
 .te-edpanel-conflict-btn--warn {
-  color: #dfa11a;
-  border: 1px solid #dfa11a;
+  color: var(--signal-warn);
+  border: 1px solid var(--signal-warn);
 }
 .te-edpanel-conflict-btn--neutral {
   color: var(--color-text-secondary);
@@ -10558,7 +10568,7 @@ button {
   white-space: nowrap;
 }
 .te-findbar-count[data-empty='true'] {
-  color: #dfa11a;
+  color: var(--signal-warn);
 }
 .te-findbar-btn {
   background: transparent;
@@ -10577,8 +10587,8 @@ button {
   align-items: center;
   gap: 0.125rem;
   padding: 0.25rem;
-  background-color: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
+  background-color: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border-default);
   border-radius: var(--r-tool);
   box-shadow:
@@ -10750,8 +10760,8 @@ button {
 /* ── SlashCommand / WikilinkSuggestion popup panel ── */
 .te-slashmenu-panel {
   width: 280px;
-  background-color: rgba(4, 4, 8, 0.9);
-  backdrop-filter: blur(24px) saturate(1.4);
+  background-color: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
   border-radius: 0;
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.5),
@@ -10883,9 +10893,9 @@ button {
   list-style: none;
   max-height: 320px;
   overflow-y: auto;
-  background: rgba(4, 4, 8, 0.95);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  background: var(--glass-popover-bg);
+  backdrop-filter: var(--glass-popover-blur);
+  -webkit-backdrop-filter: var(--glass-popover-blur);
   border: 1px solid var(--color-border-default);
   border-radius: var(--r-inline);
   box-shadow:
@@ -11854,7 +11864,7 @@ button {
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   background: rgba(14, 16, 22, 0.96);
-  backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--line-default);
   border-radius: var(--r-card);
   padding: 12px 16px;

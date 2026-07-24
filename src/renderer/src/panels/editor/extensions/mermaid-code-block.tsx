@@ -3,6 +3,7 @@ import { LoadingState } from '../../../components/emptystate/LoadingState'
 import CodeBlock from '@tiptap/extension-code-block'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react'
+import { BACKGROUND, STRUCTURAL_COLORS } from '@renderer/design/themes'
 
 // Mermaid is loaded on demand (~2MB). The module is cached after first import.
 let mermaidModule: (typeof import('mermaid'))['default'] | null = null
@@ -32,12 +33,12 @@ function initMermaid(m: (typeof import('mermaid'))['default']): void {
     theme: 'dark',
     darkMode: true,
     themeVariables: {
-      primaryColor: resolveCssVar('--color-bg-elevated', '#1e293b'),
-      primaryBorderColor: resolveCssVar('--color-border-default', '#475569'),
-      primaryTextColor: resolveCssVar('--color-text-primary', '#e2e8f0'),
-      lineColor: resolveCssVar('--color-text-secondary', '#9a9a9a'),
-      secondaryColor: resolveCssVar('--color-bg-surface', '#334155'),
-      tertiaryColor: resolveCssVar('--color-bg-elevated', '#1e293b'),
+      primaryColor: resolveCssVar('--color-bg-elevated', BACKGROUND.elevated),
+      primaryBorderColor: resolveCssVar('--color-border-default', STRUCTURAL_COLORS.border.default),
+      primaryTextColor: resolveCssVar('--color-text-primary', STRUCTURAL_COLORS.text.primary),
+      lineColor: resolveCssVar('--color-text-secondary', STRUCTURAL_COLORS.text.secondary),
+      secondaryColor: resolveCssVar('--color-bg-surface', BACKGROUND.surface),
+      tertiaryColor: resolveCssVar('--color-bg-elevated', BACKGROUND.elevated),
       fontFamily: 'var(--font-mono)',
       fontSize: '14px'
     }

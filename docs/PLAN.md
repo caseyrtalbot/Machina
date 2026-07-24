@@ -109,6 +109,14 @@ is green. Layer 4 items may start once their stated dependencies exist.
    tokens + `te-` classes; stand up the enforcement machinery (contrast unit tests,
    dev-only component gallery route, Playwright visual regression over gallery +
    shell). → verify: ADR 0005 greppable gates pass.
+   (Completed 2026-07-24 across seven slices, 2026-07-21→24. All eight appearance
+   axes deleted; Tailwind engine and both deps removed; styling converged on tokens +
+   `te-` classes. Enforcement machinery, all in-tree: six strict gates in
+   `tests/design/greppable-gates.test.ts`; 35 WCAG assertions in
+   `tests/design/contrast.test.ts` (muted-text 4.5:1 shortfall pinned at ≥4.0 for the
+   Layer 4 retune); dev gallery `design/Gallery.tsx` behind `?gallery=1`
+   (`TE_GALLERY=1` for packaged runs); 13 Playwright baselines in
+   `e2e/visual.spec.ts`.)
 3. One write spine: route ghost-emerge and graph-enrichment writes through
    PathGuard + `writeStampedNote` + ApprovalQueue, retiring the bespoke
    `claude-cli.ts`/`ghost-emerge.ts` path's ungated writes.

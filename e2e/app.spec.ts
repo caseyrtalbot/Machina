@@ -197,22 +197,19 @@ test.describe.serial('Workspace', () => {
     await expect(sidebar).toBeVisible()
   })
 
-  test('settings File Tree slider updates file-tree typography', async () => {
-    await page.getByTitle('Settings').click()
+  test('settings modal opens and its sliders update their value', async () => {
+    await page.getByRole('button', { name: 'Open settings' }).click()
     const dialog = page.getByRole('dialog', { name: 'Settings' })
     await expect(dialog).toBeVisible({ timeout: 5000 })
 
-    // Flat settings surface (no Environment sub-page since the modal redesign):
-    // the sidebar font size lives on the "File Tree" row.
-    const sidebarFontSlider = dialog
-      .locator('.settings-row', { hasText: 'File Tree' })
-      .locator('input[type="range"]')
+    // The appearance axis (File Tree font-size slider) was removed in ADR 0005
+    // slice 1. Autosave is the representative slider on the flat settings
+    // surface; assert it drives its own value readout.
+    const autosaveRow = dialog.locator('.settings-row', { hasText: 'Autosave' })
+    const autosaveSlider = autosaveRow.locator('input[type="range"]')
 
-    await setRangeValue(sidebarFontSlider, 16)
-    await expect(page.locator('[data-testid="file-tree"] [data-node-name]').first()).toHaveCSS(
-      'font-size',
-      '16px'
-    )
+    await setRangeValue(autosaveSlider, 2000)
+    await expect(autosaveRow.locator('.settings-value')).toHaveText('2000ms')
   })
 })
 

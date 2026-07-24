@@ -1,0 +1,330 @@
+/*
+ * Dev-only gallery layout (ADR 0005 §Enforcement — the component gallery route).
+ * Imported ONLY by Gallery.tsx, which renders only behind `?gallery=1`. This
+ * file owns nothing but scaffolding: page frame, section rhythm, swatch grids,
+ * and a type-scale ramp. Every color is a token var() — zero hex literals and
+ * no motion declarations — so the file passes the same ADR 0005 gates as ship CSS.
+ */
+
+.te-gallery {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 32px 40px 96px;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  overflow-y: auto;
+}
+
+.te-gallery__title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.te-gallery__lede {
+  margin: 0 0 40px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.te-gallery-section {
+  margin-bottom: 44px;
+}
+
+.te-gallery-section__label {
+  margin: 0 0 14px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--line-subtle);
+  padding-bottom: 6px;
+}
+
+.te-gallery-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.te-gallery-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Color swatches ── */
+
+.te-gallery-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px;
+}
+
+.te-gallery-swatch {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-inline);
+  overflow: hidden;
+}
+
+.te-gallery-swatch__chip {
+  height: 56px;
+  width: 100%;
+}
+
+/* Neutral background ramp (void → raised → chrome/rail). */
+.te-gallery-swatch__chip[data-token='bg-base'] {
+  background: var(--color-bg-base);
+}
+.te-gallery-swatch__chip[data-token='bg-surface'] {
+  background: var(--color-bg-surface);
+}
+.te-gallery-swatch__chip[data-token='bg-elevated'] {
+  background: var(--color-bg-elevated);
+}
+.te-gallery-swatch__chip[data-token='bg-chrome'] {
+  background: var(--color-bg-chrome);
+}
+.te-gallery-swatch__chip[data-token='bg-rail'] {
+  background: var(--color-bg-rail);
+}
+.te-gallery-swatch__chip[data-token='bg-card'] {
+  background: var(--bg-card);
+}
+.te-gallery-swatch__chip[data-token='bg-card-hover'] {
+  background: var(--bg-card-hover);
+}
+
+/* Accent ramp. */
+.te-gallery-swatch__chip[data-token='accent-default'] {
+  background: var(--color-accent-default);
+}
+.te-gallery-swatch__chip[data-token='accent-hover'] {
+  background: var(--color-accent-hover);
+}
+.te-gallery-swatch__chip[data-token='accent-muted'] {
+  background: var(--color-accent-muted);
+}
+.te-gallery-swatch__chip[data-token='accent-soft'] {
+  background: var(--color-accent-soft);
+}
+.te-gallery-swatch__chip[data-token='accent-line'] {
+  background: var(--color-accent-line);
+}
+
+/* Signals. */
+.te-gallery-swatch__chip[data-token='signal-success'] {
+  background: var(--signal-success);
+}
+.te-gallery-swatch__chip[data-token='signal-warn'] {
+  background: var(--signal-warn);
+}
+.te-gallery-swatch__chip[data-token='signal-danger'] {
+  background: var(--signal-danger);
+}
+.te-gallery-swatch__chip[data-token='signal-info'] {
+  background: var(--signal-info);
+}
+
+/* Border / hairline alpha ramp — shown as a fill over a mid surface so the
+ * translucent white steps read against the near-black page. */
+.te-gallery-swatch__chip[data-token='line-faint'] {
+  background: var(--line-faint);
+}
+.te-gallery-swatch__chip[data-token='line-subtle'] {
+  background: var(--line-subtle);
+}
+.te-gallery-swatch__chip[data-token='line-default'] {
+  background: var(--line-default);
+}
+.te-gallery-swatch__chip[data-token='line-strong'] {
+  background: var(--line-strong);
+}
+
+.te-gallery-swatch__meta {
+  padding: 6px 8px;
+  background: var(--color-bg-surface);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.te-gallery-swatch__name {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-primary);
+}
+
+.te-gallery-swatch__val {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+/* ── Text-level specimens (color applied to real text on real surfaces) ── */
+
+.te-gallery-text-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+}
+
+.te-gallery-text-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-inline);
+  font-size: 13px;
+}
+
+.te-gallery-text-row[data-surface='base'] {
+  background: var(--color-bg-base);
+}
+.te-gallery-text-row[data-surface='surface'] {
+  background: var(--color-bg-surface);
+}
+.te-gallery-text-row[data-surface='elevated'] {
+  background: var(--color-bg-elevated);
+}
+
+.te-gallery-text-row[data-level='primary'] {
+  color: var(--color-text-primary);
+}
+.te-gallery-text-row[data-level='secondary'] {
+  color: var(--color-text-secondary);
+}
+.te-gallery-text-row[data-level='muted'] {
+  color: var(--color-text-muted);
+}
+.te-gallery-text-row[data-level='disabled'] {
+  color: var(--color-text-disabled);
+}
+.te-gallery-text-row[data-level='accent'] {
+  color: var(--color-accent-default);
+}
+
+/* ── Type scale (fixed modular sizes; px mirrors the token constants) ── */
+
+.te-gallery-type-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.te-gallery-type-row__tag {
+  flex: 0 0 132px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.te-gallery-type-row__sample {
+  color: var(--color-text-primary);
+}
+
+.te-gallery-type-row__sample[data-size='micro'] {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.te-gallery-type-row__sample[data-size='metadata'] {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.te-gallery-type-row__sample[data-size='ui-sm'] {
+  font-size: 12px;
+}
+.te-gallery-type-row__sample[data-size='ui'] {
+  font-size: 13px;
+}
+.te-gallery-type-row__sample[data-size='input'] {
+  font-size: 15px;
+}
+.te-gallery-type-row__sample[data-size='body'] {
+  font-size: 16px;
+}
+
+/* ── Elevation / material tiers (current shadow tokens over the bg ramp) ── */
+
+.te-gallery-elevation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 12px 0 24px;
+}
+
+.te-gallery-elev-card {
+  width: 168px;
+  padding: 18px 16px;
+  border: 1px solid var(--line-default);
+  border-radius: var(--r-card);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.te-gallery-elev-card[data-elev='void'] {
+  background: var(--color-bg-base);
+}
+.te-gallery-elev-card[data-elev='surface'] {
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+.te-gallery-elev-card[data-elev='raised'] {
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-compact);
+}
+.te-gallery-elev-card[data-elev='overlay'] {
+  background: var(--bg-card);
+  box-shadow: var(--shadow-floating);
+}
+
+.te-gallery-elev-card__name {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+/* ── Primitive-instance shells (give live primitives room + a surface) ── */
+
+.te-gallery-frame {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-card);
+  background: var(--color-bg-surface);
+  min-width: 280px;
+  max-width: 420px;
+  overflow: hidden;
+}
+
+.te-gallery-frame__caption {
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.te-gallery-frame__body {
+  padding: 16px;
+}
+
+.te-gallery-menu-host {
+  padding: 20px;
+  background: var(--color-bg-base);
+}
+
+/* Float-chip toolrail showcase: give the chip inner padding + gap only. */
+.te-gallery-chip-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
