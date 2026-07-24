@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react'
 import type { AgentIdentity } from '@shared/agent-identity'
 import { agentPillStyle } from './agent-color'
 import { agentTag } from './agent-tag'
-import { typography } from '../../design/tokens'
 
 export function AgentBadge({
   agent,
@@ -16,20 +15,14 @@ export function AgentBadge({
 
   return (
     <span
+      className="te-agent-badge"
+      // Identity pill colors (agent-color.ts) are runtime-computed exemptions;
+      // gap tracks the compact prop.
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
         gap: compact ? 5 : 6,
-        padding: 0,
         background: pill.background,
         border: pill.border,
-        color: pill.color,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.metadata.size,
-        letterSpacing: typography.metadata.letterSpacing,
-        textTransform: typography.metadata.textTransform,
-        whiteSpace: 'nowrap',
-        lineHeight: 1
+        color: pill.color
       }}
     >
       <AgentIcon agent={agent} size={iconSize} />

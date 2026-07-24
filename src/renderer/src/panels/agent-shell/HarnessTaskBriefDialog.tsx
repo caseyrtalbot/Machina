@@ -10,7 +10,6 @@ import { Modal } from '../../components/overlay/Modal'
 import { runHarness } from '../../store/harness-run'
 import { useAgentDispatchStore } from '../../store/agent-dispatch-store'
 import { useThreadStore } from '../../store/thread-store'
-import { harnessUi } from './harness-styles'
 
 interface HarnessTaskBriefDialogProps {
   readonly summary: HarnessSummary
@@ -77,11 +76,11 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
       onClose={onClose}
       canDismiss={!starting}
       scrimBlur="blur(4px)"
-      className={harnessUi.backdropPad}
+      className="harness-gallery-backdrop"
       ariaLabelledBy="harness-task-title"
       ariaBusy={starting}
       initialFocusRef={textareaRef}
-      panelClassName={harnessUi.taskDialog}
+      panelClassName="harness-task-dialog"
       panelStyle={{
         background: floatingPanel.glass.bg,
         backdropFilter: floatingPanel.glass.blur,
@@ -89,19 +88,19 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
         boxShadow: floatingPanel.shadow
       }}
     >
-      <header className={harnessUi.header}>
+      <header className="harness-gallery-header">
         <div>
-          <div className={harnessUi.eyebrow}>Mandatory run context</div>
-          <h1 id="harness-task-title" className={harnessUi.headerTitle}>
+          <div className="harness-gallery-eyebrow">Mandatory run context</div>
+          <h1 id="harness-task-title" className="harness-gallery-title">
             Brief {summary.name}
           </h1>
-          <p className={harnessUi.headerLede}>
+          <p className="harness-gallery-lede">
             Give this role one concrete task. Rules and scope remain authoritative.
           </p>
         </div>
         <button
           type="button"
-          className={harnessUi.closeButton}
+          className="harness-gallery-close"
           aria-label="Close task brief"
           disabled={starting}
           onClick={onClose}
@@ -111,32 +110,32 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
       </header>
 
       <form
-        className={harnessUi.taskBody}
+        className="harness-task-body"
         onSubmit={(event) => {
           event.preventDefault()
           void startRun()
         }}
       >
         <section
-          className={`${harnessUi.taskPanel} ${harnessUi.taskRoleColumns}`}
+          className="harness-task-panel harness-task-role-columns"
           aria-labelledby="harness-task-role-heading"
         >
           <div>
-            <h2 id="harness-task-role-heading" className={harnessUi.taskPanelHeading}>
+            <h2 id="harness-task-role-heading" className="harness-task-panel-heading">
               Selected role
             </h2>
-            <strong className={harnessUi.taskRoleName}>{summary.name}</strong>
-            <p className={harnessUi.taskPanelText}>{summary.description}</p>
+            <strong className="harness-task-role-name">{summary.name}</strong>
+            <p className="harness-task-panel-text">{summary.description}</p>
           </div>
-          <dl className={harnessUi.taskRoleFacts}>
-            <div className={harnessUi.taskRoleFactRow}>
-              <dt className={harnessUi.taskFactTerm}>Adapter</dt>
-              <dd className={harnessUi.taskFactValue}>{summary.adapter}</dd>
+          <dl className="harness-task-role-facts">
+            <div className="harness-task-role-fact-row">
+              <dt className="harness-task-fact-term">Adapter</dt>
+              <dd className="harness-task-fact-value">{summary.adapter}</dd>
             </div>
             {summary.budgets !== undefined && (
-              <div className={harnessUi.taskRoleFactRow}>
-                <dt className={harnessUi.taskFactTerm}>Budget</dt>
-                <dd className={harnessUi.taskFactValue}>
+              <div className="harness-task-role-fact-row">
+                <dt className="harness-task-fact-term">Budget</dt>
+                <dd className="harness-task-fact-value">
                   {summary.budgets.maxTurns} turns · {summary.budgets.maxWritesPerMinute} writes/min
                 </dd>
               </div>
@@ -144,16 +143,16 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
           </dl>
         </section>
 
-        <section className={harnessUi.taskPanel} aria-labelledby="harness-task-scope-heading">
-          <h2 id="harness-task-scope-heading" className={harnessUi.taskPanelHeading}>
+        <section className="harness-task-panel" aria-labelledby="harness-task-scope-heading">
+          <h2 id="harness-task-scope-heading" className="harness-task-panel-heading">
             Declared scope
           </h2>
-          <p className={harnessUi.scopeBoundary}>
+          <p className="harness-task-scope-boundary">
             These globs guide the agent; they are not a sandbox. Writes reach disk before the
             approvals review.
           </p>
           {summary.scope === undefined ? (
-            <p className={harnessUi.taskPanelText}>
+            <p className="harness-task-panel-text">
               The installed contract at{' '}
               <code>
                 {TE_DIR}/agents/{summary.slug}/scope.json
@@ -162,16 +161,16 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
             </p>
           ) : (
             <>
-              <p className={harnessUi.taskPanelText}>{summary.scope.goal}</p>
-              <div className={harnessUi.scopeRow}>
-                <strong className={harnessUi.taskFactTerm}>Allowed</strong>
-                <code className={harnessUi.scopeCode}>
+              <p className="harness-task-panel-text">{summary.scope.goal}</p>
+              <div className="harness-task-scope-row">
+                <strong className="harness-task-fact-term">Allowed</strong>
+                <code className="harness-task-scope-code">
                   {summary.scope.allowedGlobs.join(', ') || 'No writable paths'}
                 </code>
               </div>
-              <div className={harnessUi.scopeRow}>
-                <strong className={harnessUi.taskFactTerm}>Forbidden</strong>
-                <code className={harnessUi.scopeCode}>
+              <div className="harness-task-scope-row">
+                <strong className="harness-task-fact-term">Forbidden</strong>
+                <code className="harness-task-scope-code">
                   {summary.scope.forbiddenGlobs.join(', ')}
                 </code>
               </div>
@@ -179,11 +178,11 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
           )}
         </section>
 
-        <label className={harnessUi.taskField}>
-          <span className={harnessUi.taskFieldLabel}>Task brief · required</span>
+        <label className="harness-task-field">
+          <span className="harness-task-field-label">Task brief · required</span>
           <textarea
             ref={textareaRef}
-            className={harnessUi.taskFieldTextarea}
+            className="harness-task-field-textarea"
             aria-label="Task brief"
             aria-describedby="harness-task-validation harness-task-count"
             rows={7}
@@ -193,7 +192,7 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
             placeholder="Name the target, desired outcome, and evidence or validation expected."
           />
         </label>
-        <div className={harnessUi.validationRow} aria-live="polite">
+        <div className="harness-task-validation-row" aria-live="polite">
           <span id="harness-task-validation" data-valid={validation.ok ? 'true' : 'false'}>
             {validation.ok ? 'Task brief ready.' : validation.error}
           </span>
@@ -205,12 +204,12 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
           </span>
         </div>
 
-        <div className={harnessUi.taskProgress} role="status" aria-live="polite">
+        <div className="harness-task-progress" role="status" aria-live="polite">
           {starting ? 'Starting harness. The task brief will stay here if launch fails.' : ''}
         </div>
 
         {launchStatus !== null && (
-          <div role="alert" className={harnessUi.createError}>
+          <div role="alert" className="harness-create-error">
             <strong>
               {launchStatus === 'indeterminate'
                 ? 'Launch status is unknown.'
@@ -224,10 +223,10 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
           </div>
         )}
 
-        <div className={harnessUi.taskActions}>
+        <div className="harness-task-actions">
           <button
             type="button"
-            className={`${harnessUi.button} ${harnessUi.buttonSecondary}`}
+            className="harness-button harness-button-secondary"
             disabled={starting}
             onClick={onClose}
           >
@@ -235,7 +234,7 @@ export function HarnessTaskBriefDialog({ summary, onClose }: HarnessTaskBriefDia
           </button>
           <button
             type="submit"
-            className={`${harnessUi.button} ${harnessUi.buttonPrimary}`}
+            className="harness-button harness-button-primary"
             disabled={!validation.ok || launchStatus === 'indeterminate'}
             aria-disabled={!validation.ok || starting || launchStatus === 'indeterminate'}
           >

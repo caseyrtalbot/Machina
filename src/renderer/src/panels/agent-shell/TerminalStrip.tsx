@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
-import { borderRadius, colors } from '../../design/tokens'
 import { TabBar, type TabBarItem } from '../../components/tabbar/TabBar'
 import type { ContextMenuEntry } from '../../components/ContextMenu'
 import { useThreadStore } from '../../store/thread-store'
@@ -138,7 +137,7 @@ export function TerminalStrip() {
       data-testid="terminal-strip-new"
       title="New terminal at workspace root (right-click a tab for more)"
       onClick={() => openStripTerminal()}
-      style={iconButtonStyle}
+      className="te-term-strip-btn"
     >
       <Plus size={13} strokeWidth={1.75} aria-hidden />
     </button>
@@ -150,7 +149,7 @@ export function TerminalStrip() {
       data-testid="terminal-strip-collapse"
       title={collapsed ? 'Expand terminal strip' : 'Collapse terminal strip'}
       onClick={() => toggleCollapsed(threadId)}
-      style={iconButtonStyle}
+      className="te-term-strip-btn"
     >
       {collapsed ? (
         <ChevronUp size={13} strokeWidth={1.75} aria-hidden />
@@ -163,21 +162,16 @@ export function TerminalStrip() {
   return (
     <div
       data-testid="terminal-strip"
-      style={{
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        borderTop: hasVisibleSessions ? `1px solid ${colors.border.default}` : 'none',
-        background: colors.bg.rail
-      }}
+      className="te-term-strip"
+      data-has-sessions={hasVisibleSessions ? 'true' : undefined}
     >
       {hasVisibleSessions && !collapsed && (
         <div
           data-testid="terminal-strip-resize"
+          className="te-term-strip-resize"
           onPointerDown={onHandlePointerDown}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
-          style={{ height: 4, marginBottom: -4, cursor: 'row-resize', zIndex: 1 }}
         />
       )}
       {hasVisibleSessions && (
@@ -202,10 +196,10 @@ export function TerminalStrip() {
         />
       )}
       <div
+        className="te-term-strip-body"
         style={{
           height: collapsed || !hasVisibleSessions ? 0 : strip.height,
-          display: collapsed || !hasVisibleSessions ? 'none' : 'block',
-          position: 'relative'
+          display: collapsed || !hasVisibleSessions ? 'none' : 'block'
         }}
       >
         {/* pendingKill entries render in the SAME keyed map so the live
@@ -219,7 +213,11 @@ export function TerminalStrip() {
           if (!mountedIds.includes(key)) return null
           const isActive = !pending && session.tabId === activeTabId
           return (
-            <div key={key} style={{ display: isActive ? 'block' : 'none', height: '100%' }}>
+            <div
+              key={key}
+              className="te-term-strip-pane"
+              style={{ display: isActive ? 'block' : 'none' }}
+            >
               <StripSessionView
                 session={session}
                 onSessionCreated={
@@ -264,19 +262,4 @@ function StripSessionView({
       onSessionExited={onSessionExited}
     />
   )
-}
-
-const iconButtonStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 22,
-  height: 22,
-  padding: 0,
-  border: 'none',
-  borderRadius: borderRadius.inline,
-  background: 'transparent',
-  color: colors.text.muted,
-  cursor: 'pointer',
-  flexShrink: 0
 }

@@ -19,13 +19,9 @@ import { ResizeHandle } from './ResizeHandle'
 import { StaticDivider } from './StaticDivider'
 import { useAgentShellKeybindings } from './keybindings'
 import { DEFAULT_NATIVE_MODEL } from '@shared/machina-native-tools'
-import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
 import { TitlebarBreadcrumb } from '../../components/TitlebarBreadcrumb'
 import { Statusbar } from '../../components/Statusbar'
 import type { HarnessSummary } from '@shared/harness-types'
-
-const WINDOW_HEADER_HEIGHT = 39
-const WINDOW_CONTROLS_CONTAINER_WIDTH = 148
 
 interface AgentShellProps {
   readonly onOpenSettings?: () => void
@@ -108,10 +104,7 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
   useAgentShellKeybindings(keybindingOpts)
 
   return (
-    <div
-      data-testid="agent-shell"
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}
-    >
+    <div data-testid="agent-shell" className="te-shell-root">
       <WindowDragRegion
         centerSlot={<TitlebarBreadcrumb />}
         rightSlot={
@@ -139,7 +132,7 @@ export function AgentShell({ onOpenSettings, onChangeVault }: AgentShellProps = 
           </>
         }
       />
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}>
+      <div className="te-shell-body">
         {!sidebarCollapsed && (
           <>
             <ThreadSidebar
@@ -225,38 +218,19 @@ function WindowDragRegion({
   // ownership of the corner resize hit zones. Without these gutters, the drag
   // region wins over OS resize at the corners.
   return (
-    <div
-      data-testid="window-drag-region"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        height: WINDOW_HEADER_HEIGHT,
-        flexShrink: 0,
-        paddingLeft: 8,
-        paddingRight: 8,
-        boxSizing: 'border-box',
-        background: colors.bg.chrome,
-        borderBottom: `1px solid var(--line-subtle)`
-      }}
-    >
+    <div data-testid="window-drag-region" className="te-shell-titlebar">
       <div
         data-testid="window-controls-container"
+        className="te-shell-titlebar-controls"
         style={{
-          width: WINDOW_CONTROLS_CONTAINER_WIDTH,
-          height: WINDOW_HEADER_HEIGHT,
-          flexShrink: 0,
           // @ts-expect-error -- Electron-only CSS property
           WebkitAppRegion: 'drag'
         }}
       />
       <div
         aria-hidden
+        className="te-shell-titlebar-drag"
         style={{
-          flex: 1,
-          minWidth: 0,
-          height: WINDOW_HEADER_HEIGHT,
-          display: 'flex',
-          alignItems: 'center',
           // @ts-expect-error -- Electron-only CSS property
           WebkitAppRegion: 'drag'
         }}
@@ -266,11 +240,8 @@ function WindowDragRegion({
       {rightSlot && (
         <div
           data-testid="window-header-right-slot"
+          className="te-shell-titlebar-actions"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexShrink: 0,
             // @ts-expect-error -- Electron-only CSS property
             WebkitAppRegion: 'no-drag'
           }}
@@ -311,62 +282,15 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
       data-testid="agent-shell-welcome-tooltip"
       role="dialog"
       aria-label="welcome"
-      style={{
-        position: 'fixed',
-        bottom: 20,
-        right: 20,
-        maxWidth: 300,
-        padding: '12px 16px',
-        background: floatingPanel.glass.bg,
-        backdropFilter: floatingPanel.glass.blur,
-        WebkitBackdropFilter: floatingPanel.glass.blur,
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: floatingPanel.borderRadius,
-        color: colors.text.primary,
-        fontFamily: typography.fontFamily.body,
-        fontSize: 13,
-        lineHeight: 1.55,
-        boxShadow: floatingPanel.shadowCompact,
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10
-      }}
+      className="te-shell-welcome"
     >
-      <div
-        style={{
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted
-        }}
-      >
-        Welcome
-      </div>
-      <div style={{ color: colors.text.secondary }}>
+      <div className="te-shell-welcome-eyebrow">Welcome</div>
+      <div className="te-shell-welcome-body">
         Type to chat, <WelcomeKbd>/</WelcomeKbd> to switch agent, <WelcomeKbd>⌘K</WelcomeKbd> for
         the palette.
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
-        <button
-          type="button"
-          onClick={dismiss}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: colors.text.muted,
-            padding: '2px 4px',
-            fontFamily: typography.fontFamily.mono,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform,
-            cursor: 'pointer',
-            transition: `color ${transitions.focusRing}`
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = colors.text.primary)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = colors.text.muted)}
-        >
+      <div className="te-shell-welcome-footer">
+        <button type="button" onClick={dismiss} className="te-shell-welcome-dismiss">
           Got it
         </button>
       </div>
@@ -375,26 +299,5 @@ function WelcomeTooltip({ vaultPath }: { readonly vaultPath: string | null }) {
 }
 
 function WelcomeKbd({ children }: { readonly children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: 18,
-        height: 18,
-        padding: '0 5px',
-        margin: '0 2px',
-        verticalAlign: 'baseline',
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: borderRadius.inline,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 10,
-        color: colors.text.primary,
-        background: 'transparent'
-      }}
-    >
-      {children}
-    </span>
-  )
+  return <span className="te-shell-kbd">{children}</span>
 }

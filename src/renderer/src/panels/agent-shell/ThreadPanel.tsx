@@ -4,7 +4,6 @@ import { useCliSessionStore } from '../../store/cli-session-store'
 import { ThreadMessage } from './ThreadMessage'
 import { ThreadInputBar } from './ThreadInputBar'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { colors, borderRadius, transitions, typography, floatingPanel } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
 import { WatcherHealthChip, WatcherHealthNotice } from './WatcherHealthChip'
 import { HarnessIdentityChip } from './HarnessIdentityChip'
@@ -78,34 +77,14 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
 
   if (!t) {
     return (
-      <section
-        style={{
-          ...sizing,
-          boxSizing: 'border-box',
-          padding: 24,
-          color: colors.text.muted,
-          background: colors.bg.base,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform
-        }}
-      >
+      <section className="te-thread-empty-section" style={sizing}>
         No thread selected.
       </section>
     )
   }
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        ...sizing,
-        height: '100%',
-        background: colors.bg.base
-      }}
-    >
+    <section className="te-thread-panel" style={sizing}>
       <PanelHeader
         leading={streaming !== null ? <LiveDot /> : undefined}
         title={t.title}
@@ -134,16 +113,12 @@ export function ThreadPanel({ width }: ThreadPanelProps = {}) {
           </>
         }
       />
-      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+      <div className="te-thread-panel__body">
         {projection.mode === 'raw' && t.agent !== 'machina-native' ? (
           <RawProjectionView threadId={t.id} />
         ) : (
           <>
-            <div
-              ref={scrollRef}
-              onScroll={handleScroll}
-              style={{ height: '100%', overflowY: 'auto' }}
-            >
+            <div ref={scrollRef} onScroll={handleScroll} className="te-thread-scroll">
               {t.messages.length === 0 && !streaming && !pendingTools?.length && !inFlight ? (
                 <EmptyThreadState />
               ) : (
@@ -203,36 +178,14 @@ function ProjectionToggle({
             ? 'Raw view: the live PTY behind this thread. Keystrokes go to the same shell the agent runs in.'
             : 'Structured thread view'
         }
-        style={{
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          padding: '3px 8px',
-          border: 'none',
-          background: active
-            ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
-            : 'transparent',
-          color: active ? colors.text.primary : colors.text.muted,
-          cursor: 'pointer',
-          transition: `background ${transitions.fast}, color ${transitions.fast}`
-        }}
+        className="te-thread-seg"
       >
         {label}
       </button>
     )
   }
   return (
-    <div
-      data-testid="projection-toggle"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'stretch',
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: borderRadius.inline,
-        overflow: 'hidden'
-      }}
-    >
+    <div data-testid="projection-toggle" className="te-thread-seg-group">
       {segment('thread', 'thread')}
       {segment('raw', 'raw')}
     </div>
@@ -256,35 +209,11 @@ function RawProjectionView({ threadId }: { readonly threadId: string }) {
 
   if (!entry || !entry.live) {
     return (
-      <div
-        role="status"
-        data-testid="raw-projection-dead"
-        style={{
-          height: '100%',
-          boxSizing: 'border-box',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-          padding: 24,
-          gap: 6,
-          background: colors.bg.surface,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 12,
-          lineHeight: 1.6
-        }}
-      >
-        <div
-          style={{
-            color: colors.text.muted,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform
-          }}
-        >
+      <div role="status" data-testid="raw-projection-dead" className="te-thread-raw-dead">
+        <div className="te-thread-raw-dead__label">
           {entry ? 'agent session ended' : 'no agent session'}
         </div>
-        <div style={{ color: colors.text.secondary }}>
+        <div className="te-thread-raw-dead__body">
           {entry
             ? 'This PTY is gone. Machina does not restart shells for agent threads — send a message to start the next turn in a fresh, attributed session.'
             : 'No PTY is running for this thread yet. Send a message to start one.'}
@@ -300,37 +229,18 @@ function EmptyThreadState() {
   return (
     <EmptyState
       align="start"
-      icon={
-        <span
-          aria-hidden
-          style={{
-            display: 'block',
-            width: 18,
-            height: 1,
-            background: colors.accent.line,
-            opacity: 0.9
-          }}
-        />
-      }
+      icon={<span aria-hidden className="te-thread-empty-icon" />}
       title="Ask anything about your vault."
       body={
-        <span style={{ display: 'inline-block', maxWidth: 420 }}>
+        <span className="te-thread-empty-body">
           Cite notes, trace ideas across the graph, or ask the agent to draft from what you already
           wrote.
         </span>
       }
       hint={
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            textTransform: typography.metadata.textTransform,
-            color: colors.text.disabled
-          }}
-        >
+        <span className="te-thread-empty-hint">
           <span>type</span>
-          <span style={{ color: colors.text.muted }}>/</span>
+          <span className="te-thread-empty-hint__slash">/</span>
           <span>to switch agent</span>
         </span>
       }
@@ -345,24 +255,7 @@ function ScrollToBottomButton({ onClick }: { readonly onClick: () => void }) {
       onClick={onClick}
       aria-label="scroll to bottom"
       title="Scroll to bottom"
-      style={{
-        position: 'absolute',
-        bottom: 16,
-        right: 20,
-        width: 28,
-        height: 28,
-        borderRadius: borderRadius.inline,
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        color: colors.text.secondary,
-        cursor: 'pointer',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 0,
-        boxShadow: floatingPanel.shadowCompact,
-        transition: `color ${transitions.fast}, border-color ${transitions.fast}`
-      }}
+      className="te-thread-scrollbtn"
     >
       <svg
         width={12}
@@ -391,51 +284,11 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
           ? 'Auto-accept on: writes apply without approval'
           : 'Auto-accept off: writes require approval'
       }
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.metadata.size,
-        letterSpacing: typography.metadata.letterSpacing,
-        textTransform: typography.metadata.textTransform,
-        padding: '4px 10px',
-        borderRadius: borderRadius.inline,
-        border: `1px solid ${on ? colors.accent.default : colors.border.subtle}`,
-        background: on
-          ? 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)'
-          : 'transparent',
-        color: on ? colors.text.primary : colors.text.muted,
-        cursor: 'pointer',
-        transition: `background ${transitions.fast}, border-color ${transitions.fast}, color ${transitions.fast}`
-      }}
+      className="te-thread-autoaccept"
+      data-on={on ? 'true' : undefined}
     >
-      <span
-        aria-hidden
-        style={{
-          width: 22,
-          height: 12,
-          borderRadius: borderRadius.inline,
-          background: on
-            ? colors.accent.default
-            : 'color-mix(in srgb, var(--color-text-primary) 18%, transparent)',
-          position: 'relative',
-          flexShrink: 0,
-          transition: `background ${transitions.fast}`
-        }}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: 2,
-            left: on ? 12 : 2,
-            width: 8,
-            height: 8,
-            borderRadius: borderRadius.inline,
-            background: on ? colors.bg.base : colors.text.primary,
-            transition: `left ${transitions.fast}, background ${transitions.fast}`
-          }}
-        />
+      <span aria-hidden className="te-thread-autoaccept__track">
+        <span className="te-thread-autoaccept__knob" />
       </span>
       <span>auto-accept</span>
     </button>
@@ -443,21 +296,7 @@ function AutoAcceptToggle({ on, onClick }: { readonly on: boolean; readonly onCl
 }
 
 function LiveDot() {
-  return (
-    <span
-      aria-hidden
-      data-testid="thread-live-dot"
-      style={{
-        display: 'inline-block',
-        width: 6,
-        height: 6,
-        borderRadius: '50%',
-        background: colors.accent.default,
-        flexShrink: 0,
-        animation: 'te-pulse 1.4s ease-in-out infinite'
-      }}
-    />
-  )
+  return <span aria-hidden data-testid="thread-live-dot" className="te-thread-livedot" />
 }
 
 function InflightAssistant({
@@ -480,29 +319,10 @@ function InflightAssistant({
   const hasTools = pendingTools !== null && pendingTools.length > 0
   if (!hasText && !hasTools && !inFlight) return null
   return (
-    <article
-      data-role="assistant"
-      data-inflight="true"
-      style={{ padding: '20px 24px', borderBottom: `1px solid ${colors.border.subtle}` }}
-    >
-      <div
-        style={{
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted,
-          marginBottom: 8
-        }}
-      >
-        Machina
-      </div>
+    <article data-role="assistant" data-inflight="true" className="te-thread-msg">
+      <div className="te-thread-msg__label">Machina</div>
       {!hasText && !hasTools && <ThinkingIndicator />}
-      {hasText && (
-        <div className="thread-prose" style={{ whiteSpace: 'pre-wrap' }}>
-          {streaming}
-        </div>
-      )}
+      {hasText && <div className="thread-prose te-thread-streaming-body">{streaming}</div>}
       {hasTools &&
         pendingTools!.map((tc, i) => (
           <ToolCallRenderer key={tc.call.id ?? i} call={tc.call} result={tc.result} />

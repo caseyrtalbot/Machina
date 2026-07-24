@@ -8,7 +8,6 @@ import { IpcTimeoutError, withTimeout } from '../../utils/ipc-timeout'
 import { useHarnessStore } from '../../store/harness-store'
 import { HarnessBuilderForm } from './HarnessBuilderForm'
 import { HarnessTemplateCatalog } from './HarnessTemplateCatalog'
-import { harnessUi } from './harness-styles'
 import {
   HARNESS_CATALOG,
   seedHarnessBuilderState,
@@ -126,11 +125,11 @@ export function HarnessGallery({
       onClose={onClose}
       canDismiss={creatingSlug === null}
       scrimBlur="blur(4px)"
-      className={harnessUi.backdropPad}
+      className="harness-gallery-backdrop"
       ariaLabelledBy="harness-gallery-title"
       ariaBusy={creatingSlug !== null}
       initialFocusRef={closeButtonRef}
-      panelClassName={harnessUi.galleryDialog}
+      panelClassName="harness-gallery-dialog"
       panelStyle={{
         background: floatingPanel.glass.bg,
         backdropFilter: floatingPanel.glass.blur,
@@ -138,20 +137,20 @@ export function HarnessGallery({
         boxShadow: floatingPanel.shadow
       }}
     >
-      <header className={harnessUi.header}>
+      <header className="harness-gallery-header">
         <div>
-          <div className={harnessUi.eyebrow}>Workspace agents</div>
-          <h1 id="harness-gallery-title" className={harnessUi.headerTitle}>
+          <div className="harness-gallery-eyebrow">Workspace agents</div>
+          <h1 id="harness-gallery-title" className="harness-gallery-title">
             Create a local agent
           </h1>
-          <p className={harnessUi.headerLede}>
+          <p className="harness-gallery-lede">
             Templates are generated locally, linted before creation, and never overwrite.
           </p>
         </div>
         <button
           ref={closeButtonRef}
           type="button"
-          className={harnessUi.closeButton}
+          className="harness-gallery-close"
           aria-label="Close agent gallery"
           disabled={creatingSlug !== null}
           onClick={onClose}
@@ -160,10 +159,10 @@ export function HarnessGallery({
         </button>
       </header>
 
-      <nav className={harnessUi.modeTabs} aria-label="Harness gallery mode">
+      <nav className="harness-gallery-mode-tabs" aria-label="Harness gallery mode">
         <button
           type="button"
-          className={harnessUi.modeTab}
+          className="harness-gallery-mode-tab"
           aria-current={mode === 'templates' ? 'page' : undefined}
           disabled={creatingSlug !== null}
           onClick={() => setMode('templates')}
@@ -172,7 +171,7 @@ export function HarnessGallery({
         </button>
         <button
           type="button"
-          className={harnessUi.modeTab}
+          className="harness-gallery-mode-tab"
           aria-current={mode === 'builder' ? 'page' : undefined}
           disabled={creatingSlug !== null}
           onClick={() => openBuilder()}
@@ -181,9 +180,9 @@ export function HarnessGallery({
         </button>
       </nav>
 
-      <main className={harnessUi.galleryBody}>
+      <main className="harness-gallery-body">
         {submitError !== null && (
-          <div role="alert" className={harnessUi.createError}>
+          <div role="alert" className="harness-create-error">
             <strong>
               {submitError.uncertain ? 'Creation status is unknown.' : 'Harness was not created.'}
             </strong>
@@ -196,18 +195,18 @@ export function HarnessGallery({
           </div>
         )}
         {created !== null && (
-          <div role="status" className={harnessUi.createSuccess}>
-            <div className={harnessUi.createSuccessDetails}>
+          <div role="status" className="harness-create-success">
+            <div className="harness-create-success-details">
               <strong>Created {created.slug}</strong>
-              <span className={harnessUi.createSuccessPath}>{created.root}</span>
-              <small className={harnessUi.createSuccessNote}>
+              <span className="harness-create-success-path">{created.root}</span>
+              <small className="harness-create-success-note">
                 A concrete task brief is required before this harness can start.
               </small>
             </div>
             {created.summary !== null && (
               <button
                 type="button"
-                className={`${harnessUi.button} ${harnessUi.buttonPrimary}`}
+                className="harness-button harness-button-primary"
                 onClick={() => {
                   onClose()
                   onRequestRun?.(created.summary as HarnessSummary)

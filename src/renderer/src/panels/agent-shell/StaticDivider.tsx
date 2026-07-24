@@ -6,14 +6,5 @@
  * panels still have breathing room.
  */
 export function StaticDivider() {
-  return (
-    <div
-      aria-hidden
-      style={{
-        flexShrink: 0,
-        width: 1,
-        background: 'var(--line-subtle)'
-      }}
-    />
-  )
+  return <div aria-hidden className="te-shell-divider" />
 }

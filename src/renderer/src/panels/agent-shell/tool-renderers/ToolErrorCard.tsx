@@ -1,5 +1,4 @@
 import type { ToolCall, ToolError } from '@shared/thread-types'
-import { colors, typography } from '../../../design/tokens'
 import { maskSecretsInText } from './mask-secrets'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
 import { ToolCardShell } from './ToolCardShell'
@@ -30,19 +29,11 @@ export function ToolErrorCard({
   ])
   return (
     <ToolCardShell variant="error" onContextMenu={onContextMenu}>
-      <div
-        style={{
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.diff.removed,
-          marginBottom: 4
-        }}
-      >
+      <div className="te-tool-error-code">
         {call.kind} · {error.code}
       </div>
-      <div style={{ fontSize: 12, color: colors.text.primary }}>{message}</div>
-      {hint && <div style={{ fontSize: 11, color: colors.text.muted, marginTop: 4 }}>{hint}</div>}
+      <div className="te-tool-error-msg">{message}</div>
+      {hint && <div className="te-tool-error-hint">{hint}</div>}
       {menu}
     </ToolCardShell>
   )

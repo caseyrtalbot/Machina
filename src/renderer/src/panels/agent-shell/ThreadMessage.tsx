@@ -5,7 +5,6 @@ import { resolveWikilinkTarget } from '@shared/engine/wikilink-resolver'
 import { useVaultStore } from '../../store/vault-store'
 import { openNoteInEditor } from '../../store/dock-store'
 import { ToolCallRenderer } from './tool-renderers/ToolCallRenderer'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { rehypeEmojiIcons } from '../../markdown/rehype-emoji-icons'
 import { remarkWikilinks } from '../../markdown/remark-wikilinks'
 import { LucideInline } from '../../markdown/LucideInline'
@@ -54,12 +53,7 @@ const markdownComponents: Components = {
           href="#wikilink"
           data-wikilink-target={target}
           title={target}
-          style={{
-            color: colors.accent.default,
-            textDecoration: 'none',
-            cursor: 'pointer',
-            borderBottom: `1px solid ${colors.accent.line}`
-          }}
+          className="te-thread-wikilink"
           onClick={(e) => {
             e.preventDefault()
             openWikilink(target)
@@ -106,25 +100,8 @@ export function ThreadMessage({ message, streamingBody }: Props) {
   const toolOnly = message.role === 'assistant' && !hasBody && (message.toolCalls?.length ?? 0) > 0
 
   return (
-    <article
-      data-role={message.role}
-      style={{
-        padding: '20px 24px',
-        borderBottom: `1px solid ${colors.border.subtle}`
-      }}
-    >
-      <div
-        style={{
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted,
-          marginBottom: 8
-        }}
-      >
-        {heading}
-      </div>
+    <article data-role={message.role} className="te-thread-msg">
+      <div className="te-thread-msg__label">{heading}</div>
       {hasBody && (
         <div className="thread-prose">
           <ReactMarkdown
@@ -137,15 +114,7 @@ export function ThreadMessage({ message, streamingBody }: Props) {
         </div>
       )}
       {toolOnly && (
-        <div
-          style={{
-            fontSize: typography.metadata.size,
-            color: colors.text.muted,
-            fontStyle: 'italic'
-          }}
-        >
-          No text reply (see command output)
-        </div>
+        <div className="te-thread-msg__toolnote">No text reply (see command output)</div>
       )}
       {message.role === 'assistant' &&
         message.toolCalls?.map((tc, i) => (
@@ -161,20 +130,7 @@ function OpenSettingsAction() {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new CustomEvent('te:open-settings'))}
-      style={{
-        marginTop: 10,
-        padding: '5px 12px',
-        borderRadius: borderRadius.inline,
-        border: `1px solid ${colors.accent.default}`,
-        background: 'color-mix(in srgb, var(--color-accent-default) 12%, transparent)',
-        color: colors.text.primary,
-        cursor: 'pointer',
-        fontFamily: typography.fontFamily.mono,
-        fontSize: typography.metadata.size,
-        letterSpacing: typography.metadata.letterSpacing,
-        textTransform: typography.metadata.textTransform,
-        transition: `background ${transitions.fast}, border-color ${transitions.fast}`
-      }}
+      className="te-thread-authkey-btn"
     >
       Add API key in Settings
     </button>

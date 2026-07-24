@@ -1,5 +1,4 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, typography } from '../../../design/tokens'
 import { openNoteInEditor } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { ToolCardShell } from './ToolCardShell'
@@ -24,7 +23,7 @@ export function SearchVaultCard({
 }) {
   if (!result) {
     return (
-      <ToolCardShell variant="pill" inline pending style={{ gap: 6, color: colors.text.muted }}>
+      <ToolCardShell variant="pill" inline pending className="te-tool-loading">
         <SearchGlyph />
         <span>searching for &ldquo;{call.args.query}&rdquo;…</span>
       </ToolCardShell>
@@ -46,18 +45,7 @@ export function SearchVaultCard({
 
   return (
     <ToolCardShell variant="block">
-      <div
-        style={{
-          color: colors.text.muted,
-          marginBottom: 8,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform
-        }}
-      >
+      <div className="te-tool-search-head">
         <SearchGlyph />
         <span>
           {hits.length}
@@ -66,52 +54,28 @@ export function SearchVaultCard({
           {truncated ? ' — capped, narrow the query for more' : ''}
         </span>
       </div>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <ul className="te-tool-plain-list">
         {hits.slice(0, PREVIEW_LIMIT).map((h, i) => (
           <li
             key={`${h.path}:${h.line}:${i}`}
-            style={{
-              padding: '5px 0',
-              borderBottom:
-                i === Math.min(hits.length, PREVIEW_LIMIT) - 1
-                  ? 'none'
-                  : `1px solid ${colors.border.subtle}`
-            }}
+            className="te-tool-hit"
+            data-last={i === Math.min(hits.length, PREVIEW_LIMIT) - 1 ? '' : undefined}
           >
             <a
               href="#"
-              className="no-underline hover:underline"
+              className="te-tool-link"
               onClick={(e) => {
                 e.preventDefault()
                 open(h.path)
               }}
-              style={{
-                fontSize: 12,
-                fontFamily: typography.fontFamily.mono,
-                color: colors.text.primary
-              }}
             >
               {h.path}:{h.line}
             </a>
-            <code
-              style={{
-                display: 'block',
-                fontSize: 11,
-                fontFamily: typography.fontFamily.mono,
-                color: colors.text.muted,
-                marginTop: 3,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word'
-              }}
-            >
-              {h.snippet}
-            </code>
+            <code className="te-tool-hit-snippet">{h.snippet}</code>
           </li>
         ))}
         {hits.length > PREVIEW_LIMIT && (
-          <li style={{ padding: '5px 0', color: colors.text.muted }}>
-            … {hits.length - PREVIEW_LIMIT} more
-          </li>
+          <li className="te-tool-hit-more">… {hits.length - PREVIEW_LIMIT} more</li>
         )}
       </ul>
     </ToolCardShell>
@@ -120,13 +84,7 @@ export function SearchVaultCard({
 
 function SearchGlyph() {
   return (
-    <svg
-      aria-hidden
-      width={11}
-      height={11}
-      viewBox="0 0 11 11"
-      style={{ flexShrink: 0, opacity: 0.7 }}
-    >
+    <svg aria-hidden width={11} height={11} viewBox="0 0 11 11" className="te-tool-glyph">
       <circle cx={4.5} cy={4.5} r={3.5} fill="none" stroke="currentColor" strokeWidth={1} />
       <path d="M7.5 7.5 L10 10" stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
     </svg>

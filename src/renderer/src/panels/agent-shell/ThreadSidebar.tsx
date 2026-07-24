@@ -2,7 +2,6 @@ import { PanelHeader } from '../../components/panelheader/PanelHeader'
 import { useMemo, useRef, useState } from 'react'
 import { useThreadStore } from '../../store/thread-store'
 import { useVaultStore } from '../../store/vault-store'
-import { colors, borderRadius, transitions, typography } from '../../design/tokens'
 import { ContextMenu, type ContextMenuPosition } from '../../components/ContextMenu'
 import { AgentPicker } from './AgentPicker'
 import { AgentBadge } from './agent-badge'
@@ -74,16 +73,7 @@ export function ThreadSidebar({
   }
 
   return (
-    <aside
-      style={{
-        width,
-        flexShrink: 0,
-        background: colors.bg.rail,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%'
-      }}
-    >
+    <aside className="te-thread-sidebar" style={{ width }}>
       <PanelHeader flush>
         <VaultSwitcher
           name={vaultPath ? vaultName : 'Open vault…'}
@@ -91,8 +81,8 @@ export function ThreadSidebar({
           onClick={onChangeVault}
         />
       </PanelHeader>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <div className="te-thread-sidebar__list-scroll">
+        <ul className="te-thread-list">
           {sorted.map((t) => (
             <ThreadRow
               key={t.id}
@@ -115,12 +105,7 @@ export function ThreadSidebar({
           onContextMenu={(id, x, y) => openMenuAt(id, x, y, true)}
         />
       </div>
-      <footer
-        style={{
-          padding: '12px 8px 16px',
-          borderTop: `1px solid ${colors.border.subtle}`
-        }}
-      >
+      <footer className="te-thread-sidebar__footer">
         {pickerOpen && vaultPath ? (
           <AgentPicker
             onPick={(a) => {
@@ -130,7 +115,7 @@ export function ThreadSidebar({
             onCancel={() => setPickerOpen(false)}
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="te-thread-sidebar__actions">
             <NewThreadButton disabled={!vaultPath} onClick={() => setPickerOpen(true)} />
             <NewAgentButton
               disabled={!vaultPath || !onOpenHarnessGallery}
@@ -195,55 +180,23 @@ function ArchivedSection({
   readonly onContextMenu: (threadId: string, x: number, y: number) => void
 }) {
   return (
-    <section style={{ borderTop: `1px solid ${colors.border.subtle}` }}>
+    <section className="te-thread-archived">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         data-testid="archived-section-toggle"
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '8px 12px',
-          background: 'transparent',
-          border: 'none',
-          color: colors.text.muted,
-          cursor: 'pointer',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 11,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          textAlign: 'left'
-        }}
+        className="te-thread-archived__toggle"
       >
-        <span
-          aria-hidden
-          style={{
-            display: 'inline-block',
-            transform: open ? 'rotate(90deg)' : 'none',
-            transition: `transform ${transitions.micro}`,
-            fontSize: 9
-          }}
-        >
+        <span aria-hidden className="te-thread-archived__caret">
           ▶
         </span>
         Archived{open ? ` (${threads.length})` : ''}
       </button>
       {open && (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul className="te-thread-list">
           {threads.length === 0 ? (
-            <li
-              style={{
-                padding: '4px 12px 10px',
-                color: colors.text.muted,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 11
-              }}
-            >
-              No archived threads
-            </li>
+            <li className="te-thread-archived__empty">No archived threads</li>
           ) : (
             threads.map((t) => (
               <ArchivedRow
@@ -285,55 +238,21 @@ function ArchivedRow({
     <li
       data-testid="archived-thread-row"
       data-thread-id={id}
-      className="thread-row"
+      className="thread-row te-thread-arow"
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu(e.clientX, e.clientY)
       }}
-      style={{
-        padding: '6px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4
-      }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span
-          style={{
-            flex: 1,
-            color: colors.text.muted,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 12,
-            letterSpacing: '0.01em',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {title}
-        </span>
+      <div className="te-thread-row__line">
+        <span className="te-thread-arow__title">{title}</span>
         <button
           ref={kebabRef}
           type="button"
-          className="thread-row__kebab"
+          className="thread-row__kebab te-thread-kebab"
           aria-label="Archived thread actions"
           title="More"
           onClick={handleKebab}
-          style={{
-            flexShrink: 0,
-            width: 18,
-            height: 18,
-            padding: 0,
-            border: 'none',
-            background: 'transparent',
-            color: colors.text.muted,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 14,
-            lineHeight: 1
-          }}
         >
           ⋯
         </button>
@@ -361,19 +280,6 @@ function VaultSwitcher({
       disabled={disabled}
       title={fullPath ? `${fullPath}\nClick to switch vault` : 'Open a vault'}
       aria-label={fullPath ? `Vault: ${name}. Click to switch.` : 'Open a vault'}
-      style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '0 14px',
-        border: 'none',
-        borderRadius: 0,
-        color: disabled ? colors.text.muted : colors.text.primary,
-        cursor: disabled ? 'default' : 'pointer',
-        textAlign: 'left',
-        minWidth: 0
-      }}
     >
       <svg
         width={11}
@@ -385,25 +291,11 @@ function VaultSwitcher({
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden
-        style={{ flexShrink: 0, opacity: 0.7 }}
+        className="te-vault-switcher__icon"
       >
         <path d="M2 3.5a1 1 0 0 1 1-1h2.4l1 1.2H9a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5z" />
       </svg>
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 12,
-          letterSpacing: '0.01em',
-          color: 'inherit'
-        }}
-      >
-        {name}
-      </span>
+      <span className="te-vault-switcher__name">{name}</span>
       {!disabled && (
         <svg
           className="vault-switcher__chevron"
@@ -416,10 +308,6 @@ function VaultSwitcher({
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden
-          style={{
-            flexShrink: 0,
-            color: colors.text.muted
-          }}
         >
           <path d="M3.5 5l2.5 2.5L8.5 5" />
         </svg>
@@ -465,67 +353,28 @@ function ThreadRow({
       data-testid="thread-row"
       data-thread-id={id}
       data-active={isActive ? 'true' : undefined}
-      className="thread-row"
+      data-renaming={isRenaming ? 'true' : undefined}
+      className="thread-row te-thread-row"
       onClick={isRenaming ? undefined : onSelect}
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu(e.clientX, e.clientY)
       }}
-      style={{
-        padding: '8px 12px',
-        cursor: isRenaming ? 'text' : 'pointer',
-        boxShadow: isActive
-          ? `inset 0 0 0 1px color-mix(in srgb, ${colors.text.primary} 55%, transparent)`
-          : 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-        position: 'relative'
-      }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="te-thread-row__line">
         {isRenaming ? (
           <RenameInput initial={title} onCommit={onCommitRename} onCancel={onCancelRename} />
         ) : (
-          <span
-            style={{
-              flex: 1,
-              color: isActive ? colors.text.primary : colors.text.secondary,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 12,
-              fontWeight: isActive ? 500 : 400,
-              letterSpacing: '0.01em',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {title}
-          </span>
+          <span className="te-thread-row__title">{title}</span>
         )}
         {!isRenaming && (
           <button
             ref={kebabRef}
             type="button"
-            className="thread-row__kebab"
+            className="thread-row__kebab te-thread-kebab"
             aria-label="Thread actions"
             title="More"
             onClick={handleKebab}
-            style={{
-              flexShrink: 0,
-              width: 18,
-              height: 18,
-              padding: 0,
-              border: 'none',
-              background: 'transparent',
-              color: colors.text.muted,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 14,
-              lineHeight: 1
-            }}
           >
             ⋯
           </button>
@@ -550,9 +399,8 @@ function NewAgentButton({
       aria-label="Create a local agent"
       title={disabled ? 'Open a vault first (use Open Folder)' : 'Create a local agent'}
       className="te-new-thread-button"
-      style={disabled ? { opacity: 0.45, cursor: 'default' } : undefined}
     >
-      <Bot size={12} strokeWidth={1.6} aria-hidden style={{ flexShrink: 0 }} />
+      <Bot size={12} strokeWidth={1.6} aria-hidden className="te-thread-btn-icon" />
       <span>New Agent</span>
     </button>
   )
@@ -573,9 +421,8 @@ function NewThreadButton({
       disabled={disabled}
       title={disabled ? 'Open a vault first (use Open Folder)' : 'New thread'}
       className="te-new-thread-button"
-      style={disabled ? { opacity: 0.45, cursor: 'default' } : undefined}
     >
-      <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden style={{ flexShrink: 0 }}>
+      <svg width={11} height={11} viewBox="0 0 11 11" aria-hidden className="te-thread-btn-icon">
         <path
           d="M5.5 1V10 M1 5.5H10"
           stroke="currentColor"
@@ -614,18 +461,7 @@ function RenameInput({
         }
       }}
       onBlur={() => onCommit(value)}
-      style={{
-        flex: 1,
-        background: colors.bg.base,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: borderRadius.inline,
-        color: colors.text.primary,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 12,
-        padding: '2px 6px',
-        outline: 'none',
-        minWidth: 0
-      }}
+      className="te-thread-rename-input"
     />
   )
 }

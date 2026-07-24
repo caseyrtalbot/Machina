@@ -53,7 +53,9 @@ describe('SideDockRibbon', () => {
     const openPalette = vi.fn()
     render(<SideDockRibbon onOpenPalette={openPalette} onOpenSettings={() => {}} />)
 
-    expect(screen.getByTestId('side-dock-ribbon').style.width).toBe('35px')
+    // The 35px ribbon width is pinned in the .side-dock-ribbon CSS class (ADR
+    // 0005 slice 4); happy-dom doesn't load the sheet, so assert the class.
+    expect(screen.getByTestId('side-dock-ribbon').classList.contains('side-dock-ribbon')).toBe(true)
     expect(screen.getByLabelText('Collapse surface dock')).toBeTruthy()
     expect(screen.getByLabelText('Open command palette')).toBeTruthy()
     expect(screen.getByLabelText('Open canvas')).toBeTruthy()

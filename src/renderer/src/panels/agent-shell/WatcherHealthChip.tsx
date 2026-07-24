@@ -9,7 +9,6 @@
 import { useState } from 'react'
 import { isWatcherUnhealthy, useApprovalsStore } from '../../store/approvals-store'
 import { useThreadStore } from '../../store/thread-store'
-import { borderRadius, colors, typography } from '../../design/tokens'
 
 /** Compact header chip; renders nothing while healthy/stopped/unknown. */
 export function WatcherHealthChip() {
@@ -19,17 +18,7 @@ export function WatcherHealthChip() {
     <span
       data-testid="thread-watcher-chip"
       title="Write containment is not watching. Agent writes are not being captured for review — retry from the approvals tray."
-      style={{
-        padding: '2px 7px',
-        border: `1px solid ${colors.claude.warning}`,
-        borderRadius: borderRadius.inline,
-        color: colors.claude.warning,
-        background: `color-mix(in srgb, ${colors.claude.warning} 8%, transparent)`,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 10,
-        letterSpacing: '0.02em',
-        whiteSpace: 'nowrap'
-      }}
+      className="te-watcher-chip"
     >
       containment {health.state}
     </span>
@@ -55,20 +44,7 @@ export function WatcherHealthNotice({ threadId }: { readonly threadId: string })
 
   if (!shown) return null
   return (
-    <div
-      data-testid="thread-watcher-notice"
-      style={{
-        margin: '10px 24px',
-        padding: '8px 10px',
-        border: `1px solid ${colors.claude.warning}`,
-        borderRadius: borderRadius.inline,
-        background: colors.callout.warning.bg,
-        color: colors.text.primary,
-        fontFamily: typography.fontFamily.body,
-        fontSize: 11.5,
-        lineHeight: 1.5
-      }}
-    >
+    <div data-testid="thread-watcher-notice" className="te-watcher-notice">
       Write containment is not watching. File writes from this turn are not being captured for
       review. Retry from the approvals tray.
     </div>

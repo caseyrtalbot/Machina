@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, borderRadius, typography } from '../../../design/tokens'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
 import { ToolCardShell } from './ToolCardShell'
 
@@ -68,113 +67,57 @@ export function EditNoteCard({
 
   return (
     <ToolCardShell variant="block" onContextMenu={onContextMenu}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ color: colors.text.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: colors.text.muted, fontFamily: typography.fontFamily.mono }}>
-            ~
-          </span>
+      <div className="te-tool-note-head">
+        <div className="te-tool-note-title">
+          <span className="te-tool-note-sigil">~</span>
           <strong>{call.args.path}</strong>
         </div>
-        <span
-          style={{
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform,
-            color: colors.text.muted
-          }}
-        >
-          {status}
-        </span>
+        <span className="te-tool-meta">{status}</span>
       </div>
-      <pre
-        style={{
-          margin: '8px 0 0 0',
-          padding: '8px 10px',
-          maxHeight: 260,
-          overflow: 'auto',
-          fontSize: 11.5,
-          lineHeight: 1.55,
-          background: colors.bg.base,
-          borderRadius: borderRadius.inline,
-          border: `1px solid ${colors.border.subtle}`,
-          fontFamily: typography.fontFamily.mono
-        }}
-      >
+      <pre className="te-tool-diff te-tool-diff--edit">
         {findLines.slice(0, PREVIEW_LIMIT).map((l, i) => (
-          <div
-            key={`f-${i}`}
-            style={{
-              background: colors.diff.removedBg,
-              color: colors.text.primary,
-              padding: '0 4px'
-            }}
-          >
-            <span style={{ color: colors.diff.removed, marginRight: 6 }}>-</span>
+          <div key={`f-${i}`} className="te-tool-diff-line--del">
+            <span className="te-tool-diff-sign--del">-</span>
             {l || ' '}
           </div>
         ))}
         {findLines.length > PREVIEW_LIMIT && (
-          <div style={{ color: colors.text.muted, marginTop: 4, padding: '0 4px' }}>
+          <div className="te-tool-diff-more">
             … {findLines.length - PREVIEW_LIMIT} more removed lines
           </div>
         )}
         {replaceLines.slice(0, PREVIEW_LIMIT).map((l, i) => (
-          <div
-            key={`r-${i}`}
-            style={{
-              background: colors.diff.addedBg,
-              color: colors.text.primary,
-              padding: '0 4px'
-            }}
-          >
-            <span style={{ color: colors.diff.added, marginRight: 6 }}>+</span>
+          <div key={`r-${i}`} className="te-tool-diff-line--add">
+            <span className="te-tool-diff-sign--add">+</span>
             {l || ' '}
           </div>
         ))}
         {replaceLines.length > PREVIEW_LIMIT && (
-          <div style={{ color: colors.text.muted, marginTop: 4, padding: '0 4px' }}>
+          <div className="te-tool-diff-more">
             … {replaceLines.length - PREVIEW_LIMIT} more added lines
           </div>
         )}
       </pre>
       {!settled && !historical && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <div className="te-tool-actions">
           <button
             onClick={() => void decide(true)}
             disabled={submitting}
-            style={{
-              padding: '4px 12px',
-              fontSize: 12,
-              borderRadius: borderRadius.inline,
-              border: `1px solid ${colors.accent.default}`,
-              background: 'color-mix(in srgb, var(--color-accent-default) 14%, transparent)',
-              color: colors.text.primary,
-              opacity: submitting ? 0.5 : 1,
-              cursor: submitting ? 'wait' : 'pointer'
-            }}
+            className="te-tool-btn te-tool-btn--accept"
           >
             Accept
           </button>
           <button
             onClick={() => void decide(false)}
             disabled={submitting}
-            style={{
-              padding: '4px 12px',
-              fontSize: 12,
-              borderRadius: borderRadius.inline,
-              border: `1px solid ${colors.border.default}`,
-              background: 'transparent',
-              color: colors.text.muted,
-              opacity: submitting ? 0.5 : 1,
-              cursor: submitting ? 'wait' : 'pointer'
-            }}
+            className="te-tool-btn te-tool-btn--reject"
           >
             Reject
           </button>
         </div>
       )}
       {rejected && (
-        <div style={{ marginTop: 8, fontSize: 11, color: colors.text.muted }}>
+        <div className="te-tool-reject-note">
           {result.error.code === 'IO_TRANSIENT' && result.error.message === 'rejected by user'
             ? 'You rejected this edit.'
             : `${result.error.code}: ${result.error.message}${result.error.hint ? ` (${result.error.hint})` : ''}`}

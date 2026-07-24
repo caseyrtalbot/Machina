@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { CSSProperties, MouseEventHandler, ReactNode, Ref } from 'react'
-import { colors } from '../../../design/tokens'
+import type { MouseEventHandler, ReactNode, Ref } from 'react'
 
 type ToolCardVariant = 'pill' | 'block' | 'error'
 
@@ -13,13 +12,10 @@ interface Props {
   readonly onMouseEnter?: MouseEventHandler<HTMLDivElement>
   readonly onMouseLeave?: MouseEventHandler<HTMLDivElement>
   readonly innerRef?: Ref<HTMLDivElement>
-  readonly style?: CSSProperties
+  /** Caller-specific static styling; compounds with `.te-tool-card`. */
+  readonly className?: string
 }
 
-const PILL_PADDING = '4px 10px'
-const BLOCK_PADDING = '8px 12px'
-const ERROR_BG = `color-mix(in srgb, ${colors.claude.error} 8%, transparent)`
-const ERROR_BORDER = `color-mix(in srgb, ${colors.claude.error} 35%, transparent)`
 // Only show shimmer once a tool call has been pending this long. Fast calls
 // must not flash a loader.
 const SHIMMER_DELAY_MS = 300
@@ -33,13 +29,9 @@ export function ToolCardShell({
   onMouseEnter,
   onMouseLeave,
   innerRef,
-  style
+  className
 }: Props) {
-  const isError = variant === 'error'
   const isPill = variant === 'pill'
-  const padding = isPill ? PILL_PADDING : BLOCK_PADDING
-  const display = isPill && inline ? 'inline-flex' : 'block'
-  const alignItems = isPill && inline ? 'center' : undefined
 
   // Delay-then-flag pattern. The timer callback (async, post-effect) flips
   // `elapsed` true; effect cleanup on the next pending change cancels the
@@ -56,27 +48,20 @@ export function ToolCardShell({
     }
   }, [pending])
 
-  const className = pending && elapsed ? 'te-tool-card-pending' : undefined
+  const classes = ['te-tool-card', className, pending && elapsed && 'te-tool-card-pending']
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
       ref={innerRef}
-      className={className}
+      className={classes}
+      data-variant={variant}
+      data-inline={isPill && inline ? '' : undefined}
+      data-pending={pending ? '' : undefined}
       onContextMenu={onContextMenu}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      style={{
-        display,
-        alignItems,
-        marginTop: 8,
-        padding,
-        borderRadius: 0,
-        background: isError ? ERROR_BG : 'transparent',
-        border: isError ? `1px solid ${ERROR_BORDER}` : '1px solid transparent',
-        fontSize: 12,
-        color: colors.text.primary,
-        ...style
-      }}
     >
       {children}
     </div>

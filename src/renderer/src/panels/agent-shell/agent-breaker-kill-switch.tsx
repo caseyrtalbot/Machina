@@ -13,7 +13,6 @@
 import { useEffect } from 'react'
 import { useCliSessionStore } from '../../store/cli-session-store'
 import { tripForThread, useAgentBreakerStore } from '../../store/agent-breaker-store'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 export function AgentKillSwitch({ threadId }: { readonly threadId: string }) {
   const entry = useCliSessionStore((s) => s.byThread[threadId])
@@ -39,7 +38,7 @@ export function AgentKillSwitch({ threadId }: { readonly threadId: string }) {
 
   if (!live && trip === null) return null
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+    <span className="te-breaker-killswitch">
       {trip !== null && (
         <span
           data-testid="breaker-tripped-chip"
@@ -48,17 +47,7 @@ export function AgentKillSwitch({ threadId }: { readonly threadId: string }) {
               ? 'The PTY was stopped as containment; its writes stay in the approvals queue.'
               : 'Ambiguous attribution — nothing was stopped automatically.'
           }`}
-          style={{
-            padding: '2px 7px',
-            border: `1px solid ${colors.claude.warning}`,
-            borderRadius: borderRadius.inline,
-            color: colors.claude.warning,
-            background: `color-mix(in srgb, ${colors.claude.warning} 8%, transparent)`,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 10,
-            letterSpacing: '0.02em',
-            whiteSpace: 'nowrap'
-          }}
+          className="te-breaker-chip"
         >
           breaker tripped
         </span>
@@ -69,19 +58,7 @@ export function AgentKillSwitch({ threadId }: { readonly threadId: string }) {
           data-testid="agent-kill-switch"
           title="Kill this agent's shell now. Hard stop: the PTY dies immediately; writes already made stay on disk and in the approvals queue. The next message starts a fresh session."
           onClick={() => void kill()}
-          style={{
-            padding: '3px 9px',
-            border: `1px solid ${colors.claude.error}`,
-            borderRadius: borderRadius.inline,
-            background: `color-mix(in srgb, ${colors.claude.error} 8%, transparent)`,
-            color: colors.claude.error,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform,
-            cursor: 'pointer',
-            transition: `background ${transitions.fast}, color ${transitions.fast}`
-          }}
+          className="te-breaker-kill"
         >
           kill
         </button>

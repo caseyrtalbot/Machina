@@ -8,7 +8,6 @@
  * value stays main-binding-sourced. Renders nothing while unbound (ad-hoc
  * threads) or bound under a different workspace root.
  */
-import { borderRadius, colors, typography } from '../../design/tokens'
 import { useHarnessBinding } from './use-harness-binding'
 
 export function HarnessIdentityChip({
@@ -25,17 +24,7 @@ export function HarnessIdentityChip({
     <span
       data-testid="thread-harness-chip"
       title={`Harness: ${slug}. Attribution is bound main-side for this thread.`}
-      style={{
-        padding: '2px 7px',
-        border: `1px solid ${colors.accent.line}`,
-        borderRadius: borderRadius.inline,
-        color: colors.accent.default,
-        background: `color-mix(in srgb, ${colors.accent.default} 8%, transparent)`,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 10,
-        letterSpacing: '0.02em',
-        whiteSpace: 'nowrap'
-      }}
+      className="harness-identity-chip"
     >
       harness {slug}
     </span>

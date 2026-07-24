@@ -12,7 +12,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { AgentCommits } from '@shared/git-types'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 
 /**
  * Palette "Revert harness: <slug>" entries dispatch this CustomEvent (detail =
@@ -88,31 +87,13 @@ export function RevertAgentSection({ requestedAgentId = null }: RevertAgentSecti
   )
 
   return (
-    <div
-      data-testid="revert-agent-section"
-      style={{ borderTop: `1px solid ${colors.border.subtle}` }}
-    >
+    <div data-testid="revert-agent-section" className="te-revert-section">
       <button
         type="button"
         data-testid="revert-agent-toggle"
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '9px 14px',
-          border: 'none',
-          background: 'transparent',
-          cursor: 'pointer',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted,
-          transition: `color ${transitions.focusRing}`
-        }}
+        className="te-revert-toggle"
       >
         {expanded ? (
           <ChevronDown size={12} strokeWidth={1.75} aria-hidden />
@@ -123,26 +104,15 @@ export function RevertAgentSection({ requestedAgentId = null }: RevertAgentSecti
       </button>
 
       {expanded && (
-        <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+        <div className="te-revert-list">
           {notice !== null && (
-            <div
-              data-testid="revert-agent-notice"
-              style={{
-                padding: '8px 14px',
-                borderTop: `1px solid ${colors.border.subtle}`,
-                background: colors.callout.warning.bg,
-                color: colors.text.primary,
-                fontFamily: typography.fontFamily.body,
-                fontSize: 12,
-                lineHeight: 1.5
-              }}
-            >
+            <div data-testid="revert-agent-notice" className="te-revert-notice">
               {notice}
             </div>
           )}
 
           {list.kind === 'error' && (
-            <div data-testid="revert-agent-error" style={emptyRowStyle}>
+            <div data-testid="revert-agent-error" className="te-revert-empty">
               {list.reason === 'not-a-git-repo'
                 ? 'Not a git repository — nothing to revert from.'
                 : list.reason === 'no-workspace'
@@ -154,7 +124,7 @@ export function RevertAgentSection({ requestedAgentId = null }: RevertAgentSecti
           )}
 
           {list.kind === 'loaded' && list.agents.length === 0 && (
-            <div data-testid="revert-agent-empty" style={emptyRowStyle}>
+            <div data-testid="revert-agent-empty" className="te-revert-empty">
               No unreverted agent commits.
             </div>
           )}
@@ -190,30 +160,11 @@ function AgentRow({ agent, busy, confirming, onArm, onCancel, onConfirm }: Agent
   const count = agent.shas.length
   const commits = count === 1 ? 'commit' : 'commits'
   return (
-    <div
-      data-testid={`revert-agent-row-${agent.agentId}`}
-      style={{
-        padding: '10px 14px',
-        borderTop: `1px solid ${colors.border.subtle}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 7
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: 8,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 11.5
-          }}
-        >
-          <span style={{ color: colors.text.primary }}>{agent.agentId}</span>
-          <span style={{ color: colors.text.muted }}>
+    <div data-testid={`revert-agent-row-${agent.agentId}`} className="te-revert-row">
+      <div className="te-revert-row-head">
+        <span className="te-revert-row-id">
+          <span className="te-tray-id">{agent.agentId}</span>
+          <span className="te-tray-meta">
             {count} {commits}
           </span>
         </span>
@@ -224,60 +175,34 @@ function AgentRow({ agent, busy, confirming, onArm, onCancel, onConfirm }: Agent
             disabled={busy}
             title={`Revert ${agent.agentId}'s ${commits} (asks to confirm)`}
             onClick={onArm}
-            style={actionButtonStyle(colors.claude.error, busy)}
+            className="te-tray-action"
+            data-tone="danger"
           >
             Revert…
           </button>
         )}
       </div>
 
-      <div
-        style={{
-          color: colors.text.secondary,
-          fontFamily: typography.fontFamily.body,
-          fontSize: 11.5,
-          lineHeight: 1.5,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}
-      >
+      <div className="te-revert-subject">
         {agent.lastSubject}
-        <span style={{ color: colors.text.muted }}> · {formatDate(agent.lastDate)}</span>
+        <span className="te-tray-meta"> · {formatDate(agent.lastDate)}</span>
       </div>
 
       {confirming && (
-        <div
-          data-testid="revert-agent-confirm"
-          style={{
-            padding: '8px 10px',
-            border: `1px solid ${colors.claude.error}`,
-            borderRadius: borderRadius.inline,
-            background: colors.callout.danger.bg,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8
-          }}
-        >
-          <div
-            style={{
-              color: colors.text.primary,
-              fontFamily: typography.fontFamily.body,
-              fontSize: 11.5,
-              lineHeight: 1.55
-            }}
-          >
+        <div data-testid="revert-agent-confirm" className="te-revert-confirm">
+          <div className="te-revert-confirm-text">
             Revert {count} {commits} by {agent.agentId}? This creates new commits that undo them —
             history is not deleted, and this is not protection: writes the agent makes after this
             are not blocked.
           </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className="te-tray-actions">
             <button
               type="button"
               data-testid="revert-agent-cancel"
               disabled={busy}
               onClick={onCancel}
-              style={actionButtonStyle(colors.text.secondary, busy)}
+              className="te-tray-action"
+              data-tone="neutral"
             >
               Cancel
             </button>
@@ -287,7 +212,8 @@ function AgentRow({ agent, busy, confirming, onArm, onCancel, onConfirm }: Agent
               disabled={busy}
               title="Create commits reverting this agent's commits"
               onClick={onConfirm}
-              style={actionButtonStyle(colors.claude.error, busy)}
+              className="te-tray-action"
+              data-tone="danger"
             >
               Revert {count} {commits}
             </button>
@@ -312,26 +238,4 @@ function revertFailureCopy(agentId: string, reason: string): string {
 function formatDate(iso: string): string {
   const parsed = Date.parse(iso)
   return Number.isNaN(parsed) ? iso : new Date(parsed).toLocaleDateString()
-}
-
-const emptyRowStyle: React.CSSProperties = {
-  padding: '10px 14px',
-  borderTop: `1px solid ${colors.border.subtle}`,
-  color: colors.text.muted,
-  fontFamily: typography.fontFamily.body,
-  fontSize: 12
-}
-
-function actionButtonStyle(color: string, disabled: boolean): React.CSSProperties {
-  return {
-    padding: '4px 12px',
-    border: `1px solid ${disabled ? colors.border.subtle : color}`,
-    borderRadius: borderRadius.inline,
-    background: disabled ? 'transparent' : `color-mix(in srgb, ${color} 10%, transparent)`,
-    color: disabled ? colors.text.disabled : color,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    cursor: disabled ? 'default' : 'pointer',
-    transition: `background ${transitions.focusRing}, color ${transitions.focusRing}`
-  }
 }

@@ -116,21 +116,24 @@ describe('AgentShell welcome tooltip', () => {
     render(<AgentShell />)
     const strip = screen.getByTestId('window-drag-region')
     const controls = screen.getByTestId('window-controls-container')
-    expect(strip.style.height).toBe('39px')
-    expect(controls.style.width).toBe('148px')
-    expect(controls.style.height).toBe('39px')
+    // The 39px titlebar height and the 148px native-controls zone are pinned in
+    // the te-shell-titlebar* CSS classes (ADR 0005 slice 4). happy-dom does not
+    // load that sheet, so assert the elements carry the classes that own those
+    // values rather than the computed px.
+    expect(strip.classList.contains('te-shell-titlebar')).toBe(true)
+    expect(controls.classList.contains('te-shell-titlebar-controls')).toBe(true)
   })
 
   it('pins 8px corner gutters so macOS keeps the resize hit zones', () => {
-    // The drag region must be inset 8px from the left/right edges. Without
-    // this padding the WebkitAppRegion: drag wins over the OS corner-resize
-    // handles and users can't resize the window from the top corners. This is
-    // load-bearing platform behavior, not visual polish.
+    // The drag region is inset 8px from the left/right edges. Without this
+    // padding the WebkitAppRegion: drag wins over the OS corner-resize handles
+    // and users can't resize the window from the top corners. This is
+    // load-bearing platform behavior, not visual polish; the gutters live in
+    // .te-shell-titlebar's padding.
     useVaultStore.setState({ vaultPath: null })
     render(<AgentShell />)
     const strip = screen.getByTestId('window-drag-region')
-    expect(strip.style.paddingLeft).toBe('8px')
-    expect(strip.style.paddingRight).toBe('8px')
+    expect(strip.classList.contains('te-shell-titlebar')).toBe(true)
   })
 
   it('dismissing flips welcomed and writes config', async () => {

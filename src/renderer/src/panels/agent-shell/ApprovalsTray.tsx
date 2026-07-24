@@ -14,11 +14,10 @@ import { useVaultStore } from '../../store/vault-store'
 import { AgentBreakerNotices } from './agent-breaker-notice'
 import { flagChips } from './approval-flags'
 import { REVERT_AGENT_EVENT, RevertAgentSection } from './RevertAgentSection'
-import { borderRadius, colors, floatingPanel, transitions, typography } from '../../design/tokens'
+import { colors } from '../../design/tokens'
 import { Overlay } from '../../components/overlay/Overlay'
 
 const PATHS_SHOWN_MAX = 6
-const TRIGGER_BUTTON_SIZE = 26
 
 export function ApprovalsTray() {
   const pending = useApprovalsStore((s) => s.pending)
@@ -97,7 +96,7 @@ export function ApprovalsTray() {
   }, [])
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex' }}>
+    <div className="te-tray-anchor">
       <button
         type="button"
         data-testid="approvals-tray-button"
@@ -108,47 +107,17 @@ export function ApprovalsTray() {
         // net effect a reopen instead of a close. Stopping propagation keeps
         // the trigger the sole source of truth for its own open state.
         onMouseDown={(event) => event.stopPropagation()}
-        className="titlebar-toggle"
+        className="titlebar-toggle te-tray-trigger"
         data-open={open ? 'true' : undefined}
         aria-label={`Agent approvals: ${pending} pending${
           unhealthy && watcherHealth !== null ? `; write containment ${watcherHealth.state}` : ''
         }`}
         aria-expanded={open}
         title="Agent approvals"
-        style={{
-          width: TRIGGER_BUTTON_SIZE,
-          height: TRIGGER_BUTTON_SIZE,
-          padding: 0,
-          boxSizing: 'border-box',
-          position: 'relative',
-          borderRadius: borderRadius.inline,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer'
-        }}
       >
         <Inbox size={15} strokeWidth={1.75} aria-hidden />
         {pending > 0 && (
-          <span
-            data-testid="approvals-tray-badge"
-            style={{
-              position: 'absolute',
-              top: -4,
-              right: -4,
-              minWidth: 14,
-              height: 14,
-              padding: '0 3px',
-              boxSizing: 'border-box',
-              borderRadius: borderRadius.inline,
-              background: colors.accent.default,
-              color: 'var(--color-bg-base)',
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 9,
-              lineHeight: '14px',
-              textAlign: 'center'
-            }}
-          >
+          <span data-testid="approvals-tray-badge" className="te-tray-badge">
             {pending > 99 ? '99+' : pending}
           </span>
         )}
@@ -156,18 +125,7 @@ export function ApprovalsTray() {
           <span
             data-testid="approvals-watcher-warning"
             aria-hidden
-            style={{
-              position: 'absolute',
-              bottom: -3,
-              right: -3,
-              width: 8,
-              height: 8,
-              // Round exception: status dot (knife-edge geometry contract).
-              borderRadius: '50%',
-              background: colors.claude.warning,
-              border: '2px solid var(--color-bg-base)',
-              boxSizing: 'content-box'
-            }}
+            className="te-tray-watcher-dot"
           />
         )}
       </button>
@@ -177,64 +135,19 @@ export function ApprovalsTray() {
         onClose={() => setOpen(false)}
         variant="popover"
         zLayer="dockPopover"
-        style={{
-          position: 'fixed',
-          top: 44,
-          right: 10,
-          width: 440,
-          maxHeight: '72vh',
-          display: 'flex',
-          flexDirection: 'column',
-          background: floatingPanel.glass.bg,
-          backdropFilter: floatingPanel.glass.blur,
-          WebkitBackdropFilter: floatingPanel.glass.blur,
-          border: `1px solid ${colors.border.subtle}`,
-          borderRadius: floatingPanel.borderRadius,
-          boxShadow: floatingPanel.shadowCompact,
-          overflow: 'hidden'
-        }}
+        className="te-tray-popover"
       >
         <div
           data-testid="approvals-popover"
           role="dialog"
           aria-label="Agent approvals"
-          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+          className="te-tray-popover-inner"
         >
-          <div
-            style={{
-              padding: '10px 14px',
-              borderBottom: `1px solid ${colors.border.subtle}`,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              color: colors.text.muted
-            }}
-          >
-            Agent approvals · {pending} pending
-          </div>
+          <div className="te-tray-header">Agent approvals · {pending} pending</div>
 
           {unhealthy && watcherHealth !== null && (
-            <div
-              data-testid="approvals-watcher-banner"
-              style={{
-                padding: '10px 14px',
-                borderBottom: `1px solid ${colors.border.subtle}`,
-                background: colors.callout.warning.bg,
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 10
-              }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  color: colors.text.primary,
-                  fontFamily: typography.fontFamily.body,
-                  fontSize: 12,
-                  lineHeight: 1.5
-                }}
-              >
+            <div data-testid="approvals-watcher-banner" className="te-tray-watcher-banner">
+              <div className="te-tray-watcher-banner-text">
                 Write containment is not watching. Agent writes since{' '}
                 {new Date(watcherHealth.since).toLocaleTimeString()} are not being captured for
                 review.
@@ -245,7 +158,8 @@ export function ApprovalsTray() {
                 disabled={retrying}
                 title="Restart the agent write watcher"
                 onClick={() => void retryWatcher()}
-                style={actionButtonStyle(colors.claude.warning, retrying)}
+                className="te-tray-action"
+                data-tone="warn"
               >
                 Retry
               </button>
@@ -258,33 +172,14 @@ export function ApprovalsTray() {
           <AgentBreakerNotices />
 
           {notice !== null && (
-            <div
-              data-testid="approvals-notice"
-              style={{
-                padding: '8px 14px',
-                borderBottom: `1px solid ${colors.border.subtle}`,
-                background: colors.callout.warning.bg,
-                color: colors.text.primary,
-                fontFamily: typography.fontFamily.body,
-                fontSize: 12,
-                lineHeight: 1.5
-              }}
-            >
+            <div data-testid="approvals-notice" className="te-tray-notice">
               {notice}
             </div>
           )}
 
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div className="te-tray-scroll">
             {items.length === 0 ? (
-              <div
-                data-testid="approvals-empty"
-                style={{
-                  padding: '18px 14px',
-                  color: colors.text.muted,
-                  fontFamily: typography.fontFamily.body,
-                  fontSize: 12.5
-                }}
-              >
+              <div data-testid="approvals-empty" className="te-tray-empty">
                 No pending agent changes.
               </div>
             ) : (
@@ -303,16 +198,7 @@ export function ApprovalsTray() {
 
           <RevertAgentSection requestedAgentId={revertRequest} />
 
-          <div
-            style={{
-              padding: '9px 14px',
-              borderTop: `1px solid ${colors.border.subtle}`,
-              color: colors.text.muted,
-              fontFamily: typography.fontFamily.body,
-              fontSize: 11.5,
-              lineHeight: 1.55
-            }}
-          >
+          <div className="te-tray-footer">
             These changes are already on disk. Approve records them as a commit; Reject reverts
             files via git. Only writes inside the workspace root are tracked.
             {items.some((item) => item.kind === 'gate-confirm') && (
@@ -353,32 +239,15 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
   const capturedRoot = item.capturedRoot ?? null
 
   return (
-    <div
-      data-testid="approval-item"
-      style={{
-        padding: '12px 14px',
-        borderBottom: `1px solid ${colors.border.subtle}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 8,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 11.5
-        }}
-      >
-        <span style={{ color: colors.text.primary }}>{item.agentId}</span>
-        <span style={{ color: colors.text.muted }}>{item.threadId}</span>
+    <div data-testid="approval-item" className="te-tray-item">
+      <div className="te-tray-item-head">
+        <span className="te-tray-id">{item.agentId}</span>
+        <span className="te-tray-meta">{item.threadId}</span>
         {item.kind === 'gate-confirm' && (
           // Converged surfaces (v1.3.1): MCP and native-agent write confirms
           // ride this row — never a modal. Copy honesty: the write is
           // awaiting confirmation, nothing is phrased as blocked.
-          <span data-testid="approval-gate-confirm" style={{ color: colors.text.muted }}>
+          <span data-testid="approval-gate-confirm" className="te-tray-meta">
             write confirm
           </span>
         )}
@@ -386,50 +255,27 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
           <span
             data-testid="approval-root-label"
             title={capturedRoot}
-            style={{
-              marginLeft: 'auto',
-              padding: '1px 6px',
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: borderRadius.inline,
-              color: colors.text.secondary,
-              fontSize: 10,
-              letterSpacing: '0.02em',
-              whiteSpace: 'nowrap'
-            }}
+            className="te-tray-root-label"
           >
             {rootBasename(capturedRoot)}
           </span>
         )}
       </div>
 
-      {item.description !== undefined && (
-        <div
-          style={{
-            color: colors.text.secondary,
-            fontFamily: typography.fontFamily.body,
-            fontSize: 12,
-            lineHeight: 1.5
-          }}
-        >
-          {item.description}
-        </div>
-      )}
+      {item.description !== undefined && <div className="te-tray-desc">{item.description}</div>}
 
       {chips.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+        <div className="te-tray-chips">
           {chips.map((chip) => (
             <span
               key={chip.label}
               data-testid={`approval-flag-${chip.key}`}
+              className="te-tray-chip"
+              // chip.color is a runtime flag-identity color (approval-flags.ts).
               style={{
-                padding: '2px 7px',
-                border: `1px solid ${chip.color}`,
-                borderRadius: borderRadius.inline,
+                borderColor: chip.color,
                 color: chip.color,
-                background: `color-mix(in srgb, ${chip.color} 8%, transparent)`,
-                fontFamily: typography.fontFamily.mono,
-                fontSize: 10,
-                letterSpacing: '0.02em'
+                background: `color-mix(in srgb, ${chip.color} 8%, transparent)`
               }}
             >
               {chip.label}
@@ -439,59 +285,25 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
       )}
 
       {item.flags.headMoved && (
-        <div
-          data-testid="approval-headmoved-banner"
-          style={{
-            padding: '6px 9px',
-            border: `1px solid ${colors.claude.error}`,
-            borderRadius: borderRadius.inline,
-            background: colors.callout.danger.bg,
-            color: colors.text.primary,
-            fontFamily: typography.fontFamily.body,
-            fontSize: 11.5,
-            lineHeight: 1.5
-          }}
-        >
+        <div data-testid="approval-headmoved-banner" className="te-tray-headmoved">
           Git history moved during this turn — the agent ran git itself. Review the diff against the
           actual repo state before deciding.
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 11,
-          color: colors.text.secondary
-        }}
-      >
+      <div className="te-tray-paths">
         {shownPaths.map((p) => (
-          <span key={p} style={{ wordBreak: 'break-all' }}>
+          <span key={p} className="te-tray-path">
             {p}
           </span>
         ))}
-        {hiddenCount > 0 && <span style={{ color: colors.text.muted }}>+{hiddenCount} more</span>}
+        {hiddenCount > 0 && <span className="te-tray-meta">+{hiddenCount} more</span>}
       </div>
 
       {item.diff.length > 0 && (
-        <pre
-          data-testid="approval-diff"
-          style={{
-            margin: 0,
-            padding: '8px 10px',
-            maxHeight: 180,
-            overflow: 'auto',
-            background: 'var(--color-bg-base)',
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: borderRadius.inline,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 10.5,
-            lineHeight: 1.5
-          }}
-        >
+        <pre data-testid="approval-diff" className="te-tray-diff">
           {item.diff.split('\n').map((line, i) => (
+            // diffLineColor is a per-line semantic color (added/removed/meta).
             <div key={i} style={{ color: diffLineColor(line) }}>
               {line.length === 0 ? ' ' : line}
             </div>
@@ -504,23 +316,8 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
           'workspace-changed' — so the tray offers the switch, never a resolve
           that would fail. Copy stays honest: writes are on disk either way. */}
       {foreign ? (
-        <div
-          data-testid="approval-foreign-root"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            justifyContent: 'space-between'
-          }}
-        >
-          <span
-            style={{
-              color: colors.text.muted,
-              fontFamily: typography.fontFamily.body,
-              fontSize: 11.5,
-              lineHeight: 1.5
-            }}
-          >
+        <div data-testid="approval-foreign-root" className="te-tray-foreign">
+          <span className="te-tray-foreign-text">
             {capturedRoot === null
               ? 'Captured with no workspace open — it cannot be resolved from here.'
               : 'Captured in a different workspace.'}
@@ -531,14 +328,15 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
               data-testid="approval-switch-root"
               title={`Open ${capturedRoot} to resolve this change`}
               onClick={() => onSwitchRoot(capturedRoot)}
-              style={{ ...actionButtonStyle(colors.accent.default, false), whiteSpace: 'nowrap' }}
+              className="te-tray-action te-tray-switch"
+              data-tone="accent"
             >
               Switch to {rootBasename(capturedRoot)} to resolve
             </button>
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div className="te-tray-actions">
           <button
             type="button"
             data-testid="approval-reject"
@@ -551,7 +349,8 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
                   : 'Revert these files via git'
             }
             onClick={() => onResolve(false)}
-            style={actionButtonStyle(colors.claude.error, rejectDisabled)}
+            className="te-tray-action"
+            data-tone="danger"
           >
             Reject
           </button>
@@ -567,7 +366,8 @@ function ApprovalItem({ item, foreign, busy, onResolve, onSwitchRoot }: Approval
                   : 'Acknowledge — non-repo workspace, no commit is possible'
             }
             onClick={() => onResolve(true)}
-            style={actionButtonStyle(colors.claude.ready, busy)}
+            className="te-tray-action"
+            data-tone="ready"
           >
             Approve
           </button>
@@ -582,18 +382,4 @@ function diffLineColor(line: string): string {
   if (line.startsWith('-') && !line.startsWith('---')) return colors.diff.removed
   if (line.startsWith('@@')) return colors.text.muted
   return colors.text.secondary
-}
-
-function actionButtonStyle(color: string, disabled: boolean): React.CSSProperties {
-  return {
-    padding: '4px 12px',
-    border: `1px solid ${disabled ? colors.border.subtle : color}`,
-    borderRadius: borderRadius.inline,
-    background: disabled ? 'transparent' : `color-mix(in srgb, ${color} 10%, transparent)`,
-    color: disabled ? colors.text.disabled : color,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    cursor: disabled ? 'default' : 'pointer',
-    transition: `background ${transitions.focusRing}, color ${transitions.focusRing}`
-  }
 }

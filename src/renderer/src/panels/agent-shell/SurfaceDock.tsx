@@ -3,7 +3,6 @@ import { useThreadStore } from '../../store/thread-store'
 import { useDockStore } from '../../store/dock-store'
 import { DockTabBar } from './DockTabBar'
 import { DockTabContent } from './DockTabContent'
-import { colors } from '../../design/tokens'
 import { EmptyState } from '../../components/emptystate/EmptyState'
 import { type DockTab } from '@shared/dock-types'
 import { TerminalStrip } from './TerminalStrip'
@@ -23,9 +22,6 @@ function tabIdentity(tab: DockTab): string {
   tabIdMap.set(tab, id)
   return id
 }
-
-/** Floor below which dock surfaces (editor, canvas, graph) stop being usable. */
-const DOCK_MIN_WIDTH = 240
 
 export function SurfaceDock() {
   const id = useThreadStore((s) => s.activeThreadId)
@@ -78,21 +74,13 @@ export function SurfaceDock() {
     if (changed) setMountedIds(next)
   }
 
-  if (collapsed) return <aside data-testid="dock-collapsed" style={{ width: 0 }} />
+  if (collapsed) return <aside data-testid="dock-collapsed" className="te-dock-collapsed" />
   return (
-    <aside
-      style={{
-        // The dock is the workbench: it claims all width the fixed-size rails
-        // (sidebar, chat, ribbon, files panel) leave over.
-        flex: 1,
-        minWidth: DOCK_MIN_WIDTH,
-        background: colors.bg.rail,
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
+    // The dock is the workbench: te-dock-surface flexes to claim all width the
+    // fixed-size rails (sidebar, chat, ribbon, files panel) leave over.
+    <aside className="te-dock-surface">
       <DockTabBar activeIndex={safeIndex} onActivate={onActivate} />
-      <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+      <div className="te-dock-content">
         {active ? (
           tabs.map((tab) => {
             const key = tabIdentity(tab)
@@ -101,10 +89,8 @@ export function SurfaceDock() {
             return (
               <div
                 key={key}
-                style={{
-                  display: isActive ? 'block' : 'none',
-                  height: '100%'
-                }}
+                className="te-dock-tab-pane"
+                style={{ display: isActive ? 'block' : 'none' }}
               >
                 <DockTabContent tab={tab} />
               </div>
@@ -126,7 +112,7 @@ function EmptyDockState() {
       maxWidth={280}
       eyebrow="no surface open"
       hint={
-        <span style={{ lineHeight: 1.8 }}>
+        <span className="te-dock-empty-hint">
           use the ribbon on the right edge to open the editor, canvas, graph, ghosts, or health, or
           press ⌘K for the command palette
         </span>

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
 import { scanSecrets } from '@shared/engine/secrets'
 import { segmentOutput, maskSegmentText } from '@shared/engine/block-output-segments'
-import { borderRadius, colors, typography } from '../../../design/tokens'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
 import { ToolCardShell } from './ToolCardShell'
 
@@ -49,56 +48,22 @@ export function CliCommandCard({
       variant="block"
       pending={!result}
       onContextMenu={onContextMenu}
-      style={{
-        padding: 0,
-        fontFamily: typography.fontFamily.mono,
-        overflow: 'hidden'
-      }}
+      className="te-tool-cli"
     >
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          width: '100%',
-          padding: '8px 12px',
-          background: 'transparent',
-          border: 'none',
-          color: colors.text.primary,
-          textAlign: 'left',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          fontSize: 'inherit'
-        }}
+        className="te-tool-cli-trigger"
         aria-expanded={expanded}
       >
-        <span aria-hidden style={{ opacity: 0.5, width: 10 }}>
+        <span aria-hidden className="te-tool-caret">
           {expanded ? '▾' : '▸'}
         </span>
-        <span
-          style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-        >
-          {call.args.command}
-        </span>
+        <span className="te-tool-cli-cmd">{call.args.command}</span>
         <ExitBadge ok={ok} code={exitCode} />
       </button>
       {expanded && secrets.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '4px 12px',
-            borderTop: `1px solid ${colors.border.subtle}`,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: typography.metadata.size,
-            letterSpacing: typography.metadata.letterSpacing,
-            textTransform: typography.metadata.textTransform,
-            color: colors.text.muted
-          }}
-        >
+        <div className="te-tool-cli-secrets">
           <span>
             {secrets.length} secret{secrets.length === 1 ? '' : 's'}{' '}
             {revealed ? 'revealed' : 'masked'}
@@ -107,60 +72,22 @@ export function CliCommandCard({
             type="button"
             data-testid="cli-reveal-secrets"
             onClick={() => setRevealed((v) => !v)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              color: colors.text.secondary,
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              textTransform: 'inherit'
-            }}
+            className="te-tool-cli-reveal"
           >
             {revealed ? 'hide' : 'reveal'}
           </button>
         </div>
       )}
-      {expanded && (
-        <pre
-          style={{
-            margin: 0,
-            padding: '10px 12px',
-            borderTop: `1px solid ${colors.border.subtle}`,
-            background: colors.bg.base,
-            color: colors.text.secondary,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            maxHeight: 360,
-            overflow: 'auto',
-            fontSize: 11.5,
-            lineHeight: 1.55
-          }}
-        >
-          {output || '(no output)'}
-        </pre>
-      )}
+      {expanded && <pre className="te-tool-cli-output">{output || '(no output)'}</pre>}
       {menu}
     </ToolCardShell>
   )
 }
 
 function ExitBadge({ ok, code }: { readonly ok: boolean; readonly code: number | null }) {
-  const bg = ok ? colors.claude.ready : colors.claude.error
   const label = code === null ? '…' : `exit ${code}`
   return (
-    <span
-      style={{
-        padding: '1px 6px',
-        borderRadius: borderRadius.inline,
-        background: `color-mix(in srgb, ${bg} 18%, transparent)`,
-        color: bg,
-        fontSize: 11,
-        whiteSpace: 'nowrap'
-      }}
-    >
+    <span className="te-tool-exit-badge" data-ok={ok ? '' : undefined}>
       {label}
     </span>
   )

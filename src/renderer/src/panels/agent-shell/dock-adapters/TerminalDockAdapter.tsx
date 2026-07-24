@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVaultStore } from '../../../store/vault-store'
-import { colors, typography } from '../../../design/tokens'
 import { buildTerminalWebviewSrc, resolveTerminalWebviewBase } from '../terminal-webview-src'
 
 interface LoadFailure {
@@ -137,69 +136,28 @@ export function TerminalDockAdapter({
 
   /* eslint-disable react/no-unknown-property */
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div className="te-term-adapter">
       <webview
         key={reloadKey}
         ref={webviewRef as unknown as React.RefObject<HTMLElement>}
         src={webviewSrc}
         preload={preloadPath}
-        style={{
-          width: '100%',
-          height: '100%',
-          visibility: failure ? 'hidden' : 'visible'
-        }}
+        className="te-term-adapter-webview"
+        style={{ visibility: failure ? 'hidden' : 'visible' }}
         webpreferences="contextIsolation=yes, sandbox=yes"
       />
       {dead && <DeadSessionState overlay />}
       {failure && (
-        <div
-          role="alert"
-          data-testid="terminal-webview-error"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-            padding: 24,
-            gap: 8,
-            background: colors.bg.surface,
-            color: colors.text.primary,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 12,
-            lineHeight: 1.6
-          }}
-        >
-          <div
-            style={{
-              color: colors.claude.error,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform
-            }}
-          >
-            terminal webview failed to load
-          </div>
-          <div style={{ color: colors.text.secondary }}>
+        <div role="alert" data-testid="terminal-webview-error" className="te-term-adapter-error">
+          <div className="te-term-adapter-error-eyebrow">terminal webview failed to load</div>
+          <div className="te-term-adapter-error-desc">
             {failure.description} (code {failure.code})
           </div>
-          <div style={{ color: colors.text.muted, wordBreak: 'break-all' }}>{failure.url}</div>
+          <div className="te-term-adapter-error-url">{failure.url}</div>
           <button
             type="button"
             onClick={() => setReloadKey((k) => k + 1)}
-            style={{
-              marginTop: 8,
-              padding: '6px 12px',
-              background: 'transparent',
-              border: `1px solid ${colors.border.default}`,
-              color: colors.text.primary,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              cursor: 'pointer'
-            }}
+            className="te-term-adapter-retry"
           >
             retry
           </button>
@@ -222,35 +180,11 @@ function DeadSessionState({ overlay }: { readonly overlay?: boolean }) {
     <div
       role="status"
       data-testid="terminal-dead-state"
-      style={{
-        ...(overlay
-          ? { position: 'absolute' as const, top: 0, left: 0, right: 0 }
-          : { width: '100%', height: '100%', boxSizing: 'border-box' as const }),
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        justifyContent: overlay ? 'flex-start' : 'center',
-        padding: overlay ? '10px 16px' : 24,
-        gap: 6,
-        background: colors.bg.surface,
-        borderBottom: overlay ? `1px solid ${colors.border.subtle}` : undefined,
-        color: colors.text.primary,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 12,
-        lineHeight: 1.6
-      }}
+      className="te-term-dead"
+      data-overlay={overlay ? 'true' : undefined}
     >
-      <div
-        style={{
-          color: colors.text.muted,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform
-        }}
-      >
-        agent session ended
-      </div>
-      <div style={{ color: colors.text.secondary }}>
+      <div className="te-term-dead-eyebrow">agent session ended</div>
+      <div className="te-term-dead-body">
         This PTY is gone. Machina does not restart shells for agent threads — send a message to
         start the next turn in a fresh, attributed session.
       </div>

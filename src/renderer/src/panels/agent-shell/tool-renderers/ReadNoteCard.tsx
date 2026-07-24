@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { borderRadius, colors, floatingPanel, typography } from '../../../design/tokens'
 import { openNoteInEditor } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { copyText, useToolCardMenu } from './useToolCardMenu'
@@ -69,7 +68,7 @@ export function ReadNoteCard({
         onContextMenu={onContextMenu}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        style={{ cursor: settled ? 'pointer' : 'default', gap: 6 }}
+        className="te-tool-read"
       >
         <div
           role="button"
@@ -82,19 +81,14 @@ export function ReadNoteCard({
               handleClick(e as unknown as ReactMouseEvent<HTMLDivElement>)
             }
           }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            color: settled ? colors.text.primary : colors.text.muted
-          }}
+          className="te-tool-read-body"
         >
           <FileGlyph />
           <span>{call.args.path}</span>
           {!settled ? (
-            <span style={{ color: colors.text.muted }}>· reading…</span>
+            <span className="te-tool-muted">· reading…</span>
           ) : (
-            lines && <span style={{ color: colors.text.muted }}>· {lines}</span>
+            lines && <span className="te-tool-muted">· {lines}</span>
           )}
         </div>
       </ToolCardShell>
@@ -207,61 +201,24 @@ function ReadNotePreview({
   const truncated = content.split('\n').length > PREVIEW_MAX_LINES
   const isEmpty = content.trim().length === 0
 
-  const style: CSSProperties = {
-    position: 'fixed',
-    top: -9999,
-    left: -9999,
-    width: PREVIEW_WIDTH,
-    maxHeight: PREVIEW_MAX_HEIGHT,
-    background: colors.bg.elevated,
-    border: `1px solid ${colors.border.default}`,
-    borderRadius: borderRadius.container,
-    boxShadow: floatingPanel.shadow,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    zIndex: 1000,
-    pointerEvents: 'none',
-    visibility: 'hidden'
-  }
-
   return createPortal(
-    <div ref={previewRef} className="te-popover-enter" style={style} role="tooltip">
-      <div
-        style={{
-          padding: '6px 10px',
-          borderBottom: `1px solid ${colors.border.subtle}`,
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 10,
-          letterSpacing: 'var(--label-tracking)',
-          textTransform: 'uppercase',
-          color: colors.text.muted,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}
-      >
-        {path}
-      </div>
-      <div
-        style={{
-          padding: '8px 10px',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: 11,
-          lineHeight: 1.5,
-          color: colors.text.primary,
-          overflow: 'hidden',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word'
-        }}
-      >
+    // top/left/visibility are set imperatively in useLayoutEffect (measured
+    // placement); the static surface lives in .te-tool-note-preview.
+    <div
+      ref={previewRef}
+      className="te-popover-enter te-tool-note-preview"
+      style={{ top: -9999, left: -9999, visibility: 'hidden' }}
+      role="tooltip"
+    >
+      <div className="te-tool-note-preview-path">{path}</div>
+      <div className="te-tool-note-preview-body">
         {isEmpty ? (
-          <span style={{ color: colors.text.muted, fontStyle: 'italic' }}>(empty file)</span>
+          <span className="te-tool-note-preview-empty">(empty file)</span>
         ) : (
           <>
             {lines.join('\n')}
             {truncated && (
-              <span style={{ color: colors.text.muted }}>{`\n…(+${
+              <span className="te-tool-muted">{`\n…(+${
                 content.split('\n').length - PREVIEW_MAX_LINES
               } more lines)`}</span>
             )}
@@ -280,7 +237,7 @@ function FileGlyph() {
       width={11}
       height={13}
       viewBox="0 0 11 13"
-      style={{ flexShrink: 0, opacity: 0.65 }}
+      className="te-tool-glyph te-tool-glyph--dim"
     >
       <path
         d="M1 1.5A1 1 0 0 1 2 .5h4.5L10 4v7.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1.5z"

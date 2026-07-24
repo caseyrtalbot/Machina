@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import {
   Activity,
   FileText,
@@ -16,7 +16,6 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { DockTab } from '@shared/dock-types'
-import { borderRadius, colors } from '../../design/tokens'
 import { useThreadStore } from '../../store/thread-store'
 import { openNoteInEditor, useDockStore } from '../../store/dock-store'
 import { useEditorStore } from '../../store/editor-store'
@@ -28,9 +27,6 @@ interface SideDockRibbonProps {
   readonly onOpenSettings?: () => void
 }
 
-const RIBBON_WIDTH = 35
-const ACTION_WIDTH = 30
-const ACTION_HEIGHT = 26
 const ICON_SIZE = 18
 
 export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbonProps) {
@@ -82,19 +78,6 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
       className="side-dock-ribbon"
       data-testid="side-dock-ribbon"
       aria-label="Surface dock ribbon"
-      style={{
-        width: RIBBON_WIDTH,
-        height: '100%',
-        flexShrink: 0,
-        boxSizing: 'border-box',
-        padding: '4px 2px 8px 3px',
-        background: colors.bg.rail,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 4,
-        position: 'relative'
-      }}
     >
       <RibbonGroup>
         <RibbonAction
@@ -158,7 +141,7 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
         />
       </RibbonGroup>
 
-      <div style={{ flex: 1, minHeight: 12 }} />
+      <div className="te-dock-ribbon-spacer" />
 
       {onOpenSettings && (
         <RibbonAction label="Open settings" icon={Settings} onClick={onOpenSettings} />
@@ -168,25 +151,11 @@ export function SideDockRibbon({ onOpenPalette, onOpenSettings }: SideDockRibbon
 }
 
 function RibbonGroup({ children }: { readonly children: ReactNode }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      {children}
-    </div>
-  )
+  return <div className="te-dock-ribbon-group">{children}</div>
 }
 
 function RibbonDivider() {
-  return (
-    <div
-      aria-hidden
-      style={{
-        width: 18,
-        height: 1,
-        margin: '8px 0',
-        background: 'var(--line-subtle)'
-      }}
-    />
-  )
+  return <div aria-hidden className="te-dock-ribbon-divider" />
 }
 
 function RibbonAction({
@@ -204,23 +173,7 @@ function RibbonAction({
   readonly pressed?: boolean
   readonly tone?: 'default' | 'active' | 'danger'
 }) {
-  const interactive = !disabled
   const isActive = pressed === true || tone === 'active'
-
-  const style: CSSProperties = {
-    width: ACTION_WIDTH,
-    height: ACTION_HEIGHT,
-    padding: '4px 6px',
-    boxSizing: 'border-box',
-    border: 'none',
-    borderRadius: borderRadius.inline,
-    cursor: interactive ? 'pointer' : 'not-allowed',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    position: 'relative'
-  }
 
   return (
     <button
@@ -233,22 +186,8 @@ function RibbonAction({
       data-tone={tone === 'danger' ? 'danger' : undefined}
       disabled={disabled}
       onClick={onClick}
-      style={style}
     >
-      {isActive ? (
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: -3,
-            top: 4,
-            bottom: 4,
-            width: 2,
-            background: colors.accent.default,
-            borderRadius: 1
-          }}
-        />
-      ) : null}
+      {isActive ? <span aria-hidden className="te-dock-ribbon-active-bar" /> : null}
       <Icon size={ICON_SIZE} strokeWidth={1.75} aria-hidden />
     </button>
   )

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentIdentity } from '@shared/agent-identity'
-import { borderRadius, colors, typography } from '../../design/tokens'
 import { AgentBadge } from './agent-badge'
 
 // 'cli-raw' appended in workstation step 1: picking it spawns a plain PTY
@@ -53,16 +52,7 @@ export function AgentPicker({
   }, [active, onPick, onCancel])
 
   return (
-    <div
-      ref={ref}
-      role="listbox"
-      style={{
-        background: colors.bg.elevated,
-        border: `1px solid ${colors.border.default}`,
-        padding: 4,
-        borderRadius: borderRadius.tool
-      }}
-    >
+    <div ref={ref} role="listbox" className="te-picker">
       {AGENTS.map((a, i) => {
         const isActive = i === active
         return (
@@ -72,38 +62,13 @@ export function AgentPicker({
             aria-selected={isActive}
             onMouseEnter={() => setActive(i)}
             onClick={() => onPick(a)}
-            style={{
-              padding: '6px 10px',
-              cursor: 'pointer',
-              borderRadius: borderRadius.inline,
-              background: isActive ? 'var(--bg-tint-accent)' : 'transparent',
-              color: isActive ? colors.accent.default : colors.text.secondary,
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              display: 'flex',
-              alignItems: 'center'
-            }}
+            className="te-picker-option"
           >
             <AgentBadge agent={a} compact />
           </div>
         )
       })}
-      <div
-        role="option"
-        aria-selected={false}
-        onClick={onCancel}
-        style={{
-          padding: '6px 10px',
-          cursor: 'pointer',
-          fontFamily: typography.fontFamily.mono,
-          fontSize: typography.metadata.size,
-          letterSpacing: typography.metadata.letterSpacing,
-          textTransform: typography.metadata.textTransform,
-          color: colors.text.muted
-        }}
-      >
+      <div role="option" aria-selected={false} onClick={onCancel} className="te-picker-cancel">
         Cancel
       </div>
     </div>

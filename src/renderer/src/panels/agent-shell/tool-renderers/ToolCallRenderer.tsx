@@ -1,5 +1,4 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, typography } from '../../../design/tokens'
 import { maskSecretsInText } from './mask-secrets'
 import { CliCommandCard } from './CliCommandCard'
 import { EditNoteCard } from './EditNoteCard'
@@ -59,34 +58,10 @@ export function ToolCallRenderer({
           : null
       return (
         <ToolCardShell variant="pill" inline>
-          <span
-            style={{
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              color: colors.text.muted,
-              whiteSpace: 'nowrap'
-            }}
-          >
+          <span className="te-tool-unknown-label">
             tool: {call.kind} {unknownToolStatus(call, result, historical)}
           </span>
-          {preview && (
-            <span
-              style={{
-                fontFamily: typography.fontFamily.mono,
-                fontSize: typography.metadata.size,
-                color: colors.text.secondary,
-                marginLeft: 8,
-                maxWidth: 420,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {preview}
-            </span>
-          )}
+          {preview && <span className="te-tool-unknown-preview">{preview}</span>}
         </ToolCardShell>
       )
     }

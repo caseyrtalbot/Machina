@@ -1,5 +1,4 @@
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors } from '../../../design/tokens'
 import { ToolCardShell } from './ToolCardShell'
 
 type ReadCanvasCall = Extract<ToolCall, { kind: 'read_canvas' }>
@@ -22,12 +21,7 @@ export function ReadCanvasCard({
       : 0
 
   return (
-    <ToolCardShell
-      variant="pill"
-      inline
-      pending={!settled}
-      style={{ gap: 6, color: settled ? colors.text.primary : colors.text.muted }}
-    >
+    <ToolCardShell variant="pill" inline pending={!settled} className="te-tool-canvas-pill">
       <CanvasGlyph />
       <span>
         {!settled
@@ -45,7 +39,7 @@ function CanvasGlyph() {
       width={11}
       height={11}
       viewBox="0 0 11 11"
-      style={{ flexShrink: 0, opacity: 0.65 }}
+      className="te-tool-glyph te-tool-glyph--dim"
     >
       <rect
         x={0.5}

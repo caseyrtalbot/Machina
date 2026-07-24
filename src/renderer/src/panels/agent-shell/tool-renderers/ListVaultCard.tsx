@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { ToolCall, ToolResult } from '@shared/thread-types'
-import { colors, typography } from '../../../design/tokens'
 import { openNoteInEditor } from '../../../store/dock-store'
 import { useVaultStore } from '../../../store/vault-store'
 import { ToolCardShell } from './ToolCardShell'
@@ -21,7 +20,7 @@ export function ListVaultCard({
 
   if (!result) {
     return (
-      <ToolCardShell variant="pill" inline pending style={{ gap: 6, color: colors.text.muted }}>
+      <ToolCardShell variant="pill" inline pending className="te-tool-loading">
         <FolderGlyph />
         <span>listing vault…</span>
       </ToolCardShell>
@@ -42,59 +41,32 @@ export function ListVaultCard({
   }
 
   return (
-    <ToolCardShell variant="block" style={{ padding: 0 }}>
+    <ToolCardShell variant="block" className="te-tool-flush">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          width: '100%',
-          padding: '8px 12px',
-          background: 'transparent',
-          border: 'none',
-          color: colors.text.primary,
-          textAlign: 'left',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          fontSize: 'inherit'
-        }}
+        className="te-tool-disclosure"
       >
-        <span aria-hidden style={{ opacity: 0.5, width: 10 }}>
+        <span aria-hidden className="te-tool-caret">
           {expanded ? '▾' : '▸'}
         </span>
         <FolderGlyph />
         <span>
           {paths.length} {paths.length === 1 ? 'file' : 'files'}
         </span>
-        <span style={{ color: colors.text.muted, fontFamily: typography.fontFamily.mono }}>
-          · {globsLabel}
-        </span>
+        <span className="te-tool-mono-muted">· {globsLabel}</span>
       </button>
       {expanded && (
-        <ul
-          style={{
-            margin: 0,
-            padding: '6px 12px 10px 28px',
-            listStyle: 'none',
-            borderTop: `1px solid ${colors.border.subtle}`
-          }}
-        >
+        <ul className="te-tool-list">
           {paths.slice(0, PREVIEW_LIMIT).map((p) => (
-            <li key={p} style={{ padding: '2px 0' }}>
+            <li key={p} className="te-tool-list-item">
               <a
                 href="#"
-                className="no-underline hover:underline"
+                className="te-tool-link"
                 onClick={(e) => {
                   e.preventDefault()
                   openInEditor(p)
-                }}
-                style={{
-                  color: colors.text.primary,
-                  fontSize: 12,
-                  fontFamily: typography.fontFamily.mono
                 }}
               >
                 {p}
@@ -102,9 +74,7 @@ export function ListVaultCard({
             </li>
           ))}
           {paths.length > PREVIEW_LIMIT && (
-            <li style={{ padding: '2px 0', color: colors.text.muted }}>
-              … {paths.length - PREVIEW_LIMIT} more
-            </li>
+            <li className="te-tool-list-more">… {paths.length - PREVIEW_LIMIT} more</li>
           )}
         </ul>
       )}
@@ -114,13 +84,7 @@ export function ListVaultCard({
 
 function FolderGlyph() {
   return (
-    <svg
-      aria-hidden
-      width={12}
-      height={11}
-      viewBox="0 0 12 11"
-      style={{ flexShrink: 0, opacity: 0.7 }}
-    >
+    <svg aria-hidden width={12} height={11} viewBox="0 0 12 11" className="te-tool-glyph">
       <path
         d="M.5 2.5A1 1 0 0 1 1.5 1.5h3l1.2 1.5h5.3a1 1 0 0 1 1 1V9.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1v-7z"
         fill="none"

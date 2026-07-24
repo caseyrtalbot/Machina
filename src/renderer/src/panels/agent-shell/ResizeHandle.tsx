@@ -49,25 +49,8 @@ export function ResizeHandle({ side, width, onChange, onCommit }: ResizeHandlePr
       role="separator"
       aria-orientation="vertical"
       onPointerDown={handlePointerDown}
-      style={{
-        flexShrink: 0,
-        width: 3,
-        position: 'relative',
-        cursor: 'col-resize',
-        background: 'transparent'
-      }}
     >
-      <div
-        className="resize-handle__line"
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 1,
-          width: 0.5
-        }}
-      />
+      <div className="resize-handle__line" aria-hidden />
     </div>
   )
 }

@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { FolderTree } from 'lucide-react'
-import { colors, transitions, typography } from '../../design/tokens'
 import { FilesDockAdapter } from './dock-adapters/FilesDockAdapter'
 import { TitlebarPanelToggle } from './TitlebarPanelToggle'
 import {
@@ -9,8 +7,6 @@ import {
   persistFilesPanelWidth,
   readPersistedFilesPanelWidth
 } from './files-side-panel-storage'
-
-const RESIZE_HANDLE_WIDTH = 6
 
 interface HeaderFilesToggleButtonProps {
   readonly open: boolean
@@ -67,27 +63,10 @@ export function HeaderFilesSidePanel({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  const panelStyle: CSSProperties = {
-    position: 'relative',
-    width: open ? width : 0,
-    // Open: shrinkable down to the storage module's min so a cramped window
-    // squeezes panels instead of overflowing the row. Closed: hard 0.
-    minWidth: open ? 280 : 0,
-    flexShrink: open ? 1 : 0,
-    background: colors.bg.rail,
-    borderLeft: open ? `1px solid ${colors.border.default}` : 'none',
-    boxSizing: 'border-box',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    fontFamily: typography.fontFamily.body,
-    color: colors.text.primary,
-    // Suppress the width transition while actively dragging so width changes
-    // are 1:1 with the cursor instead of trailing through a 180ms ease.
-    transition: resizing ? 'none' : `width ${transitions.surface}`
-  }
-
   return (
+    // Open state (min-width 280 shrinkable, left border, width transition) keys
+    // off data-open in CSS; data-resizing suppresses the transition mid-drag so
+    // width tracks the cursor 1:1. The resting width itself is measured state.
     <div
       id="header-files-side-panel"
       ref={panelRef}
@@ -96,7 +75,9 @@ export function HeaderFilesSidePanel({
       aria-hidden={!open}
       data-testid="header-files-side-panel"
       data-open={open ? 'true' : 'false'}
-      style={panelStyle}
+      data-resizing={resizing ? 'true' : undefined}
+      className="te-shell-files-panel"
+      style={{ width: open ? width : 0 }}
     >
       {open && (
         <LeftEdgeResizeHandle
@@ -109,7 +90,7 @@ export function HeaderFilesSidePanel({
       {hasOpened && (
         // Inner wrapper pinned to the resting width so content doesn't
         // reflow mid-animation while the outer column collapses to 0.
-        <div style={{ width, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div className="te-shell-files-inner" style={{ width }}>
           <FilesDockAdapter onChangeVault={onChangeVault} onOpenSettings={onOpenSettings} />
         </div>
       )}
@@ -177,29 +158,8 @@ function LeftEdgeResizeHandle({
       role="separator"
       aria-orientation="vertical"
       onPointerDown={handlePointerDown}
-      style={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: -RESIZE_HANDLE_WIDTH / 2,
-        width: RESIZE_HANDLE_WIDTH,
-        cursor: 'col-resize',
-        background: 'transparent',
-        zIndex: 2
-      }}
     >
-      <div
-        className="resize-handle__line"
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 0.5
-        }}
-      />
+      <div className="resize-handle__line" aria-hidden />
     </div>
   )
 }

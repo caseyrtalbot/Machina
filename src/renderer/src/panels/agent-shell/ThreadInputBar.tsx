@@ -9,7 +9,6 @@ import type { AdapterId, AgentAdapter } from '@shared/session-types'
 import { ADAPTERS, identityForAdapter } from '@shared/agent-adapters'
 import { DEFAULT_NATIVE_MODEL, NATIVE_MODEL_OPTIONS } from '@shared/machina-native-tools'
 import { formatModelLabel } from '@shared/format-model-label'
-import { borderRadius, colors, transitions, typography } from '../../design/tokens'
 import { useHarnessBinding } from './use-harness-binding'
 
 const MIN_INPUT_HEIGHT = 22
@@ -154,37 +153,10 @@ export function ThreadInputBar() {
   }
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        background: colors.bg.base
-      }}
-    >
+    <div className="te-thread-inputbar">
       {pickerOpen && <AgentPicker onPick={pickAgent} onCancel={() => setPickerOpen(false)} />}
-      <div
-        className="thread-input-box"
-        style={{
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 8,
-          padding: '12px 20px 16px',
-          background: colors.bg.base,
-          borderTop: `1px solid ${colors.border.subtle}`,
-          transition: `background ${transitions.fast}, border-color ${transitions.fast}`
-        }}
-      >
-        <span
-          aria-hidden
-          style={{
-            flexShrink: 0,
-            color: colors.text.muted,
-            fontFamily: typography.fontFamily.mono,
-            fontSize: 13,
-            lineHeight: '22px',
-            userSelect: 'none'
-          }}
-        >
+      <div className="thread-input-box">
+        <span aria-hidden className="te-thread-input-prompt">
           ›
         </span>
         <textarea
@@ -206,20 +178,6 @@ export function ThreadInputBar() {
                 : 'Ask anything about your vault…'
           }
           className="thread-input-textarea"
-          style={{
-            flex: 1,
-            resize: 'none',
-            minHeight: MIN_INPUT_HEIGHT,
-            maxHeight: MAX_INPUT_HEIGHT,
-            background: 'transparent',
-            color: colors.text.primary,
-            border: 'none',
-            outline: 'none',
-            padding: 0,
-            fontFamily: typography.fontFamily.body,
-            fontSize: 14,
-            lineHeight: 1.55
-          }}
         />
         {modelChoices !== null && activeId && (
           <select
@@ -229,21 +187,7 @@ export function ThreadInputBar() {
             value={modelChoices.value}
             disabled={inFlight || isSessionStartBlocked}
             onChange={(e) => void setThreadModel(activeId, e.target.value)}
-            style={{
-              flexShrink: 0,
-              appearance: 'none',
-              WebkitAppearance: 'none',
-              padding: '3px 8px',
-              background: 'transparent',
-              border: `1px solid ${colors.border.subtle}`,
-              borderRadius: borderRadius.inline,
-              color: colors.text.muted,
-              cursor: inFlight ? 'default' : 'pointer',
-              fontFamily: typography.fontFamily.mono,
-              fontSize: 10,
-              letterSpacing: '0.04em',
-              lineHeight: '16px'
-            }}
+            className="te-thread-model-select"
           >
             {modelChoices.choices.map((c) => (
               <option key={c.value} value={c.value}>
@@ -259,33 +203,9 @@ export function ThreadInputBar() {
             aria-label="Stop"
             title="Request stop; sending stays blocked until the run settles"
             onClick={() => void cancelActive(activeId)}
-            style={{
-              flexShrink: 0,
-              padding: '4px 10px',
-              background: 'transparent',
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: borderRadius.inline,
-              color: colors.text.secondary,
-              cursor: 'pointer',
-              fontFamily: typography.fontFamily.mono,
-              fontSize: typography.metadata.size,
-              letterSpacing: typography.metadata.letterSpacing,
-              textTransform: typography.metadata.textTransform,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6
-            }}
+            className="te-thread-stop"
           >
-            <span
-              aria-hidden
-              style={{
-                display: 'inline-block',
-                width: 8,
-                height: 8,
-                background: colors.claude.error,
-                borderRadius: borderRadius.round
-              }}
-            />
+            <span aria-hidden className="te-thread-stop__dot" />
             Stop
           </button>
         ) : (
@@ -298,49 +218,14 @@ export function ThreadInputBar() {
 
 function KeyHint({ visible }: { readonly visible: boolean }) {
   return (
-    <span
-      aria-hidden
-      style={{
-        flexShrink: 0,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        opacity: visible ? 1 : 0,
-        transition: `opacity ${transitions.fast}`,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 10,
-        letterSpacing: '0.08em',
-        color: colors.text.disabled,
-        lineHeight: '22px',
-        userSelect: 'none'
-      }}
-    >
+    <span aria-hidden className="te-thread-keyhint" data-visible={visible ? 'true' : undefined}>
       <Kbd>⌘K</Kbd>
-      <span style={{ color: colors.text.disabled }}>·</span>
+      <span className="te-thread-keyhint__sep">·</span>
       <Kbd>/</Kbd>
     </span>
   )
 }
 
 function Kbd({ children }: { readonly children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: 16,
-        height: 16,
-        padding: '0 4px',
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: borderRadius.inline,
-        fontFamily: typography.fontFamily.mono,
-        fontSize: 10,
-        color: colors.text.muted,
-        background: 'transparent'
-      }}
-    >
-      {children}
-    </span>
-  )
+  return <span className="te-thread-kbd">{children}</span>
 }
