@@ -44,7 +44,7 @@ function authedTransport(lifecycle: McpLifecycle): StreamableHTTPClientTransport
 }
 
 /** Raw POST to the endpoint with explicit headers; returns the HTTP status. */
-function rawPost(url: URL, headers: Record<string, string>): Promise<number> {
+function rawPost(url: URL, headers: Record<string, string>, body?: string): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     const req = request(
       {
@@ -64,7 +64,7 @@ function rawPost(url: URL, headers: Record<string, string>): Promise<number> {
       }
     )
     req.on('error', reject)
-    req.end(JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }))
+    req.end(body ?? JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }))
   })
 }
 
@@ -80,6 +80,18 @@ describe('McpLifecycle', () => {
   afterEach(async () => {
     await lifecycle.stop()
     rmSync(vaultRoot, { recursive: true, force: true })
+  })
+
+  it('rejects authenticated requests larger than 1 MiB', async () => {
+    lifecycle.createForVault(vaultRoot)
+    await lifecycle.startTransport({ port: 0 })
+    const { url, token } = lifecycle.status()
+    const status = await rawPost(
+      new URL(url!),
+      { Authorization: `Bearer ${token}` },
+      JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1, padding: 'x'.repeat(1024 * 1024) })
+    )
+    expect(status).toBe(413)
   })
 
   it('createForVault prepares the factory but does not report running until the transport starts', () => {

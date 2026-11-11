@@ -4,9 +4,9 @@
 // Without this, gray-matter throws ReferenceError in parseClaudeSkill,
 // causing skill cards to show "SKILL" (the filename) instead of real names.
 // The Web Worker gets Buffer via nodeIntegrationInWorker (gray-matter dependency).
-import { Buffer } from 'buffer'
+import { Buffer } from 'buffer/'
 if (typeof globalThis.Buffer === 'undefined') {
-  globalThis.Buffer = Buffer
+  Object.assign(globalThis, { Buffer })
 }
 
 import './assets/index.css'

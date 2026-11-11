@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    // Preserve import-time IPC subscription history (Vitest 4 behavior).
+    clearMocks: false,
     environment: 'happy-dom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     passWithNoTests: true

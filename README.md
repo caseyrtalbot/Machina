@@ -13,7 +13,7 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-ebebeb?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-111111?style=flat-square)
-![Electron](https://img.shields.io/badge/Electron-39-2b2e3b?style=flat-square)
+![Electron](https://img.shields.io/badge/Electron-45-2b2e3b?style=flat-square)
 ![React](https://img.shields.io/badge/React-19-149eca?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-4000%2B%20passing-3fb950?style=flat-square)
 
@@ -223,7 +223,7 @@ Read the full tour in the [architecture overview](docs/architecture/overview.md)
 
 | Layer | Technologies |
 |---|---|
-| Shell | Electron 39, electron-vite 5, Vite 7 |
+| Shell | Electron 45, electron-vite 5, Vite 7 |
 | UI | React 19, TypeScript 5.9 (strict), Zustand 5 |
 | Canvas | React DOM + CSS transforms, viewport culling, level-of-detail |
 | Graph view | Pixi.js 8, d3-force 3 |

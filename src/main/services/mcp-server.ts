@@ -23,6 +23,7 @@ import type { CanvasMutationPlan } from '@shared/canvas-mutation-types'
 import { applyCanvasPlanToFile } from './canvas-apply'
 import { DEFAULT_PROJECT_MAP_OPTIONS, isBinaryPath } from '@shared/engine/project-map-types'
 import { buildProjectMapSnapshot, type FileInput } from '@shared/engine/project-map-analyzers'
+import { PathGuardError } from '@shared/agent-types'
 import { wrapSpotlighting } from '@shared/spotlighting'
 
 export interface McpServerOpts {
@@ -34,7 +35,7 @@ export interface McpServerOpts {
 export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts): McpServer {
   const server = new McpServer(
     { name: 'machina', version: '1.0.0' },
-    { capabilities: { tools: {} } }
+    { capabilities: { tools: {} }, maxToolInputElements: 10_000 }
   )
 
   const gate = opts?.gate
@@ -139,7 +140,15 @@ export function createMcpServer(facade: VaultQueryFacade, opts?: McpServerOpts):
       async function walkDir(dir: string): Promise<void> {
         const entries = await readdir(dir, { withFileTypes: true })
         for (const entry of entries) {
-          const fullPath = join(dir, entry.name)
+          // Do not follow links or open special files (e.g. FIFOs).
+          if (!entry.isDirectory() && !entry.isFile()) continue
+          let fullPath: string
+          try {
+            fullPath = facade.assertReadable(join(dir, entry.name), 'project.map_folder')
+          } catch (err) {
+            if (err instanceof PathGuardError) continue
+            throw err
+          }
           if (entry.isDirectory()) {
             if (entry.name === 'node_modules' || entry.name === '.git') continue
             await walkDir(fullPath)

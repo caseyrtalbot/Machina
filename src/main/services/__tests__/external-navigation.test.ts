@@ -35,6 +35,30 @@ describe('external-navigation', () => {
     expect(openExternal).toHaveBeenCalledWith('https://example.com')
   })
 
+  it.each([
+    'file:///tmp/untrusted.html',
+    'data:text/html,<script></script>',
+    'javascript:alert(1)',
+    'about:blank'
+  ])('blocks untrusted navigation to %s without launching it externally', (url) => {
+    const openExternal = vi.fn()
+    const preventDefault = vi.fn()
+    const listeners = new Map<
+      string,
+      (event: { preventDefault: () => void }, url: string) => void
+    >()
+    attachExternalNavigationGuards(
+      {
+        setWindowOpenHandler: vi.fn(),
+        on: vi.fn((event, listener) => listeners.set(event, listener))
+      } as never,
+      { openExternal }
+    )
+    listeners.get('will-navigate')!({ preventDefault }, url)
+    expect(preventDefault).toHaveBeenCalledOnce()
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
   it('prevents external navigation on will-navigate', async () => {
     const openExternal = vi.fn()
     const preventDefault = vi.fn()
