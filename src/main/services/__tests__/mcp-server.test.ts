@@ -5,7 +5,7 @@
  * without stdio.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync, realpathSync, statSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync, realpathSync, statSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -123,6 +123,20 @@ describe('MCP Server', () => {
 
   afterEach(() => {
     rmSync(vaultRoot, { recursive: true, force: true })
+  })
+
+  it('rejects excessive tool input complexity before execution', async () => {
+    const { client, server } = await createConnectedPair(vaultRoot)
+    try {
+      const result = await client.callTool({
+        name: 'search.query',
+        arguments: { query: 'hello', excess: Array(10_001).fill(null) }
+      })
+      expect(result.isError).toBe(true)
+    } finally {
+      await client.close()
+      await server.close()
+    }
   })
 
   it('lists 12 registered tools when gate is provided (vault.* + workspace.* aliases)', async () => {
@@ -266,6 +280,35 @@ describe('MCP Server', () => {
 
     await client.close()
     await server.close()
+  })
+
+  it('project.map_folder excludes denied descendants and symlinked files', async () => {
+    const outside = createTestVault()
+    const { client, server } = await createConnectedPair(vaultRoot)
+    try {
+      writeFileSync(join(vaultRoot, '.env.local'), 'SECRET=private')
+      mkdirSync(join(vaultRoot, '.ssh'))
+      writeFileSync(join(vaultRoot, '.ssh', 'key.md'), '# Private key')
+      symlinkSync(join(outside, 'notes', 'hello.md'), join(vaultRoot, 'escaped.md'))
+      symlinkSync(join(vaultRoot, '.env.local'), join(vaultRoot, 'alias.md'))
+      const result = await client.callTool({
+        name: 'project.map_folder',
+        arguments: { rootPath: vaultRoot }
+      })
+      expect(result.isError).toBeFalsy()
+      const text = (result.content as Array<{ text: string }>)[0].text
+      const snapshot = extractWrappedJson(text) as { nodes: Array<{ relativePath: string }> }
+      const paths = snapshot.nodes.map((node) => node.relativePath)
+      expect(paths).toContain('notes/hello.md')
+      expect(paths).not.toContain('.env.local')
+      expect(paths).not.toContain('.ssh/key.md')
+      expect(paths).not.toContain('escaped.md')
+      expect(paths).not.toContain('alias.md')
+    } finally {
+      await client.close()
+      await server.close()
+      rmSync(outside, { recursive: true, force: true })
+    }
   })
 
   it('canvas.get_snapshot rejects an out-of-vault canvasPath', async () => {

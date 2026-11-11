@@ -298,6 +298,7 @@ export class McpLifecycle {
     }
 
     const transport = new StreamableHTTPServerTransport({
+      maxRequestBodySize: 1024 * 1024,
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
         this.sessions.set(id, transport)

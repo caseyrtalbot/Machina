@@ -7,10 +7,11 @@
  */
 
 import { PathGuardError } from '@shared/agent-types'
+import { resolve, relative } from 'node:path'
 import { canonicalizePath } from '../utils/paths'
 
 /** Exact segment names that are always denied, even inside the vault. */
-const DENY_LIST = new Set(['.git', '.ssh', 'node_modules', '.DS_Store'])
+const DENY_LIST = new Set(['.git', '.ssh', 'node_modules', '.ds_store'])
 
 /**
  * Dotenv-family files are always denied: `.env`, `.env.local`, `.env.production`,
@@ -28,9 +29,11 @@ const DOTENV_SEGMENT_RE = /^\.env(\.|$)/
  */
 export class PathGuard {
   private readonly resolvedRoot: string
+  private readonly requestedRoot: string
 
   constructor(vaultRoot: string) {
     this.resolvedRoot = canonicalizePath(vaultRoot)
+    this.requestedRoot = resolve(vaultRoot.normalize('NFC'))
   }
 
   /**
@@ -44,6 +47,14 @@ export class PathGuard {
     this.rejectNullBytes(filePath)
 
     const normalized = this.normalizePath(filePath)
+    // Check the requested name too: a .env symlink must not become readable
+    // merely because it resolves to an otherwise permitted note.
+    const lexical = resolve(normalized)
+    const requestedRelative = relative(this.requestedRoot, lexical)
+    // A vault may itself be opened through a symlink (including /var on macOS).
+    // Resolve the boundary below; inspect lexical segments without requiring
+    // the caller to already know the canonical root spelling.
+    this.checkSegments(requestedRelative)
     const resolved = this.resolvePath(normalized)
 
     this.checkBoundary(resolved)
@@ -91,13 +102,16 @@ export class PathGuard {
 
   private checkDenyList(resolved: string): void {
     // Split the path relative to vault root and check each segment.
-    const relative = resolved.slice(this.resolvedRoot.length + 1)
-    const segments = relative.split('/')
+    this.checkSegments(relative(this.resolvedRoot, resolved))
+  }
+
+  private checkSegments(path: string): void {
+    const segments = path.split('/')
 
     for (const segment of segments) {
-      if (DENY_LIST.has(segment) || DOTENV_SEGMENT_RE.test(segment)) {
+      if (DENY_LIST.has(segment.toLowerCase()) || DOTENV_SEGMENT_RE.test(segment.toLowerCase())) {
         throw new PathGuardError(
-          resolved,
+          path,
           this.resolvedRoot,
           `Path contains denied segment: ${segment}`
         )

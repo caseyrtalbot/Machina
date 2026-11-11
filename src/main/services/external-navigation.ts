@@ -36,7 +36,7 @@ export function isExternalHttpNavigation(url: string, rendererUrl?: string): boo
   try {
     return parsed.origin !== new URL(rendererUrl).origin
   } catch {
-    return !url.startsWith(rendererUrl)
+    return true
   }
 }
 
@@ -51,12 +51,14 @@ export function attachExternalNavigationGuards(
     return { action: 'deny' }
   })
 
-  contents.on('will-navigate', (event, url) => {
-    if (!isExternalHttpNavigation(url, deps.rendererUrl)) {
-      return
-    }
-
+  // Programmatic loadURL/loadFile is unaffected. All document-initiated
+  // navigation is blocked, including file:, data: and custom protocols.
+  const blockNavigation = (event: { preventDefault(): void }, url: string): void => {
     event.preventDefault()
-    callOpenExternalSafely(deps.openExternal, url)
-  })
+    if (isExternalHttpNavigation(url, deps.rendererUrl)) {
+      callOpenExternalSafely(deps.openExternal, url)
+    }
+  }
+  contents.on('will-navigate', blockNavigation)
+  contents.on('will-redirect', blockNavigation)
 }
