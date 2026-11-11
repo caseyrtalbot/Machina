@@ -56,6 +56,18 @@ describe('PathGuard', () => {
     expect(result).toBe(vaultRoot)
   })
 
+  it('rejects case variants of sensitive paths on case-insensitive filesystems', () => {
+    for (const name of ['.ENV', '.Env.local', '.GIT/config', '.SSH/key', 'NODE_MODULES/pkg']) {
+      expect(() => guard.assertWithinVault(join(vaultRoot, name))).toThrow(PathGuardError)
+    }
+  })
+
+  it('rejects a denied symlink name even when its target is allowed', () => {
+    const alias = join(vaultRoot, '.env.link')
+    symlinkSync(join(vaultRoot, 'notes', 'hello.md'), alias)
+    expect(() => guard.assertWithinVault(alias)).toThrow(PathGuardError)
+  })
+
   // --- Path traversal ---
 
   it('rejects path traversal with ../../etc/passwd', () => {
