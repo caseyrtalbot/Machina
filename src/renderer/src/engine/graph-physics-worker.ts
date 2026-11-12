@@ -144,8 +144,15 @@ export function createPhysicsEngine(): PhysicsEngine {
     return { buffer, alpha, settled }
   }
 
+  // Worker messages are structured-cloned, so `nodeIndex: number` is not
+  // enforced at runtime. A string such as '__proto__' passes a bare range
+  // check and would turn the node write into a write on Array.prototype.
+  function isNodeIndex(nodeIndex: number): boolean {
+    return Number.isInteger(nodeIndex) && nodeIndex >= 0 && nodeIndex < d3Nodes.length
+  }
+
   function drag(nodeIndex: number, x: number, y: number): void {
-    if (!simulation || nodeIndex < 0 || nodeIndex >= d3Nodes.length) return
+    if (!simulation || !isNodeIndex(nodeIndex)) return
 
     d3Nodes[nodeIndex].fx = x
     d3Nodes[nodeIndex].fy = y
@@ -156,7 +163,7 @@ export function createPhysicsEngine(): PhysicsEngine {
   }
 
   function dragEnd(nodeIndex: number): void {
-    if (!simulation || nodeIndex < 0 || nodeIndex >= d3Nodes.length) return
+    if (!simulation || !isNodeIndex(nodeIndex)) return
 
     d3Nodes[nodeIndex].fx = null
     d3Nodes[nodeIndex].fy = null
