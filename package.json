@@ -85,7 +85,7 @@
     "minisearch": "^7.2.0",
     "node-pty": "^1.1.0",
     "p-limit": "^7.3.0",
-    "pdfjs-dist": "^5.5.207",
+    "pdfjs-dist": "^6.5.438",
     "pixi.js": "^8.17.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
