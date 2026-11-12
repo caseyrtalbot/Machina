@@ -95,4 +95,29 @@ describe('graph-physics-engine', () => {
     expect(result.buffer.length).toBe(0)
     expect(result.settled).toBe(true)
   })
+
+  // Worker messages are structured-cloned, so the `number` type is not
+  // enforced at runtime. A non-integer index must be ignored, not used as a key.
+  it.each([['__proto__'], ['constructor'], [1.5], [Number.NaN]])(
+    'drag and drag-end ignore the non-integer node index %s',
+    (badIndex) => {
+      const engine = createPhysicsEngine()
+      engine.init(makeNodes(3), [])
+      const index = badIndex as unknown as number
+      try {
+        expect(() => engine.drag(index, 100, 200)).not.toThrow()
+        expect(() => engine.dragEnd(index)).not.toThrow()
+        expect(Object.prototype.hasOwnProperty.call(Array.prototype, 'fx')).toBe(false)
+        expect(Object.prototype.hasOwnProperty.call(Array.prototype, 'fy')).toBe(false)
+        expect(Object.prototype.hasOwnProperty.call(Array, 'fx')).toBe(false)
+      } finally {
+        const leaked = Array.prototype as unknown as Record<string, unknown>
+        delete leaked.fx
+        delete leaked.fy
+        const leakedCtor = Array as unknown as Record<string, unknown>
+        delete leakedCtor.fx
+        delete leakedCtor.fy
+      }
+    }
+  )
 })

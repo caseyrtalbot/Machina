@@ -293,7 +293,9 @@ describe('engineering harness executable verifiers', () => {
         }
       }
     }
-  })
+    // 20s: the 120-tick watchdog loop spawns a shell per tick and ran past the
+    // 5s default on the macOS CI runner (passes locally in ~3s).
+  }, 20_000)
 
   it.each([
     'node -e "console.error(\'AssertionError: unrelated\'); process.exit(1)"',
